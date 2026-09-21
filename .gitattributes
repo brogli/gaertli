@@ -1,0 +1,2 @@
+# LF everywhere: gofmt and prettier check formatting on Windows runners too.
+* text=auto eol=lf

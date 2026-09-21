@@ -1,0 +1,89 @@
+version: '3'
+
+vars:
+  APP_NAME: "nebegit"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: pnpm
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # Target OS for build/package/run. Defaults to the host OS, and is overridden
+  # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
+  # tasks below dispatch to the matching platform Taskfile via this variable.
+  GOOS: '{{.GOOS | default OS}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{.GOOS}}:build"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{.GOOS}}:package"
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  setup:
+    summary: Downloads Go modules and frontend packages (the only step that needs the network)
+    cmds:
+      - go mod download
+      - task: common:install:frontend:deps
+
+  test:
+    summary: Runs Go and frontend tests offline (QA-MNT-03)
+    deps:
+      - task: common:build:frontend
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      - go test ./...
+      - task: common:frontend:run
+        vars: { SCRIPT: test }
+
+  lint:
+    summary: golangci-lint, eslint, vue-tsc
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - golangci-lint run
+      - task: common:frontend:run
+        vars: { SCRIPT: lint }
+      - task: common:frontend:run
+        vars: { SCRIPT: typecheck }
+
+  trace:
+    summary: Every MUST/QA ID has a test name or a manual checklist entry (TR-30)
+    cmds:
+      - go run ./tools/trace
+
+  build:core:
+    summary: Builds the headless core as pure Go (TR-07)
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - go build -o {{.BIN_DIR}}/nebegit-core{{exeExt}} ./cmd/nebegit-core
+
+  ci:
+    summary: What CI runs offline after `task setup`
+    cmds:
+      - task: lint
+      - task: trace
+      - task: test
+      - task: build
+      - task: build:core

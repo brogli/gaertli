@@ -1,0 +1,37 @@
+# Technical requirements (TR)
+
+| ID | Requirement |
+|---|---|
+| TR-01 | Go ≥ 1.26. |
+| TR-02 | Wails v3, exact version pinned (ADR-2). |
+| TR-03 | Frontend: Vue 3.5 (Vapor mode not used), TypeScript strict, Vite, Pinia 4, VueUse, OpenVue 1.0. |
+| TR-04 | System git ≥ 2.40 at runtime, checked on start. Older → clear error. |
+| TR-05 | Windows: WebView2 runtime. |
+| TR-06 | Linux: GTK4 + WebKitGTK 6.0 (the Wails v3 default). The GTK3 opt-in is not used. |
+| TR-07 | No database. No network code in the app (the WSL core pipe is stdin/stdout). All core packages are pure Go: `CGO_ENABLED=0` must build `cmd/nebegit-core`. Only `internal/app` may depend on Wails and cgo. |
+| TR-08 | Git output is parsed from machine formats only (`--porcelain`, `-z`, custom `--format`), never from human output. `--porcelain=v2` parsers ignore unknown header lines and record types. |
+| TR-09 | Git runs with the user's environment plus `GIT_TERMINAL_PROMPT=0`; `GIT_OPTIONAL_LOCKS=0` on read-only calls; `GIT_EDITOR=true` only on `--continue` calls; `LC_MESSAGES=C` + `LANGUAGE=C` for English messages. Not `LC_ALL=C`: it would change the locale hooks and filters run in (QA-COMP-01). Message text is all that needs pinning, since every parsed format is machine-readable with epoch timestamps. |
+| TR-10 | Git is called with an argument list, never through a shell. Repo text never becomes an option: `--` before paths, `--end-of-options` before revisions (QA-SEC-03). |
+| TR-11 | Every git call takes a `context.Context` and can be killed. |
+| TR-12 | Windows child processes start with `CreationFlags: windows.CREATE_NO_WINDOW` (`HideWindow` alone does not suppress the console). Detached editor launches: `Setsid` on Linux, `CREATE_NEW_PROCESS_GROUP \| DETACHED_PROCESS` on Windows, then `Process.Release`. |
+| TR-13 | Settings live in one JSON file in the shell's OS user config dir (on Windows also for WSL repos). The shell pushes the relevant subset to each core on connect. Editor profiles are stored per environment (FR-ED-11). |
+| TR-14 | Tests use real git against temp repos; a local bare repo is the remote. Tests set `HOME` and `GIT_CONFIG_GLOBAL` to a temp dir. Dependency download is a separate setup step; the test run needs no network. CI proves it: `GOPROXY=off`, `GOTOOLCHAIN=local`, `GOFLAGS=-mod=readonly`, pnpm offline (QA-MNT-03). |
+| TR-15 | A feature spec is written only after the research it depends on exists in the plans dir `research/`. |
+| TR-16 | Research uses primary sources: official docs, release notes, source code. Each finding has a link and a date. |
+| TR-17 | For every non-trivial problem, look for an established library or proven pattern first. Own code only if nothing fits; the spec states why (ADR-8). |
+| TR-18 | Preference order. Go: standard library → `golang.org/x/*` → established third-party → own code. Frontend: Vue core → VueUse → OpenVue / established lib → own code. |
+| TR-19 | "Established": release or commits in the last 12 months, widely used, permissive licence (MIT, BSD, Apache-2.0, MPL-2.0), acceptable transitive dependencies, works on Windows and Linux. The licence rule applies to everything linked into the app or its tests; standalone dev tools that are only run (linters, CI actions) are exempt. |
+| TR-20 | Every added dependency is listed in `dependencies.md`: purpose, alternatives, why chosen, licence, date checked. |
+| TR-22 | Supported targets: `windows/amd64`, `linux/amd64`. Best effort: `darwin/arm64`, built in CI, untested (QA-PORT-04). No macOS-specific code beyond what Wails needs. |
+| TR-23 | pnpm is the only JS package manager. `pnpm-lock.yaml` is committed; `package-lock.json` must not exist (CI check). Version pinned via `packageManager` in `package.json`. CI installs with `--frozen-lockfile`. The Taskfile's frontend tasks call pnpm, not the template's npm. |
+| TR-24 | Everything non-Go comes from a Nix dev shell + direnv: `flake.nix`, committed `flake.lock` (nixpkgs stable, 26.05), `.envrc` with `use flake`. `mkShell` supplies Node.js 24, `pnpm_10`, `golangci-lint`, and on Linux `gtk4`, `webkitgtk_6_0`, `pkg-config`, gcc. gcc comes from Nix so cgo links against the same glibc as the Nix libraries. Binaries built in this shell run only inside it. |
+| TR-25 | Go is not supplied by Nix. The `go` and `toolchain` lines in `go.mod` fix the version. `wails3` and `task` are `tool` directives in `go.mod`, run with `go tool <name>`. `golangci-lint` is not: its docs advise against `go tool`; it comes from the Nix shell and from its official CI action. |
+| TR-26 | The Nix shell is for development only. Release binaries are built in CI on stock runners. |
+| TR-27 | Native Windows development is not covered by Nix. Documented manual path: Node 24 + pnpm by hand, `golangci-lint` binary, the rest via `go tool`. Recommended: develop inside WSL with the Nix shell and cross-compile the Windows shell from there (`wails3 build` with `GOOS=windows`; no cgo, no extra resource tools). The Linux build under WSLg is a development convenience, not a supported way to use WSL repos (QA-PORT-02). |
+| TR-28 | The core API is one Go interface in `internal/core`, using only JSON-serialisable types. Two implementations: `internal/services` (in-process, local repos) and a generated JSON-RPC client (WSL repos). `tools/gencore` generates from the interface: the RPC client, the RPC dispatcher for `nebegit-core`, and the facade struct the shell binds to Wails, which forwards each call to the core chosen by the window's worktree. A method is written once. The shell never runs git itself. |
+| TR-29 | Test-driven. For every acceptance case: failing test first, least code that passes, refactor. No production code without a failing test that asks for it. |
+| TR-30 | Traceability. Test names carry the requirement ID: Go `TestFR_LOG_01_ListsAllBranches`, Vitest `it('FR-LOG-01 lists all branches')`. `tools/trace` lists every MUST ID from `requirements.md` and fails CI if an ID appears in neither a test name nor the manual checklist (`testing.md`). |
+| TR-31 | Frontend tests: component tests (Vitest + Vue Test Utils, mocked bindings) by default. Playwright against the Vite dev server with a mocked Go layer only where a component test cannot prove the case (virtual scrolling, cross-view keyboard flow); the spec states why. Real Wails windows are tested by hand (`testing.md`). |
+| TR-32 | Process. `docs/` holds only the requirements and architecture files listed in `docs/requirements.md` and `docs/architecture.md`, kept current. Specs, research notes, roadmap, and status live in a plans directory outside the repo; its location is in the untracked `CLAUDE.local.md`. All work happens on branch `dev`; `main` receives releases, merged by the owner. Specs are self-approved after the template checklist. Critical decisions go to the owner: failed spike, ADR/TR/MUST change, dependency failing TR-19, release, anything destructive. |
+
+---

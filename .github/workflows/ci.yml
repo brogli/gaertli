@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            task: ci
+          - os: windows-latest
+            task: ci
+          - os: macos-latest
+            task: build
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Linux native deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - uses: golangci/golangci-lint-action@v9
+        if: matrix.task == 'ci'
+        with:
+          install-only: true
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: ${{ matrix.task }} (offline)
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+          npm_config_offline: "true"
+        run: task ${{ matrix.task }}

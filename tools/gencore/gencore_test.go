@@ -1,0 +1,72 @@
+package main
+
+import (
+	"flag"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+var update = flag.Bool("update", false, "rewrite golden files")
+
+func TestTR_28_GeneratesFacadeClientDispatcher(t *testing.T) {
+	files, err := Generate("testdata/fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"facade_gen.go", "client_gen.go", "dispatch_gen.go"} {
+		golden := filepath.Join("testdata/fixture/golden", name+".golden")
+		if *update {
+			if err := os.WriteFile(golden, files[name], 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want, err := os.ReadFile(golden)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(files[name]) != string(want) {
+			t.Errorf("%s differs from golden (run with -update to accept):\n%s", name, files[name])
+		}
+	}
+}
+
+func TestTR_28_RejectsNonJSONSignatures(t *testing.T) {
+	cases := map[string]string{
+		"noctx":      "Version: first parameter must be context.Context",
+		"chanparam":  "Stream: parameter out: chan string is not JSON-serialisable",
+		"funcresult": "Hook: result: func() is not JSON-serialisable",
+		"ifacefield": "Load: parameter o: interface{Match(string) bool} is not JSON-serialisable",
+		"noerror":    "Ping: last result must be error",
+		"unnamed":    "Load: parameter 2 has no name",
+	}
+	for dir, want := range cases {
+		t.Run(dir, func(t *testing.T) {
+			t.Parallel()
+			files, err := Generate(filepath.Join("testdata/bad", dir))
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("err = %v, want containing %q", err, want)
+			}
+			if files != nil {
+				t.Error("files returned with error")
+			}
+		})
+	}
+}
+
+func TestTR_28_GeneratedCodeIsCurrent(t *testing.T) {
+	files, err := Generate("../../internal/core")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, onDisk := range outputs {
+		want, err := os.ReadFile(filepath.Join("../..", onDisk))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(files[name]) != string(want) {
+			t.Errorf("%s is stale; run go generate ./internal/core", onDisk)
+		}
+	}
+}
