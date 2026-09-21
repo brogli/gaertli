@@ -8,9 +8,21 @@ importers:
 
   .:
     dependencies:
+      '@openvue/themes':
+        specifier: 1.0.0
+        version: 1.0.0
+      '@tanstack/vue-virtual':
+        specifier: ^3.13.39
+        version: 3.13.39(vue@3.5.42(typescript@5.9.3))
+      '@vueuse/core':
+        specifier: ^14.4.0
+        version: 14.4.0(vue@3.5.42(typescript@5.9.3))
       '@wailsio/runtime':
         specifier: 3.0.0-beta.24
         version: 3.0.0-beta.24
+      openvue:
+        specifier: 1.0.0
+        version: 1.0.0(vue@3.5.42(typescript@5.9.3))
       pinia:
         specifier: ^4.0.3
         version: 4.0.3(@vue/devtools-api@8.2.1)(typescript@5.9.3)(vue@3.5.42(typescript@5.9.3))
@@ -18,6 +30,9 @@ importers:
         specifier: ^3.5.0
         version: 3.5.42(typescript@5.9.3)
     devDependencies:
+      '@playwright/test':
+        specifier: 1.59.1
+        version: 1.59.1
       '@vitejs/plugin-vue':
         specifier: ^6.0.0
         version: 6.0.8(vite@8.3.0(@types/node@26.5.1)(jiti@2.7.0))(vue@3.5.42(typescript@5.9.3))
@@ -167,12 +182,45 @@ packages:
   '@one-ini/wasm@0.2.1':
     resolution: {integrity: sha512-TUqERXGNTifZ9y2g3wPxQrw3HpHv/02DsW3D90T9x0hhonrL1ZqpSmNrU2XkoIq0fP1N6gZfVQzy2Fw1ZvGBNg==}
 
+  '@openuxkit/styled@1.0.0':
+    resolution: {integrity: sha512-tXPv00g3qlhZJkDMMK2vxYFQldO5T6Y5HRISU+dfJ3/I1bV8JNx93N1aJb2SQN1xlrO/2UhsISDFYPTVMwXUFQ==}
+    engines: {node: '>=12.11.0'}
+
+  '@openuxkit/styles@1.1.0':
+    resolution: {integrity: sha512-DohE7jvtnTeapfFjqL0RmX63JmKfv1YbL4V2LFTruNXkdK+GfhtvkyUM/1pCrcmjWyflGfZhW5z8LJzUkzwLDQ==}
+
+  '@openuxkit/themes@1.1.0':
+    resolution: {integrity: sha512-0OuDQLFuhUGKWujAs8ejbhrRac9u0h03T349JqKyuGTQWCVaRyNJiShX9OcqCsVi9tbvFHuMkCxppCL/w1Hslw==}
+
+  '@openuxkit/utils@1.0.0':
+    resolution: {integrity: sha512-JCLEEFMJK7JVxlMpzC/szjzxem8XkehY3vknHjrs/mjyWcEIoDd8Gk4ySM+HGILuYbMymlzPqkELYnYQq44E4w==}
+    engines: {node: '>=12.11.0'}
+
+  '@openvue/core@1.0.0':
+    resolution: {integrity: sha512-cVgUD4gSTboMi+zM55fSNxeqrmGlECdrh5oYfZDFx7BwPgvgdZgDKTrIp2/pjiUoxracD+zlS2KYTyw96aai3Q==}
+    engines: {node: '>=12.11.0'}
+    peerDependencies:
+      vue: ^3.5.0
+
+  '@openvue/icons@1.0.0':
+    resolution: {integrity: sha512-xCBcHvs0SjEqrDkL54cwcSKUYkjbAPPbfISfygoxjkE/yibUGk3STyutVsGTAEeV5BIYmK/Hd4eUMN/FOTcsfw==}
+    engines: {node: '>=12.11.0'}
+
+  '@openvue/themes@1.0.0':
+    resolution: {integrity: sha512-YiLHzoa+0ic5yz/+vljDaH3UWNofgu5JLENq2FPMY+rPJD9L2F+/QumvUj7vUHvPIFexnb35FwM6fpetw6BfiA==}
+    engines: {node: '>=12.11.0'}
+
   '@oxc-project/types@0.149.0':
     resolution: {integrity: sha512-Efcc+iF0j3Bf67YjEqIqWXbX5XddXoK/Mw4K1/JuXwRCZ8N16VR7iT23nlCc9XrveFVh/E5Rqs2StT0V8v9LdA==}
 
   '@pkgr/core@0.3.6':
     resolution: {integrity: sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==}
     engines: {node: ^14.18.0 || >=16.0.0}
+
+  '@playwright/test@1.59.1':
+    resolution: {integrity: sha512-PG6q63nQg5c9rIi4/Z5lR5IVF7yU5MqmKaPOe0HSc0O2cX1fPi96sUQu5j7eo4gKCkB2AnNGoWt7y4/Xx3Kcqg==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@rolldown/binding-android-arm-eabi@1.2.8':
     resolution: {integrity: sha512-tN5aztYkKCte4i5SIrrz5yK/HMjEuCqCSCJa418jOV8tZ1cBY3YF2otxB1ktPxzsLA1BeTqwapK0bfjxNvHJVw==}
@@ -273,6 +321,14 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
+  '@tanstack/virtual-core@3.17.11':
+    resolution: {integrity: sha512-+ILjvtHup6Y2hzQ6YzwMgX1Q+oQpxEGOXCEsCNaPoIP0VxMbizIBTmYTDtkerkIQS8/CbP1BRuyt8V/8BCsy1g==}
+
+  '@tanstack/vue-virtual@3.13.39':
+    resolution: {integrity: sha512-AG8sI+6nfrDvN6ixuHJL9LaJTf3//0V5VITZYW3UOaIuSVexnEzsbMu4LH/JhMfRTxwhUXPnLqkl1DlzkZbRtg==}
+    peerDependencies:
+      vue: ^2.7.0 || ^3.0.0
+
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -290,6 +346,9 @@ packages:
 
   '@types/node@26.5.1':
     resolution: {integrity: sha512-CzNm2FezW4VR/LjG6yUdiEgLE/rAQ9Slj5gCu/C2VrdcW7I0ahNZ8DRbHT7zOZ6r3ONgd/bsQIeSaoDGrd1C6g==}
+
+  '@types/web-bluetooth@0.0.21':
+    resolution: {integrity: sha512-oIQLCGWtcFZy2JW77j9k8nHzAOpqMHLQejDA48XXMWH6tjCQHz5RCFz1bzsmROyL6PUm+LLnUiI4BCn221inxA==}
 
   '@types/whatwg-mimetype@3.0.2':
     resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
@@ -452,6 +511,19 @@ packages:
     peerDependenciesMeta:
       '@vue/server-renderer':
         optional: true
+
+  '@vueuse/core@14.4.0':
+    resolution: {integrity: sha512-X4WHz1HlCzCBoYXesUkifzzWBAcZgXG8Fi5iNPQg/epdzOB3gu8Fawj3hvuwYR1nGcXGnvxwYYcUC/71++svtQ==}
+    peerDependencies:
+      vue: ^3.5.0
+
+  '@vueuse/metadata@14.4.0':
+    resolution: {integrity: sha512-swx/255R6JyHZFJhx845iz5CRWDZdCfvkZOpACWc5+c5WHcG24mv8gUT1WIdFQaHt6dq79rvILd9QnCWiyVm9g==}
+
+  '@vueuse/shared@14.4.0':
+    resolution: {integrity: sha512-JRgY90Sz8DDtPMsaDflvPMp9xYk69JZAmbuDvAquUVXKr2gEjqtzGNTTthLfckH0BzBqvnu31gb4a8TGLRe79g==}
+    peerDependencies:
+      vue: ^3.5.0
 
   '@wailsio/runtime@3.0.0-beta.24':
     resolution: {integrity: sha512-lm4AjsohsTn6jheQ1QYCT3+7WG3QZM15R5mKVabSp2GyptjKFNLcOxCdp1+lbdQTxi0qEdTfEsjNezNQFNtjGw==}
@@ -691,6 +763,11 @@ packages:
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -913,6 +990,18 @@ packages:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
     engines: {node: '>=12.20.0'}
 
+  openvue@1.0.0:
+    resolution: {integrity: sha512-mbc1p+P5TMI2wT9W1Q9eUuK5xG4RJvsxDnfEJ53gBGCoYcr+jwZmsnds673YruEHAko49c958Mn/lzT/G31ZsA==}
+    engines: {node: '>=12.11.0'}
+    peerDependencies:
+      chart.js: ^4.0.0
+      quill: ^2.0.0
+    peerDependenciesMeta:
+      chart.js:
+        optional: true
+      quill:
+        optional: true
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -963,6 +1052,16 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  playwright-core@1.59.1:
+    resolution: {integrity: sha512-HBV/RJg81z5BiiZ9yPzIiClYV/QMsDCKUyogwH9p3MCP6IYjUFu/MActgYAvK0oWyV9NlwM3GLBjADyWgydVyg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.59.1:
+    resolution: {integrity: sha512-C8oWjPR3F81yljW9o5OxcWzfh6avkVwDD2VYdwIGqTkl+OGFISgypqzfu7dOe4QNLL2aqcWBmI3PMtLIK233lw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   postcss-selector-parser@7.1.6:
     resolution: {integrity: sha512-7qASPzhKF2l2KLboRZux8CCTRMdGiV08vWmyKzPz22qZ7ZjQBOeY7rNzNoCLSUiftJ7HUq0GERHmxw/t0dCdMw==}
@@ -1340,9 +1439,46 @@ snapshots:
 
   '@one-ini/wasm@0.2.1': {}
 
+  '@openuxkit/styled@1.0.0':
+    dependencies:
+      '@openuxkit/utils': 1.0.0
+
+  '@openuxkit/styles@1.1.0':
+    dependencies:
+      '@openuxkit/styled': 1.0.0
+
+  '@openuxkit/themes@1.1.0':
+    dependencies:
+      '@openuxkit/styled': 1.0.0
+
+  '@openuxkit/utils@1.0.0': {}
+
+  '@openvue/core@1.0.0(vue@3.5.42(typescript@5.9.3))':
+    dependencies:
+      '@openuxkit/styled': 1.0.0
+      '@openuxkit/styles': 1.1.0
+      '@openuxkit/utils': 1.0.0
+      vue: 3.5.42(typescript@5.9.3)
+
+  '@openvue/icons@1.0.0(vue@3.5.42(typescript@5.9.3))':
+    dependencies:
+      '@openuxkit/utils': 1.0.0
+      '@openvue/core': 1.0.0(vue@3.5.42(typescript@5.9.3))
+    transitivePeerDependencies:
+      - vue
+
+  '@openvue/themes@1.0.0':
+    dependencies:
+      '@openuxkit/styled': 1.0.0
+      '@openuxkit/themes': 1.1.0
+
   '@oxc-project/types@0.149.0': {}
 
   '@pkgr/core@0.3.6': {}
+
+  '@playwright/test@1.59.1':
+    dependencies:
+      playwright: 1.59.1
 
   '@rolldown/binding-android-arm-eabi@1.2.8':
     optional: true
@@ -1391,6 +1527,13 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
+  '@tanstack/virtual-core@3.17.11': {}
+
+  '@tanstack/vue-virtual@3.13.39(vue@3.5.42(typescript@5.9.3))':
+    dependencies:
+      '@tanstack/virtual-core': 3.17.11
+      vue: 3.5.42(typescript@5.9.3)
+
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -1407,6 +1550,8 @@ snapshots:
   '@types/node@26.5.1':
     dependencies:
       undici-types: 8.9.0
+
+  '@types/web-bluetooth@0.0.21': {}
 
   '@types/whatwg-mimetype@3.0.2': {}
 
@@ -1642,6 +1787,19 @@ snapshots:
     optionalDependencies:
       '@vue/server-renderer': 3.5.42
 
+  '@vueuse/core@14.4.0(vue@3.5.42(typescript@5.9.3))':
+    dependencies:
+      '@types/web-bluetooth': 0.0.21
+      '@vueuse/metadata': 14.4.0
+      '@vueuse/shared': 14.4.0(vue@3.5.42(typescript@5.9.3))
+      vue: 3.5.42(typescript@5.9.3)
+
+  '@vueuse/metadata@14.4.0': {}
+
+  '@vueuse/shared@14.4.0(vue@3.5.42(typescript@5.9.3))':
+    dependencies:
+      vue: 3.5.42(typescript@5.9.3)
+
   '@wailsio/runtime@3.0.0-beta.24': {}
 
   abbrev@5.0.0: {}
@@ -1874,6 +2032,9 @@ snapshots:
 
   flatted@3.4.4: {}
 
+  fsevents@2.3.2:
+    optional: true
+
   fsevents@2.3.3:
     optional: true
 
@@ -2053,6 +2214,16 @@ snapshots:
 
   obug@2.2.1: {}
 
+  openvue@1.0.0(vue@3.5.42(typescript@5.9.3)):
+    dependencies:
+      '@openuxkit/styled': 1.0.0
+      '@openuxkit/styles': 1.1.0
+      '@openuxkit/utils': 1.0.0
+      '@openvue/core': 1.0.0(vue@3.5.42(typescript@5.9.3))
+      '@openvue/icons': 1.0.0(vue@3.5.42(typescript@5.9.3))
+    transitivePeerDependencies:
+      - vue
+
   optionator@0.9.4:
     dependencies:
       deep-is: 0.1.4
@@ -2096,6 +2267,14 @@ snapshots:
       vue: 3.5.42(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
+
+  playwright-core@1.59.1: {}
+
+  playwright@1.59.1:
+    dependencies:
+      playwright-core: 1.59.1
+    optionalDependencies:
+      fsevents: 2.3.2
 
   postcss-selector-parser@7.1.6:
     dependencies:

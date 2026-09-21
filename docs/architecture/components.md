@@ -9,9 +9,9 @@
 | `internal/app` | Wails setup, window manager (one window per worktree, focus existing), single-instance hand-over, event bridge, settings. Binds the generated facade. The only package that imports Wails. |
 | `internal/session` | Repo and worktree sessions (ADR-9): mints/reuses a session from a validated path, buffers the command log. Later specs add caches, write queues, watchers. |
 | `internal/git` | Runner (exec, env, timeout, cancel, stderr capture, command log) and parsers (log, refs, status v2, worktree list, diff name-status, hunks). |
-| `internal/graph` | Lane layout. Pure function over a commit stream. |
+| `internal/graph` | Lane layout. Pure function over a commit stream. Delivered (spec 10). |
 | `internal/jobs` | Long-running tasks: id, state, progress, cancel. Emits events. |
-| `internal/watch` | Debounced "changed" signals with a scope (refs, index, worktrees, state). |
+| `internal/watch` | Debounced "changed" signals with a scope (refs, index, worktrees, state): a repo-dir watcher (fsnotify + poll fallback) and a worktree status poller. Delivered (spec 12). |
 | `internal/settings` | Settings JSON load/save (TR-13): recent repos, windows open at last quit, and the FR-UX-04 fields. |
 | `internal/editor` | Editor profiles (presets + custom); builds and starts the editor command. |
 | `internal/services` | Implements `core.API`. Validates input, calls git, returns DTOs. One service per feature area. |
@@ -21,8 +21,8 @@ Services and the requirements they serve:
 
 | Service | Covers |
 |---|---|
-| `RepoService` | FR-REPO-*: open, recent, summary (branch, ahead/behind, state). `OpenWorktree`/`Summary` delivered (spec 05); ahead/behind and refs are spec 11 |
-| `LogService` | FR-LOG-*: load, row window, details, search, filters |
+| `RepoService` | FR-REPO-*: open, recent, summary (branch, ahead/behind, state). `OpenWorktree`/`Summary` delivered (spec 05); ahead/behind come from `Refs` (spec 11, `LogService`); `Refresh`/`SetFocused`/`CloseWorktree` (manual refresh, focus-driven poll, session teardown) delivered (spec 12) |
+| `LogService` | FR-LOG-*: load, row window, details, search, filters. `LoadLog`/`LogRows`/`CommitDetails` delivered (spec 10); `ReloadLog` (reload only if ref tips changed) delivered (spec 12); `Refs` (branches/remotes/tags for the sidebar) and `LogIndexOf` (a ref's row index, for click-to-jump) delivered (spec 11); search and filters are a later spec |
 | `DiffService` | FR-CMP-*, FR-DIFF-*, FR-LOG-04, FR-CHG-04: file lists, file contents, hunks |
 | `BranchService` | FR-BR-*, FR-UPD-*, FR-CP-*, FR-RV-*: create, reset, checkout, rename, delete, update in background, cherry-pick, revert, checkout commit |
 | `WorktreeService` | FR-WT-*: list, add, remove, prune. "Open in app window" (FR-WT-08) is a shell action in `internal/app`; a core has no windows. |
@@ -37,7 +37,7 @@ Settings (FR-UX-04) are a shell service (TR-13), not part of `core.API`.
 
 ### Frontend (Vue)
 
-- Generated Wails bindings of the facade are the only way to reach Go. One Pinia store per area: `repo`, `commandLog`, `log`, `changes`, `worktrees`, `jobs`, `settings`.
+- Generated Wails bindings of the facade are the only way to reach Go. One Pinia store per area: `repo`, `commandLog`, `log`, `refs`, `changes`, `worktrees`, `jobs`, `settings`.
 - Stores hold view state only. After a write action the store reloads from Go. No optimistic updates (QA-COMP-01).
 
 Main layout:
@@ -56,6 +56,8 @@ Main layout:
 │ Status bar: running jobs · last result · command log         │
 └───────────────────────────────────────────────────────────────┘
 ```
+
+Sidebar's Branches/Remotes/Tags trees, the current-branch marker, click-to-jump into the log, and the toolbar's ahead/behind counts are delivered (spec 11, `RefsSidebar.vue`, `stores/refs.ts`). The sidebar's Worktrees section is spec 50 (FR-WT-01).
 
 ### Communication
 

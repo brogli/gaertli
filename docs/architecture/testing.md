@@ -33,6 +33,7 @@ Run by the owner per platform before a release. `tools/trace` accepts these IDs 
 | QA-MNT-01 | Every spec in the plans dir lists the IDs it covers; the plans dir is outside the repo, so no tool can check it. | — |
 | FR-REPO-01 | The native "Open folder…" dialog opens and a picked directory opens as a worktree; component tests only prove the binding is called. | Windows, Linux |
 | TR-13, FR-REPO-02 | Quit and relaunch nebegit: recent repos and the windows open at last quit persist across an actual process restart, not just a mocked `Store`. | Windows, Linux |
+| QA-PERF-01 | Fresh `task dev` / `bin/nebegit` launch, stopwatch: a usable window appears within 2s. No existing window-ready signal in `internal/app` to automate against (spec 13); building one is a bigger, separate piece of plumbing. | Windows, Linux |
 
 CI: GitHub Actions (`actions/setup-go`, `actions/setup-node` with pnpm cache, golangci-lint's action). Matrix windows-latest and ubuntu-24.04 (`libgtk-4-dev`, `libwebkitgtk-6.0-dev`). Two steps per job: install dependencies with network; then lint (`golangci-lint`, `eslint`, `vue-tsc`), tests, build, offline (TR-14). The Linux job runs the Go tests against git 2.40 and the runner's current git. macos-latest: build only (QA-PORT-04).
 

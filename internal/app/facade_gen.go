@@ -8,6 +8,14 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
+func (f *Facade) CloseWorktree(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.CloseWorktree(ctx, wt)
+}
+
 func (f *Facade) CommandLog(ctx context.Context, wt core.WorktreeID) ([]core.CommandLogEntry, error) {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -17,6 +25,41 @@ func (f *Facade) CommandLog(ctx context.Context, wt core.WorktreeID) ([]core.Com
 	return c.CommandLog(ctx, wt)
 }
 
+func (f *Facade) CommitDetails(ctx context.Context, wt core.WorktreeID, sha string) (core.CommitDetails, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.CommitDetails
+		return zero, err
+	}
+	return c.CommitDetails(ctx, wt, sha)
+}
+
+func (f *Facade) LoadLog(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.LoadLog(ctx, wt)
+}
+
+func (f *Facade) LogIndexOf(ctx context.Context, wt core.WorktreeID, sha string) (core.LogIndexResult, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.LogIndexResult
+		return zero, err
+	}
+	return c.LogIndexOf(ctx, wt, sha)
+}
+
+func (f *Facade) LogRows(ctx context.Context, wt core.WorktreeID, from int, to int) (core.LogRowsResult, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.LogRowsResult
+		return zero, err
+	}
+	return c.LogRows(ctx, wt, from, to)
+}
+
 func (f *Facade) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 	c, err := f.router.CoreFor(path)
 	if err != nil {
@@ -24,6 +67,39 @@ func (f *Facade) OpenWorktree(ctx context.Context, path core.RepoPath) (core.Wor
 		return zero, err
 	}
 	return c.OpenWorktree(ctx, path)
+}
+
+func (f *Facade) Refresh(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.Refresh(ctx, wt)
+}
+
+func (f *Facade) Refs(ctx context.Context, wt core.WorktreeID) (core.Refs, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.Refs
+		return zero, err
+	}
+	return c.Refs(ctx, wt)
+}
+
+func (f *Facade) ReloadLog(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.ReloadLog(ctx, wt)
+}
+
+func (f *Facade) SetFocused(ctx context.Context, wt core.WorktreeID, focused bool) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.SetFocused(ctx, wt, focused)
 }
 
 func (f *Facade) Summary(ctx context.Context, wt core.WorktreeID) (core.Summary, error) {

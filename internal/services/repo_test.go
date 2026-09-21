@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
@@ -163,6 +164,84 @@ func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
 	}
 	if got.Operation != "rebase" {
 		t.Errorf("Operation = %q, want %q", got.Operation, "rebase")
+	}
+}
+
+func TestFR_REPO_04_SetFocusedTrueRunsAnImmediatePollerCheck(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	c := services.New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetFocused(context.Background(), wt.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	before, err := c.CommandLog(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.SetFocused(context.Background(), wt.ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := c.CommandLog(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != len(before)+1 {
+		t.Fatalf("CommandLog grew by %d, want 1 (an immediate poll)", len(after)-len(before))
+	}
+}
+
+func TestFR_REPO_04_RefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	events := make(chan core.Event, 16)
+	c := services.New(func(e core.Event) { events <- e })
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainEvents(events)
+
+	// an external commit just before Refresh: the watcher's baseline
+	// predates it, so only a fresh CheckNow notices it without waiting for
+	// the fallback ticker's own interval.
+	commit(t, repo.Dir, "seed.txt", "y", "second")
+	before, err := c.CommandLog(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	start := time.Now()
+	if err := c.Refresh(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Errorf("Refresh took %v, want a prompt return", elapsed)
+	}
+
+	after, err := c.CommandLog(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) <= len(before) {
+		t.Errorf("CommandLog did not grow, want the poller's CheckNow to have run")
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case e := <-events:
+			if e.Name == "repo:changed" && string(e.Payload) == `{"scope":"refs"}` {
+				return
+			}
+		case <-deadline:
+			t.Fatal("no repo:changed(refs) event after Refresh (the watcher's CheckNow)")
+		}
 	}
 }
 

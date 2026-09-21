@@ -62,29 +62,13 @@ type Runner struct {
 //   - git started and exited non-zero: Code GitFailed
 //   - git could not be started (LookPath failure, bad Dir, ...): Code Internal
 func (r Runner) Run(ctx context.Context, call Call) (Result, error) {
-	command := formatCommand(call.Args, call.Stdin != nil)
-	if ctx.Err() != nil {
+	cmd, effectiveCtx, cancel, command, err := r.prepare(ctx, call)
+	if err != nil {
 		result := Result{ExitCode: -1}
-		err := core.Errorf(core.Cancelled, "%s", ctx.Err())
 		r.log(call, command, result, 0, err)
 		return result, err
 	}
-
-	effectiveCtx, cancel := r.withTimeout(ctx, call.Timeout)
 	defer cancel()
-
-	git := r.Git
-	if git == "" {
-		git = "git"
-	}
-	cmd := exec.CommandContext(effectiveCtx, git, call.Args...)
-	cmd.Dir = call.Dir
-	cmd.Env = buildEnv(call)
-	cmd.SysProcAttr = sysProcAttr()
-	cmd.WaitDelay = 2 * time.Second
-	if call.Stdin != nil {
-		cmd.Stdin = bytes.NewReader(call.Stdin)
-	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -95,9 +79,35 @@ func (r Runner) Run(ctx context.Context, call Call) (Result, error) {
 	duration := time.Since(start)
 
 	result := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), ExitCode: cmd.ProcessState.ExitCode()}
-	err := classify(effectiveCtx, cmd, runErr, result, command)
+	err = classify(effectiveCtx, cmd, runErr, result, command)
 	r.log(call, command, result, duration, err)
 	return result, err
+}
+
+// prepare builds the *exec.Cmd for call, sharing env/SysProcAttr/timeout
+// setup with Run and Stream. cmd is nil and err is the Cancelled error to
+// return immediately if ctx is already done.
+func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, effectiveCtx context.Context, cancel context.CancelFunc, command string, err error) {
+	command = formatCommand(call.Args, call.Stdin != nil)
+	if ctx.Err() != nil {
+		return nil, ctx, func() {}, command, core.Errorf(core.Cancelled, "%s", ctx.Err())
+	}
+
+	effectiveCtx, cancel = r.withTimeout(ctx, call.Timeout)
+
+	git := r.Git
+	if git == "" {
+		git = "git"
+	}
+	cmd = exec.CommandContext(effectiveCtx, git, call.Args...)
+	cmd.Dir = call.Dir
+	cmd.Env = buildEnv(call)
+	cmd.SysProcAttr = sysProcAttr()
+	cmd.WaitDelay = 2 * time.Second
+	if call.Stdin != nil {
+		cmd.Stdin = bytes.NewReader(call.Stdin)
+	}
+	return cmd, effectiveCtx, cancel, command, nil
 }
 
 // log reports one Entry to r.Log, if set.

@@ -1,0 +1,37 @@
+name: bench
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # off-peak UTC; avoids the top-of-hour congestion GitHub's own docs warn about
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20 # repo build a few seconds, each check well under 1s; Playwright browser download ~30-60s — generous headroom for a shared/loaded runner
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+          pnpm --dir frontend exec playwright install --with-deps chromium
+
+      - run: task bench
+
+      - run: task e2e

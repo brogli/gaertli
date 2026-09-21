@@ -10,6 +10,14 @@ import (
 
 var _ core.API = (*Client)(nil)
 
+type closeWorktreeParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) CloseWorktree(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "CloseWorktree", closeWorktreeParams{Wt: wt}, nil)
+}
+
 type commandLogParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -17,6 +25,48 @@ type commandLogParams struct {
 func (c *Client) CommandLog(ctx context.Context, wt core.WorktreeID) ([]core.CommandLogEntry, error) {
 	var result []core.CommandLogEntry
 	err := c.call(ctx, "CommandLog", commandLogParams{Wt: wt}, &result)
+	return result, err
+}
+
+type commitDetailsParams struct {
+	Wt  core.WorktreeID `json:"wt"`
+	Sha string          `json:"sha"`
+}
+
+func (c *Client) CommitDetails(ctx context.Context, wt core.WorktreeID, sha string) (core.CommitDetails, error) {
+	var result core.CommitDetails
+	err := c.call(ctx, "CommitDetails", commitDetailsParams{Wt: wt, Sha: sha}, &result)
+	return result, err
+}
+
+type loadLogParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) LoadLog(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "LoadLog", loadLogParams{Wt: wt}, nil)
+}
+
+type logIndexOfParams struct {
+	Wt  core.WorktreeID `json:"wt"`
+	Sha string          `json:"sha"`
+}
+
+func (c *Client) LogIndexOf(ctx context.Context, wt core.WorktreeID, sha string) (core.LogIndexResult, error) {
+	var result core.LogIndexResult
+	err := c.call(ctx, "LogIndexOf", logIndexOfParams{Wt: wt, Sha: sha}, &result)
+	return result, err
+}
+
+type logRowsParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	From int             `json:"from"`
+	To   int             `json:"to"`
+}
+
+func (c *Client) LogRows(ctx context.Context, wt core.WorktreeID, from int, to int) (core.LogRowsResult, error) {
+	var result core.LogRowsResult
+	err := c.call(ctx, "LogRows", logRowsParams{Wt: wt, From: from, To: to}, &result)
 	return result, err
 }
 
@@ -28,6 +78,41 @@ func (c *Client) OpenWorktree(ctx context.Context, path core.RepoPath) (core.Wor
 	var result core.WorktreeInfo
 	err := c.call(ctx, "OpenWorktree", openWorktreeParams{Path: path}, &result)
 	return result, err
+}
+
+type refreshParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) Refresh(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "Refresh", refreshParams{Wt: wt}, nil)
+}
+
+type refsParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) Refs(ctx context.Context, wt core.WorktreeID) (core.Refs, error) {
+	var result core.Refs
+	err := c.call(ctx, "Refs", refsParams{Wt: wt}, &result)
+	return result, err
+}
+
+type reloadLogParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) ReloadLog(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "ReloadLog", reloadLogParams{Wt: wt}, nil)
+}
+
+type setFocusedParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Focused bool            `json:"focused"`
+}
+
+func (c *Client) SetFocused(ctx context.Context, wt core.WorktreeID, focused bool) error {
+	return c.call(ctx, "SetFocused", setFocusedParams{Wt: wt, Focused: focused}, nil)
 }
 
 type summaryParams struct {

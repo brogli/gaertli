@@ -11,6 +11,7 @@ tool (
 
 require (
 	github.com/creachadair/jrpc2 v1.3.5
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.24
 	golang.org/x/sys v0.48.0
 	golang.org/x/tools v0.50.0
@@ -108,7 +109,6 @@ require (
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
-	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.9.0 // indirect
 	github.com/go-git/go-git/v5 v5.19.2 // indirect

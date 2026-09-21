@@ -170,3 +170,31 @@ func TestQA_MNT_03_TestTaskAndCIRunOffline(t *testing.T) {
 	assertContainsAll(t, "ci.yml", readFile(t, root, ".github/workflows/ci.yml"), offlineEnv...)
 	assertContainsAll(t, "build/Taskfile.yml", readFile(t, root, "build/Taskfile.yml"), "pnpm install --frozen-lockfile")
 }
+
+func TestTR_31_PerfBenchAndPlaywrightWiring(t *testing.T) {
+	root := repoRoot(t)
+
+	var pkg struct {
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal([]byte(readFile(t, root, "frontend/package.json")), &pkg); err != nil {
+		t.Fatal(err)
+	}
+	if pin := pkg.DevDependencies["@playwright/test"]; pin == "" || strings.ContainsAny(pin, "^~") {
+		t.Errorf(`@playwright/test = %q, want an exact version (no "^"/"~")`, pin)
+	}
+
+	assertContainsAll(t, "flake.nix", readFile(t, root, "flake.nix"), "playwright-driver.browsers")
+	assertContainsAll(t, ".golangci.yml", readFile(t, root, ".golangci.yml"), "build-tags: [bench]")
+	assertContainsAll(t, "bench.yml", readFile(t, root, ".github/workflows/bench.yml"), "schedule:")
+	assertContainsAll(t, ".gitignore", readFile(t, root, ".gitignore"), ".bench/")
+
+	taskfile := readFile(t, root, "Taskfile.yml")
+	ciTask := taskBody(t, taskfile, "ci")
+	for _, name := range []string{"bench", "e2e"} {
+		taskBody(t, taskfile, name) // fails via t.Fatalf if the task is missing
+		if strings.Contains(ciTask, "task: "+name) {
+			t.Errorf("ci task must not run %s", name)
+		}
+	}
+}

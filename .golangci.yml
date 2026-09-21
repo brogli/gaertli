@@ -1,5 +1,8 @@
 version: "2"
 
+run:
+  build-tags: [bench]
+
 linters:
   default: standard
 

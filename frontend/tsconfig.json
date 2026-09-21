@@ -16,5 +16,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "bindings/**/*.ts", "*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "bindings/**/*.ts", "e2e/**/*.ts", "*.ts"]
 }

@@ -10,9 +10,11 @@ import (
 	"github.com/brogli/nebegit/internal/settings"
 )
 
-// fakeAPI is a core.API whose OpenWorktree behaviour a test picks.
+// fakeAPI is a core.API whose OpenWorktree behaviour a test picks; other
+// calls are recorded or no-op.
 type fakeAPI struct {
 	openWorktree func(context.Context, core.RepoPath) (core.WorktreeInfo, error)
+	closed       *[]core.WorktreeID
 }
 
 func (f fakeAPI) Version(context.Context) (core.Version, error) { return core.Version{}, nil }
@@ -25,8 +27,39 @@ func (f fakeAPI) Summary(context.Context, core.WorktreeID) (core.Summary, error)
 	return core.Summary{}, nil
 }
 
+func (f fakeAPI) Refs(context.Context, core.WorktreeID) (core.Refs, error) {
+	return core.Refs{}, nil
+}
+
 func (f fakeAPI) CommandLog(context.Context, core.WorktreeID) ([]core.CommandLogEntry, error) {
 	return nil, nil
+}
+
+func (f fakeAPI) LoadLog(context.Context, core.WorktreeID) error { return nil }
+
+func (f fakeAPI) LogRows(context.Context, core.WorktreeID, int, int) (core.LogRowsResult, error) {
+	return core.LogRowsResult{}, nil
+}
+
+func (f fakeAPI) CommitDetails(context.Context, core.WorktreeID, string) (core.CommitDetails, error) {
+	return core.CommitDetails{}, nil
+}
+
+func (f fakeAPI) Refresh(context.Context, core.WorktreeID) error { return nil }
+
+func (f fakeAPI) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
+
+func (f fakeAPI) CloseWorktree(_ context.Context, id core.WorktreeID) error {
+	if f.closed != nil {
+		*f.closed = append(*f.closed, id)
+	}
+	return nil
+}
+
+func (f fakeAPI) ReloadLog(context.Context, core.WorktreeID) error { return nil }
+
+func (f fakeAPI) LogIndexOf(context.Context, core.WorktreeID, string) (core.LogIndexResult, error) {
+	return core.LogIndexResult{}, nil
 }
 
 // fakeNotifier is an errorNotifier that counts its calls.

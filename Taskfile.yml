@@ -72,6 +72,21 @@ tasks:
     cmds:
       - go run ./tools/trace
 
+  bench:
+    summary: Builds/refreshes the reference repo and runs the perf checks (QA-PERF-02/06/07 + research diagnostics; on demand, also nightly)
+    env: { GOPROXY: off, GOFLAGS: -mod=readonly, GOTOOLCHAIN: local }
+    cmds:
+      - go run ./tools/mkrepo/cmd/mkrepo --out .bench/reference-repo
+      - go test -tags=bench -v ./tools/bench
+
+  e2e:
+    summary: Playwright against the Vite dev server with a mocked Go layer (TR-31)
+    deps:
+      - task: common:install:frontend:deps
+    dir: frontend
+    cmds:
+      - pnpm exec playwright test
+
   build:core:
     summary: Builds the headless core as pure Go (TR-07)
     env:

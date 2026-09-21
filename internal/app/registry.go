@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net/url"
 	"sync"
 
@@ -86,9 +87,20 @@ func (r *Registry) openOrRegister(id core.WorktreeID, path string) shellWindow {
 	if entry, ok := r.byID[id]; ok {
 		return entry.window
 	}
-	window := r.newWindow(windowTitle(path, ""), "/?path="+url.QueryEscape(path), func() { r.Remove(id) })
+	window := r.newWindow(windowTitle(path, ""), "/?path="+url.QueryEscape(path), func() {
+		r.Remove(id)
+		_ = r.local.CloseWorktree(context.Background(), id) // ADR-9: best-effort, nothing user-visible to show
+	})
+	wireFocusEvents(window, func(focused bool) { _ = r.local.SetFocused(context.Background(), id, focused) })
 	r.byID[id] = &windowEntry{window: window, path: path}
 	return nil
+}
+
+// wireFocusEvents relays a window's OS-level focus state to setFocused
+// (FR-REPO-04, QA-PERF-06): a worktree window only, not the home window.
+func wireFocusEvents(w shellWindow, setFocused func(focused bool)) {
+	w.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) { go setFocused(true) })
+	w.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) { go setFocused(false) })
 }
 
 // newWindow creates a window that drops itself from the registry when the

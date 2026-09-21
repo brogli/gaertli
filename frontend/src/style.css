@@ -1,0 +1,8 @@
+/* One height chain from the window down, so a view can fill it and let a
+   child (the virtual-scrolled log) be the only scroll container. */
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+}

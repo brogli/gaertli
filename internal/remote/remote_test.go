@@ -28,8 +28,34 @@ func (f *fake) Summary(context.Context, core.WorktreeID) (core.Summary, error) {
 	return core.Summary{}, nil
 }
 
+func (f *fake) Refs(context.Context, core.WorktreeID) (core.Refs, error) {
+	return core.Refs{}, nil
+}
+
 func (f *fake) CommandLog(context.Context, core.WorktreeID) ([]core.CommandLogEntry, error) {
 	return nil, nil
+}
+
+func (f *fake) LoadLog(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) LogRows(context.Context, core.WorktreeID, int, int) (core.LogRowsResult, error) {
+	return core.LogRowsResult{}, nil
+}
+
+func (f *fake) CommitDetails(context.Context, core.WorktreeID, string) (core.CommitDetails, error) {
+	return core.CommitDetails{}, nil
+}
+
+func (f *fake) Refresh(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
+
+func (f *fake) CloseWorktree(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) ReloadLog(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) LogIndexOf(context.Context, core.WorktreeID, string) (core.LogIndexResult, error) {
+	return core.LogIndexResult{}, nil
 }
 
 // pipeClient serves f over an in-memory pipe and returns a client on it.

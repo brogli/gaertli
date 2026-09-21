@@ -13,3 +13,8 @@ type Event struct {
 
 // EventSink receives every event a core emits. Every core takes one.
 type EventSink func(Event)
+
+// RepoChanged is the payload of a "repo:changed" event (components.md).
+type RepoChanged struct {
+	Scope string `json:"scope"` // "refs" | "index" | "worktrees" | "state"
+}

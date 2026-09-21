@@ -20,8 +20,34 @@ func (s stubCore) Summary(context.Context, core.WorktreeID) (core.Summary, error
 	return core.Summary{}, nil
 }
 
+func (s stubCore) Refs(context.Context, core.WorktreeID) (core.Refs, error) {
+	return core.Refs{}, nil
+}
+
 func (s stubCore) CommandLog(context.Context, core.WorktreeID) ([]core.CommandLogEntry, error) {
 	return nil, nil
+}
+
+func (s stubCore) LoadLog(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) LogRows(context.Context, core.WorktreeID, int, int) (core.LogRowsResult, error) {
+	return core.LogRowsResult{}, nil
+}
+
+func (s stubCore) CommitDetails(context.Context, core.WorktreeID, string) (core.CommitDetails, error) {
+	return core.CommitDetails{}, nil
+}
+
+func (s stubCore) Refresh(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
+
+func (s stubCore) CloseWorktree(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) ReloadLog(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) LogIndexOf(context.Context, core.WorktreeID, string) (core.LogIndexResult, error) {
+	return core.LogIndexResult{}, nil
 }
 
 type stubRouter struct {

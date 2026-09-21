@@ -55,6 +55,7 @@ func newTestRegistry() (*Registry, *fakeOpener) {
 	opener := &fakeOpener{}
 	r := NewRegistry()
 	r.opener = opener
+	r.SetLocal(fakeAPI{})
 	return r, opener
 }
 
@@ -167,6 +168,19 @@ func TestOpenWorktreePathsListsOpenWindows(t *testing.T) {
 	sort.Strings(got)
 	if want := []string{"/a", "/b"}; !slices.Equal(got, want) {
 		t.Errorf("OpenWorktreePaths() = %v, want %v", got, want)
+	}
+}
+
+func TestQA_PERF_06_ClosingAWindowCallsCloseWorktreeOnTheLocalCore(t *testing.T) {
+	r, opener := newTestRegistry()
+	var closed []core.WorktreeID
+	r.SetLocal(fakeAPI{closed: &closed})
+
+	r.OpenOrFocus("X", "/x")
+	opener.windows[0].close()
+
+	if len(closed) != 1 || closed[0] != "X" {
+		t.Errorf("CloseWorktree calls = %v, want [\"X\"]", closed)
 	}
 }
 

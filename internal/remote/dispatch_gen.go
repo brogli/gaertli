@@ -11,11 +11,38 @@ import (
 
 func handlers(api core.API) handler.Map {
 	return handler.Map{
+		"CloseWorktree": handler.New(func(ctx context.Context, p closeWorktreeParams) error {
+			return api.CloseWorktree(ctx, p.Wt)
+		}),
 		"CommandLog": handler.New(func(ctx context.Context, p commandLogParams) ([]core.CommandLogEntry, error) {
 			return api.CommandLog(ctx, p.Wt)
 		}),
+		"CommitDetails": handler.New(func(ctx context.Context, p commitDetailsParams) (core.CommitDetails, error) {
+			return api.CommitDetails(ctx, p.Wt, p.Sha)
+		}),
+		"LoadLog": handler.New(func(ctx context.Context, p loadLogParams) error {
+			return api.LoadLog(ctx, p.Wt)
+		}),
+		"LogIndexOf": handler.New(func(ctx context.Context, p logIndexOfParams) (core.LogIndexResult, error) {
+			return api.LogIndexOf(ctx, p.Wt, p.Sha)
+		}),
+		"LogRows": handler.New(func(ctx context.Context, p logRowsParams) (core.LogRowsResult, error) {
+			return api.LogRows(ctx, p.Wt, p.From, p.To)
+		}),
 		"OpenWorktree": handler.New(func(ctx context.Context, p openWorktreeParams) (core.WorktreeInfo, error) {
 			return api.OpenWorktree(ctx, p.Path)
+		}),
+		"Refresh": handler.New(func(ctx context.Context, p refreshParams) error {
+			return api.Refresh(ctx, p.Wt)
+		}),
+		"Refs": handler.New(func(ctx context.Context, p refsParams) (core.Refs, error) {
+			return api.Refs(ctx, p.Wt)
+		}),
+		"ReloadLog": handler.New(func(ctx context.Context, p reloadLogParams) error {
+			return api.ReloadLog(ctx, p.Wt)
+		}),
+		"SetFocused": handler.New(func(ctx context.Context, p setFocusedParams) error {
+			return api.SetFocused(ctx, p.Wt, p.Focused)
 		}),
 		"Summary": handler.New(func(ctx context.Context, p summaryParams) (core.Summary, error) {
 			return api.Summary(ctx, p.Wt)

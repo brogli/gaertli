@@ -1,0 +1,271 @@
+package services
+
+import (
+	"context"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/nebegit/internal/git/gittest"
+)
+
+func TestFR_LOG_01_ParseTrackParsesBracketedForms(t *testing.T) {
+	tests := []struct {
+		track                 string
+		wantAhead, wantBehind int
+		wantGone              bool
+	}{
+		{"", 0, 0, false},
+		{"[ahead 2]", 2, 0, false},
+		{"[behind 3]", 0, 3, false},
+		{"[ahead 2, behind 3]", 2, 3, false},
+		{"[gone]", 0, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.track, func(t *testing.T) {
+			ahead, behind, gone := parseTrack(tt.track)
+			if ahead != tt.wantAhead || behind != tt.wantBehind || gone != tt.wantGone {
+				t.Errorf("parseTrack(%q) = (%d, %d, %v), want (%d, %d, %v)",
+					tt.track, ahead, behind, gone, tt.wantAhead, tt.wantBehind, tt.wantGone)
+			}
+		})
+	}
+}
+
+func TestFR_LOG_01_ParseRefRecordsThenToRefsBucketsAndDereferencesTags(t *testing.T) {
+	const (
+		shaMain        = "1111111111111111111111111111111111111111"
+		shaFeature     = "2222222222222222222222222222222222222222"
+		shaOriginMain  = "3333333333333333333333333333333333333333"
+		shaOriginFeat  = "4444444444444444444444444444444444444444"
+		shaLightweight = "5555555555555555555555555555555555555555"
+		shaTagObject   = "6666666666666666666666666666666666666666"
+		shaAnnotated   = "7777777777777777777777777777777777777777"
+	)
+	records := []ref{
+		{"refs/heads/main", shaMain, "", "origin/main", "[ahead 1, behind 1]", "*", ""},
+		{"refs/heads/feature", shaFeature, "", "", "", "", ""},
+		{"refs/remotes/origin/main", shaOriginMain, "", "", "", "", ""},
+		{"refs/remotes/origin/feature", shaOriginFeat, "", "", "", "", ""},
+		{"refs/tags/v1", shaLightweight, "", "", "", "", ""},
+		{"refs/tags/v2", shaTagObject, shaAnnotated, "", "", "", ""},
+	}
+	out := buildForEachRefFixture(records)
+
+	refs := toRefs(parseRefRecords(out))
+
+	if len(refs.Branches) != 2 {
+		t.Fatalf("Branches = %+v, want 2 entries", refs.Branches)
+	}
+	main, feature := refs.Branches[0], refs.Branches[1]
+	if main.Name != "main" || !main.Current || main.Upstream != "origin/main" || main.Ahead != 1 || main.Behind != 1 {
+		t.Errorf("main = %+v, want Current true, Upstream origin/main, Ahead 1, Behind 1", main)
+	}
+	if feature.Name != "feature" || feature.Current || feature.Upstream != "" {
+		t.Errorf("feature = %+v, want Current false, no Upstream", feature)
+	}
+
+	if len(refs.Remotes) != 1 || refs.Remotes[0].Name != "origin" || len(refs.Remotes[0].Branches) != 2 {
+		t.Fatalf("Remotes = %+v, want one origin group with 2 branches", refs.Remotes)
+	}
+
+	if len(refs.Tags) != 2 {
+		t.Fatalf("Tags = %+v, want 2 entries", refs.Tags)
+	}
+	lightweight, annotated := refs.Tags[0], refs.Tags[1]
+	if lightweight.SHA != shaLightweight {
+		t.Errorf("lightweight tag SHA = %q, want %q", lightweight.SHA, shaLightweight)
+	}
+	if annotated.SHA != shaAnnotated {
+		t.Errorf("annotated tag SHA = %q, want the dereferenced commit %q, not the tag object", annotated.SHA, shaAnnotated)
+	}
+}
+
+// ref is one for-each-ref record's fields, in refsFormat's own order.
+type ref struct {
+	name, sha, deref, upstream, track, head, worktree string
+}
+
+// buildForEachRefFixture renders records the way for-each-ref's own
+// %1f/%00 framing does: each record ends in "\x00\n".
+func buildForEachRefFixture(records []ref) []byte {
+	var b strings.Builder
+	for _, r := range records {
+		b.WriteString(strings.Join([]string{r.name, r.sha, r.deref, r.upstream, r.track, r.head, r.worktree}, "\x1f"))
+		b.WriteString("\x00\n")
+	}
+	return []byte(b.String())
+}
+
+func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	sha := headSHA(t, repo.Dir)
+	run(t, repo.Dir, "branch", "feature")
+	run(t, repo.Dir, "update-ref", "refs/remotes/origin/master", sha)
+	run(t, repo.Dir, "update-ref", "refs/remotes/origin/feature", sha)
+	run(t, repo.Dir, "tag", "v1")
+
+	c := New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := c.Refs(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs.Branches) != 2 {
+		t.Fatalf("Branches = %+v, want 2 entries", refs.Branches)
+	}
+	current := findBranch(refs.Branches, "master")
+	if current == nil || !current.Current {
+		t.Errorf("Branches = %+v, want master marked Current", refs.Branches)
+	}
+	other := findBranch(refs.Branches, "feature")
+	if other == nil || other.Current {
+		t.Errorf("Branches = %+v, want feature not Current", refs.Branches)
+	}
+
+	if len(refs.Remotes) != 1 || refs.Remotes[0].Name != "origin" || len(refs.Remotes[0].Branches) != 2 {
+		t.Errorf("Remotes = %+v, want one origin group with 2 branches", refs.Remotes)
+	}
+	if len(refs.Tags) != 1 || refs.Tags[0].Name != "v1" {
+		t.Errorf("Tags = %+v, want [v1]", refs.Tags)
+	}
+}
+
+func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	run(t, repo.Dir, "branch", "feature")
+	linked := filepath.Join(t.TempDir(), "linked")
+	run(t, repo.Dir, "worktree", "add", linked, "feature")
+
+	c := New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := c.Refs(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{"master": repo.Dir, "feature": linked}
+	for _, b := range refs.Branches {
+		if b.CheckedOutIn != want[b.Name] {
+			t.Errorf("branch %q CheckedOutIn = %q, want %q", b.Name, b.CheckedOutIn, want[b.Name])
+		}
+	}
+}
+
+func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
+	repo := gittest.New(t)
+	c := New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := c.Refs(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(refs.Branches) != 0 || len(refs.Remotes) != 0 || len(refs.Tags) != 0 {
+		t.Errorf("Refs = %+v, want all empty", refs)
+	}
+}
+
+func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	run(t, repo.Dir, "switch", "-c", "feature")
+	bare := initBare(t)
+	run(t, repo.Dir, "remote", "add", "origin", bare)
+	run(t, repo.Dir, "push", "-u", "origin", "feature")
+	commit(t, repo.Dir, "local.txt", "local", "local-only")
+	clonePush(t, bare, "feature", "remote.txt", "remote", "remote-only")
+	run(t, repo.Dir, "fetch", "origin")
+
+	c := New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := c.Refs(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feature := findBranch(refs.Branches, "feature")
+	if feature == nil {
+		t.Fatalf("Branches = %+v, want a feature entry", refs.Branches)
+	}
+	if feature.Upstream != "origin/feature" || feature.Ahead != 1 || feature.Behind != 1 {
+		t.Errorf("feature = %+v, want Upstream origin/feature, Ahead 1, Behind 1", feature)
+	}
+}
+
+func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	bare := initBare(t)
+	run(t, repo.Dir, "remote", "add", "origin", bare)
+	run(t, repo.Dir, "push", "-u", "origin", "master")
+	run(t, bare, "update-ref", "-d", "refs/heads/master")
+	run(t, repo.Dir, "fetch", "--prune", "origin")
+
+	c := New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refs, err := c.Refs(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	branch := findBranch(refs.Branches, "master")
+	if branch == nil || !branch.UpstreamGone {
+		t.Errorf("master = %+v, want UpstreamGone true", branch)
+	}
+}
+
+// initBare creates a bare repo (a fake remote) and returns its path.
+func initBare(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "bare.git")
+	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Args: []string{"init", "--bare", dir}}); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// clonePush clones bareDir at branch, adds one commit, and pushes it back
+// — simulating a second contributor moving the remote ahead of the caller's
+// own local repo.
+func clonePush(t *testing.T, bareDir, branch, file, content, msg string) {
+	t.Helper()
+	clone := filepath.Join(t.TempDir(), "clone")
+	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Args: []string{"clone", "--branch", branch, bareDir, clone}}); err != nil {
+		t.Fatal(err)
+	}
+	commit(t, clone, file, content, msg)
+	run(t, clone, "push", "origin", branch)
+}
+
+func findBranch(branches []core.Branch, name string) *core.Branch {
+	for i, b := range branches {
+		if b.Name == name {
+			return &branches[i]
+		}
+	}
+	return nil
+}

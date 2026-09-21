@@ -66,3 +66,34 @@ func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+// Refresh implements core.API.
+func (c *Core) Refresh(ctx context.Context, id core.WorktreeID) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	wt.Repo.Watcher().CheckNow()
+	wt.Poller().CheckNow()
+	return nil
+}
+
+// SetFocused implements core.API.
+func (c *Core) SetFocused(ctx context.Context, id core.WorktreeID, focused bool) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	if focused {
+		wt.Poller().Focus()
+	} else {
+		wt.Poller().Blur()
+	}
+	return nil
+}
+
+// CloseWorktree implements core.API.
+func (c *Core) CloseWorktree(ctx context.Context, id core.WorktreeID) error {
+	c.sessions.Close(id)
+	return nil
+}

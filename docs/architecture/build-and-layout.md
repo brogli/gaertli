@@ -47,11 +47,13 @@ CLAUDE.md              entry point for Claude sessions: rules + pointer to the p
 /tools/mkrepo          builds test and benchmark repos
 /tools/trace           requirement-ID traceability check (TR-30)
 /tools/gencore         go generate: RPC client + dispatcher + shell facade from internal/core (TR-28)
-/.github/workflows     ci.yml, release.yml
+/.github/workflows     ci.yml, release.yml, bench.yml (nightly perf bench + e2e, spec 13)
 LICENSE  README.md  CONTRIBUTING.md  CHANGELOG.md
 flake.nix  flake.lock  .envrc  .golangci.yml
 Taskfile.yml           setup · test · lint · build · dev · ci (+ Wails tasks)
 ```
+
+`.bench/`: the generated 100k-commit reference repo `tools/mkrepo` builds and `tools/bench`/`task bench` read (spec 13). Gitignored, cached by a fingerprint file, rebuilt only when `tools/mkrepo`'s `Config` changes.
 
 Milestones and the spec list: plans dir `ROADMAP.md`.
 

@@ -14,11 +14,16 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@openvue/themes": "1.0.0",
+    "@tanstack/vue-virtual": "^3.13.39",
+    "@vueuse/core": "^14.4.0",
     "@wailsio/runtime": "3.0.0-beta.24",
+    "openvue": "1.0.0",
     "pinia": "^4.0.3",
     "vue": "^3.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.59.1",
     "@vitejs/plugin-vue": "^6.0.0",
     "@vue/eslint-config-prettier": "^10.0.0",
     "@vue/eslint-config-typescript": "^14.0.0",

@@ -6,10 +6,10 @@ Exact flags are fixed in the feature specs.
 |---|---|
 | Open repo | `git rev-parse --path-format=absolute --show-toplevel --git-dir --git-common-dir --is-inside-work-tree` |
 | Repo summary | `git symbolic-ref --short -q HEAD` (branch, detached HEAD); merge/rebase/cherry-pick/revert in progress from the worktree's own git dir, same file checks as "Operation in progress" below |
-| Refs for labels | `git for-each-ref --format=…` (heads, remotes, tags, upstream, ahead/behind, `%(worktreepath)` for FR-LOG-10) |
-| Log | `git log --topo-order --parents --format=<fields split by %x00> -z [--all \| <branches>] [-- <path>]`, streamed |
+| Refs for labels | `git for-each-ref --format=%(refname)%1f%(objectname)%1f%(*objectname)%1f%(upstream:short)%1f%(upstream:track)%1f%(HEAD)%1f%(worktreepath)%00 refs/heads refs/remotes refs/tags` (`for-each-ref`'s own hex-escape syntax is `%1f`/`%00`, not `%x1f`/`%x00` like `git log`; `%(*objectname)` falls back to `%(objectname)` so an annotated tag's SHA is the commit it points to, not the tag object; `%(worktreepath)` marks which worktree has a *branch* checked out, for the sidebar's `CheckedOutIn` — FR-LOG-10, the log row's own checked-out marker, is a different fact, delivered via `worktree list --porcelain -z` instead, spec 10) |
+| Log | `git log --topo-order --parents --decorate=full --exclude=refs/stash --all --format=<fields split by %x1f, %x00-terminated>` (no `-z`: git's own `%x00`/`\n` framing is enough, spec 10), streamed. `--exclude` before `--all` (order matters) drops `refs/stash`. `--decorate=full` gives ref labels their fully-qualified path (branch vs remote-tracking) |
 | Search | `--grep`, `--author`, `-i`; hash via `git rev-parse --verify` |
-| Commit details | `git show --format=… --name-status -z -M <sha>` (merge commits vs first parent) |
+| Commit details | `git show --format=… --name-status -z -M --first-parent --end-of-options <sha>` (`--first-parent` is what diffs a merge against its first parent only, not all of them) |
 | Compare commits | `git diff --name-status -z -M <a> <b>`; contents via `git cat-file --batch` |
 | Create branch | `git branch -- <name> <sha>`, optional `git switch <name>` |
 | Reset | `git reset --soft\|--mixed\|--hard <sha>` (SHOULD: `--keep`) in the window's worktree; old HEAD recorded in the command log (FR-BR-04) |
@@ -18,6 +18,7 @@ Exact flags are fixed in the feature specs.
 | Worktree add | `git worktree add <path> <branch>` or `git worktree add -b <new> <path> <start>` |
 | Worktree remove | `git worktree remove [--force] <path>`, `git worktree prune` |
 | Status | `git status --porcelain=v2 -z --branch --untracked-files=all` |
+| Ref tips | `git for-each-ref --format=%(refname)%1f%(objectname)%00 refs/heads refs/tags refs/remotes` (note: `for-each-ref`'s own hex-escape syntax is `%1f`/`%00`, not `%x1f`/`%x00` like `git log`), plus a synthetic `HEAD` entry: `git symbolic-ref --short -q HEAD` if on a branch, `git rev-parse -q --verify HEAD` if detached. The cheap "did anything move" signature the log's reload check (below) compares against its last-finished snapshot |
 | Stage / unstage file | `git add -- <path>` / `git restore --staged -- <path>` |
 | Stage / unstage hunk or lines | partial patch → `git apply --cached --recount [--reverse] -` |
 | Discard | `git restore -- <path>`; hunks: `git apply --reverse -` |
@@ -31,6 +32,7 @@ Exact flags are fixed in the feature specs.
 | Revert | `git revert [-n] <sha>…`, newest first. Merge commits refused as for cherry-pick. |
 | Operation in progress | unmerged entries in status; `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-merge/`, `rebase-apply/`, `sequencer/` in the worktree's git dir. File checks, no subprocess. |
 | Resolve / continue / abort | `git add -- <path>`; `git merge\|rebase\|cherry-pick\|revert --continue\|--skip\|--abort` |
+| Commit-graph (large repo, first open) | `git commit-graph write --reachable`, after the load's done signal, once `LoadLog` has loaded ≥ 20k rows and `<git-common-dir>/objects/info/commit-graph` doesn't exist yet | spec 13, QA-PERF-02, ADR-4 exception: cuts `git log`'s time-to-first-record and peak memory at real scale; failure is logged, never surfaced; git keeps the file current itself during `gc`, nebegit never rewrites it |
 
 ### Update another branch in the background (FR-UPD)
 
@@ -61,9 +63,19 @@ Runs as a job. Result comes from comparing `B` before and after (FR-UPD-05).
 
 ### Noticing outside changes (FR-REPO-04)
 
-- The common git dir is watched with fs notifications: `HEAD`, `refs/`, `packed-refs`, `index`, `worktrees/`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-*`. Per-worktree files live under `<git dir>/worktrees/<name>/`, so one watch covers all windows. Debounce ~300 ms.
-- Working files are not watched recursively. Status runs on window focus, after every own action, and on a timer while focused: start at 1 s so poll interval plus status time stays within 3 s; back off when status gets slow and show "refreshing". Polls are marked as background in the command log (FR-UX-02).
+- The common git dir is watched with fs notifications (`internal/watch.RepoWatcher`, spec 12): `HEAD`, `refs/`, `packed-refs`, `index`, `worktrees/`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-*`, `sequencer/`. Per-worktree files live under `<git dir>/worktrees/<name>/`, so one watch covers all windows. `objects/`, `logs/`, `hooks/`, `info/` are not watched; a `*.lock` file is ignored (git's lockfile-then-rename pattern — the rename's target already classifies). fsnotify is primary; a 5 s low-frequency poll is an insurance fallback for what it misses (a dropped event, an exhausted watch count, a filesystem it doesn't support at all — e.g. WSL's 9p, decided per-platform in spec 30). Debounce ~300 ms: an `onChange` fires once per distinct scope touched in the window, not once per fs event.
+- What changed maps to one of four scopes, delivered as a `"repo:changed"` event's `scope`:
+
+  | Base name | Scope |
+  |---|---|
+  | `HEAD`, `packed-refs`, any path under `refs/` (any depth) | `refs` |
+  | `index` | `index` |
+  | `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-merge`, `rebase-apply`, `sequencer` | `state` |
+  | `worktrees/` itself, or a direct child of it | `worktrees` |
+
+- Working files are not watched recursively. Status runs on window focus, after every own action, and on a timer while focused: start at 1 s so poll interval plus status time stays within 3 s; back off when status gets slow and show "refreshing". Polls are marked as background in the command log (FR-UX-02). A working-file poll only ever reports its own window's `index` scope (FR-REPO-04's working-file half); the fs-watched `.git/index` reports `index` repo-wide (the staging half).
 - The app's own writes also trigger the watcher; debounce plus reload-after-write makes that harmless.
+- The log/graph reloads only if its ref tips actually changed (spec 12): a `refs` scope event re-checks the "Ref tips" row above against the snapshot recorded when the log last finished, and restarts the stream only on a difference — a cheap `for-each-ref`, not a re-walk.
 
 ### Jobs, progress, cancel
 

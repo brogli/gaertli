@@ -12,13 +12,15 @@ import (
 
 func TestFR_UX_02_CommandLogReturnsBufferedEntryAndSinkReceivesMatchingEvent(t *testing.T) {
 	repo := gittest.New(t)
-	events := make(chan core.Event, 1)
+	events := make(chan core.Event, 8)
 	c := services.New(func(e core.Event) { events <- e })
 
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
 	if err != nil {
 		t.Fatal(err)
 	}
+	drainEvents(events) // the poller's own baseline status check (spec 12)
+
 	if _, err := c.Summary(context.Background(), wt.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -27,23 +29,42 @@ func TestFR_UX_02_CommandLogReturnsBufferedEntryAndSinkReceivesMatchingEvent(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 {
-		t.Fatalf("CommandLog() = %d entries, want 1", len(got))
-	}
+	want := got[len(got)-1]
 
-	select {
-	case e := <-events:
-		if e.Name != "command" || e.Worktree != wt.ID {
-			t.Fatalf("event = %+v, want Name \"command\", Worktree %q", e, wt.ID)
+	// Summary can run more than one git call (spec 11: ahead/behind);
+	// drain every "command" event the sink received and check the last
+	// one, not just the first.
+	var payload core.CommandLogEntry
+	received := 0
+	for drained := false; !drained; {
+		select {
+		case e := <-events:
+			if e.Name != "command" || e.Worktree != wt.ID {
+				t.Fatalf("event = %+v, want Name \"command\", Worktree %q", e, wt.ID)
+			}
+			if err := json.Unmarshal(e.Payload, &payload); err != nil {
+				t.Fatal(err)
+			}
+			received++
+		default:
+			drained = true
 		}
-		var payload core.CommandLogEntry
-		if err := json.Unmarshal(e.Payload, &payload); err != nil {
-			t.Fatal(err)
+	}
+	if received == 0 {
+		t.Fatal("sink received no event")
+	}
+	if payload != want {
+		t.Errorf("last event payload = %+v, want %+v", payload, want)
+	}
+}
+
+// drainEvents discards whatever is already buffered, without waiting.
+func drainEvents(events chan core.Event) {
+	for {
+		select {
+		case <-events:
+		default:
+			return
 		}
-		if payload != got[0] {
-			t.Errorf("event payload = %+v, want %+v", payload, got[0])
-		}
-	default:
-		t.Error("sink received no event")
 	}
 }

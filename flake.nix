@@ -30,6 +30,7 @@
             pkg-config
             gtk4
             webkitgtk_6_0
+            playwright-driver.browsers
           ];
 
           shellHook = ''
@@ -39,6 +40,8 @@
             if grep -qi microsoft /proc/version 2>/dev/null; then
               export WEBKIT_DISABLE_DMABUF_RENDERER=1
             fi
+            export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
           '';
         };
     in
