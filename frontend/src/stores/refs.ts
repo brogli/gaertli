@@ -12,6 +12,7 @@ export const useRefsStore = defineStore('refs', () => {
   const refs = ref<Refs | null>(null)
   let wt = ''
   let unlistenChanged: (() => void) | undefined
+  let unlistenReconnected: (() => void) | undefined
 
   async function refresh(): Promise<void> {
     refs.value = await Facade.Refs(wt)
@@ -25,6 +26,11 @@ export const useRefsStore = defineStore('refs', () => {
       const { scope } = ev.data as { scope: string }
       if (scope === 'refs') void refresh()
     })
+
+    // core:reconnected (ADR-4): the window's distro core respawned, so this
+    // window's data starts over, same as its own mount load.
+    unlistenReconnected?.()
+    unlistenReconnected = Events.On('core:reconnected', () => void refresh())
 
     await refresh()
   }

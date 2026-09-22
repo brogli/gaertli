@@ -48,4 +48,16 @@ describe('repo store', () => {
 
     expect(mockSummary).toHaveBeenCalledTimes(2)
   })
+
+  it('ADR-4 reloads Summary on a core:reconnected event', async () => {
+    const repo = useRepoStore()
+    await repo.loadSummary('/repo')
+    mockSummary.mockClear()
+
+    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'core:reconnected')?.[1]
+    handler?.({})
+    await Promise.resolve()
+
+    expect(mockSummary).toHaveBeenCalledTimes(1)
+  })
 })

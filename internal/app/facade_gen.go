@@ -8,6 +8,30 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
+func (f *Facade) Checkout(ctx context.Context, wt core.WorktreeID, branch string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.Checkout(ctx, wt, branch)
+}
+
+func (f *Facade) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.CheckoutCommit(ctx, wt, sha)
+}
+
+func (f *Facade) CherryPick(ctx context.Context, wt core.WorktreeID, shas []string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.CherryPick(ctx, wt, shas)
+}
+
 func (f *Facade) CloseWorktree(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -41,6 +65,14 @@ func (f *Facade) CompareCommits(ctx context.Context, wt core.WorktreeID, a strin
 		return zero, err
 	}
 	return c.CompareCommits(ctx, wt, a, b)
+}
+
+func (f *Facade) CreateBranch(ctx context.Context, wt core.WorktreeID, name string, start string, checkout bool) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.CreateBranch(ctx, wt, name, start, checkout)
 }
 
 func (f *Facade) DiffFile(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, force bool) (core.DiffFile, error) {
@@ -87,6 +119,22 @@ func (f *Facade) LogRows(ctx context.Context, wt core.WorktreeID, from int, to i
 	return c.LogRows(ctx, wt, from, to)
 }
 
+func (f *Facade) OpenFile(ctx context.Context, wt core.WorktreeID, path string, line int) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.OpenFile(ctx, wt, path, line)
+}
+
+func (f *Facade) OpenFolder(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.OpenFolder(ctx, wt)
+}
+
 func (f *Facade) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 	c, err := f.router.CoreFor(path)
 	if err != nil {
@@ -121,6 +169,27 @@ func (f *Facade) ReloadLog(ctx context.Context, wt core.WorktreeID) error {
 	return c.ReloadLog(ctx, wt)
 }
 
+func (f *Facade) Reset(ctx context.Context, wt core.WorktreeID, sha string, mode core.ResetMode) (core.ResetResult, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.ResetResult
+		return zero, err
+	}
+	return c.Reset(ctx, wt, sha, mode)
+}
+
+func (f *Facade) Revert(ctx context.Context, wt core.WorktreeID, shas []string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.Revert(ctx, wt, shas)
+}
+
+func (f *Facade) SetEditorProfile(ctx context.Context, profile core.EditorProfile) error {
+	return f.router.Local().SetEditorProfile(ctx, profile)
+}
+
 func (f *Facade) SetFocused(ctx context.Context, wt core.WorktreeID, focused bool) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -144,6 +213,15 @@ func (f *Facade) Summary(ctx context.Context, wt core.WorktreeID) (core.Summary,
 		return zero, err
 	}
 	return c.Summary(ctx, wt)
+}
+
+func (f *Facade) UncommittedCount(ctx context.Context, wt core.WorktreeID) (int, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero int
+		return zero, err
+	}
+	return c.UncommittedCount(ctx, wt)
 }
 
 func (f *Facade) Version(ctx context.Context) (core.Version, error) {

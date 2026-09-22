@@ -21,6 +21,15 @@ const (
 	// Internal marks a failure that is not git's: a panic, a bad request, a
 	// broken transport.
 	Internal Code = "INTERNAL"
+	// WslNotFound: wsl.exe not on PATH (Windows), or any WSL call attempted
+	// on a non-Windows shell (spec 30).
+	WslNotFound Code = "WSL_NOT_FOUND"
+	// DistroNotFound: the named distro is not among ListDistros's result, or
+	// wsl.exe -d <name> itself refuses it (spec 30).
+	DistroNotFound Code = "DISTRO_NOT_FOUND"
+	// DeployRefused: the consent dialog to copy the core into a distro was
+	// declined (spec 30, QA-PORT-02).
+	DeployRefused Code = "DEPLOY_REFUSED"
 )
 
 // Error is the one error type that crosses the core boundary. GitStderr and

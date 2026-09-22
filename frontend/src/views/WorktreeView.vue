@@ -15,6 +15,9 @@ import CompareView from '../components/CompareView.vue'
 import DiffView from '../components/DiffView.vue'
 import RefsSidebar from '../components/RefsSidebar.vue'
 import FilterBar from '../components/FilterBar.vue'
+import CreateBranchDialog from '../components/CreateBranchDialog.vue'
+import DetachWarningDialog from '../components/DetachWarningDialog.vue'
+import ResetDialog from '../components/ResetDialog.vue'
 
 const props = defineProps<{ path: string }>()
 const name = props.path.split(/[\\/]/).pop() || props.path
@@ -40,6 +43,17 @@ const showDiff = computed(
 const { error, run } = useCoreCall()
 const showSettings = ref(false)
 
+// The dialogs LogList's context menu opens (spec 40/41, FR-BR-01/FR-BR-02/
+// FR-BR-08): one instance each, owned here rather than by LogList itself —
+// the same reason showSettings lives here instead of inside SettingsPanel.vue.
+const createBranchSha = ref<string | null>(null)
+const checkoutCommitSha = ref<string | null>(null)
+const resetTarget = ref<{ sha: string; subject: string } | null>(null)
+
+// FR-BR-02: the branch ResetDialog names — "" while detached, shown there
+// as "HEAD" (same as the summary panel just above it).
+const currentBranch = computed(() => (repo.summary?.detached ? '' : (repo.summary?.branch ?? '')))
+
 onMounted(() => {
   void run(() => repo.loadSummary(props.path))
   void refs.load(props.path)
@@ -51,6 +65,14 @@ function refresh(): void {
   void run(() => Facade.Refresh(props.path))
 }
 
+// FR-ED-01, FR-ED-05: labelled with the effective profile's name once the
+// summary has loaded; a generic fallback only before then.
+const editorLabel = computed(() => `Open in ${repo.summary?.editorName || 'editor'}`)
+
+function openInEditor(): void {
+  void run(() => Facade.OpenFolder(props.path))
+}
+
 // FR-REPO-03: the refs store already carries the current branch's
 // upstream state; nothing to count without an upstream, and a gone
 // upstream has no meaningful ahead/behind either (Design).
@@ -58,6 +80,13 @@ const tracked = computed(() => {
   const current = refs.refs?.branches?.find((b) => b.current)
   return current?.upstream && !current.upstreamGone ? current : undefined
 })
+
+// FR-BR-08's "offer 'create branch here'" while detached: only reachable
+// from the button that already requires repo.summary to be loaded, and its
+// sha is always populated once the summary panel shows detached at all.
+function openCreateBranchHere(): void {
+  createBranchSha.value = repo.summary!.sha ?? null
+}
 </script>
 
 <template>
@@ -65,33 +94,68 @@ const tracked = computed(() => {
     <h1>{{ name }}</h1>
     <button type="button" @click="showSettings = !showSettings">Settings</button>
     <button type="button" @click="refresh">Refresh</button>
-    <ErrorBanner v-if="error" :error="error" />
+    <button type="button" @click="openInEditor">{{ editorLabel }}</button>
+    <ErrorBanner v-if="error" :error="error" @open-settings="showSettings = true" />
     <p v-else-if="repo.summary">
       {{ repo.summary.detached ? 'detached HEAD' : repo.summary.branch }}
       <template v-if="repo.summary.operation"> ({{ repo.summary.operation }})</template>
       <span v-if="tracked" class="ahead-behind" data-test="ahead-behind">
         ↑{{ tracked.ahead }} ↓{{ tracked.behind }}
       </span>
+      <button v-if="repo.summary.detached" type="button" @click="openCreateBranchHere">
+        Create branch here
+      </button>
     </p>
     <SettingsPanel v-if="showSettings" />
     <div class="worktree-body">
-      <RefsSidebar />
-      <div class="log-area">
+      <RefsSidebar :wt="path" />
+      <div class="log-column">
         <FilterBar />
-        <LogList :wt="path" />
+        <LogList
+          :wt="path"
+          @create-branch="createBranchSha = $event"
+          @checkout-commit="checkoutCommitSha = $event"
+          @reset="(sha, subject) => (resetTarget = { sha, subject })"
+        />
+      </div>
+      <div class="side-column">
         <CompareView v-if="compare.active" :wt="path" />
         <CommitDetailsPanel v-else />
         <DiffView v-if="showDiff" :wt="path" :range="compareRange" />
       </div>
     </div>
     <CommandLogPanel :wt="path" />
+    <CreateBranchDialog
+      v-if="createBranchSha !== null"
+      :wt="path"
+      :sha="createBranchSha"
+      :visible="true"
+      @update:visible="createBranchSha = null"
+    />
+    <DetachWarningDialog
+      v-if="checkoutCommitSha !== null"
+      :wt="path"
+      :sha="checkoutCommitSha"
+      :visible="true"
+      @update:visible="checkoutCommitSha = null"
+    />
+    <ResetDialog
+      v-if="resetTarget !== null"
+      :wt="path"
+      :branch="currentBranch"
+      :sha="resetTarget.sha"
+      :subject="resetTarget.subject"
+      :visible="true"
+      @update:visible="resetTarget = null"
+    />
   </main>
 </template>
 
 <style scoped>
-/* LogList's virtual scroll (QA-PERF-03) needs a bounded viewport to clip
-   against: fill the app (style.css's height chain), give the log area the
-   leftover space, everything else its natural size. */
+/* FR-UX-08: refs left, log in the middle, details and diff in a column to
+   its right. LogList's virtual scroll (QA-PERF-03) needs a bounded viewport
+   to clip against: fill the app (style.css's height chain), give the body
+   the leftover space, everything else its natural size. */
 main {
   display: flex;
   flex-direction: column;
@@ -104,11 +168,15 @@ main {
   flex: 1;
   min-height: 0;
 }
-.log-area {
+.log-column,
+.side-column {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+.side-column {
+  overflow: auto;
 }
 </style>

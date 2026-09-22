@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from 'vue'
+import { watch } from 'vue'
 import { useCompareStore } from '../stores/compare'
+import { onKeyStroke } from '@vueuse/core'
 import { useCoreCall } from '../composables/useCoreCall'
+import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ChangedFileList from './ChangedFileList.vue'
 import ErrorBanner from './ErrorBanner.vue'
+import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // CompareView shows the compare store's two selected commits (FR-CMP-01),
 // their direction and a swap action (FR-CMP-03), and their changed files
-// (FR-CMP-02). Escape leaves compare mode.
+// (FR-CMP-02). Escape leaves compare mode. A double-click on a file opens
+// its own diff window (spec 23, FR-CMP-02).
 const props = defineProps<{ wt: string }>()
 const compare = useCompareStore()
 const { error, run } = useCoreCall()
+
+function openDiffWindow(f: ChangedFile): void {
+  if (!compare.from || !compare.to) return
+  void AppService.OpenCompareDiff(props.wt, compare.from.sha, compare.to.sha, f.path, f.oldPath ?? '')
+}
 
 watch(
   [() => compare.from, () => compare.to],
@@ -20,11 +29,7 @@ watch(
   { immediate: true },
 )
 
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') compare.exit()
-}
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onKeyStroke('Escape', () => compare.exit())
 </script>
 
 <template>
@@ -41,6 +46,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :files="compare.files"
       :selected="compare.selectedFile"
       @select="compare.selectFile"
+      @open="openDiffWindow"
     />
   </section>
 </template>

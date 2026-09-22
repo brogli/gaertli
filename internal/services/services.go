@@ -5,6 +5,7 @@ package services
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/brogli/nebegit/internal/buildinfo"
 	"github.com/brogli/nebegit/internal/core"
@@ -15,6 +16,11 @@ import (
 type Core struct {
 	sink     core.EventSink
 	sessions *session.Manager
+
+	// editorProfile is the profile pushed by SetEditorProfile (TR-13); an
+	// atomic.Value since it is set from a different goroutine than the one
+	// serving OpenFolder/OpenFile/Summary.
+	editorProfile atomic.Value
 }
 
 // New builds a core that reports events to sink.

@@ -533,3 +533,33 @@ func run(t *testing.T, dir string, args ...string) {
 		t.Fatal(err)
 	}
 }
+
+func TestFR_UX_02_AppDrivenReadsAreBackgroundCommands(t *testing.T) {
+	repo := gittest.New(t)
+	c := New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitForLog(t, c, wt.ID)
+	if _, err := c.Summary(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Refs(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := c.CommandLog(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if !e.Background {
+			t.Errorf("%q logged as a user command, want background (FR-UX-02: automatic reads are hidden by default)", e.Command)
+		}
+	}
+}

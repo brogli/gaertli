@@ -40,16 +40,9 @@ vi.mock('@wailsio/runtime', () => ({
 
 import DiffView from './DiffView.vue'
 import { useLogStore } from '../stores/log'
+import { defaultSettingsFixture } from '../testing/fixtures/settings'
 
-const settings = {
-  recentRepos: [],
-  openWorktrees: [],
-  editor: '',
-  protectedBranches: [],
-  defaultPullMode: 'merge',
-  diffMode: 'unified',
-  autoFetchIntervalMinutes: 0,
-}
+const settings = defaultSettingsFixture()
 
 // open makes the log store show commit abc123 with paths, the first selected.
 function open(...paths: string[]) {
@@ -229,5 +222,61 @@ describe('DiffView', () => {
     expect(mockDiffFile).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="next-file"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="prev-file"]').exists()).toBe(false)
+  })
+
+  it('FR-CMP-02 with range and files, next file steps the file list and emits update:range', async () => {
+    mockDiffRange.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+    const files = [
+      { path: 'a.txt', status: 'M' },
+      { path: 'b.txt', status: 'M' },
+    ]
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, range: { from: 'sha-a', to: 'sha-b', path: 'a.txt', oldPath: '' }, files },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="next-file"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="prev-file"]').exists()).toBe(true)
+
+    await wrapper.get('[data-test="next-file"]').trigger('click')
+
+    expect(wrapper.emitted('update:range')?.[0]).toEqual([
+      { from: 'sha-a', to: 'sha-b', path: 'b.txt', oldPath: '' },
+    ])
+
+    await wrapper.setProps({ range: { from: 'sha-a', to: 'sha-b', path: 'b.txt', oldPath: '' } })
+    await flushPromises()
+
+    expect(mockDiffRange).toHaveBeenCalledWith('/repo', 'sha-a', 'sha-b', 'b.txt', '', false)
+  })
+
+  it('FR-CMP-02 with range and files, previous file from the first file is a no-op', async () => {
+    mockDiffRange.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+    const files = [
+      { path: 'a.txt', status: 'M' },
+      { path: 'b.txt', status: 'M' },
+    ]
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, range: { from: 'sha-a', to: 'sha-b', path: 'a.txt', oldPath: '' }, files },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="prev-file"]').trigger('click')
+
+    expect(wrapper.emitted('update:range')).toBeUndefined()
   })
 })

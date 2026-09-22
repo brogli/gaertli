@@ -117,6 +117,36 @@ func TestFR_REPO_03_SummaryReportsDetachedHEAD(t *testing.T) {
 	}
 }
 
+func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	c := services.New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	before, err := c.Summary(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.EditorName != "the editor" {
+		t.Errorf("EditorName before any push = %q, want %q (the core-side default)", before.EditorName, "the editor")
+	}
+
+	if err := c.SetEditorProfile(context.Background(), core.EditorProfile{Name: "another editor", FolderCmd: "other {path}"}); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := c.Summary(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.EditorName != "another editor" {
+		t.Errorf("EditorName after push = %q, want %q", after.EditorName, "another editor")
+	}
+}
+
 func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
 	repo := gittest.New(t)
 	commit(t, repo.Dir, "file.txt", "base\n", "base")
@@ -164,6 +194,71 @@ func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
 	}
 	if got.Operation != "rebase" {
 		t.Errorf("Operation = %q, want %q", got.Operation, "rebase")
+	}
+}
+
+func TestQA_REL_02_SummaryReportsHeadSHA(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	commit(t, repo.Dir, "seed.txt", "y", "second")
+	sha := headSHA(t, repo.Dir)
+	c := services.New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := c.Summary(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.SHA != sha {
+		t.Errorf("SHA = %q, want %q", got.SHA, sha)
+	}
+}
+
+func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
+	repo := gittest.New(t)
+	c := services.New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := c.Summary(context.Background(), wt.ID)
+
+	if err != nil {
+		t.Fatalf("Summary on an empty repo: %v, want no error", err)
+	}
+	if got.SHA != "" {
+		t.Errorf("SHA = %q, want empty for an unborn HEAD", got.SHA)
+	}
+}
+
+func TestQA_REL_02_SummaryReportsSHAWhenDetached(t *testing.T) {
+	repo := gittest.New(t)
+	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	sha := headSHA(t, repo.Dir)
+	c := services.New(func(core.Event) {})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.CheckoutCommit(context.Background(), wt.ID, sha); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := c.Summary(context.Background(), wt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !got.Detached {
+		t.Error("Detached = false, want true")
+	}
+	if got.SHA != sha {
+		t.Errorf("SHA = %q, want %q", got.SHA, sha)
 	}
 }
 

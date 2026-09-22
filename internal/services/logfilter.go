@@ -82,7 +82,7 @@ func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filt
 		return
 	}
 	progress := func(loaded int, done bool) { c.emitFilterProgress(wt.ID, loaded, done) }
-	loaded, logErr := streamCommits(ctx, wt, LogArgs(filter), flat,
+	loaded, logErr := streamCommits(ctx, wt, LogArgs(filter), flat, false,
 		func(commit core.LogCommit) { wt.FilterAppend(gen, commit) }, progress)
 	wt.FilterFinish(gen, logErr)
 	progress(loaded, true)
@@ -94,7 +94,7 @@ func (c *Core) streamFilteredHashHit(wt *session.Worktree, sha string, gen int) 
 	commit, err := loadSingleCommit(context.Background(), wt.Runner, wt.Path, sha)
 	var logErr *core.Error
 	if err == nil {
-		if checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path); ckErr == nil {
+		if checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path, false); ckErr == nil {
 			commit.CheckedOutIn = checkedOut[commit.SHA]
 		}
 		wt.FilterAppend(gen, commit)

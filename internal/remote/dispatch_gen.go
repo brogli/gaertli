@@ -11,6 +11,15 @@ import (
 
 func handlers(api core.API) handler.Map {
 	return handler.Map{
+		"Checkout": handler.New(func(ctx context.Context, p checkoutParams) error {
+			return api.Checkout(ctx, p.Wt, p.Branch)
+		}),
+		"CheckoutCommit": handler.New(func(ctx context.Context, p checkoutCommitParams) error {
+			return api.CheckoutCommit(ctx, p.Wt, p.Sha)
+		}),
+		"CherryPick": handler.New(func(ctx context.Context, p cherryPickParams) error {
+			return api.CherryPick(ctx, p.Wt, p.Shas)
+		}),
 		"CloseWorktree": handler.New(func(ctx context.Context, p closeWorktreeParams) error {
 			return api.CloseWorktree(ctx, p.Wt)
 		}),
@@ -22,6 +31,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"CompareCommits": handler.New(func(ctx context.Context, p compareCommitsParams) ([]core.ChangedFile, error) {
 			return api.CompareCommits(ctx, p.Wt, p.A, p.B)
+		}),
+		"CreateBranch": handler.New(func(ctx context.Context, p createBranchParams) error {
+			return api.CreateBranch(ctx, p.Wt, p.Name, p.Start, p.Checkout)
 		}),
 		"DiffFile": handler.New(func(ctx context.Context, p diffFileParams) (core.DiffFile, error) {
 			return api.DiffFile(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Force)
@@ -38,6 +50,12 @@ func handlers(api core.API) handler.Map {
 		"LogRows": handler.New(func(ctx context.Context, p logRowsParams) (core.LogRowsResult, error) {
 			return api.LogRows(ctx, p.Wt, p.From, p.To)
 		}),
+		"OpenFile": handler.New(func(ctx context.Context, p openFileParams) error {
+			return api.OpenFile(ctx, p.Wt, p.Path, p.Line)
+		}),
+		"OpenFolder": handler.New(func(ctx context.Context, p openFolderParams) error {
+			return api.OpenFolder(ctx, p.Wt)
+		}),
 		"OpenWorktree": handler.New(func(ctx context.Context, p openWorktreeParams) (core.WorktreeInfo, error) {
 			return api.OpenWorktree(ctx, p.Path)
 		}),
@@ -50,6 +68,15 @@ func handlers(api core.API) handler.Map {
 		"ReloadLog": handler.New(func(ctx context.Context, p reloadLogParams) error {
 			return api.ReloadLog(ctx, p.Wt)
 		}),
+		"Reset": handler.New(func(ctx context.Context, p resetParams) (core.ResetResult, error) {
+			return api.Reset(ctx, p.Wt, p.Sha, p.Mode)
+		}),
+		"Revert": handler.New(func(ctx context.Context, p revertParams) error {
+			return api.Revert(ctx, p.Wt, p.Shas)
+		}),
+		"SetEditorProfile": handler.New(func(ctx context.Context, p setEditorProfileParams) error {
+			return api.SetEditorProfile(ctx, p.Profile)
+		}),
 		"SetFocused": handler.New(func(ctx context.Context, p setFocusedParams) error {
 			return api.SetFocused(ctx, p.Wt, p.Focused)
 		}),
@@ -58,6 +85,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"Summary": handler.New(func(ctx context.Context, p summaryParams) (core.Summary, error) {
 			return api.Summary(ctx, p.Wt)
+		}),
+		"UncommittedCount": handler.New(func(ctx context.Context, p uncommittedCountParams) (int, error) {
+			return api.UncommittedCount(ctx, p.Wt)
 		}),
 		"Version": handler.New(func(ctx context.Context) (core.Version, error) {
 			return api.Version(ctx)

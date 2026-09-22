@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/brogli/nebegit/internal/core"
 )
 
 // maxRecent bounds RecentRepos.
@@ -14,19 +16,28 @@ const maxRecent = 10
 
 // Settings is the whole persisted file.
 type Settings struct {
-	RecentRepos              []RecentRepo `json:"recentRepos"`              // FR-REPO-02, most-recent-first, capped at maxRecent
-	OpenWorktrees            []string     `json:"openWorktrees"`            // FR-REPO-02: windows open at last quit
-	Editor                   string       `json:"editor"`                   // FR-UX-04; "" = built-in default
-	ProtectedBranches        []string     `json:"protectedBranches"`        // FR-UX-04
-	DefaultPullMode          string       `json:"defaultPullMode"`          // FR-UX-04: "merge" | "rebase"
-	DiffMode                 string       `json:"diffMode"`                 // FR-UX-04: "unified" | "side-by-side"
-	AutoFetchIntervalMinutes int          `json:"autoFetchIntervalMinutes"` // FR-UX-04; 0 = disabled
+	RecentRepos   []RecentRepo `json:"recentRepos"`   // FR-REPO-02, most-recent-first, capped at maxRecent
+	OpenWorktrees []string     `json:"openWorktrees"` // FR-REPO-02: windows open at last quit
+
+	// EditorProfiles is keyed by environment: "" for local (Windows/Linux/
+	// macOS native), else a WSL distro name (FR-ED-11) — same "" = local
+	// convention as RecentRepo.Distro. Replaces spec 05's flat "editor"
+	// string; an old settings file's bare "editor" key is silently ignored
+	// by encoding/json (unknown field), not migrated — nebegit has shipped
+	// no release yet, so there is no real user settings file to preserve.
+	EditorProfiles map[string]core.EditorProfile `json:"editorProfiles,omitempty"`
+
+	ProtectedBranches        []string `json:"protectedBranches"`        // FR-UX-04
+	DefaultPullMode          string   `json:"defaultPullMode"`          // FR-UX-04: "merge" | "rebase"
+	DiffMode                 string   `json:"diffMode"`                 // FR-UX-04: "unified" | "side-by-side"
+	AutoFetchIntervalMinutes int      `json:"autoFetchIntervalMinutes"` // FR-UX-04; 0 = disabled
 }
 
 // RecentRepo is one entry of Settings.RecentRepos.
 type RecentRepo struct {
 	Path       string `json:"path"`
-	LastOpened string `json:"lastOpened"` // RFC3339
+	LastOpened string `json:"lastOpened"`       // RFC3339
+	Distro     string `json:"distro,omitempty"` // "" = local; else the WSL distro name (FR-REPO-07)
 }
 
 // Default is a fresh install's settings: no recents, nothing open, git's own
@@ -80,9 +91,10 @@ func Save(path string, s Settings) error {
 }
 
 // AddRecent inserts path at the front with LastOpened = now, removing any
-// earlier entry for the same path, capped at maxRecent.
-func (s *Settings) AddRecent(path string, now time.Time) {
-	entries := []RecentRepo{{Path: path, LastOpened: now.Format(time.RFC3339)}}
+// earlier entry for the same path, capped at maxRecent. distro is "" for a
+// local repo, else the WSL distro it was opened from (FR-REPO-07).
+func (s *Settings) AddRecent(path string, now time.Time, distro string) {
+	entries := []RecentRepo{{Path: path, LastOpened: now.Format(time.RFC3339), Distro: distro}}
 	for _, r := range s.RecentRepos {
 		if r.Path != path {
 			entries = append(entries, r)

@@ -79,7 +79,7 @@ export const Facade = {
   },
 
   Summary(wt: WorktreeID): Promise<Summary> {
-    return Promise.resolve({ path: wt, branch: 'main', detached: false, operation: '' })
+    return Promise.resolve({ path: wt, branch: 'main', detached: false, operation: '', editorName: 'the editor' })
   },
 
   CommandLog(_wt: WorktreeID): Promise<CommandLogEntry[]> {

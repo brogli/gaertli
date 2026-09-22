@@ -37,7 +37,7 @@ It fills the gap left after moving from an IDE to the editor: a strong log viewe
 - Users: developers who know git well. First user is the owner; the app is published as open source for others.
 - Git is installed. The user is already logged in to their remotes through the git command line.
 - The owner uses the editor. Other users may use any editor (FR-ED). The app runs beside it.
-- One app window shows exactly one worktree. Several windows can be open.
+- A window shows one selected worktree at a time; a selector panel in the window switches it. Several windows can be open.
 
 ---
 
@@ -52,7 +52,7 @@ It fills the gap left after moving from an IDE to the editor: a strong log viewe
 - The user is already authenticated for their remotes.
 - Single user, single machine. One worktree per window.
 - UI language: English.
-- Development is spec-driven and test-driven, done hands-off by Claude sessions. The owner handles session handovers and critical decisions only. Process and tooling: `architecture.md`, TR-15 to TR-32.
+- Development is spec-driven and test-driven, done hands-off by Claude sessions. The owner handles session handovers and critical decisions only. Process and tooling: `architecture.md`, TR-15 to TR-33.
 
 ## Out of scope for v1
 
@@ -66,7 +66,7 @@ Clone · built-in merge editor · interactive rebase · stash management (beyond
 | Licence | BSD-3-Clause |
 | Hosting / CI | GitHub + GitHub Actions |
 | macOS | Best effort: build only, untested |
-| Worktree handling | One app window per worktree, no picker |
+| Worktree handling | A selector panel in the window (repos, worktrees, branches); the rest of the window follows the selection. |
 | Audience | Open source with release downloads |
 | Log actions in v1 | Cherry-pick, revert, check out commit. Reset mode "keep" stays SHOULD. |
 | Process | Hands-off by Claude sessions; critical decisions to the owner. |

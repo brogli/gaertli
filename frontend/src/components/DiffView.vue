@@ -8,6 +8,7 @@ import { useSettingsStore } from '../stores/settings'
 import { useLogStore } from '../stores/log'
 import { useCoreCall } from '../composables/useCoreCall'
 import ErrorBanner from './ErrorBanner.vue'
+import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // DiffView renders a file's two-sided content, either the log store's
 // selected file at its selected commit (FR-LOG-04, ADR-7) or, when range is
@@ -15,10 +16,19 @@ import ErrorBanner from './ErrorBanner.vue'
 // FR-CMP-02). CodeMirror computes the diff client-side from the store's
 // fetched old/new content. Read-only; unified/side-by-side is
 // Settings.DiffMode (FR-DIFF-01).
+//
+// files is the compare diff window's own ordered file list (spec 23,
+// FR-CMP-02); meaningful only together with range. DiffView doesn't own
+// range, so stepping through files emits update:range for the parent to
+// apply, rather than mutating the prop.
+type DiffRange = { from: string; to: string; path: string; oldPath: string }
+
 const props = defineProps<{
   wt: string
-  range?: { from: string; to: string; path: string; oldPath: string } | null
+  range?: DiffRange | null
+  files?: ChangedFile[]
 }>()
+const emit = defineEmits<{ 'update:range': [range: DiffRange] }>()
 
 const diff = useDiffStore()
 const settings = useSettingsStore()
@@ -117,6 +127,20 @@ function prevChange(): void {
 // Next/previous file (FR-DIFF-02) step the log store's already-loaded file
 // list; the target watcher reloads. No auto-chaining into change
 // navigation (own decision, two independent controls).
+
+// stepRangeFile is files' own next/previous-file (spec 23, FR-CMP-02): a
+// no-op past either end (mirrors log.nextFile/prevFile's own boundary
+// behaviour).
+function stepRangeFile(step: 1 | -1): void {
+  if (!props.range || !props.files) return
+  const i = props.files.findIndex(
+    (f) => f.path === props.range!.path && (f.oldPath ?? '') === props.range!.oldPath,
+  )
+  const next = props.files[i + step]
+  if (i >= 0 && next) {
+    emit('update:range', { from: props.range.from, to: props.range.to, path: next.path, oldPath: next.oldPath ?? '' })
+  }
+}
 </script>
 
 <template>
@@ -136,7 +160,11 @@ function prevChange(): void {
       </button>
       <button type="button" data-test="prev-change" @click="prevChange">Previous change</button>
       <button type="button" data-test="next-change" @click="nextChange">Next change</button>
-      <template v-if="!range">
+      <template v-if="range && files">
+        <button type="button" data-test="prev-file" @click="stepRangeFile(-1)">Previous file</button>
+        <button type="button" data-test="next-file" @click="stepRangeFile(1)">Next file</button>
+      </template>
+      <template v-else-if="!range">
         <button type="button" data-test="prev-file" @click="log.prevFile()">Previous file</button>
         <button type="button" data-test="next-file" @click="log.nextFile()">Next file</button>
       </template>

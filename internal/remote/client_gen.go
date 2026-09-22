@@ -10,6 +10,33 @@ import (
 
 var _ core.API = (*Client)(nil)
 
+type checkoutParams struct {
+	Wt     core.WorktreeID `json:"wt"`
+	Branch string          `json:"branch"`
+}
+
+func (c *Client) Checkout(ctx context.Context, wt core.WorktreeID, branch string) error {
+	return c.call(ctx, "Checkout", checkoutParams{Wt: wt, Branch: branch}, nil)
+}
+
+type checkoutCommitParams struct {
+	Wt  core.WorktreeID `json:"wt"`
+	Sha string          `json:"sha"`
+}
+
+func (c *Client) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha string) error {
+	return c.call(ctx, "CheckoutCommit", checkoutCommitParams{Wt: wt, Sha: sha}, nil)
+}
+
+type cherryPickParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Shas []string        `json:"shas"`
+}
+
+func (c *Client) CherryPick(ctx context.Context, wt core.WorktreeID, shas []string) error {
+	return c.call(ctx, "CherryPick", cherryPickParams{Wt: wt, Shas: shas}, nil)
+}
+
 type closeWorktreeParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -49,6 +76,17 @@ func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a strin
 	var result []core.ChangedFile
 	err := c.call(ctx, "CompareCommits", compareCommitsParams{Wt: wt, A: a, B: b}, &result)
 	return result, err
+}
+
+type createBranchParams struct {
+	Wt       core.WorktreeID `json:"wt"`
+	Name     string          `json:"name"`
+	Start    string          `json:"start"`
+	Checkout bool            `json:"checkout"`
+}
+
+func (c *Client) CreateBranch(ctx context.Context, wt core.WorktreeID, name string, start string, checkout bool) error {
+	return c.call(ctx, "CreateBranch", createBranchParams{Wt: wt, Name: name, Start: start, Checkout: checkout}, nil)
 }
 
 type diffFileParams struct {
@@ -111,6 +149,24 @@ func (c *Client) LogRows(ctx context.Context, wt core.WorktreeID, from int, to i
 	return result, err
 }
 
+type openFileParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Path string          `json:"path"`
+	Line int             `json:"line"`
+}
+
+func (c *Client) OpenFile(ctx context.Context, wt core.WorktreeID, path string, line int) error {
+	return c.call(ctx, "OpenFile", openFileParams{Wt: wt, Path: path, Line: line}, nil)
+}
+
+type openFolderParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) OpenFolder(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "OpenFolder", openFolderParams{Wt: wt}, nil)
+}
+
 type openWorktreeParams struct {
 	Path core.RepoPath `json:"path"`
 }
@@ -147,6 +203,35 @@ func (c *Client) ReloadLog(ctx context.Context, wt core.WorktreeID) error {
 	return c.call(ctx, "ReloadLog", reloadLogParams{Wt: wt}, nil)
 }
 
+type resetParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Sha  string          `json:"sha"`
+	Mode core.ResetMode  `json:"mode"`
+}
+
+func (c *Client) Reset(ctx context.Context, wt core.WorktreeID, sha string, mode core.ResetMode) (core.ResetResult, error) {
+	var result core.ResetResult
+	err := c.call(ctx, "Reset", resetParams{Wt: wt, Sha: sha, Mode: mode}, &result)
+	return result, err
+}
+
+type revertParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Shas []string        `json:"shas"`
+}
+
+func (c *Client) Revert(ctx context.Context, wt core.WorktreeID, shas []string) error {
+	return c.call(ctx, "Revert", revertParams{Wt: wt, Shas: shas}, nil)
+}
+
+type setEditorProfileParams struct {
+	Profile core.EditorProfile `json:"profile"`
+}
+
+func (c *Client) SetEditorProfile(ctx context.Context, profile core.EditorProfile) error {
+	return c.call(ctx, "SetEditorProfile", setEditorProfileParams{Profile: profile}, nil)
+}
+
 type setFocusedParams struct {
 	Wt      core.WorktreeID `json:"wt"`
 	Focused bool            `json:"focused"`
@@ -172,6 +257,16 @@ type summaryParams struct {
 func (c *Client) Summary(ctx context.Context, wt core.WorktreeID) (core.Summary, error) {
 	var result core.Summary
 	err := c.call(ctx, "Summary", summaryParams{Wt: wt}, &result)
+	return result, err
+}
+
+type uncommittedCountParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) UncommittedCount(ctx context.Context, wt core.WorktreeID) (int, error) {
+	var result int
+	err := c.call(ctx, "UncommittedCount", uncommittedCountParams{Wt: wt}, &result)
 	return result, err
 }
 

@@ -28,20 +28,55 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 	}
 
 	result, err := wt.Runner.Run(ctx, git.Call{
-		Dir: wt.Path, ReadOnly: true,
+		Dir: wt.Path, ReadOnly: true, Background: true,
 		Args: []string{"symbolic-ref", "--short", "-q", "HEAD"},
 	})
 	// exit 1 with empty stdout = detached HEAD (git-symbolic-ref: "-q ...
 	// exit with non-zero status"); any other failure is returned as-is
 	// (QA-REL-02: show it; no more specific code exists yet).
-	var ce *core.Error
-	detached := errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == 1 && len(result.Stdout) == 0
+	detached := quietFailure(err, result)
 	if err != nil && !detached {
 		return core.Summary{}, err
 	}
 
 	branch := strings.TrimSpace(string(result.Stdout))
-	return core.Summary{Path: wt.Path, Branch: branch, Detached: detached, Operation: operation(wt.GitDir)}, nil
+
+	sha, err := resolveHeadSHA(ctx, wt.Runner, wt.Path)
+	if err != nil {
+		return core.Summary{}, err
+	}
+	return core.Summary{
+		Path: wt.Path, Branch: branch, Detached: detached, Operation: operation(wt.GitDir), SHA: sha,
+		EditorName: c.currentProfile().Name,
+	}, nil
+}
+
+// resolveHeadSHA resolves HEAD's own commit (QA-REL-02): "" for an unborn
+// HEAD, never an error — same exit-1/empty-stdout shape as the detached
+// check just above it (quietFailure). Named apart from the test suite's own
+// headSHA(t, dir) helper (log_test.go), already established across this
+// package's tests (Design note: the spec's own draft named this the same as
+// that helper — adapted to the code found, not the spec's exact name).
+func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, error) {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true, Background: true,
+		Args: []string{"rev-parse", "-q", "--verify", "--end-of-options", "HEAD"},
+	})
+	if err != nil && !quietFailure(err, result) {
+		return "", err
+	}
+	return strings.TrimSpace(string(result.Stdout)), nil
+}
+
+// quietFailure reports whether err is git's own "-q ... nothing to report"
+// shape — a Code GitFailed, exit-1 result with empty stdout — rather than a
+// real failure: an unattached HEAD's symbolic-ref, or an unborn HEAD's
+// rev-parse, both used above. Shared so this exit-code/empty-stdout idiom
+// (errors-security.md: classified from exit code, not stderr text) is
+// checked identically in both places instead of copy-pasted.
+func quietFailure(err error, result git.Result) bool {
+	var ce *core.Error
+	return errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == 1 && len(result.Stdout) == 0
 }
 
 // operation checks the state files git-mapping.md names, in the worktree's

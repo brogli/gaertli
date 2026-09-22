@@ -54,7 +54,7 @@ tasks:
     cmds:
       - go test ./...
       - task: common:frontend:run
-        vars: { SCRIPT: test }
+        vars: { SCRIPT: test:unit }
 
   lint:
     summary: golangci-lint, eslint, vue-tsc
@@ -65,7 +65,7 @@ tasks:
       - task: common:frontend:run
         vars: { SCRIPT: lint }
       - task: common:frontend:run
-        vars: { SCRIPT: typecheck }
+        vars: { SCRIPT: type-check }
 
   trace:
     summary: Every MUST/QA ID has a test name or a manual checklist entry (TR-30)
@@ -83,9 +83,9 @@ tasks:
     summary: Playwright against the Vite dev server with a mocked Go layer (TR-31)
     deps:
       - task: common:install:frontend:deps
-    dir: frontend
     cmds:
-      - pnpm exec playwright test
+      - task: common:frontend:run
+        vars: { SCRIPT: test:e2e }
 
   build:core:
     summary: Builds the headless core as pure Go (TR-07)
@@ -93,6 +93,14 @@ tasks:
       CGO_ENABLED: "0"
     cmds:
       - go build -o {{.BIN_DIR}}/nebegit-core{{exeExt}} ./cmd/nebegit-core
+
+  build:core:embed:
+    summary: Cross-compiles the headless core for linux/amd64 into internal/remote, for the Windows build to embed (ADR-3)
+    sources: [cmd/nebegit-core/**/*.go, internal/**/*.go]
+    generates: [internal/remote/nebegit-core-linux]
+    env: { GOOS: linux, GOARCH: amd64, CGO_ENABLED: "0" }
+    cmds:
+      - go build -o internal/remote/nebegit-core-linux ./cmd/nebegit-core
 
   ci:
     summary: What CI runs offline after `task setup`

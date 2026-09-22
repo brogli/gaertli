@@ -38,4 +38,16 @@ describe('refs store', () => {
 
     expect(mockRefs).toHaveBeenCalledTimes(2)
   })
+
+  it('ADR-4 reloads Refs on a core:reconnected event', async () => {
+    const refs = useRefsStore()
+    await refs.load('/repo')
+    expect(mockRefs).toHaveBeenCalledTimes(1)
+
+    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'core:reconnected')?.[1]
+    handler?.({})
+    await Promise.resolve()
+
+    expect(mockRefs).toHaveBeenCalledTimes(2)
+  })
 })

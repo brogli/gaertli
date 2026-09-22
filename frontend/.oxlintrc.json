@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "vue", "vitest"],
+  "env": {
+    "browser": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    // Flags every existing untyped vi.fn() mock across nebegit's test suite;
+    // that plain form is the established convention, not adopted here (spec 07).
+    "vitest/require-mock-type-parameters": "off"
+  }
+}

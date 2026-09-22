@@ -5,7 +5,7 @@
 | ID | Prio | Requirement |
 |---|---|---|
 | FR-REPO-01 | MUST | Open a local repo by picking a folder. Any folder inside a repo or inside one of its worktrees works. |
-| FR-REPO-02 | MUST | Remember recent repos. Started without a path: reopen the windows that were open at last quit. Started with a path (FR-REPO-06): open that one only. |
+| FR-REPO-02 | MUST | Remember recent repos. Started without a path: reopen the windows that were open at last quit, each on its last selected worktree. Started with a path (FR-REPO-06): open that one only. |
 | FR-REPO-03 | MUST | Always show: repo, window's worktree, current branch, ahead/behind counts vs upstream, and any operation in progress (merge, rebase, cherry-pick, revert), and detached HEAD. |
 | FR-REPO-04 | MUST | Pick up changes made outside the app (terminal, editor) while the window has focus: git-state changes (commit, checkout, staging, new branch) within 2 seconds; edits to working files within 3 seconds. On very large working trees this may take longer; then the app shows that it is refreshing. Immediate refresh when the window gains focus. Manual refresh is also possible. |
 | FR-REPO-06 | MUST | Start from a terminal: `nebegit [path]` opens (or focuses) the window for that worktree. From a WSL terminal this opens the app on Windows, showing the WSL repo — like the `editor` command does. The app offers a one-click action to make the `nebegit` command available in a terminal (incl. inside WSL). |
@@ -33,8 +33,8 @@
 
 | ID | Prio | Requirement |
 |---|---|---|
-| FR-CMP-01 | MUST | Select two commits and compare them. Show the list of changed files with their type: added, modified, deleted, renamed. |
-| FR-CMP-02 | MUST | Open the diff of any file in that list. |
+| FR-CMP-01 | MUST | Select two commits and compare them: Ctrl-click a second commit, or right-click a commit and choose "Compare with selected". Show the list of changed files with their type: added, modified, deleted, renamed. |
+| FR-CMP-02 | MUST | Open the diff of any file in that list: a single click previews it in the window's diff pane; a double-click opens the diff window, a separate OS window with the list of differing files on the left, the diff on the right, next/previous change and file, closed by Escape or its close button (an IDE's Diff dialog). The main window stays usable behind it. |
 | FR-CMP-03 | MUST | Show the direction clearly (from → to). Allow swapping. |
 | FR-CMP-04 | SHOULD | Compare a commit with the current working files. |
 
@@ -70,11 +70,12 @@
 | FR-WT-02 | MUST | Create a worktree at a location the user chooses. Source: an existing branch, or a new branch from a branch or commit. |
 | FR-WT-03 | MUST | The target folder must not exist or must be empty. Otherwise reject with a clear message. |
 | FR-WT-04 | MUST | "Switch to worktree" = open that worktree in the configured external editor (ED) with one action. |
-| FR-WT-05 | MUST | **One window per worktree.** Each app window is bound to one worktree. Changes, commit, pull, push, reset, checkout, cherry-pick, revert act on that worktree only. There is no worktree switcher inside a window. |
-| FR-WT-08 | MUST | From the worktree list: open a worktree in its own app window. If that worktree already has a window, focus it instead of opening a second one. |
-| FR-WT-09 | MUST | The window title shows worktree name/path and current branch, so windows are easy to tell apart. |
+| FR-WT-05 | MUST | **A window acts on one selected worktree.** The selector panel (FR-WT-13) picks it; the whole window (log, sidebar, changes, diff) follows the selection, and changes, commit, pull, push, reset, checkout, cherry-pick, revert act on the selected worktree only. |
+| FR-WT-08 | MUST | Selecting a worktree in the panel switches this window to it. "Open in new window" shows it in a second window; if a window already shows it, focus that one instead of opening another. |
+| FR-WT-09 | MUST | The window title shows the selected worktree's name/path and current branch, so windows are easy to tell apart. |
 | FR-WT-10 | MUST | Log, branches, tags, and the worktree list are the same in all windows of one repo and stay in sync. |
 | FR-WT-11 | SHOULD | Windows for worktrees of different repos at the same time. |
+| FR-WT-13 | MUST | The selector panel lists the recent repos, each with its worktrees (FR-WT-01 details) and their branches. From the panel: switch the window to a worktree, open one in a new window (FR-WT-08), create a worktree (FR-WT-02), create or switch a branch (FR-BR-01, FR-BR-05), open Settings (FR-UX-04). The panel can be collapsed. Like an IDE's project and branch selection. |
 | FR-WT-12 | SHOULD | After creating a worktree, offer: open in app window, open in editor, both. |
 | FR-WT-06 | SHOULD | Create a worktree straight from a commit or branch in the log. |
 | FR-WT-07 | SHOULD | Remove a worktree. Confirm first. Refuse if it has uncommitted changes unless the user forces it. Clean up stale entries. |
@@ -179,8 +180,10 @@ The app is editor-neutral. the editor is only the default.
 | FR-UX-01 | MUST | Every action ends with a visible result. Errors include git's original message. |
 | FR-UX-02 | MUST | A command log shows every git operation the app ran, with its output. Operations started by the user are shown by default. Automatic background reads (refresh, polling) are hidden by default and can be switched on. |
 | FR-UX-03 | MUST | Confirmation before: hard reset, force push, discard changes, remove worktree, delete unmerged branch. |
-| FR-UX-04 | MUST | Settings: external editor (ED), protected branches, default pull mode, diff mode, auto-fetch interval. |
+| FR-UX-04 | MUST | Settings: external editor (ED), protected branches, default pull mode, diff mode, auto-fetch interval. Reached from the selector panel (FR-WT-13). |
 | FR-UX-05 | SHOULD | Keyboard shortcuts for the main actions. |
 | FR-UX-06 | SHOULD | Light and dark theme. |
+| FR-UX-07 | MUST | Everything for the daily flow is in sight at once: selector panel, refs, log, commit details, diff, and the working-tree changes share one window. No switching between views or tabs to reach any of them; panels may be resized or collapsed. |
+| FR-UX-08 | MUST | Layout of the window: the selector panel and refs on the left, the log with its graph in the middle, the selected commit's details and the diff in a column to the right of the log, never below it. |
 
 ---

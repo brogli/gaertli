@@ -64,6 +64,30 @@ func (s stubCore) DiffRange(context.Context, core.WorktreeID, string, string, st
 
 func (s stubCore) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
 
+func (s stubCore) CreateBranch(context.Context, core.WorktreeID, string, string, bool) error {
+	return nil
+}
+
+func (s stubCore) Checkout(context.Context, core.WorktreeID, string) error { return nil }
+
+func (s stubCore) CheckoutCommit(context.Context, core.WorktreeID, string) error { return nil }
+
+func (s stubCore) Reset(context.Context, core.WorktreeID, string, core.ResetMode) (core.ResetResult, error) {
+	return core.ResetResult{}, nil
+}
+
+func (s stubCore) UncommittedCount(context.Context, core.WorktreeID) (int, error) { return 0, nil }
+
+func (s stubCore) CherryPick(context.Context, core.WorktreeID, []string) error { return nil }
+
+func (s stubCore) Revert(context.Context, core.WorktreeID, []string) error { return nil }
+
+func (s stubCore) SetEditorProfile(context.Context, core.EditorProfile) error { return nil }
+
+func (s stubCore) OpenFolder(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
+
 type stubRouter struct {
 	local core.API
 	other int

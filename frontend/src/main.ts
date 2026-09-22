@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVueConfig from 'openvue/config'
+import ConfirmationService from 'openvue/confirmationservice'
 import App from './App.vue'
 import './style.css'
 
@@ -11,4 +12,11 @@ import './style.css'
 // theme: 'none' skips loading any CSS theme, keeping the "no ThemeProvider
 // wired" stance (RefsSidebar.vue) — this only provides the behavioural
 // config object those components require to exist at all.
-createApp(App).use(createPinia()).use(PrimeVueConfig, { theme: 'none' }).mount('#app')
+//
+// ConfirmationService (spec 41, first use): backs useConfirm()/<ConfirmDialog>
+// (App.vue) — QA-SAFE-01/FR-UX-03's shared confirmation.
+createApp(App)
+  .use(createPinia())
+  .use(PrimeVueConfig, { theme: 'none' })
+  .use(ConfirmationService)
+  .mount('#app')

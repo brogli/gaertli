@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/proc"
 )
 
 // Call is one git invocation.
@@ -102,7 +103,7 @@ func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, effectiv
 	cmd = exec.CommandContext(effectiveCtx, git, call.Args...)
 	cmd.Dir = call.Dir
 	cmd.Env = buildEnv(call)
-	cmd.SysProcAttr = sysProcAttr()
+	cmd.SysProcAttr = proc.HiddenConsole()
 	cmd.WaitDelay = 2 * time.Second
 	if call.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(call.Stdin)

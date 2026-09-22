@@ -45,6 +45,14 @@ type Worktree struct {
 
 	poller worktreePoller // FR-REPO-04's working-file half, focused while the window is (spec 12)
 
+	// writeMu serialises everything that writes this worktree's index or
+	// files (ADR-6: "one at a time per worktree" — stage, commit, reset,
+	// checkout, cherry-pick, revert, merge/rebase steps, discard). First use:
+	// Checkout, CheckoutCommit, and CreateBranch when it also checks out
+	// (spec 40). A distinct mutex from mu below, which guards the unrelated
+	// command-log ring buffer and filter state.
+	writeMu sync.Mutex
+
 	mu  sync.Mutex
 	log []core.CommandLogEntry // ring buffer, capped at logCap
 
@@ -64,6 +72,11 @@ type Worktree struct {
 
 // Poller is the worktree's status poller (internal/services.Refresh/SetFocused).
 func (w *Worktree) Poller() worktreePoller { return w.poller }
+
+// Lock/Unlock serialise this worktree's own writes (ADR-6's per-worktree
+// queue), held for the duration of one write call.
+func (w *Worktree) Lock()   { w.writeMu.Lock() }
+func (w *Worktree) Unlock() { w.writeMu.Unlock() }
 
 // CommandLog returns a copy of the buffered entries, oldest first.
 func (w *Worktree) CommandLog() []core.CommandLogEntry {
@@ -88,6 +101,13 @@ type Repo struct {
 
 	watcher repoWatcher // FR-REPO-04's git-state half (spec 12)
 
+	// writeMu serialises this repo's write one-offs (ADR-6: "worktree
+	// add/remove/prune, branch delete/rename" — first use here is branch
+	// create without checkout, spec 40: a plain ref create touches no
+	// worktree's index/files, so it belongs on this queue, not a
+	// worktree's). Distinct from mu below (log cache/refcount state).
+	writeMu sync.Mutex
+
 	mu       sync.Mutex
 	log      []core.LogCommit
 	logDone  bool
@@ -100,6 +120,11 @@ type Repo struct {
 
 // Watcher is the repo's git-dir watcher (internal/services.Refresh).
 func (r *Repo) Watcher() repoWatcher { return r.watcher }
+
+// Lock/Unlock serialise this repo's write one-offs (ADR-6's per-repo queue),
+// held for the duration of one write call.
+func (r *Repo) Lock()   { r.writeMu.Lock() }
+func (r *Repo) Unlock() { r.writeMu.Unlock() }
 
 // acquire records one more worktree session referencing r.
 func (r *Repo) acquire() {
@@ -384,12 +409,12 @@ func (m *Manager) Open(ctx context.Context, path core.RepoPath) (*Worktree, erro
 		Args:     []string{"rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir", "--is-inside-work-tree"},
 	})
 	if err != nil {
-		return nil, remapNotARepo(err)
+		return nil, remapNotARepo(err, path)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(result.Stdout)), "\n")
 	if len(lines) != 4 || lines[3] != "true" {
-		return nil, core.Errorf(core.NotARepo, "not a git repository")
+		return nil, notARepo(path)
 	}
 	return m.session(lines[0], lines[1], lines[2]), nil
 }
@@ -492,15 +517,20 @@ func (m *Manager) Close(id core.WorktreeID) {
 	}
 }
 
-// remapNotARepo turns a discovery failure into Code NotARepo, keeping
-// Message/GitStderr/Command (the same remap convention CheckVersion already
-// established for GitTooOld).
-func remapNotARepo(err error) error {
+// remapNotARepo turns a discovery failure into Code NotARepo with
+// FR-REPO-05's own message, keeping GitStderr/Command for the details.
+func remapNotARepo(err error, path core.RepoPath) error {
 	var src *core.Error
 	if errors.As(err, &src) {
-		return &core.Error{Code: core.NotARepo, Message: src.Message, GitStderr: src.GitStderr, Command: src.Command}
+		src.Code, src.Message = core.NotARepo, notARepo(path).Message
+		return src
 	}
-	return core.Errorf(core.NotARepo, "%v", err)
+	return notARepo(path)
+}
+
+// notARepo is FR-REPO-05's message: the folder, and that it is not a repo.
+func notARepo(path core.RepoPath) *core.Error {
+	return core.Errorf(core.NotARepo, "%s is not a git repository", path)
 }
 
 // toCommandLogEntry converts a git.Entry into the JSON DTO buffered and

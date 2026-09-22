@@ -1,15 +1,23 @@
-import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockLoadLog, mockLogRows, mockCommitDetails } = vi.hoisted(() => ({
+const { mockLoadLog, mockLogRows, mockCommitDetails, mockCherryPick, mockRevert } = vi.hoisted(() => ({
   mockLoadLog: vi.fn(),
   mockLogRows: vi.fn(),
   mockCommitDetails: vi.fn(),
+  mockCherryPick: vi.fn(),
+  mockRevert: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { LoadLog: mockLoadLog, LogRows: mockLogRows, CommitDetails: mockCommitDetails },
+  Facade: {
+    LoadLog: mockLoadLog,
+    LogRows: mockLogRows,
+    CommitDetails: mockCommitDetails,
+    CherryPick: mockCherryPick,
+    Revert: mockRevert,
+  },
 }))
 
 vi.mock('@wailsio/runtime', () => ({
@@ -20,35 +28,37 @@ import LogList from './LogList.vue'
 import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { commitRow } from '../testing/fixtures/log-rows'
 
 function row(sha: string): LogCommit {
   return { sha, shortSha: sha, author: '', authorAt: 0, subject: sha, graph: { lane: 0, colour: 0, edges: [] } }
 }
 
-const sampleRow = {
-  sha: 'abc123',
-  shortSha: 'abc123',
-  author: 'Alice',
-  authorAt: 0,
-  subject: 'Fix the bug',
-  graph: { lane: 0, colour: 0, edges: [] },
-}
+const sampleRow = commitRow()
 
-// @tanstack/vue-virtual measures its scroll container via offsetWidth/
-// offsetHeight, which happy-dom always reports as 0 (no real layout engine
-// — the same limitation spec 10 named for its own scrolling e2e case).
-// Stubbing a real size is the standard workaround for testing a virtualized
-// list under happy-dom/jsdom; it's the minimal mock this suite needs, not a
-// library-behaviour assumption.
-function stubScrollContainerSize(): void {
-  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 800 })
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 })
+// mountWithRows renders LogList with shas.length rows already cached, ready
+// to click/shift-click (spec 42's multi-select cases). clientHeight, not
+// just offsetHeight, is what @tanstack/vue-virtual needs to size enough
+// rows for a shift-click range to render under happy-dom.
+async function mountWithRows(shas: string[]): Promise<{ wrapper: VueWrapper; rowEls: DOMWrapper<Element>[] }> {
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 500 })
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 500 })
+
+  const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })
+  await flushPromises()
+  const log = useLogStore()
+  const rows = shas.map(row)
+  log.loaded = rows.length
+  rows.forEach((r, i) => log.rowCache.set(i, r))
+  await wrapper.vm.$nextTick()
+  await wrapper.vm.$nextTick()
+
+  return { wrapper, rowEls: wrapper.findAll('.row') }
 }
 
 describe('LogList', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    stubScrollContainerSize()
     mockLoadLog.mockReset()
     mockLoadLog.mockResolvedValue(undefined)
     mockLogRows.mockReset()
@@ -66,9 +76,23 @@ describe('LogList', () => {
       body: '',
       files: [],
     })
+    mockCherryPick.mockReset()
+    mockCherryPick.mockResolvedValue(undefined)
+    mockRevert.mockReset()
+    mockRevert.mockResolvedValue(undefined)
   })
 
-  it('FR-LOG-11 right-click opens a context menu with copy hash/subject only', async () => {
+  // clickMenuItem finds the context-menu item content by its label text and
+  // clicks it — robust to the item list's own order/length (spec 42 appends
+  // two items after the ones spec 22/40 already added).
+  async function clickMenuItem(body: DOMWrapper<Element>, label: string): Promise<void> {
+    const labels = body.findAll('.p-contextmenu-item-label')
+    const index = labels.findIndex((l) => l.text() === label)
+    const items = body.findAll('.p-contextmenu-item-content')
+    await items[index]!.trigger('click')
+  }
+
+  it('FR-LOG-11 right-click opens a context menu with copy, branch, checkout-commit, reset, cherry-pick, and revert items', async () => {
     const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })
     await flushPromises()
     const log = useLogStore()
@@ -81,7 +105,69 @@ describe('LogList', () => {
 
     const body = new DOMWrapper(document.body)
     const labels = body.findAll('.p-contextmenu-item-label').map((n) => n.text())
-    expect(labels).toEqual(['Copy hash', 'Copy subject'])
+    expect(labels).toEqual([
+      'Copy hash',
+      'Copy subject',
+      'New branch from here…',
+      'Check out commit',
+      'Reset current branch to here…',
+      'Cherry-pick',
+      'Revert',
+    ])
+
+    wrapper.unmount()
+  })
+
+  it('FR-BR-01 clicking "New branch from here…" emits create-branch with the row\'s sha', async () => {
+    const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })
+    await flushPromises()
+    const log = useLogStore()
+    log.rowCache.set(0, sampleRow)
+    log.loaded = 1
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.row').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+
+    await clickMenuItem(new DOMWrapper(document.body), 'New branch from here…')
+
+    expect(wrapper.emitted('create-branch')).toEqual([['abc123']])
+
+    wrapper.unmount()
+  })
+
+  it('FR-BR-08 clicking "Check out commit" emits checkout-commit with the row\'s sha', async () => {
+    const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })
+    await flushPromises()
+    const log = useLogStore()
+    log.rowCache.set(0, sampleRow)
+    log.loaded = 1
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.row').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+
+    await clickMenuItem(new DOMWrapper(document.body), 'Check out commit')
+
+    expect(wrapper.emitted('checkout-commit')).toEqual([['abc123']])
+
+    wrapper.unmount()
+  })
+
+  it('FR-BR-02 clicking "Reset current branch to here…" emits reset with the row\'s sha and subject', async () => {
+    const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })
+    await flushPromises()
+    const log = useLogStore()
+    log.rowCache.set(0, sampleRow)
+    log.loaded = 1
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.row').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+
+    await clickMenuItem(new DOMWrapper(document.body), 'Reset current branch to here…')
+
+    expect(wrapper.emitted('reset')).toEqual([['abc123', 'Fix the bug']])
 
     wrapper.unmount()
   })
@@ -101,8 +187,7 @@ describe('LogList', () => {
     await wrapper.vm.$nextTick()
 
     const body = new DOMWrapper(document.body)
-    const items = body.findAll('.p-contextmenu-item-content')
-    await items[0]!.trigger('click')
+    await clickMenuItem(body, 'Copy hash')
 
     expect(writeText).toHaveBeenCalledTimes(1)
     expect(writeText).toHaveBeenCalledWith('abc123')
@@ -130,22 +215,8 @@ describe('LogList', () => {
   })
 
   it('FR-CMP-01 ctrl/cmd-click selects two rows to compare; a plain click exits compare and selects the row', async () => {
-    // @tanstack/vue-virtual needs a measured, non-zero viewport to render
-    // any row at all; happy-dom's elements report 0 by default.
-    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 500 })
-    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 500 })
-
-    const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })
-    await flushPromises()
-    const log = useLogStore()
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const compare = useCompareStore()
-    const rows = [row('sha-a'), row('sha-b'), row('sha-c')]
-    log.loaded = rows.length
-    rows.forEach((r, i) => log.rowCache.set(i, r))
-    await wrapper.vm.$nextTick()
-    await wrapper.vm.$nextTick()
-
-    const rowEls = wrapper.findAll('.row')
     expect(rowEls.length).toBe(3)
 
     await rowEls[0]!.trigger('click', { ctrlKey: true })
@@ -155,6 +226,158 @@ describe('LogList', () => {
     await rowEls[2]!.trigger('click')
     expect(compare.selection).toEqual([])
     expect(mockCommitDetails).toHaveBeenCalledWith('/repo', 'sha-c')
+
+    wrapper.unmount()
+  })
+
+  it('FR-CP-01, FR-LOG-11 click then shift-click then right-click acts on the whole range', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[2]!.trigger('click', { shiftKey: true })
+    await rowEls[1]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    await clickMenuItem(new DOMWrapper(document.body), 'Cherry-pick')
+
+    expect(mockCherryPick).toHaveBeenCalledTimes(1)
+    expect(mockCherryPick).toHaveBeenCalledWith('/repo', ['sha-a', 'sha-b', 'sha-c'])
+
+    wrapper.unmount()
+  })
+
+  it('FR-CP-01 a plain click outside the range collapses it before acting', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c', 'sha-d'])
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[2]!.trigger('click', { shiftKey: true })
+    await rowEls[3]!.trigger('click')
+    await rowEls[3]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    await clickMenuItem(new DOMWrapper(document.body), 'Cherry-pick')
+
+    expect(mockCherryPick).toHaveBeenCalledWith('/repo', ['sha-d'])
+
+    wrapper.unmount()
+  })
+
+  it('FR-CP-01 clears the multi-select once the cherry-pick resolves', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
+    const log = useLogStore()
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[2]!.trigger('click', { shiftKey: true })
+    expect(log.multiSelect).toHaveLength(3)
+
+    await rowEls[1]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    await clickMenuItem(new DOMWrapper(document.body), 'Cherry-pick')
+    await flushPromises()
+
+    expect(log.multiSelect).toEqual([])
+
+    wrapper.unmount()
+  })
+
+  it("FR-CP-04 a rejection renders in LogList's own ErrorBanner and keeps the multi-select", async () => {
+    mockCherryPick.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'would be overwritten by merge' } }),
+    )
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
+    const log = useLogStore()
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[2]!.trigger('click', { shiftKey: true })
+    await rowEls[1]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    await clickMenuItem(new DOMWrapper(document.body), 'Cherry-pick')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('would be overwritten by merge')
+    expect(log.multiSelect).toHaveLength(3)
+
+    wrapper.unmount()
+  })
+
+  it('FR-CP-01 a shift-click range renders multi-selected on the range only', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c', 'sha-d'])
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[2]!.trigger('click', { shiftKey: true })
+    await wrapper.vm.$nextTick()
+
+    expect(rowEls[0]!.classes()).toContain('multi-selected')
+    expect(rowEls[1]!.classes()).toContain('multi-selected')
+    expect(rowEls[2]!.classes()).toContain('multi-selected')
+    expect(rowEls[3]!.classes()).not.toContain('multi-selected')
+
+    wrapper.unmount()
+  })
+
+  it('FR-CMP-01, FR-LOG-11 right-click a different row after an ordinary selection includes "Compare with selected"', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[1]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    const labels = body.findAll('.p-contextmenu-item-label').map((l) => l.text())
+    expect(labels).toContain('Compare with selected')
+
+    wrapper.unmount()
+  })
+
+  it('FR-CMP-01 clicking "Compare with selected" pairs the previously selected row with the right-clicked one', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
+    const compare = useCompareStore()
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[1]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    await clickMenuItem(new DOMWrapper(document.body), 'Compare with selected')
+
+    expect(compare.selection.map((r) => r.sha)).toEqual(['sha-a', 'sha-b'])
+
+    wrapper.unmount()
+  })
+
+  it('FR-CMP-01 right-click with nothing selected yet shows no "Compare with selected"', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
+
+    await rowEls[0]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    const labels = body.findAll('.p-contextmenu-item-label').map((l) => l.text())
+    expect(labels).not.toContain('Compare with selected')
+
+    wrapper.unmount()
+  })
+
+  it('FR-CMP-01 right-click on the already-selected row shows no "Compare with selected"', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[0]!.trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    const labels = body.findAll('.p-contextmenu-item-label').map((l) => l.text())
+    expect(labels).not.toContain('Compare with selected')
+
+    wrapper.unmount()
+  })
+
+  it('FR-CMP-01 ctrl-click with the compare selection empty pairs the selected row with the ctrl-clicked one', async () => {
+    const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
+    const compare = useCompareStore()
+
+    await rowEls[0]!.trigger('click')
+    await rowEls[1]!.trigger('click', { ctrlKey: true })
+
+    expect(compare.selection.map((r) => r.sha)).toEqual(['sha-a', 'sha-b'])
+    expect(compare.active).toBe(true)
 
     wrapper.unmount()
   })

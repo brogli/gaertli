@@ -54,10 +54,18 @@ export const useLogStore = defineStore('log', () => {
   const selectedFile = ref<ChangedFile | null>(null)
   const pendingScrollTo = ref<number | null>(null)
 
+  // multiSelect is a Shift-click contiguous range (FR-LOG-11, spec 42):
+  // independent of selectedRow (single-row details) and of the compare
+  // store's own 2-max pair (spec 21) — spec 21 explicitly reserved
+  // Shift-click for this exact use.
+  const multiSelect = ref<LogCommit[]>([])
+  let anchorIndex: number | null = null
+
   const detailsCache = new Map<string, CommitDetails>()
   let wt = ''
   let unlistenProgress: (() => void) | undefined
   let unlistenChanged: (() => void) | undefined
+  let unlistenReconnected: (() => void) | undefined
 
   // filterActive mirrors core.LogFilter.Empty() (Go): whether filter narrows
   // anything at all. activeLoaded/activeDone read the filtered pair while
@@ -123,6 +131,12 @@ export const useLogStore = defineStore('log', () => {
       const { scope } = ev.data as { scope: string }
       if (scope === 'refs') void Facade.ReloadLog(wt)
     })
+
+    // core:reconnected (ADR-4): a fresh core's session/generation numbers
+    // have no relationship to the old ones, so this starts the log over,
+    // same as its own mount load (Design: not folded into ReloadLog above).
+    unlistenReconnected?.()
+    unlistenReconnected = Events.On('core:reconnected', () => void Facade.LoadLog(wt))
 
     await Facade.LoadLog(wt)
   }
@@ -220,6 +234,29 @@ export const useLogStore = defineStore('log', () => {
     pendingScrollTo.value = index
   }
 
+  // selectOnly collapses the multi-select to just row (a plain click, or a
+  // right-click on a row outside the current range — Design, LogList.vue).
+  function selectOnly(row: LogCommit, index: number): void {
+    multiSelect.value = [row]
+    anchorIndex = index
+  }
+
+  // shiftSelectTo extends/creates a range from the last plain-clicked row
+  // to toIndex (FR-LOG-11, spec 42). Reuses rows() (not rowCache
+  // directly): a fast fling-scroll can shift-click far past rows that were
+  // never rendered in between, so the whole [lo, hi] window may need a
+  // fresh LogRows call, not just what happens to be cached (Design).
+  async function shiftSelectTo(toIndex: number): Promise<void> {
+    if (anchorIndex === null) anchorIndex = toIndex
+    const [lo, hi] = anchorIndex <= toIndex ? [anchorIndex, toIndex] : [toIndex, anchorIndex]
+    multiSelect.value = await rows(lo, hi + 1)
+  }
+
+  function clearMultiSelect(): void {
+    multiSelect.value = []
+    anchorIndex = null
+  }
+
   return {
     loaded,
     done,
@@ -235,6 +272,7 @@ export const useLogStore = defineStore('log', () => {
     details,
     selectedFile,
     pendingScrollTo,
+    multiSelect,
     rowCache,
     load,
     rows,
@@ -243,6 +281,9 @@ export const useLogStore = defineStore('log', () => {
     nextFile,
     prevFile,
     jumpTo,
+    selectOnly,
+    shiftSelectTo,
+    clearMultiSelect,
     applyFilter,
     clearFilter,
   }

@@ -124,6 +124,102 @@ type API interface {
 	// rows arrive incrementally, readable via LogRows and announced by
 	// "log:progress" events exactly like LoadLog.
 	SetLogFilter(ctx context.Context, wt WorktreeID, filter LogFilter) error
+
+	// CreateBranch creates a new branch named name at start — a commit, an
+	// existing branch, or any other revision git itself resolves (FR-BR-01;
+	// "from any commit" or "from HEAD" both just supply start). name is
+	// validated (syntax) before any mutating git call, so an invalid name
+	// comes back as Code InvalidName without ever touching the worktree; a
+	// duplicate name is git's own refusal (GitFailed, "a branch named ...
+	// already exists") — FR-BR-01: "rejected with a clear message".
+	// checkout switches this worktree to the new branch in the same atomic
+	// git call (a checkout failure then creates no orphan branch) — a
+	// refusal (local changes in the way) comes back as Code DirtyWorktree,
+	// same as Checkout/CheckoutCommit's own refusal.
+	CreateBranch(ctx context.Context, wt WorktreeID, name, start string, checkout bool) error
+
+	// Checkout switches this worktree to branch: an existing local branch, or
+	// — via git's own DWIM, no app-side branch list needed — a
+	// remote-tracking branch with no local branch of that name yet, which
+	// git turns into a new local branch tracking it (FR-BR-05). A refusal is
+	// git's own, returned as-is: Code DirtyWorktree for local changes in the
+	// way (a tracked file's modification, or an untracked file, that
+	// checkout would overwrite), plain GitFailed for anything else (an
+	// ambiguous name, an invalid/nonexistent branch, or the branch already
+	// checked out in another worktree — its own message names the
+	// worktree's path). No pre-check, no stash: "if git refuses... show why"
+	// (FR-BR-05) is git's own message, not a guess this app makes first.
+	Checkout(ctx context.Context, wt WorktreeID, branch string) error
+
+	// CheckoutCommit detaches this worktree's HEAD at sha (FR-BR-08). Same
+	// DirtyWorktree/GitFailed split as Checkout. Unlike Checkout, never
+	// refused for being "already checked out": a detached commit may be
+	// checked out in several worktrees at once.
+	CheckoutCommit(ctx context.Context, wt WorktreeID, sha string) error
+
+	// Reset moves wt's current branch — or, while detached, HEAD directly;
+	// git treats both the same (FR-BR-02) — to sha. sha is always an
+	// already-resolved commit hash (a LogCommit.SHA or Summary.SHA), never
+	// free user text: no name validation, no --end-of-options, no --
+	// (reset rejects the former outright and the latter silently
+	// reinterprets the target as a pathspec — neither is needed for a
+	// value that structurally cannot start with "-"). A refusal is
+	// returned as-is, plain GitFailed: an invalid/nonexistent sha, or
+	// --soft's own "cannot do a soft reset in the middle of a merge"
+	// during any unresolved conflict — both are exit 128 with no other
+	// machine-readable signal to split them by, unlike Checkout's
+	// exit-1-vs-128 split (spec 40). --mixed/--hard are never refused for
+	// a dirty tree or a conflict in progress, mid-merge included — git's
+	// own behaviour, not pre-blocked (same stance as spec 40).
+	Reset(ctx context.Context, wt WorktreeID, sha string, mode ResetMode) (ResetResult, error)
+
+	// UncommittedCount is FR-BR-03's confirmation-dialog number: how many
+	// tracked paths carry an uncommitted change right now (staged,
+	// unstaged, or unmerged) — never untracked files, which an ordinary
+	// hard reset does not delete.
+	UncommittedCount(ctx context.Context, wt WorktreeID) (int, error)
+
+	// CherryPick applies shas onto wt's current HEAD (branch or detached,
+	// FR-WT-05 frames this as worktree-scoped, not branch-scoped) — one
+	// commit or several (FR-CP-01). shas may be given in any order; the
+	// service re-sorts them oldest-first itself before calling git
+	// (FR-CP-02: "whatever the selection order"; ties in commit time keep
+	// the caller's order reversed, so pass log order, newest first).
+	// Refuses the whole call, before running git at all, if any of shas is
+	// a merge commit (FR-CP-05): git's own per-commit refusal cannot
+	// deliver "nothing changed" for a batch, so this app-level check is
+	// what does. A stop with git's own CHERRY_PICK_HEAD state file left
+	// behind (a real content conflict, or an already-applied/empty result)
+	// comes back as Code Conflicts, left in place for spec 72's own
+	// abort/continue/skip flow. Any other refusal (a dirty file in the
+	// way, another operation already running, a nonexistent sha) is git's
+	// own, passed through as plain GitFailed (FR-CP-04's "show why").
+	CherryPick(ctx context.Context, wt WorktreeID, shas []string) error
+
+	// Revert is CherryPick's undo counterpart (FR-RV-01): applies shas
+	// newest-first (FR-RV-02, proven load-bearing the same way as
+	// FR-CP-02's ordering); every other rule — the merge pre-check,
+	// refusal classification, Code Conflicts on a stop — is identical
+	// (FR-RV-03: "handled as for cherry-pick").
+	Revert(ctx context.Context, wt WorktreeID, shas []string) error
+
+	// SetEditorProfile installs the editor profile this core uses for every
+	// OpenFolder/OpenFile call it serves (TR-13: pushed by the shell "on
+	// connect"). Never called from the frontend: internal/app calls it
+	// directly on the concrete core.API value it already holds at the
+	// moment of connecting, not through the generated Facade (whose own
+	// forwarder for this method would always resolve to the local core,
+	// since neither of SetEditorProfile's parameters is a routing key).
+	SetEditorProfile(ctx context.Context, profile EditorProfile) error
+
+	// OpenFolder starts wt's configured editor on its own worktree folder
+	// (FR-ED-01, FR-ED-03).
+	OpenFolder(ctx context.Context, wt WorktreeID) error
+
+	// OpenFile starts wt's configured editor on path, at line if line > 0
+	// (FR-ED-04). No caller in this spec's own UI — the changes list / diff
+	// / conflict list call sites are FR-ED-02 (spec 51, per ROADMAP).
+	OpenFile(ctx context.Context, wt WorktreeID, path string, line int) error
 }
 
 // Version of a core. App is "dev" until a release build stamps it.
@@ -155,4 +251,31 @@ type Summary struct {
 	Branch    string `json:"branch"` // "" when Detached
 	Detached  bool   `json:"detached"`
 	Operation string `json:"operation"` // "", "merge", "rebase", "cherry-pick", "revert"
+
+	// SHA is HEAD's own resolved commit — "" only for an unborn HEAD (a
+	// fresh repo with no commits yet, QA-REL-02), never an error. Lets
+	// "create branch here" (FR-BR-08, attached or detached) and a future
+	// "new branch from HEAD" toolbar action know a start point without
+	// depending on the log having that commit loaded.
+	SHA string `json:"sha,omitempty"`
+
+	// EditorName is the effective editor profile's Name (FR-ED-05), so the
+	// UI can label its "Open in {name}" button without a second round trip.
+	EditorName string `json:"editorName"`
 }
+
+// ResetResult is Reset's result: the HEAD commit before the reset, so the
+// user can go back (FR-BR-04). "" only if HEAD was unborn.
+type ResetResult struct {
+	PreviousHead string `json:"previousHead"`
+}
+
+// ResetMode is FR-BR-02's three choices, one explanatory line each in the
+// dialog. The fourth mode, --keep, is spec 91's (FR-BR-07).
+type ResetMode string
+
+const (
+	ResetSoft  ResetMode = "soft"
+	ResetMixed ResetMode = "mixed"
+	ResetHard  ResetMode = "hard"
+)

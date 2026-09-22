@@ -14,6 +14,7 @@ vi.mock('@wailsio/runtime', () => ({
 
 import CommitDetailsPanel from './CommitDetailsPanel.vue'
 import { useLogStore } from '../stores/log'
+import { commitRow } from '../testing/fixtures/log-rows'
 
 describe('CommitDetailsPanel', () => {
   beforeEach(() => {
@@ -46,14 +47,7 @@ describe('CommitDetailsPanel', () => {
 
     const wrapper = mount(CommitDetailsPanel)
     const log = useLogStore()
-    await log.select({
-      sha: 'abc123',
-      shortSha: 'abc123',
-      author: 'Alice',
-      authorAt: 0,
-      subject: 'Fix the bug',
-      graph: { lane: 0, colour: 0, edges: [] },
-    })
+    await log.select(commitRow())
     await flushPromises()
 
     expect(wrapper.text()).toContain('Fix the bug')
@@ -85,14 +79,7 @@ describe('CommitDetailsPanel', () => {
 
     const wrapper = mount(CommitDetailsPanel)
     const log = useLogStore()
-    await log.select({
-      sha: 'abc123',
-      shortSha: 'abc123',
-      author: 'Alice',
-      authorAt: 0,
-      subject: 'Fix the bug',
-      graph: { lane: 0, colour: 0, edges: [] },
-    })
+    await log.select(commitRow())
     await flushPromises()
 
     await wrapper.get('.files li').trigger('click')

@@ -2,10 +2,14 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCompareCommits } = vi.hoisted(() => ({ mockCompareCommits: vi.fn() }))
+const { mockCompareCommits, mockOpenCompareDiff } = vi.hoisted(() => ({
+  mockCompareCommits: vi.fn(),
+  mockOpenCompareDiff: vi.fn(),
+}))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade: { CompareCommits: mockCompareCommits },
+  AppService: { OpenCompareDiff: mockOpenCompareDiff },
 }))
 
 import CompareView from './CompareView.vue'
@@ -22,6 +26,7 @@ describe('CompareView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockCompareCommits.mockReset()
+    mockOpenCompareDiff.mockReset()
   })
 
   it('FR-CMP-01, FR-CMP-03 shows both commits short SHAs in from->to order and the changed files', async () => {
@@ -72,5 +77,22 @@ describe('CompareView', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
 
     expect(compare.selection).toEqual([])
+  })
+
+  it('FR-CMP-02 double-clicking a file opens its own diff window', async () => {
+    mockCompareCommits.mockResolvedValue([
+      { path: 'a.txt', status: 'M' },
+      { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
+    ])
+    const compare = useCompareStore()
+    compare.toggleSelect(row('sha-a', 'aaa1111'))
+    compare.toggleSelect(row('sha-b', 'bbb2222'))
+
+    const wrapper = mount(CompareView, { props })
+    await flushPromises()
+
+    await wrapper.findAll('.files li')[1]!.trigger('dblclick')
+
+    expect(mockOpenCompareDiff).toHaveBeenCalledWith('/repo', 'sha-a', 'sha-b', 'b.txt', 'a2.txt')
   })
 })

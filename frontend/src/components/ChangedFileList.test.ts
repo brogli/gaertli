@@ -23,4 +23,12 @@ describe('ChangedFileList', () => {
     expect(rows[0]!.classes()).not.toContain('selected')
     expect(rows[1]!.classes()).toContain('selected')
   })
+
+  it('FR-CMP-02 double-clicking a file row emits open with that file', async () => {
+    const wrapper = mount(ChangedFileList, { props: { files } })
+
+    await wrapper.findAll('li')[1]!.trigger('dblclick')
+
+    expect(wrapper.emitted('open')?.[0]).toEqual([files[1]])
+  })
 })

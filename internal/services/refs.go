@@ -139,7 +139,7 @@ func addRemoteBranch(remotes map[string]*core.Remote, order *[]string, remoteNam
 // loadRefs runs one for-each-ref call over patterns and parses it.
 func loadRefs(ctx context.Context, r git.Runner, dir string, patterns ...string) ([]parsedRef, error) {
 	result, err := r.Run(ctx, git.Call{
-		Dir: dir, ReadOnly: true,
+		Dir: dir, ReadOnly: true, Background: true,
 		Args: append([]string{"for-each-ref", "--format=" + refsFormat}, patterns...),
 	})
 	if err != nil {

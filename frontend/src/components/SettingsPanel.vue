@@ -1,32 +1,82 @@
 <script setup lang="ts">
-import { onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useSettingsStore } from '../stores/settings'
+import { useCoreCall } from '../composables/useCoreCall'
+import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import type { EditorProfile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { Distro } from '../../bindings/github.com/brogli/nebegit/internal/remote'
+import ErrorBanner from './ErrorBanner.vue'
+
+// DEFAULT_PROFILE mirrors editor.Default() (FR-ED-05): the built-in
+// fallback a newly added distro profile starts from, client-side, so it
+// looks pre-filled before the user ever saves.
+const DEFAULT_PROFILE: EditorProfile = {
+  name: 'Zed',
+  folderCmd: 'zed {path}',
+  fileCmd: 'zed {path}',
+  fileAtLineCmd: 'zed {path}:{line}',
+}
 
 const store = useSettingsStore()
+const { error, run } = useCoreCall()
+
 const form = reactive({
-  editor: '',
   protectedBranches: '',
   defaultPullMode: 'merge',
   diffMode: 'unified',
   autoFetchIntervalMinutes: 0,
 })
 
+// editorProfiles is edited directly, keyed the same way
+// Settings.EditorProfiles is ("" = local, else a WSL distro name, FR-ED-11):
+// one independently editable form per environment (FR-ED-04).
+const editorProfiles = reactive<Record<string, EditorProfile>>({})
+
+const distros = ref<Distro[]>([])
+
+// distrosWithoutProfile feeds "add a distro profile": only distros not
+// already configured are offered.
+const distrosWithoutProfile = computed(() =>
+  distros.value.filter((d) => !(d.name in editorProfiles)),
+)
+
+function environmentLabel(name: string): string {
+  return name === '' ? 'Local' : name
+}
+
+function addDistroProfile(name: string): void {
+  editorProfiles[name] = { ...DEFAULT_PROFILE }
+}
+
+// installLauncher is FR-REPO-06's "one-click" install action, per distro
+// (case 9's other half — the Go side, AppService.InstallWSLLauncher, spec
+// 31 task 5).
+function installLauncher(distro: string): void {
+  void run(() => AppService.InstallWSLLauncher(distro))
+}
+
 onMounted(async () => {
   await store.load()
   const s = store.settings
-  if (!s) return
-  form.editor = s.editor
-  form.protectedBranches = (s.protectedBranches ?? []).join(', ')
-  form.defaultPullMode = s.defaultPullMode
-  form.diffMode = s.diffMode
-  form.autoFetchIntervalMinutes = s.autoFetchIntervalMinutes
+  if (s) {
+    form.protectedBranches = (s.protectedBranches ?? []).join(', ')
+    form.defaultPullMode = s.defaultPullMode
+    form.diffMode = s.diffMode
+    form.autoFetchIntervalMinutes = s.autoFetchIntervalMinutes
+    Object.assign(editorProfiles, s.editorProfiles ?? {})
+    if (!('' in editorProfiles)) editorProfiles[''] = { ...DEFAULT_PROFILE } // Local always has a form, even unconfigured
+  }
+  // Rendered only when distros are listable at all (Windows host): on any
+  // other platform this rejects (WslNotFound) and both the "add a distro
+  // profile" control and the "WSL command" section stay empty.
+  distros.value = (await run(() => store.loadDistros())) ?? []
 })
 
 async function submit(): Promise<void> {
   if (!store.settings) return
   await store.save({
     ...store.settings,
-    editor: form.editor,
+    editorProfiles: { ...editorProfiles },
     protectedBranches: form.protectedBranches
       .split(',')
       .map((b) => b.trim())
@@ -40,10 +90,41 @@ async function submit(): Promise<void> {
 
 <template>
   <form class="settings-panel" @submit.prevent="submit">
-    <label>
-      Editor
-      <input v-model="form.editor" type="text" />
-    </label>
+    <ErrorBanner v-if="error" :error="error" />
+
+    <fieldset v-for="(profile, name) in editorProfiles" :key="name">
+      <legend>{{ environmentLabel(name) }}</legend>
+      <label>
+        Name
+        <input v-model="profile.name" type="text" />
+      </label>
+      <label>
+        Folder command
+        <input v-model="profile.folderCmd" data-test="folder-cmd" type="text" />
+      </label>
+      <label>
+        File command
+        <input v-model="profile.fileCmd" type="text" />
+      </label>
+      <label>
+        File-at-line command
+        <input v-model="profile.fileAtLineCmd" type="text" />
+      </label>
+    </fieldset>
+
+    <div v-if="distrosWithoutProfile.length">
+      Add a distro profile:
+      <button
+        v-for="d in distrosWithoutProfile"
+        :key="d.name"
+        type="button"
+        data-test="add-distro-profile"
+        @click="addDistroProfile(d.name)"
+      >
+        {{ d.name }}
+      </button>
+    </div>
+
     <label>
       Protected branches
       <input v-model="form.protectedBranches" type="text" />
@@ -66,6 +147,17 @@ async function submit(): Promise<void> {
       Auto-fetch interval (minutes)
       <input v-model.number="form.autoFetchIntervalMinutes" min="0" type="number" />
     </label>
+
+    <div v-if="distros.length">
+      <h2>WSL command</h2>
+      <ul>
+        <li v-for="d in distros" :key="d.name">
+          {{ d.name }}
+          <button type="button" @click="installLauncher(d.name)">Install nebegit command</button>
+        </li>
+      </ul>
+    </div>
+
     <button type="submit">Save</button>
   </form>
 </template>

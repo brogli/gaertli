@@ -59,12 +59,16 @@ func TestManagerOpenSharesRepoAcrossLinkedWorktrees(t *testing.T) {
 	}
 }
 
-func TestManagerOpenRejectsNonRepoPath(t *testing.T) {
+func TestFR_REPO_05_ManagerOpenRejectsNonRepoPathSayingSo(t *testing.T) {
 	m := NewManager(func(core.Event) {})
+	dir := t.TempDir()
 
-	_, err := m.Open(context.Background(), core.RepoPath(t.TempDir()))
+	_, err := m.Open(context.Background(), core.RepoPath(dir))
 
-	assertCode(t, err, core.NotARepo)
+	ce := assertCode(t, err, core.NotARepo)
+	if want := dir + " is not a git repository"; ce.Message != want {
+		t.Errorf("Message = %q, want %q (FR-REPO-05: say so clearly)", ce.Message, want)
+	}
 }
 
 func TestManagerOpenRejectsMissingPath(t *testing.T) {
@@ -72,7 +76,7 @@ func TestManagerOpenRejectsMissingPath(t *testing.T) {
 
 	_, err := m.Open(context.Background(), core.RepoPath(filepath.Join(t.TempDir(), "missing")))
 
-	assertCode(t, err, core.NotARepo)
+	_ = assertCode(t, err, core.NotARepo)
 }
 
 func TestManagerGetReturnsInternalErrorForUnknownID(t *testing.T) {
@@ -80,7 +84,7 @@ func TestManagerGetReturnsInternalErrorForUnknownID(t *testing.T) {
 
 	_, err := m.Get("bogus")
 
-	assertCode(t, err, core.Internal)
+	_ = assertCode(t, err, core.Internal)
 }
 
 func TestWorktreeRunnerAppendsToCommandLogAndEmitsSink(t *testing.T) {
@@ -325,10 +329,11 @@ func run(t *testing.T, dir string, args ...string) {
 	}
 }
 
-func assertCode(t *testing.T, err error, want core.Code) {
+func assertCode(t *testing.T, err error, want core.Code) *core.Error {
 	t.Helper()
 	var ce *core.Error
 	if !errors.As(err, &ce) || ce.Code != want {
-		t.Errorf("err = %v, want *core.Error{Code: %s}", err, want)
+		t.Fatalf("err = %v, want *core.Error{Code: %s}", err, want)
 	}
+	return ce
 }

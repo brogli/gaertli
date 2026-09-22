@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/remote"
+	"github.com/brogli/nebegit/internal/remote/remotetest"
 )
 
 // fake is a core whose Version behaviour the test picks per call.
@@ -72,24 +72,37 @@ func (f *fake) DiffRange(context.Context, core.WorktreeID, string, string, strin
 
 func (f *fake) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
 
+func (f *fake) CreateBranch(context.Context, core.WorktreeID, string, string, bool) error {
+	return nil
+}
+
+func (f *fake) Checkout(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f *fake) CheckoutCommit(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f *fake) Reset(context.Context, core.WorktreeID, string, core.ResetMode) (core.ResetResult, error) {
+	return core.ResetResult{}, nil
+}
+
+func (f *fake) UncommittedCount(context.Context, core.WorktreeID) (int, error) { return 0, nil }
+
+func (f *fake) CherryPick(context.Context, core.WorktreeID, []string) error { return nil }
+
+func (f *fake) Revert(context.Context, core.WorktreeID, []string) error { return nil }
+
+func (f *fake) SetEditorProfile(context.Context, core.EditorProfile) error { return nil }
+
+func (f *fake) OpenFolder(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
+
 // pipeClient serves f over an in-memory pipe and returns a client on it.
 func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {
 	t.Helper()
-	clientIn, serverOut := io.Pipe()
-	serverIn, clientOut := io.Pipe()
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		_ = remote.Serve(ctx, serverIn, serverOut, func(sink core.EventSink) core.API {
-			f.sink = sink
-			return f
-		})
-	}()
-	t.Cleanup(func() {
-		cancel()
-		_ = clientOut.Close()
-		_ = serverOut.Close()
-	})
-	return remote.NewClient(clientIn, clientOut, sink)
+	return remotetest.NewPipeClient(t, func(sink core.EventSink) core.API {
+		f.sink = sink
+		return f
+	}, sink)
 }
 
 func TestADR_3_VersionCallCrossesThePipe(t *testing.T) {

@@ -24,7 +24,16 @@ export function useCoreCall() {
     }
   }
 
-  return { error, run }
+  // runAndClose is run's own "then close on success" shape, shared by every
+  // dialog whose only action on success is to dismiss itself (e.g.
+  // CreateBranchDialog, DetachWarningDialog): onSuccess runs only when call
+  // didn't reject, leaving error set and the dialog open otherwise.
+  async function runAndClose<T>(call: () => Promise<T>, onSuccess: () => void): Promise<void> {
+    await run(call)
+    if (!error.value) onSuccess()
+  }
+
+  return { error, run, runAndClose }
 }
 
 function toCoreError(e: unknown): CoreError {

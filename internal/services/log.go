@@ -100,7 +100,7 @@ func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha string) (
 func (c *Core) streamLog(wt *session.Worktree, gen int) {
 	repo := wt.Repo
 	progress := func(loaded int, done bool) { c.emitLogProgress(repo.Key, loaded, done) }
-	loaded, logErr := streamCommits(context.Background(), wt, LogArgs(core.LogFilter{}), false,
+	loaded, logErr := streamCommits(context.Background(), wt, LogArgs(core.LogFilter{}), false, true,
 		func(commit core.LogCommit) { repo.LogAppend(gen, commit) }, progress)
 
 	var tips map[string]string
@@ -120,9 +120,9 @@ func (c *Core) streamLog(wt *session.Worktree, gen int) {
 // LogCommit (with its graph row unless flat), and hands each to appendRow;
 // progress fires for the first row and then every progressInterval, never
 // with done. Returns the row count and the call's error, if any.
-func streamCommits(ctx context.Context, wt *session.Worktree, args []string, flat bool,
+func streamCommits(ctx context.Context, wt *session.Worktree, args []string, flat, background bool,
 	appendRow func(core.LogCommit), progress func(loaded int, done bool)) (loaded int, err *core.Error) {
-	checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path)
+	checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path, background)
 	if ckErr != nil {
 		errors.As(ckErr, &err)
 		return 0, err
@@ -131,7 +131,7 @@ func streamCommits(ctx context.Context, wt *session.Worktree, args []string, fla
 	layout := graph.NewLayout()
 	lastEmit := time.Time{}
 	_, runErr := wt.Runner.Stream(ctx, git.Call{
-		Dir: wt.Path, ReadOnly: true, Timeout: logTimeout, Args: args,
+		Dir: wt.Path, ReadOnly: true, Background: background, Timeout: logTimeout, Args: args,
 	}, func(record []byte) error {
 		commit, parents, err := parseLogRecord(record)
 		if err != nil {
@@ -302,9 +302,9 @@ func toGraphRow(row graph.Row) core.GraphRow {
 // worktreeCheckouts maps a commit SHA to every worktree path currently at
 // that HEAD (FR-LOG-10), from "git worktree list --porcelain -z" run in
 // dir (any worktree of the repo lists every worktree of it).
-func worktreeCheckouts(r git.Runner, dir string) (map[string][]string, error) {
+func worktreeCheckouts(r git.Runner, dir string, background bool) (map[string][]string, error) {
 	result, err := r.Run(context.Background(), git.Call{
-		Dir: dir, ReadOnly: true,
+		Dir: dir, ReadOnly: true, Background: background,
 		Args: []string{"worktree", "list", "--porcelain", "-z"},
 	})
 	if err != nil {

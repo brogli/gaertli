@@ -8,11 +8,15 @@ import (
 
 // SettingsService is the shell-only Wails service backing SettingsPanel
 // (FR-UX-04): settings are a shell concern, not part of core.API.
-type SettingsService struct{ store *settings.Store }
+type SettingsService struct {
+	store *settings.Store
+	reg   *Registry
+}
 
-// NewSettingsService binds a SettingsService to store.
-func NewSettingsService(store *settings.Store) *SettingsService {
-	return &SettingsService{store: store}
+// NewSettingsService binds a SettingsService to store, and reg so a change
+// can re-push editor profiles to every core already using one (TR-13).
+func NewSettingsService(store *settings.Store, reg *Registry) *SettingsService {
+	return &SettingsService{store: store, reg: reg}
 }
 
 // Get returns the current settings.
@@ -20,7 +24,13 @@ func (s *SettingsService) Get(ctx context.Context) (settings.Settings, error) {
 	return s.store.Get(), nil
 }
 
-// Set replaces the persisted settings with next.
+// Set replaces the persisted settings with next, then re-pushes each
+// environment's editor profile (TR-13), so an edit takes effect immediately
+// wherever it is already in use.
 func (s *SettingsService) Set(ctx context.Context, next settings.Settings) error {
-	return s.store.Update(func(cur *settings.Settings) { *cur = next })
+	if err := s.store.Update(func(cur *settings.Settings) { *cur = next }); err != nil {
+		return err
+	}
+	s.reg.PushEditorProfiles(ctx)
+	return nil
 }

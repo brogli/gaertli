@@ -30,3 +30,13 @@ onUnmounted(() => {
     </ul>
   </section>
 </template>
+
+<style scoped>
+/* A bounded strip at the bottom of the view: the entries scroll inside it
+   instead of growing the panel until it crowds out the log (FR-UX-02). */
+.command-log {
+  flex: none;
+  max-height: 25%;
+  overflow-y: auto;
+}
+</style>

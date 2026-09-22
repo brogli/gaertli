@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -13,8 +14,9 @@ import (
 // fakeAPI is a core.API whose OpenWorktree behaviour a test picks; other
 // calls are recorded or no-op.
 type fakeAPI struct {
-	openWorktree func(context.Context, core.RepoPath) (core.WorktreeInfo, error)
-	closed       *[]core.WorktreeID
+	openWorktree   func(context.Context, core.RepoPath) (core.WorktreeInfo, error)
+	closed         *[]core.WorktreeID
+	editorProfiles *[]core.EditorProfile // records every SetEditorProfile call, if set
 }
 
 func (f fakeAPI) Version(context.Context) (core.Version, error) { return core.Version{}, nil }
@@ -76,6 +78,35 @@ func (f fakeAPI) DiffRange(context.Context, core.WorktreeID, string, string, str
 
 func (f fakeAPI) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
 
+func (f fakeAPI) CreateBranch(context.Context, core.WorktreeID, string, string, bool) error {
+	return nil
+}
+
+func (f fakeAPI) Checkout(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f fakeAPI) CheckoutCommit(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f fakeAPI) Reset(context.Context, core.WorktreeID, string, core.ResetMode) (core.ResetResult, error) {
+	return core.ResetResult{}, nil
+}
+
+func (f fakeAPI) UncommittedCount(context.Context, core.WorktreeID) (int, error) { return 0, nil }
+
+func (f fakeAPI) CherryPick(context.Context, core.WorktreeID, []string) error { return nil }
+
+func (f fakeAPI) Revert(context.Context, core.WorktreeID, []string) error { return nil }
+
+func (f fakeAPI) SetEditorProfile(_ context.Context, profile core.EditorProfile) error {
+	if f.editorProfiles != nil {
+		*f.editorProfiles = append(*f.editorProfiles, profile)
+	}
+	return nil
+}
+
+func (f fakeAPI) OpenFolder(context.Context, core.WorktreeID) error { return nil }
+
+func (f fakeAPI) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
+
 // fakeNotifier is an errorNotifier that counts its calls.
 type fakeNotifier struct{ calls int }
 
@@ -115,7 +146,7 @@ func TestFR_REPO_06_PathArgThenOpenOrFocusOpensAWindow(t *testing.T) {
 	if !ok {
 		t.Fatal("pathArg ok = false")
 	}
-	r.OpenOrFocus(core.WorktreeID(path), path)
+	r.OpenOrFocus(core.WorktreeID(path), path, "")
 
 	if len(opener.windows) != 1 {
 		t.Fatalf("windows created = %d, want 1", len(opener.windows))
@@ -192,5 +223,28 @@ func TestFR_REPO_05_OpenWorktreePathNotifiesAndOpensNoWindowOnFailure(t *testing
 	}
 	if len(opener.windows) != 0 {
 		t.Errorf("windows opened = %d, want 0", len(opener.windows))
+	}
+}
+
+// case 16's error-message half (spec 30): WSL_NOT_FOUND/DISTRO_NOT_FOUND/
+// DEPLOY_REFUSED need no bespoke handling — openFailedMessage's existing
+// generic *core.Error path (FR-UX-01) already names each situation.
+func TestOpenFailedMessageNamesWSLFailures(t *testing.T) {
+	cases := []struct {
+		name string
+		err  *core.Error
+		want string
+	}{
+		{"wsl not found", core.Errorf(core.WslNotFound, "WSL is not installed (wsl.exe not found on PATH)"), "WSL is not installed"},
+		{"distro not found", core.Errorf(core.DistroNotFound, "distro %q not found", "bogus"), `distro "bogus" not found`},
+		{"deploy refused", core.Errorf(core.DeployRefused, "copying nebegit's helper into %s was declined", "Ubuntu-22.04"), "declined"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := openFailedMessage(tt.err)
+			if !strings.Contains(got, tt.want) {
+				t.Errorf("openFailedMessage(%v) = %q, want to contain %q", tt.err, got, tt.want)
+			}
+		})
 	}
 }

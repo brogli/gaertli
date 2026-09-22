@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/services"
 	"github.com/brogli/nebegit/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -59,10 +60,11 @@ func (sh shell) open(ctx context.Context, path string) {
 		sh.notify.Show("nebegit", openFailedMessage(err))
 		return
 	}
-	sh.reg.OpenOrFocus(wt.ID, wt.Path)
+	distro, _, _ := remote.ClassifyWSLPath(path)
+	sh.reg.OpenOrFocus(wt.ID, wt.Path, distro)
 	sh.reg.SetRepo(wt.ID, wt.RepoKey)
 	_ = sh.store.Update(func(s *settings.Settings) {
-		s.AddRecent(wt.Path, time.Now())
+		s.AddRecent(wt.Path, time.Now(), distro)
 		s.SetOpenWorktrees(sh.reg.OpenWorktreePaths())
 	})
 }
@@ -152,15 +154,18 @@ func Run(assets fs.FS, args []string) error {
 	}
 
 	reg := NewRegistry()
+	reg.SetStore(store)
 	reg.SetLocal(services.New(reg.Dispatch))
+	reg.PushEditorProfiles(context.Background()) // TR-13: the local core's own profile, at startup
 
 	var sh shell
 	onPath := func(path string) { sh.launch(context.Background(), path) }
 	a := application.New(options(assets, reg, onPath))
 	reg.Bind(a)
+	reg.SetConsent(wailsConsent{app: a})
 	sh = shell{api: NewFacade(reg), reg: reg, store: store, notify: wailsNotifier{app: a}}
 	a.RegisterService(application.NewService(&AppService{shell: sh, picker: wailsPicker{app: a}}))
-	a.RegisterService(application.NewService(NewSettingsService(store)))
+	a.RegisterService(application.NewService(NewSettingsService(store, reg)))
 	sh.launch(context.Background(), path)
 
 	if err := a.Run(); err != nil {

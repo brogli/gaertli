@@ -114,6 +114,19 @@ describe('log store', () => {
     expect(mockReloadLog).toHaveBeenCalledWith('/repo')
   })
 
+  it('ADR-4 calls LoadLog again on a core:reconnected event', async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+    mockLoadLog.mockClear()
+
+    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'core:reconnected')?.[1]
+    handler?.({})
+    await Promise.resolve()
+
+    expect(mockLoadLog).toHaveBeenCalledTimes(1)
+    expect(mockLoadLog).toHaveBeenCalledWith('/repo')
+  })
+
   it('FR-REPO-04 drops the row cache when Generation changes', async () => {
     const log = useLogStore()
     await log.load('/repo')

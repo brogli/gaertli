@@ -17,3 +17,18 @@ export const LOG_ROWS_FIXTURE: LogCommit[] = Array.from({ length: ROW_COUNT }, (
     graph: { lane: 0, colour: 0, edges: [] },
   }
 })
+
+// commitRow: the single canned LogCommit shared by LogList/WorktreeView/
+// commitMenu/CommitDetailsPanel component tests (spec 40), overridable via
+// partial for the rare test that needs a different field.
+export function commitRow(overrides: Partial<LogCommit> = {}): LogCommit {
+  return {
+    sha: 'abc123',
+    shortSha: 'abc123',
+    author: 'Alice',
+    authorAt: 0,
+    subject: 'Fix the bug',
+    graph: { lane: 0, colour: 0, edges: [] },
+    ...overrides,
+  }
+}
