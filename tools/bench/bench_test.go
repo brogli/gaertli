@@ -124,8 +124,7 @@ func timeTopoOrderLog(t *testing.T, r git.Runner) time.Duration {
 	start := time.Now()
 	_, err := r.Run(t.Context(), git.Call{
 		Dir: refDir, ReadOnly: true, Timeout: 2 * time.Minute,
-		Args: []string{"log", "--topo-order", "--parents", "--decorate=full",
-			"--exclude=refs/stash", "--all", "--format=" + services.LogFormat},
+		Args: services.LogArgs(core.LogFilter{}),
 	})
 	if err != nil {
 		t.Fatal(err)

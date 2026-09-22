@@ -6,6 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: 'happy-dom',
+      setupFiles: ['src/testing/setup.ts'],
       // e2e/*.spec.ts are Playwright tests (TR-31), not Vitest's.
       exclude: [...configDefaults.exclude, 'e2e/**'],
     },

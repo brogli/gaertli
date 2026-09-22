@@ -39,6 +39,47 @@ func (c *Client) CommitDetails(ctx context.Context, wt core.WorktreeID, sha stri
 	return result, err
 }
 
+type compareCommitsParams struct {
+	Wt core.WorktreeID `json:"wt"`
+	A  string          `json:"a"`
+	B  string          `json:"b"`
+}
+
+func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a string, b string) ([]core.ChangedFile, error) {
+	var result []core.ChangedFile
+	err := c.call(ctx, "CompareCommits", compareCommitsParams{Wt: wt, A: a, B: b}, &result)
+	return result, err
+}
+
+type diffFileParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Sha     string          `json:"sha"`
+	Path    string          `json:"path"`
+	OldPath string          `json:"oldPath"`
+	Force   bool            `json:"force"`
+}
+
+func (c *Client) DiffFile(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, force bool) (core.DiffFile, error) {
+	var result core.DiffFile
+	err := c.call(ctx, "DiffFile", diffFileParams{Wt: wt, Sha: sha, Path: path, OldPath: oldPath, Force: force}, &result)
+	return result, err
+}
+
+type diffRangeParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	A       string          `json:"a"`
+	B       string          `json:"b"`
+	Path    string          `json:"path"`
+	OldPath string          `json:"oldPath"`
+	Force   bool            `json:"force"`
+}
+
+func (c *Client) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b string, path string, oldPath string, force bool) (core.DiffFile, error) {
+	var result core.DiffFile
+	err := c.call(ctx, "DiffRange", diffRangeParams{Wt: wt, A: a, B: b, Path: path, OldPath: oldPath, Force: force}, &result)
+	return result, err
+}
+
 type loadLogParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -113,6 +154,15 @@ type setFocusedParams struct {
 
 func (c *Client) SetFocused(ctx context.Context, wt core.WorktreeID, focused bool) error {
 	return c.call(ctx, "SetFocused", setFocusedParams{Wt: wt, Focused: focused}, nil)
+}
+
+type setLogFilterParams struct {
+	Wt     core.WorktreeID `json:"wt"`
+	Filter core.LogFilter  `json:"filter"`
+}
+
+func (c *Client) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter core.LogFilter) error {
+	return c.call(ctx, "SetLogFilter", setLogFilterParams{Wt: wt, Filter: filter}, nil)
 }
 
 type summaryParams struct {

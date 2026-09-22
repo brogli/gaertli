@@ -53,8 +53,11 @@ func (c *Core) LogRows(ctx context.Context, id core.WorktreeID, from, to int) (c
 	if err != nil {
 		return core.LogRowsResult{}, err
 	}
-	rows, loaded, done, logErr, gen := wt.Repo.LogSnapshot(from, to)
-	return core.LogRowsResult{Rows: rows, Loaded: loaded, Done: done, Error: logErr, Generation: gen}, nil
+	view := wt.LogSnapshot(from, to)
+	return core.LogRowsResult{
+		Rows: view.Rows, Loaded: view.Loaded, Done: view.Done, Error: view.Err,
+		Generation: view.Generation, Flat: view.Flat,
+	}, nil
 }
 
 // ReloadLog implements core.API.
@@ -96,50 +99,58 @@ func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha string) (
 // guards every LogAppend/LogFinish against a reload that superseded it.
 func (c *Core) streamLog(wt *session.Worktree, gen int) {
 	repo := wt.Repo
-	checkedOut, err := worktreeCheckouts(wt.Runner, wt.Path)
-	if err != nil {
-		var ce *core.Error
-		errors.As(err, &ce)
-		repo.LogFinish(gen, ce, nil)
-		return
+	progress := func(loaded int, done bool) { c.emitLogProgress(repo.Key, loaded, done) }
+	loaded, logErr := streamCommits(context.Background(), wt, LogArgs(core.LogFilter{}), false,
+		func(commit core.LogCommit) { repo.LogAppend(gen, commit) }, progress)
+
+	var tips map[string]string
+	if logErr == nil {
+		// best-effort: a failure here just means the next ReloadLog always
+		// refreshes, rather than failing an otherwise-successful load.
+		tips, _ = refTips(context.Background(), wt.Runner, wt.Path)
+	}
+	repo.LogFinish(gen, logErr, tips)
+	progress(loaded, true)
+	if logErr == nil {
+		writeCommitGraphIfLarge(wt, loaded) // after the done signal: never delays the UI
+	}
+}
+
+// streamCommits runs one git log call with args, parses every record into a
+// LogCommit (with its graph row unless flat), and hands each to appendRow;
+// progress fires for the first row and then every progressInterval, never
+// with done. Returns the row count and the call's error, if any.
+func streamCommits(ctx context.Context, wt *session.Worktree, args []string, flat bool,
+	appendRow func(core.LogCommit), progress func(loaded int, done bool)) (loaded int, err *core.Error) {
+	checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path)
+	if ckErr != nil {
+		errors.As(ckErr, &err)
+		return 0, err
 	}
 
 	layout := graph.NewLayout()
-	loaded, lastEmit := 0, time.Time{}
-	_, runErr := wt.Runner.Stream(context.Background(), git.Call{
-		Dir: wt.Path, ReadOnly: true, Timeout: logTimeout,
-		Args: []string{"log", "--topo-order", "--parents", "--decorate=full",
-			"--exclude=refs/stash", "--all", "--format=" + LogFormat},
+	lastEmit := time.Time{}
+	_, runErr := wt.Runner.Stream(ctx, git.Call{
+		Dir: wt.Path, ReadOnly: true, Timeout: logTimeout, Args: args,
 	}, func(record []byte) error {
 		commit, parents, err := parseLogRecord(record)
 		if err != nil {
 			return err
 		}
 		commit.CheckedOutIn = checkedOut[commit.SHA]
-		commit.Graph = toGraphRow(layout.Next(graph.Commit{SHA: commit.SHA, Parents: parents}))
-		repo.LogAppend(gen, commit)
+		if !flat {
+			commit.Graph = toGraphRow(layout.Next(graph.Commit{SHA: commit.SHA, Parents: parents}))
+		}
+		appendRow(commit)
 		loaded++
 		if loaded == 1 || time.Since(lastEmit) >= progressInterval {
-			c.emitLogProgress(repo.Key, loaded, false)
+			progress(loaded, false)
 			lastEmit = time.Now()
 		}
 		return nil
 	})
-
-	var logErr *core.Error
-	errors.As(runErr, &logErr)
-
-	var tips map[string]string
-	if runErr == nil {
-		// best-effort: a failure here just means the next ReloadLog always
-		// refreshes, rather than failing an otherwise-successful load.
-		tips, _ = refTips(context.Background(), wt.Runner, wt.Path)
-	}
-	repo.LogFinish(gen, logErr, tips)
-	c.emitLogProgress(repo.Key, loaded, true)
-	if runErr == nil {
-		writeCommitGraphIfLarge(wt, loaded) // after the done signal: never delays the UI
-	}
+	errors.As(runErr, &err)
+	return loaded, err
 }
 
 // writeCommitGraphIfLarge runs `git commit-graph write --reachable` once the
@@ -216,10 +227,7 @@ func parseRefTips(out []byte) map[string]string {
 }
 
 func (c *Core) emitLogProgress(repoKey string, loaded int, done bool) {
-	payload, _ := json.Marshal(struct {
-		Loaded int  `json:"loaded"`
-		Done   bool `json:"done"`
-	}{loaded, done})
+	payload, _ := json.Marshal(core.LogProgress{Loaded: loaded, Done: done})
 	c.sink(core.Event{Name: "log:progress", Repo: repoKey, Payload: payload})
 }
 

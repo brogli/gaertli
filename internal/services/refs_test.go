@@ -47,6 +47,7 @@ func TestFR_LOG_01_ParseRefRecordsThenToRefsBucketsAndDereferencesTags(t *testin
 	records := []ref{
 		{"refs/heads/main", shaMain, "", "origin/main", "[ahead 1, behind 1]", "*", ""},
 		{"refs/heads/feature", shaFeature, "", "", "", "", ""},
+		{"refs/remotes/origin/HEAD", shaOriginMain, "", "", "", "", ""}, // the remote's symbolic HEAD: not a branch
 		{"refs/remotes/origin/main", shaOriginMain, "", "", "", "", ""},
 		{"refs/remotes/origin/feature", shaOriginFeat, "", "", "", "", ""},
 		{"refs/tags/v1", shaLightweight, "", "", "", "", ""},

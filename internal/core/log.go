@@ -7,6 +7,7 @@ type LogRowsResult struct {
 	Done       bool        `json:"done"`
 	Error      *Error      `json:"error,omitempty"`
 	Generation int         `json:"generation"` // bumps on ReloadLog; a store sees this change and drops its row cache
+	Flat       bool        `json:"flat"`       // FR-LOG-02: true while a text/author query narrows this view — the UI hides the graph column
 }
 
 // LogCommit is one commit-log row (FR-LOG-01).
@@ -63,4 +64,33 @@ type ChangedFile struct {
 	Path    string `json:"path"`
 	OldPath string `json:"oldPath,omitempty"` // rename/copy source
 	Status  string `json:"status"`            // "A" | "M" | "D" | "R" | "C" | "T" | "U"
+}
+
+// LogFilter is FR-LOG-05..08's combined filter. Every non-empty field
+// narrows the result set together (FR-LOG-08's "combined" is AND, not OR —
+// git's own default combination of different predicate types). Query, if it
+// parses as an existing commit's hash, short-circuits every other field
+// (services.streamFilteredLog) — pasting a hash is a more specific request
+// than any fuzzy filter.
+type LogFilter struct {
+	Query    string   `json:"query,omitempty"`    // FR-LOG-05: message text (subject+body), or a commit hash
+	Author   string   `json:"author,omitempty"`   // FR-LOG-05: author name or email
+	Branches []string `json:"branches,omitempty"` // FR-LOG-06: short ref names; empty = every branch, like the unfiltered log
+	Path     string   `json:"path,omitempty"`     // FR-LOG-07: file or folder path
+}
+
+// Empty reports whether f narrows nothing — SetLogFilter(ctx, wt,
+// LogFilter{}) is FR-LOG-08's "one action clears them all".
+func (f LogFilter) Empty() bool {
+	return f.Query == "" && f.Author == "" && len(f.Branches) == 0 && f.Path == ""
+}
+
+// LogProgress is "log:progress"'s payload, shared by the unfiltered log
+// (spec 10) and a window's own filtered view (spec 22): Filtered tells the
+// two apart, since one window can have both streams running at once (its
+// base log still streaming in, its own search already active).
+type LogProgress struct {
+	Loaded   int  `json:"loaded"`
+	Done     bool `json:"done"`
+	Filtered bool `json:"filtered"`
 }

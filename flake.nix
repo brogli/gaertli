@@ -30,6 +30,7 @@
             pkg-config
             gtk4
             webkitgtk_6_0
+            adwaita-icon-theme # mouse cursor for the X11 backend under WSLg
             playwright-driver.browsers
           ];
 
@@ -38,7 +39,25 @@
               echo "nebegit: Go is not provided by this shell. Install Go $(sed -n 's/^go //p' go.mod) or newer natively (see CONTRIBUTING.md)." >&2
             fi
             if grep -qi microsoft /proc/version 2>/dev/null; then
+              # WSLg: the Nix-built libEGL finds no GL driver on a non-NixOS
+              # host (no /run/opengl-driver), so WebKit's web process aborts
+              # with EGL_BAD_PARAMETER and the window stays white. Mesa's
+              # llvmpipe hook points EGL/GLX at Mesa's own software driver.
+              # X11 (XWayland): on WSLg's Wayland path the page loads but never
+              # paints with the software driver; on X11 it renders.
               export WEBKIT_DISABLE_DMABUF_RENDERER=1
+              export GDK_BACKEND=x11
+              # On X11 GTK draws the pointer from a cursor theme; without one
+              # the mouse is invisible over the window.
+              export XCURSOR_PATH=${pkgs.adwaita-icon-theme}/share/icons
+              export XCURSOR_THEME=Adwaita
+              export XCURSOR_SIZE=24
+              # GTK 4's file dialog goes through xdg-desktop-portal; the host's
+              # portal backend cannot attach its dialog to an XWayland parent
+              # ("Unhandled parent window type") and the app waits forever.
+              # In-process dialogs instead.
+              export GDK_DEBUG=no-portals
+              source ${pkgs.mesa.llvmpipeHook}/nix-support/setup-hook
             fi
             export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
             export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true

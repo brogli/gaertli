@@ -34,6 +34,33 @@ func (f *Facade) CommitDetails(ctx context.Context, wt core.WorktreeID, sha stri
 	return c.CommitDetails(ctx, wt, sha)
 }
 
+func (f *Facade) CompareCommits(ctx context.Context, wt core.WorktreeID, a string, b string) ([]core.ChangedFile, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero []core.ChangedFile
+		return zero, err
+	}
+	return c.CompareCommits(ctx, wt, a, b)
+}
+
+func (f *Facade) DiffFile(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, force bool) (core.DiffFile, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
+	return c.DiffFile(ctx, wt, sha, path, oldPath, force)
+}
+
+func (f *Facade) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b string, path string, oldPath string, force bool) (core.DiffFile, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
+	return c.DiffRange(ctx, wt, a, b, path, oldPath, force)
+}
+
 func (f *Facade) LoadLog(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -100,6 +127,14 @@ func (f *Facade) SetFocused(ctx context.Context, wt core.WorktreeID, focused boo
 		return err
 	}
 	return c.SetFocused(ctx, wt, focused)
+}
+
+func (f *Facade) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter core.LogFilter) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.SetLogFilter(ctx, wt, filter)
 }
 
 func (f *Facade) Summary(ctx context.Context, wt core.WorktreeID) (core.Summary, error) {

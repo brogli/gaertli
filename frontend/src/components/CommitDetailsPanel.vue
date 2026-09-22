@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useLogStore } from '../stores/log'
+import ChangedFileList from './ChangedFileList.vue'
 
 // CommitDetailsPanel shows the log store's selected commit (FR-LOG-03):
 // message, committer info, parents, and changed files. Empty until a row
@@ -15,12 +16,10 @@ const log = useLogStore()
     <ul class="parents">
       <li v-for="parent in log.details.parents ?? []" :key="parent">{{ parent }}</li>
     </ul>
-    <ul class="files">
-      <li v-for="file in log.details.files ?? []" :key="file.path">
-        {{ file.status }}
-        <template v-if="file.oldPath">{{ file.oldPath }} &rarr; </template>
-        {{ file.path }}
-      </li>
-    </ul>
+    <ChangedFileList
+      :files="log.details.files ?? []"
+      :selected="log.selectedFile"
+      @select="log.selectFile"
+    />
   </section>
 </template>

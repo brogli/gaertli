@@ -45,6 +45,10 @@ func (f fakeAPI) CommitDetails(context.Context, core.WorktreeID, string) (core.C
 	return core.CommitDetails{}, nil
 }
 
+func (f fakeAPI) DiffFile(context.Context, core.WorktreeID, string, string, string, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
 func (f fakeAPI) Refresh(context.Context, core.WorktreeID) error { return nil }
 
 func (f fakeAPI) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
@@ -61,6 +65,16 @@ func (f fakeAPI) ReloadLog(context.Context, core.WorktreeID) error { return nil 
 func (f fakeAPI) LogIndexOf(context.Context, core.WorktreeID, string) (core.LogIndexResult, error) {
 	return core.LogIndexResult{}, nil
 }
+
+func (f fakeAPI) CompareCommits(context.Context, core.WorktreeID, string, string) ([]core.ChangedFile, error) {
+	return nil, nil
+}
+
+func (f fakeAPI) DiffRange(context.Context, core.WorktreeID, string, string, string, string, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
+func (f fakeAPI) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
 
 // fakeNotifier is an errorNotifier that counts its calls.
 type fakeNotifier struct{ calls int }

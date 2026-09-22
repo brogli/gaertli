@@ -157,19 +157,19 @@ func TestRepoLogSnapshotClampsWindowAndReportsState(t *testing.T) {
 	gen, _ := r.LogBeginLoad()
 	r.LogAppend(gen, core.LogCommit{SHA: "a"}, core.LogCommit{SHA: "b"})
 
-	rows, loaded, done, err, _ := r.LogSnapshot(0, 10)
-	if loaded != 2 || done || err != nil {
-		t.Fatalf("LogSnapshot = %d rows, loaded=%d, done=%v, err=%v", len(rows), loaded, done, err)
+	view := r.LogSnapshot(0, 10)
+	if view.Loaded != 2 || view.Done || view.Err != nil {
+		t.Fatalf("LogSnapshot = %d rows, loaded=%d, done=%v, err=%v", len(view.Rows), view.Loaded, view.Done, view.Err)
 	}
-	if len(rows) != 2 {
-		t.Fatalf("rows = %d, want 2 (clamped to loaded)", len(rows))
+	if len(view.Rows) != 2 {
+		t.Fatalf("rows = %d, want 2 (clamped to loaded)", len(view.Rows))
 	}
 
 	want := core.Errorf(core.Internal, "boom")
 	r.LogFinish(gen, want, nil)
-	_, _, done, err, _ = r.LogSnapshot(0, 10)
-	if !done || err != want {
-		t.Errorf("after LogFinish: done=%v err=%v, want true, %v", done, err, want)
+	view = r.LogSnapshot(0, 10)
+	if !view.Done || view.Err != want {
+		t.Errorf("after LogFinish: done=%v err=%v, want true, %v", view.Done, view.Err, want)
 	}
 }
 

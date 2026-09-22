@@ -38,6 +38,10 @@ func (s stubCore) CommitDetails(context.Context, core.WorktreeID, string) (core.
 	return core.CommitDetails{}, nil
 }
 
+func (s stubCore) DiffFile(context.Context, core.WorktreeID, string, string, string, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
 func (s stubCore) Refresh(context.Context, core.WorktreeID) error { return nil }
 
 func (s stubCore) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
@@ -49,6 +53,16 @@ func (s stubCore) ReloadLog(context.Context, core.WorktreeID) error { return nil
 func (s stubCore) LogIndexOf(context.Context, core.WorktreeID, string) (core.LogIndexResult, error) {
 	return core.LogIndexResult{}, nil
 }
+
+func (s stubCore) CompareCommits(context.Context, core.WorktreeID, string, string) ([]core.ChangedFile, error) {
+	return nil, nil
+}
+
+func (s stubCore) DiffRange(context.Context, core.WorktreeID, string, string, string, string, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
+func (s stubCore) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
 
 type stubRouter struct {
 	local core.API

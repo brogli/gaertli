@@ -18,6 +18,7 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     ReloadLog: mockReloadLog,
     CommitDetails: vi.fn(),
     LogIndexOf: mockLogIndexOf,
+    SetLogFilter: vi.fn().mockResolvedValue(undefined),
   },
 }))
 
@@ -67,6 +68,22 @@ describe('log store', () => {
 
     await log.rows(0, 1)
     await log.rows(0, 1)
+
+    expect(mockLogRows).toHaveBeenCalledTimes(1)
+  })
+
+  it('rows(from, to) dedupes an in-flight request for the same window', async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+
+    let resolve!: (value: unknown) => void
+    mockLogRows.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+
+    const first = log.rows(0, 1) // not yet cached: fetches
+    const second = log.rows(0, 1) // requested again before the first resolves
+
+    resolve({ rows: [rowFixture('a')], loaded: 1, done: false, generation: 0 })
+    await Promise.all([first, second])
 
     expect(mockLogRows).toHaveBeenCalledTimes(1)
   })
@@ -159,5 +176,37 @@ describe('log store', () => {
 
     expect(log.selectedRow?.sha).toBe('abc')
     expect(log.pendingScrollTo).toBe(7)
+  })
+
+  it('FR-LOG-05 knownAuthors dedupes and sorts every author seen in fetched rows', async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+    mockLogRows.mockResolvedValueOnce({
+      rows: [
+        { ...rowFixture('a'), author: 'Bob' },
+        { ...rowFixture('b'), author: 'Alice' },
+        { ...rowFixture('c'), author: 'Bob' },
+      ],
+      loaded: 3,
+      done: true,
+      generation: 0,
+    })
+
+    await log.rows(0, 3)
+
+    expect(log.knownAuthors).toEqual(['Alice', 'Bob'])
+  })
+
+  it('FR-LOG-08 clearing a filter shows the base rows already fetched without refetching', async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+    await log.rows(0, 1)
+
+    await log.applyFilter({ query: 'x' })
+    await log.rows(0, 1)
+    await log.clearFilter()
+    await log.rows(0, 1)
+
+    expect(mockLogRows).toHaveBeenCalledTimes(2)
   })
 })

@@ -74,6 +74,7 @@ export const Facade = {
       loaded: LOG_ROWS_FIXTURE.length,
       done: true,
       generation: 0,
+      flat: false,
     })
   },
 

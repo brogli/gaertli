@@ -65,4 +65,38 @@ describe('CommitDetailsPanel', () => {
     expect(wrapper.text()).toContain('a.txt')
     expect(wrapper.text()).toContain('b.txt')
   })
+
+  it('FR-LOG-04 clicking a file row selects it in the log store', async () => {
+    mockCommitDetails.mockResolvedValue({
+      sha: 'abc123',
+      parents: [],
+      author: 'Alice',
+      authorEmail: 'alice@example.com',
+      authorAt: 0,
+      committer: 'Bob',
+      committerEmail: 'bob@example.com',
+      committerAt: 0,
+      body: 'Fix the bug',
+      files: [
+        { path: 'a.txt', status: 'M' },
+        { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
+      ],
+    })
+
+    const wrapper = mount(CommitDetailsPanel)
+    const log = useLogStore()
+    await log.select({
+      sha: 'abc123',
+      shortSha: 'abc123',
+      author: 'Alice',
+      authorAt: 0,
+      subject: 'Fix the bug',
+      graph: { lane: 0, colour: 0, edges: [] },
+    })
+    await flushPromises()
+
+    await wrapper.get('.files li').trigger('click')
+
+    expect(log.selectedFile).toEqual({ path: 'a.txt', status: 'M' })
+  })
 })

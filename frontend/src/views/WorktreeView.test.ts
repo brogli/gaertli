@@ -27,6 +27,10 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 
 import WorktreeView from './WorktreeView.vue'
 
+function mountView(props: { path: string }) {
+  return mount(WorktreeView, { props })
+}
+
 function branch(fields: Record<string, unknown>) {
   return {
     name: 'main',
@@ -64,9 +68,7 @@ describe('WorktreeView', () => {
   })
 
   it('FR-WT-09 shows the worktree name from the path prop', () => {
-    expect(mount(WorktreeView, { props: { path: '/home/user/project' } }).text()).toContain(
-      'project',
-    )
+    expect(mountView({ path: '/home/user/project' }).text()).toContain('project')
   })
 
   it('FR-UX-01 shows the error message and reveals gitStderr behind show details', async () => {
@@ -76,7 +78,7 @@ describe('WorktreeView', () => {
       }),
     )
 
-    const wrapper = mount(WorktreeView, { props: { path: '/home/user/project' } })
+    const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
     expect(wrapper.text()).toContain('not a git repository')
@@ -88,7 +90,7 @@ describe('WorktreeView', () => {
   })
 
   it('FR-REPO-04 clicking Refresh calls the Refresh binding with the worktree id', async () => {
-    const wrapper = mount(WorktreeView, { props: { path: '/home/user/project' } })
+    const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
     const refreshButton = wrapper.findAll('button').find((b) => b.text() === 'Refresh')
@@ -105,7 +107,7 @@ describe('WorktreeView', () => {
       tags: [],
     })
 
-    const wrapper = mount(WorktreeView, { props: { path: '/home/user/project' } })
+    const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
     const indicator = wrapper.get('[data-test="ahead-behind"]')
@@ -116,7 +118,7 @@ describe('WorktreeView', () => {
   it('FR-REPO-03 shows no ahead/behind indicator without an upstream', async () => {
     mockRefs.mockResolvedValue({ branches: [branch({})], remotes: [], tags: [] })
 
-    const wrapper = mount(WorktreeView, { props: { path: '/home/user/project' } })
+    const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
     expect(wrapper.find('[data-test="ahead-behind"]').exists()).toBe(false)

@@ -20,6 +20,15 @@ func handlers(api core.API) handler.Map {
 		"CommitDetails": handler.New(func(ctx context.Context, p commitDetailsParams) (core.CommitDetails, error) {
 			return api.CommitDetails(ctx, p.Wt, p.Sha)
 		}),
+		"CompareCommits": handler.New(func(ctx context.Context, p compareCommitsParams) ([]core.ChangedFile, error) {
+			return api.CompareCommits(ctx, p.Wt, p.A, p.B)
+		}),
+		"DiffFile": handler.New(func(ctx context.Context, p diffFileParams) (core.DiffFile, error) {
+			return api.DiffFile(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Force)
+		}),
+		"DiffRange": handler.New(func(ctx context.Context, p diffRangeParams) (core.DiffFile, error) {
+			return api.DiffRange(ctx, p.Wt, p.A, p.B, p.Path, p.OldPath, p.Force)
+		}),
 		"LoadLog": handler.New(func(ctx context.Context, p loadLogParams) error {
 			return api.LoadLog(ctx, p.Wt)
 		}),
@@ -43,6 +52,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"SetFocused": handler.New(func(ctx context.Context, p setFocusedParams) error {
 			return api.SetFocused(ctx, p.Wt, p.Focused)
+		}),
+		"SetLogFilter": handler.New(func(ctx context.Context, p setLogFilterParams) error {
+			return api.SetLogFilter(ctx, p.Wt, p.Filter)
 		}),
 		"Summary": handler.New(func(ctx context.Context, p summaryParams) (core.Summary, error) {
 			return api.Summary(ctx, p.Wt)

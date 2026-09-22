@@ -95,8 +95,8 @@ func toRefs(parsed []parsedRef) core.Refs {
 		case strings.HasPrefix(p.Name, "refs/tags/"):
 			refs.Tags = append(refs.Tags, core.Tag{Name: strings.TrimPrefix(p.Name, "refs/tags/"), SHA: p.SHA})
 		case strings.HasPrefix(p.Name, "refs/remotes/"):
-			if remote, branch, ok := splitRemoteBranch(p.Name); ok {
-				addRemoteBranch(remotes, &order, remote, branch, p.SHA)
+			if remote, branch, ok := splitRemoteBranch(p.Name); ok && branch != "HEAD" {
+				addRemoteBranch(remotes, &order, remote, branch, p.SHA) // <remote>/HEAD is the remote's symbolic HEAD, not a branch
 			}
 		}
 	}

@@ -2,14 +2,18 @@
 import { computed, onMounted, ref, watch, watchEffect, type ComponentPublicInstance } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { formatTimeAgo } from '@vueuse/core'
+import ContextMenu from 'openvue/contextmenu'
 import { useLogStore } from '../stores/log'
+import { useCompareStore } from '../stores/compare'
 import GraphCell from './GraphCell.vue'
+import { buildCommitMenuItems } from '../menus/commitMenu'
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // LogList is a virtual-scrolled commit list (ADR-5, QA-PERF-03): only the
 // rows in view are rendered, and only their window is fetched (FR-LOG-09).
 const props = defineProps<{ wt: string }>()
 const log = useLogStore()
+const compare = useCompareStore()
 
 onMounted(() => {
   void log.load(props.wt)
@@ -19,7 +23,7 @@ const parentRef = ref<HTMLElement | null>(null)
 
 const virtualizer = useVirtualizer(
   computed(() => ({
-    count: log.loaded,
+    count: log.activeLoaded,
     getScrollElement: () => parentRef.value,
     estimateSize: () => 32,
     overscan: 12,
@@ -51,31 +55,38 @@ function measureElement(el: Element | ComponentPublicInstance | null): void {
   if (el instanceof Element) virtualizer.value.measureElement(el)
 }
 
-function onRowClick(row: LogCommit | undefined): void {
-  if (row) void log.select(row)
+// Ctrl/Cmd-click adds row to the compare selection (FR-CMP-01) instead of
+// selecting it in the log; any plain click leaves compare mode.
+function onRowClick(row: LogCommit | undefined, event: MouseEvent): void {
+  if (!row) return
+  if (event.ctrlKey || event.metaKey) {
+    compare.toggleSelect(row)
+    return
+  }
+  compare.exit()
+  void log.select(row)
 }
 
 function timeAgo(unixSeconds: number): string {
   return formatTimeAgo(new Date(unixSeconds * 1000))
 }
 
-// Copy actions (FR-LOG-12): browser clipboard API only, no core.API call.
-function copyHash(): void {
-  const sha = log.selectedRow?.sha
-  if (sha) void navigator.clipboard.writeText(sha)
-}
+// Right-click context menu (FR-LOG-11 shell, FR-LOG-12 items): right-
+// clicking a row acts on it, same as a left click (log.select), then opens
+// the menu OpenVue's ContextMenu owns (positioning, Escape-to-close,
+// click-outside-to-close).
+const menuRef = ref<InstanceType<typeof ContextMenu>>()
+const menuItems = ref<ReturnType<typeof buildCommitMenuItems>>([])
 
-function copySubject(): void {
-  const subject = log.selectedRow?.subject
-  if (subject) void navigator.clipboard.writeText(subject)
+function onContextMenu(event: MouseEvent, row: LogCommit | undefined): void {
+  if (!row) return
+  void log.select(row)
+  menuItems.value = buildCommitMenuItems(row)
+  menuRef.value?.show(event)
 }
 </script>
 
 <template>
-  <div v-if="log.selectedRow" class="row-actions">
-    <button type="button" data-test="copy-hash" @click="copyHash">copy hash</button>
-    <button type="button" data-test="copy-subject" @click="copySubject">copy subject</button>
-  </div>
   <div ref="parentRef" class="log-list">
     <div class="spacer" :style="{ height: `${virtualizer.getTotalSize()}px` }">
       <div
@@ -84,12 +95,16 @@ function copySubject(): void {
         :ref="measureElement"
         :data-index="item.index"
         class="row"
-        :class="{ selected: row?.sha === log.selectedRow?.sha }"
+        :class="{
+          selected: row?.sha === log.selectedRow?.sha,
+          'compare-selected': compare.selection.some((r) => r.sha === row?.sha),
+        }"
         :style="{ transform: `translateY(${item.start}px)` }"
-        @click="onRowClick(row)"
+        @click="onRowClick(row, $event)"
+        @contextmenu.prevent="onContextMenu($event, row)"
       >
         <template v-if="row">
-          <GraphCell :graph="row.graph" />
+          <GraphCell v-if="!log.flat" :graph="row.graph" />
           <span class="subject">{{ row.subject }}</span>
           <span class="author">{{ row.author }}</span>
           <span class="date">{{ timeAgo(row.authorAt) }}</span>
@@ -105,6 +120,7 @@ function copySubject(): void {
       </div>
     </div>
   </div>
+  <ContextMenu ref="menuRef" :model="menuItems" />
 </template>
 
 <style scoped>

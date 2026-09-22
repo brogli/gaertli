@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRepoStore } from '../stores/repo'
 import { useRefsStore } from '../stores/refs'
+import { useLogStore } from '../stores/log'
+import { useCompareStore } from '../stores/compare'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from '../components/ErrorBanner.vue'
@@ -9,12 +11,32 @@ import CommandLogPanel from '../components/CommandLogPanel.vue'
 import SettingsPanel from '../components/SettingsPanel.vue'
 import LogList from '../components/LogList.vue'
 import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
+import CompareView from '../components/CompareView.vue'
+import DiffView from '../components/DiffView.vue'
 import RefsSidebar from '../components/RefsSidebar.vue'
+import FilterBar from '../components/FilterBar.vue'
 
 const props = defineProps<{ path: string }>()
 const name = props.path.split(/[\\/]/).pop() || props.path
 const repo = useRepoStore()
 const refs = useRefsStore()
+const log = useLogStore()
+const compare = useCompareStore()
+
+// The compared file's diff range (FR-CMP-02); null outside compare mode or
+// before a file is picked, so the template needs no non-null assertions.
+const compareRange = computed(() => {
+  const { from, to, selectedFile } = compare
+  return from && to && selectedFile
+    ? { from: from.sha, to: to.sha, path: selectedFile.path, oldPath: selectedFile.oldPath ?? '' }
+    : null
+})
+
+// One decision for the diff pane: a compared file, or a commit's file
+// outside compare mode — never a stale commit diff under CompareView.
+const showDiff = computed(
+  () => compareRange.value !== null || (!compare.active && !!log.selectedFile),
+)
 const { error, run } = useCoreCall()
 const showSettings = ref(false)
 
@@ -55,8 +77,11 @@ const tracked = computed(() => {
     <div class="worktree-body">
       <RefsSidebar />
       <div class="log-area">
+        <FilterBar />
         <LogList :wt="path" />
-        <CommitDetailsPanel />
+        <CompareView v-if="compare.active" :wt="path" />
+        <CommitDetailsPanel v-else />
+        <DiffView v-if="showDiff" :wt="path" :range="compareRange" />
       </div>
     </div>
     <CommandLogPanel :wt="path" />

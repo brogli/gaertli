@@ -61,6 +61,16 @@ type API interface {
 	// and changed files vs. its first parent (FR-LOG-03).
 	CommitDetails(ctx context.Context, wt WorktreeID, sha string) (CommitDetails, error)
 
+	// DiffFile returns path's content on both sides of sha (FR-LOG-04): at
+	// sha^ (oldPath if the file was renamed into path, else path) and at sha
+	// itself — first-parent semantics, matching CommitDetails: a merge
+	// diffs against its first parent only, and sha's root commit (no
+	// parent) yields "missing" on the old side, not an error. Binary files
+	// (FR-DIFF-03) and files over the size cap (FR-DIFF-04) come back
+	// without content; force bypasses the size cap only — a binary result
+	// never carries content regardless of force.
+	DiffFile(ctx context.Context, wt WorktreeID, sha, path, oldPath string, force bool) (DiffFile, error)
+
 	// Refresh forces an immediate check of wt's repo and worktree for
 	// outside changes (FR-REPO-04: manual refresh). Does not wait for any
 	// resulting "repo:changed" event — those follow the normal path if
@@ -90,6 +100,30 @@ type API interface {
 	// commit). A linear scan over already-streamed rows, not a git call.
 	// Found is false if sha is not, or not yet, among the loaded rows.
 	LogIndexOf(ctx context.Context, wt WorktreeID, sha string) (LogIndexResult, error)
+
+	// CompareCommits lists the files that differ between a and b (FR-CMP-01):
+	// a direct two-revision diff (a..b), never a merge-base diff (a...b) —
+	// only the two-revision form makes swapping a and b mirror every file's
+	// status exactly (FR-CMP-03). Same ChangedFile shape as CommitDetails
+	// (spec 10) — a consumer already knows how to render it.
+	CompareCommits(ctx context.Context, wt WorktreeID, a, b string) ([]ChangedFile, error)
+
+	// DiffRange returns path's content at two arbitrary revisions a and b
+	// (FR-CMP-02): DiffFile's (spec 20) counterpart for two independently
+	// chosen commits instead of one commit vs its first parent. Same result
+	// DTO, same binary/size-cap rules — force bypasses the size cap only, a
+	// binary result never carries content regardless of force.
+	DiffRange(ctx context.Context, wt WorktreeID, a, b, path, oldPath string, force bool) (DiffFile, error)
+
+	// SetLogFilter starts (filter non-empty) or clears (filter.Empty()) wt's
+	// own filtered view of the log (FR-LOG-05..08). A filtered view is this
+	// window's private state, independent of wt's repo's shared unfiltered
+	// cache (spec 10/12). A new non-empty filter supersedes whatever
+	// filtered view was already active or loading, killing its stream.
+	// Returns once the view has started changing, not once it finishes;
+	// rows arrive incrementally, readable via LogRows and announced by
+	// "log:progress" events exactly like LoadLog.
+	SetLogFilter(ctx context.Context, wt WorktreeID, filter LogFilter) error
 }
 
 // Version of a core. App is "dev" until a release build stamps it.

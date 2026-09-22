@@ -1,0 +1,26 @@
+import { mount } from '@vue/test-utils'
+import { describe, expect, it } from 'vitest'
+import ChangedFileList from './ChangedFileList.vue'
+
+const files = [
+  { path: 'a.txt', status: 'M' },
+  { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
+]
+
+describe('ChangedFileList', () => {
+  it('FR-CMP-02 clicking a file row emits select with that file', async () => {
+    const wrapper = mount(ChangedFileList, { props: { files } })
+
+    await wrapper.findAll('li')[1]!.trigger('click')
+
+    expect(wrapper.emitted('select')?.[0]).toEqual([files[1]])
+  })
+
+  it('FR-CMP-02 marks the selected file with a selected class', () => {
+    const wrapper = mount(ChangedFileList, { props: { files, selected: files[1]! } })
+
+    const rows = wrapper.findAll('li')
+    expect(rows[0]!.classes()).not.toContain('selected')
+    expect(rows[1]!.classes()).toContain('selected')
+  })
+})
