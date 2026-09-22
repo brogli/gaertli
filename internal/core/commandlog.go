@@ -1,6 +1,6 @@
 package core
 
-// CommandLogEntry is one command-log row (FR-UX-02): a git.Runner call as
+// CommandLogEntry is one command-log row: a git.Runner call as
 // buffered by a session and streamed to the shell via the "command" event.
 type CommandLogEntry struct {
 	At         string `json:"at"` // RFC3339Nano

@@ -13,8 +13,8 @@ import ErrorBanner from './ErrorBanner.vue'
 import { buildCommitMenuItems } from '../menus/commitMenu'
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// LogList is a virtual-scrolled commit list (ADR-5, QA-PERF-03): only the
-// rows in view are rendered, and only their window is fetched (FR-LOG-09).
+// LogList is a virtual-scrolled commit list: only the rows in view are
+// rendered, and only their window is fetched.
 const props = defineProps<{ wt: string }>()
 const emit = defineEmits<{
   'create-branch': [sha: string]
@@ -33,11 +33,9 @@ onMounted(() => {
 
 const parentRef = ref<HTMLElement | null>(null)
 
-// Rows are one fixed-height line (subject ellipsised): the virtualizer
-// never measures them, so it never shifts scrollTop to compensate for a
-// size change while rows stream in — dynamic measurement left a freshly
-// loaded list scrolled away from the top, or with its rendered range
-// outside the viewport (blank), on every load of a real repo.
+// Rows are one fixed-height line (subject ellipsised), so the virtualizer
+// never measures them: dynamic measurement shifted scrollTop while rows
+// streamed in, leaving a fresh list scrolled away from the top or blank.
 const ROW_HEIGHT = 24
 
 const virtualizer = useVirtualizer(
@@ -60,8 +58,7 @@ watchEffect(() => {
   }
 })
 
-// A sidebar ref click sets pendingScrollTo (FR-LOG-01, log store's
-// jumpTo): scroll that row into view and clear the pending index.
+// log.jumpTo sets pendingScrollTo: scroll that row into view and clear it.
 watch(
   () => log.pendingScrollTo,
   (index) => {
@@ -71,12 +68,11 @@ watch(
   },
 )
 
-// Ctrl/Cmd-click adds row to the compare selection (FR-CMP-01) instead of
-// selecting it in the log; the first Ctrl-click of a pair seeds the
-// selection with whatever was plainly selected before it, so two
-// Ctrl-clicks still work when the compare selection is empty. Shift-click
-// extends a multi-select range (FR-LOG-11); any other plain click leaves
-// compare mode and collapses the multi-select to this row.
+// Ctrl/Cmd-click adds row to the compare selection instead of selecting it
+// in the log; the first Ctrl-click of a pair seeds the selection with the
+// plainly selected row. Shift-click extends a multi-select range; any
+// other plain click leaves compare mode and collapses the multi-select to
+// this row.
 function onRowClick(row: LogCommit | undefined, index: number, event: MouseEvent): void {
   if (!row) return
   if (event.ctrlKey || event.metaKey) {
@@ -87,7 +83,7 @@ function onRowClick(row: LogCommit | undefined, index: number, event: MouseEvent
     return
   }
   compare.exit()
-  changes.clearSelection() // FR-UX-07: a commit selection wins over a stale changes-panel diff
+  changes.clearSelection() // a commit selection wins over a stale changes-panel diff
   if (event.shiftKey) void log.shiftSelectTo(index)
   else log.selectOnly(row, index)
   void log.select(row)
@@ -97,11 +93,9 @@ function timeAgo(unixSeconds: number): string {
   return formatTimeAgo(new Date(unixSeconds * 1000))
 }
 
-// Right-click context menu (FR-LOG-11/12): right-clicking a row selects it
-// like a left click, then opens OpenVue's ContextMenu, which owns
-// positioning and dismissal. Cherry-pick and revert act on the current
-// multi-select if the right-clicked row is part of it, else on that row
-// alone; both are stateless writes this component runs itself.
+// Right-clicking a row selects it like a left click, then opens the context
+// menu. Cherry-pick and revert act on the current multi-select if the
+// right-clicked row is part of it, else on that row alone.
 const menuRef = ref<InstanceType<typeof ContextMenu>>()
 const menuItems = ref<ReturnType<typeof buildCommitMenuItems>>([])
 

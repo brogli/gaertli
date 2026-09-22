@@ -47,6 +47,8 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     LoadLog: mockLoadLog,
     LogRows: mockLogRows,
     CommitDetails: vi.fn(),
+    Commit: vi.fn(),
+    SetMessageDraft: vi.fn(),
     Refresh: mockRefresh,
     Refs: mockRefs,
     CheckoutCommit: mockCheckoutCommit,
@@ -81,30 +83,17 @@ import { useChangesStore } from '../stores/changes'
 import { commitRow } from '../testing/fixtures/log-rows'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
 import { changedFilesFixture } from '../testing/fixtures/changes'
+import { branchFixture } from '../testing/fixtures/branch'
+import { clickMenuItem } from '../testing/contextMenu'
 
 function mountView(props: { path: string }) {
   return mount(WorktreeContent, { props })
 }
 
-function branch(fields: Record<string, unknown>) {
-  return {
-    name: 'main',
-    sha: 'sha-main',
-    current: true,
-    upstream: '',
-    ahead: 0,
-    behind: 0,
-    upstreamGone: false,
-    checkedOutIn: '',
-    ...fields,
-  }
-}
-
 const sampleRow = commitRow()
 
 // mountWithCheckoutCommitDialogOpen mounts WorktreeContent with one log row,
-// right-clicks it, and opens "Check out commit" from the resulting menu —
-// the setup FR-BR-08's confirm and cancel cases share.
+// right-clicks it, and opens "Check out commit" from the resulting menu.
 async function mountWithCheckoutCommitDialogOpen() {
   const wrapper = mount(WorktreeContent, {
     props: { path: '/home/user/project' },
@@ -119,21 +108,10 @@ async function mountWithCheckoutCommitDialogOpen() {
   await wrapper.get('.row').trigger('contextmenu')
   await wrapper.vm.$nextTick()
   const body = new DOMWrapper(document.body)
-  const items = body.findAll('.p-contextmenu-item-content')
-  await items[3]!.trigger('click') // "Check out commit"
+  await clickMenuItem(body, 'Check out commit')
   await wrapper.vm.$nextTick()
 
   return { wrapper, body }
-}
-
-// clickMenuItemByLabel finds a context-menu item by its label text and
-// clicks it — robust to a menu's own item order/length (mirrors
-// LogList.test.ts's own helper).
-async function clickMenuItemByLabel(body: DOMWrapper<Element>, label: string): Promise<void> {
-  const labels = body.findAll('.p-contextmenu-item-label')
-  const index = labels.findIndex((l) => l.text() === label)
-  const items = body.findAll('.p-contextmenu-item-content')
-  await items[index]!.trigger('click')
 }
 
 describe('WorktreeContent', () => {
@@ -226,7 +204,7 @@ describe('WorktreeContent', () => {
 
   it('FR-REPO-03 shows an ahead/behind indicator when the branch has an upstream', async () => {
     mockRefs.mockResolvedValue({
-      branches: [branch({ upstream: 'origin/main', ahead: 2, behind: 1 })],
+      branches: [branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })],
       remotes: [],
       tags: [],
     })
@@ -240,7 +218,7 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-REPO-03 shows no ahead/behind indicator without an upstream', async () => {
-    mockRefs.mockResolvedValue({ branches: [branch({})], remotes: [], tags: [] })
+    mockRefs.mockResolvedValue({ branches: [branchFixture({})], remotes: [], tags: [] })
 
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
@@ -331,8 +309,7 @@ describe('WorktreeContent', () => {
     await wrapper.get('.row').trigger('contextmenu')
     await wrapper.vm.$nextTick()
     const body = new DOMWrapper(document.body)
-    const items = body.findAll('.p-contextmenu-item-content')
-    await items[4]!.trigger('click') // "Reset current branch to here…"
+    await clickMenuItem(body, 'Reset current branch to here…')
     await wrapper.vm.$nextTick()
 
     const dialog = wrapper.findComponent(ResetDialog)
@@ -405,7 +382,7 @@ describe('WorktreeContent', () => {
     await wrapper.get('.row').trigger('contextmenu')
     await wrapper.vm.$nextTick()
     const body = new DOMWrapper(document.body)
-    await clickMenuItemByLabel(body, 'Create worktree here…')
+    await clickMenuItem(body, 'Create worktree here…')
     await flushPromises()
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
@@ -415,9 +392,35 @@ describe('WorktreeContent', () => {
     wrapper.unmount()
   })
 
+  it('FR-UX-01 a rejected ListBranches for "Create worktree here…" renders ErrorBanner with the error', async () => {
+    mockListBranches.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'list branches failed' } }),
+    )
+    const wrapper = mount(WorktreeContent, {
+      props: { path: '/home/user/project' },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const log = useLogStore()
+    log.rowCache.set(0, sampleRow)
+    log.loaded = 1
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.row').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    const body = new DOMWrapper(document.body)
+    await clickMenuItem(body, 'Create worktree here…')
+    await flushPromises()
+
+    expect(wrapper.findComponent(CreateWorktreeDialog).exists()).toBe(false)
+    expect(wrapper.get('.error-banner').text()).toContain('list branches failed')
+
+    wrapper.unmount()
+  })
+
   it('FR-WT-06 "Create worktree here…" on a local branch in the refs sidebar opens the dialog on that branch', async () => {
     mockRefs.mockResolvedValue({
-      branches: [branch({ name: 'feature', current: false })],
+      branches: [branchFixture({ name: 'feature', current: false })],
       remotes: [],
       tags: [],
     })
@@ -428,7 +431,7 @@ describe('WorktreeContent', () => {
     await item?.find('.ref-node').trigger('contextmenu')
     await wrapper.vm.$nextTick()
     const body = new DOMWrapper(document.body)
-    await clickMenuItemByLabel(body, 'Create worktree here…')
+    await clickMenuItem(body, 'Create worktree here…')
     await flushPromises()
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
@@ -449,7 +452,7 @@ describe('WorktreeContent', () => {
     await item?.find('.ref-node').trigger('contextmenu')
     await wrapper.vm.$nextTick()
     const body = new DOMWrapper(document.body)
-    await clickMenuItemByLabel(body, 'Create worktree here…')
+    await clickMenuItem(body, 'Create worktree here…')
     await flushPromises()
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
@@ -481,12 +484,12 @@ describe('WorktreeContent', () => {
     log.details = detailsWithFile('x.txt')
     log.selectedFile = { path: 'x.txt', status: 'M' }
     const changes = useChangesStore()
-    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true }
+    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true, status: 'M' }
     await wrapper.vm.$nextTick()
 
     const diffView = wrapper.findComponent(DiffView)
     expect(diffView.exists()).toBe(true)
-    expect(diffView.props('working')).toEqual({ path: 'a.txt', oldPath: '', staged: true })
+    expect(diffView.props('working')).toEqual({ path: 'a.txt', oldPath: '', staged: true, status: 'M' })
   })
 
   it('FR-UX-07 selecting a commit file clears the changes-panel selection and shows the commit diff', async () => {
@@ -494,7 +497,7 @@ describe('WorktreeContent', () => {
     await flushPromises()
 
     const changes = useChangesStore()
-    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true }
+    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true, status: 'M' }
     const log = useLogStore()
     log.details = detailsWithFile('x.txt')
     await wrapper.vm.$nextTick()

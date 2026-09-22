@@ -60,7 +60,7 @@ func (c *Core) ListBranches(ctx context.Context, path core.RepoPath) ([]core.Bra
 
 // AddWorktree implements core.API.
 func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, branch, start string, newBranch bool) (core.Worktree, error) {
-	wt, err := c.sessions.Open(ctx, path) // mints/reuses a session for path itself (an existing worktree of this repo) — same as OpenWorktree's own first-open cost, not a new leak class
+	wt, err := c.sessions.Open(ctx, path) // path is an existing worktree of the repo
 	if err != nil {
 		return core.Worktree{}, err
 	}
@@ -80,9 +80,7 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 	return c.describeWorktree(ctx, wt, target)
 }
 
-// describeWorktree returns target's own row from wt's repo's worktree list
-// — the fully-formed result AddWorktree hands back without a second round
-// trip from the caller.
+// describeWorktree returns target's row from wt's repo's worktree list.
 func (c *Core) describeWorktree(ctx context.Context, wt *session.Worktree, target string) (core.Worktree, error) {
 	result, err := wt.Runner.Run(ctx, git.Call{
 		Dir: wt.Path, ReadOnly: true, Args: []string{"worktree", "list", "--porcelain", "-z"},
@@ -101,9 +99,7 @@ func (c *Core) describeWorktree(ctx context.Context, wt *session.Worktree, targe
 // parseWorktreeRecords parses "git worktree list --porcelain -z" output
 // (each field is its own NUL-terminated "key[ value]"; an empty field ends
 // a record). git lists the main worktree first and porcelain has no marker
-// for it, so Main is set from position alone. Dirty is always false here: it needs a
-// git call this pure parser does not make, filled in by the caller
-// (ListWorktrees) for every non-missing row.
+// for it, so Main is set from position alone. Dirty is left to the caller.
 func parseWorktreeRecords(out []byte) []core.Worktree {
 	var worktrees []core.Worktree
 	for _, block := range bytes.Split(out, []byte{0, 0}) {
@@ -137,19 +133,11 @@ func parseWorktreeRecord(block []byte, main bool) core.Worktree {
 	return wt
 }
 
-// parseBranchSummaries parses
-// "git for-each-ref --format=%(refname:short)%1f%(worktreepath)%00
-// refs/heads" output: for-each-ref's own %1f/%00 escape syntax, records
-// framed the same way as the other for-each-ref parsers in this package
-// (a leading \n on every record but the first).
+// parseBranchSummaries parses ListBranches' for-each-ref output.
 func parseBranchSummaries(out []byte) []core.BranchSummary {
 	var summaries []core.BranchSummary
-	for _, record := range bytes.Split(out, []byte{0}) {
-		record = bytes.TrimPrefix(record, []byte("\n"))
-		if len(record) == 0 {
-			continue
-		}
-		name, worktree, _ := strings.Cut(string(record), "\x1f")
+	for _, record := range nulRecords(out) {
+		name, worktree, _ := strings.Cut(record, "\x1f")
 		summaries = append(summaries, core.BranchSummary{Name: name, CheckedOutIn: worktree})
 	}
 	return summaries

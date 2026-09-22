@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
@@ -219,7 +220,7 @@ func TestFR_CHG_02_UnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
 	c, id := openWorktree(t, repo.Dir)
 	err := c.UnstageFile(context.Background(), id, "never-tracked.txt")
 
-	ce := assertCode(t, err, core.GitFailed)
+	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "pathspec") {
 		t.Errorf("GitStderr = %q, want it to mention the pathspec", ce.GitStderr)
 	}

@@ -22,9 +22,9 @@ func TestFR_SYNC_07_RepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 	}
 	drainEvents(events)
 
-	wt.Repo.Jobs().Start("test", func(ctx context.Context, progress jobs.Progress) error {
+	wt.Repo.Jobs().Start("test", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		progress(50, "halfway")
-		return nil
+		return nil, nil
 	})
 
 	sawProgress, sawDone := false, false
@@ -36,7 +36,7 @@ func TestFR_SYNC_07_RepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 				continue
 			}
 			if e.Worktree != "" {
-				t.Errorf("job:update Worktree = %q, want empty (repo-scoped, ADR-9)", e.Worktree)
+				t.Errorf("job:update Worktree = %q, want empty (repo-scoped)", e.Worktree)
 			}
 			if e.Repo != wt.Repo.Key {
 				t.Errorf("job:update Repo = %q, want %q", e.Repo, wt.Repo.Key)

@@ -1,16 +1,16 @@
 package core
 
-// LogRowsResult is a window of the commit log loaded so far (FR-LOG-09).
+// LogRowsResult is a window of the commit log loaded so far.
 type LogRowsResult struct {
 	Rows       []LogCommit `json:"rows"`
 	Loaded     int         `json:"loaded"` // rows loaded so far; grows until Done
 	Done       bool        `json:"done"`
 	Error      *Error      `json:"error,omitempty"`
 	Generation int         `json:"generation"` // bumps on ReloadLog; a store sees this change and drops its row cache
-	Flat       bool        `json:"flat"`       // FR-LOG-02: true while a text/author query narrows this view — the UI hides the graph column
+	Flat       bool        `json:"flat"`       // a text/author query narrows this view: the UI hides the graph column
 }
 
-// LogCommit is one commit-log row (FR-LOG-01).
+// LogCommit is one commit-log row.
 type LogCommit struct {
 	SHA          string     `json:"sha"`
 	ShortSHA     string     `json:"shortSha"`
@@ -18,11 +18,11 @@ type LogCommit struct {
 	AuthorAt     int64      `json:"authorAt"` // unix seconds
 	Subject      string     `json:"subject"`
 	Refs         []RefLabel `json:"refs,omitempty"`
-	CheckedOutIn []string   `json:"checkedOutIn,omitempty"` // worktree paths (FR-LOG-10)
+	CheckedOutIn []string   `json:"checkedOutIn,omitempty"` // paths of worktrees whose HEAD is this commit
 	Graph        GraphRow   `json:"graph"`
 }
 
-// RefLabel is one decoration on a commit (FR-LOG-01). Name is the short
+// RefLabel is one decoration on a commit. Name is the short
 // display form ("main", "origin/main", "v1.0", "HEAD"); Kind disambiguates
 // what --decorate=full's full ref path said it was.
 type RefLabel struct {
@@ -30,7 +30,7 @@ type RefLabel struct {
 	Kind string `json:"kind"` // "head" | "branch" | "remote" | "tag"
 }
 
-// GraphRow is a commit's lane data (ADR-5), the JSON shape of graph.Row.
+// GraphRow is a commit's lane data, the JSON shape of graph.Row.
 type GraphRow struct {
 	Lane     int         `json:"lane"`
 	Colour   int         `json:"colour"`
@@ -45,7 +45,7 @@ type GraphEdge struct {
 }
 
 // CommitDetails is one commit's full message, committer, parents, and
-// changed files vs. its first parent (FR-LOG-03).
+// changed files vs. its first parent.
 type CommitDetails struct {
 	SHA            string        `json:"sha"`
 	Parents        []string      `json:"parents"`
@@ -59,8 +59,8 @@ type CommitDetails struct {
 	Files          []ChangedFile `json:"files"`
 }
 
-// ChangedFile is one file touched by a commit, or (FR-CHG-01) one entry in a
-// worktree's current changes.
+// ChangedFile is one file touched by a commit, or one entry in a worktree's
+// current changes.
 type ChangedFile struct {
 	Path    string `json:"path"`
 	OldPath string `json:"oldPath,omitempty"` // rename/copy source
@@ -70,19 +70,18 @@ type ChangedFile struct {
 	Status string `json:"status"`
 }
 
-// LogFilter is FR-LOG-05..08's combined filter. Every non-empty field
-// narrows the result set together (FR-LOG-08's "combined" is AND, not OR —
-// git's own default combination of different predicate types). Query, if it
-// parses as an existing commit's hash, short-circuits every other field.
+// LogFilter is the log's combined filter: every non-empty field narrows the
+// result (AND). Query, if it resolves to an existing commit's hash,
+// short-circuits every other field.
 type LogFilter struct {
-	Query    string   `json:"query,omitempty"`    // FR-LOG-05: message text (subject+body), or a commit hash
-	Author   string   `json:"author,omitempty"`   // FR-LOG-05: author name or email
-	Branches []string `json:"branches,omitempty"` // FR-LOG-06: short ref names; empty = every branch, like the unfiltered log
-	Path     string   `json:"path,omitempty"`     // FR-LOG-07: file or folder path
+	Query    string   `json:"query,omitempty"`    // message text (subject+body), or a commit hash
+	Author   string   `json:"author,omitempty"`   // author name or email
+	Branches []string `json:"branches,omitempty"` // short ref names; empty = every branch, like the unfiltered log
+	Path     string   `json:"path,omitempty"`     // file or folder path
 }
 
-// Empty reports whether f narrows nothing — SetLogFilter(ctx, wt,
-// LogFilter{}) is FR-LOG-08's "one action clears them all".
+// Empty reports whether f narrows nothing; SetLogFilter with an empty
+// filter clears the filtered view.
 func (f LogFilter) Empty() bool {
 	return f.Query == "" && f.Author == "" && len(f.Branches) == 0 && f.Path == ""
 }

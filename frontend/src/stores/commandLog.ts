@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { CommandLogEntry } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// commandLog is view-only (FR-UX-02): not persisted, reset on every mount.
+// commandLog is view-only: not persisted, reset on every mount.
 export const useCommandLogStore = defineStore('commandLog', () => {
   const entries = ref<CommandLogEntry[]>([])
   const showBackground = ref(false)

@@ -8,8 +8,8 @@
     "correctness": "error"
   },
   "rules": {
-    // Flags every existing untyped vi.fn() mock across nebegit's test suite;
-    // that plain form is the established convention, not adopted here (spec 07).
+    // Would flag every untyped vi.fn() mock, the convention in this test
+    // suite.
     "vitest/require-mock-type-parameters": "off"
   }
 }

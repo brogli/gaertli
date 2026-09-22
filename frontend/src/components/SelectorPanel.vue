@@ -13,10 +13,9 @@ import OpenWSLFolderDialog from './OpenWSLFolderDialog.vue'
 import CreateBranchDialog from './CreateBranchDialog.vue'
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
 
-// SelectorPanel is the left column of every window (FR-WT-13, ADR-9): recent
-// repos, each expandable to its worktrees and branches, loaded on first
-// expand so browsing a repo starts no poller. Present with or without a
-// selection (FR-UX-04).
+// SelectorPanel is the left column of every window: recent repos, each
+// expandable to its worktrees and branches, loaded on first expand so
+// browsing a repo starts no poller. Present with or without a selection.
 const props = defineProps<{ selectedPath: string }>()
 const emit = defineEmits<{ 'open-settings': [] }>()
 
@@ -59,19 +58,20 @@ onMounted(() => {
 onUnmounted(() => unlistenChanged?.())
 
 function pickAndOpen(): void {
-  void AppService.PickAndOpen()
+  void run(() => AppService.PickAndOpen())
 }
 
 function openRecent(path: string): void {
-  void AppService.OpenRecent(path)
+  void run(() => AppService.OpenRecent(path))
 }
 
 async function expand(rn: RepoNode): Promise<void> {
   if (rn.loaded) return
-  const [worktrees, branches] = await Promise.all([
-    Facade.ListWorktrees(rn.repo.path),
-    Facade.ListBranches(rn.repo.path),
-  ])
+  const result = await run(() =>
+    Promise.all([Facade.ListWorktrees(rn.repo.path), Facade.ListBranches(rn.repo.path)]),
+  )
+  if (!result) return
+  const [worktrees, branches] = result
   rn.worktrees = worktrees ?? []
   rn.branches = branches ?? []
   rn.loaded = true
@@ -84,10 +84,9 @@ const selectedRepoPath = computed(
   () => nodes.value.find((n) => n.worktrees.some((w) => w.path === props.selectedPath))?.repo.path,
 )
 
-// PanelData rides along on each Tree node, as RefsSidebar's RefTreeNode
-// does; kind narrows which of
-// worktree/branch is populated. Flat rather than a discriminated union so
-// the template can read it with plain optional chaining, no casts.
+// PanelData rides along on each Tree node; kind says which of
+// worktree/branch is set. Flat rather than a discriminated union so the
+// template can read it with optional chaining, no casts.
 interface PanelData {
   kind: 'repo' | 'header' | 'worktree' | 'branch' | 'new-branch' | 'new-worktree'
   repoNode: RepoNode
@@ -106,9 +105,8 @@ function marker(data: PanelData): string {
   return isThisWindow && data.worktree?.path === props.selectedPath ? '●' : '○'
 }
 
-// leafNode is a plain, non-selectable row: a group header ("Worktrees",
-// "Branches") or a button row ("+ New worktree", "New branch…") — never
-// selectable, so a click on one never also triggers node-select.
+// leafNode is a non-selectable row: a group header ("Worktrees",
+// "Branches") or a button row ("+ New worktree", "New branch…").
 function leafNode(rn: RepoNode, suffix: string, label: string, kind: 'header' | 'new-branch' | 'new-worktree'): PanelNode {
   return { key: `${rn.repo.path}#${suffix}`, label, leaf: true, selectable: false, data: { kind, repoNode: rn } }
 }
@@ -136,9 +134,8 @@ function branchNode(rn: RepoNode, branch: BranchSummary): PanelNode {
 }
 
 // "New branch…" renders only under the repo node of this window's
-// selection: CreateBranch acts on the selected worktree, which only exists
-// for that repo. "+ New worktree" has no such restriction — any browsed repo
-// can grow a worktree, whether or not it is this window's own selection.
+// selection: CreateBranch acts on the selected worktree. Any repo can get
+// a new worktree.
 function repoChildren(rn: RepoNode): PanelNode[] {
   if (!rn.loaded) return []
   const isSelectedRepo = rn.repo.path === selectedRepoPath.value
@@ -174,22 +171,20 @@ function onNodeSelect(node: TreeNode): void {
   if (data.kind === 'branch' && data.branch?.checkedOutIn) selectWorktree(data.branch.checkedOutIn)
 }
 
-// selectWorktree switches this window's own selection (FR-WT-05); a
-// rejection surfaces through ErrorBanner (FR-UX-01) and leaves the window
-// showing whatever it showed before.
+// selectWorktree switches this window's selection; on failure the window
+// keeps showing what it showed before.
 function selectWorktree(path: string): void {
   void run(() => AppService.SelectWorktree(path))
 }
 
-// checkout and "New branch…" (below) always act on this window's own
-// selected worktree (FR-BR-05's own wording, Design) — the same reason
+// checkout and "New branch…" act on this window's selected worktree, so
 // they render only under the selected repo's node.
 function checkout(name: string): void {
   void run(() => Facade.Checkout(props.selectedPath, name))
 }
 
-// openInEditor is FR-WT-04's row control, no worktree session required;
-// hidden for a missing (prunable) row, which has no folder to open.
+// openInEditor needs no worktree session; hidden for a missing (prunable)
+// row, which has no folder to open.
 function openInEditor(path: string): void {
   void run(() => Facade.OpenFolderAt(path))
 }
@@ -290,8 +285,8 @@ function openInEditor(path: string): void {
 </template>
 
 <style scoped>
-/* A resizable left column (FR-UX-07): the browser's own resize handle,
-   no splitter component. Collapsed, only the toggle stays. */
+/* A resizable left column: the browser's own resize handle, no splitter
+   component. Collapsed, only the toggle stays. */
 .selector-panel {
   width: 22%;
   min-width: 12em;

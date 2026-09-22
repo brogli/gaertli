@@ -1,0 +1,16 @@
+import type { Branch } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+
+// branchFixture is the current "main" branch with no upstream.
+export function branchFixture(overrides: Partial<Branch> = {}): Branch {
+  return {
+    name: 'main',
+    sha: 'sha-main',
+    current: true,
+    upstream: '',
+    ahead: 0,
+    behind: 0,
+    upstreamGone: false,
+    checkedOutIn: '',
+    ...overrides,
+  }
+}

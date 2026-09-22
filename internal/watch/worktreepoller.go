@@ -9,14 +9,12 @@ import (
 	"github.com/brogli/nebegit/internal/git"
 )
 
-// StatusArgs is the one status call shape (git-mapping.md's Status row):
-// the poll here and the changes list read the same records.
+// StatusArgs is the one status call shape: the poll here and the changes
+// list read the same records.
 var StatusArgs = []string{"status", "--porcelain=v2", "-z", "--branch", "--untracked-files=all"}
 
 // WorktreePoller polls one worktree's git status while its window has
-// focus (ADR-9: worktree-session-level; FR-REPO-04's working-file half).
-// Compares Result.Stdout's raw bytes only; parsing porcelain v2 is spec
-// 60's job.
+// focus. It compares Result.Stdout's raw bytes only.
 type WorktreePoller struct {
 	runner   git.Runner
 	dir      string
@@ -54,8 +52,8 @@ func (p *WorktreePoller) Focus() {
 	p.scheduleNext()
 }
 
-// Blur stops the timer (QA-PERF-06): a backgrounded window's poller makes
-// no git calls at all, not just fewer.
+// Blur stops the timer: a backgrounded window's poller makes no git calls
+// at all.
 func (p *WorktreePoller) Blur() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -79,8 +77,7 @@ func (p *WorktreePoller) scheduleNext() {
 	p.timer = time.AfterFunc(p.interval, p.tick)
 }
 
-// tick runs a poll and backs off or resets the interval, git-mapping.md:
-// "back off when status gets slow".
+// tick runs a poll and backs off while status is slow.
 func (p *WorktreePoller) tick() {
 	p.pollAndAdjust()
 	p.scheduleNext()

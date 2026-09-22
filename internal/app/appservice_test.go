@@ -2,13 +2,13 @@ package app
 
 import (
 	"context"
-	"errors"
 	"os"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -94,10 +94,7 @@ func TestFR_REPO_07_ListWSLDistrosReturnsWslNotFoundOnThisPlatform(t *testing.T)
 
 	_, err := s.ListWSLDistros(context.Background())
 
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != core.WslNotFound {
-		t.Fatalf("ListWSLDistros() err = %v, want a *core.Error{Code: WslNotFound}", err)
-	}
+	coretest.AssertCode(t, err, core.WslNotFound)
 }
 
 func TestFR_REPO_07_PickAndOpenWSLSeedsThePickerAtTheDistroRoot(t *testing.T) {
@@ -133,7 +130,7 @@ func TestFR_REPO_07_PickAndOpenWSLOpensThePickedPath(t *testing.T) {
 }
 
 // An unknown distro needs no bespoke handling either: open()'s generic
-// notify-and-do-nothing-else covers it (FR-REPO-05).
+// notify-and-do-nothing-else covers it.
 func TestFR_REPO_07_PickAndOpenWSLNotifiesOnDistroNotFound(t *testing.T) {
 	reg, opener := newTestRegistry()
 	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
@@ -235,10 +232,7 @@ func TestFR_WT_05_SelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
 
 	err := s.SelectWorktree(context.Background(), "/x")
 
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != core.Internal {
-		t.Fatalf("SelectWorktree(no window in ctx) err = %v, want Code Internal", err)
-	}
+	coretest.AssertCode(t, err, core.Internal)
 	if called {
 		t.Error("OpenWorktree should not be called")
 	}

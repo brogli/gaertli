@@ -1,4 +1,4 @@
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -33,19 +33,7 @@ import { useJobsStore } from '../stores/jobs'
 import { Code } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
-
-function branch(fields: Record<string, unknown> = {}) {
-  return {
-    name: 'main',
-    sha: 'sha-main',
-    current: true,
-    upstream: '',
-    ahead: 0,
-    behind: 0,
-    upstreamGone: false,
-    ...fields,
-  }
-}
+import { branchFixture } from '../testing/fixtures/branch'
 
 function findButton(wrapper: VueWrapper, text: string) {
   return wrapper.findAll('button').find((b) => b.text() === text)
@@ -74,7 +62,7 @@ describe('SyncControls', () => {
     mockPush.mockReset().mockResolvedValue('job-1')
     mockForcePush.mockReset().mockResolvedValue('job-1')
     mockRequire.mockReset()
-    mockRefs.mockReset().mockReturnValue({ branches: [branch()], remotes: [], tags: [] })
+    mockRefs.mockReset().mockReturnValue({ branches: [branchFixture()], remotes: [], tags: [] })
     mockSettings.mockReset().mockReturnValue(defaultSettingsFixture())
   })
 
@@ -89,7 +77,7 @@ describe('SyncControls', () => {
 
   it('FR-SYNC-02 defaults the pull-mode select from settings, showing Pull and Push with no remote picker', () => {
     mockRefs.mockReturnValue({
-      branches: [branch({ upstream: 'origin/main' })],
+      branches: [branchFixture({ upstream: 'origin/main' })],
       remotes: [],
       tags: [],
     })
@@ -105,7 +93,7 @@ describe('SyncControls', () => {
 
   it('FR-SYNC-02 switching to merge then clicking Pull calls Facade.Pull with the chosen mode', async () => {
     mockRefs.mockReturnValue({
-      branches: [branch({ upstream: 'origin/main' })],
+      branches: [branchFixture({ upstream: 'origin/main' })],
       remotes: [],
       tags: [],
     })
@@ -121,7 +109,7 @@ describe('SyncControls', () => {
 
   it('FR-SYNC-03 shows a remote picker and "Push and set upstream" instead of a plain Push button without an upstream', () => {
     mockRefs.mockReturnValue({
-      branches: [branch({ upstream: '' })],
+      branches: [branchFixture({ upstream: '' })],
       remotes: [{ name: 'origin', branches: [] }],
       tags: [],
     })
@@ -140,7 +128,7 @@ describe('SyncControls', () => {
 
   it('FR-SYNC-03 picking a remote then clicking "Push and set upstream" calls Facade.Push with that remote', async () => {
     mockRefs.mockReturnValue({
-      branches: [branch({ upstream: '' })],
+      branches: [branchFixture({ upstream: '' })],
       remotes: [{ name: 'origin', branches: [] }],
       tags: [],
     })
@@ -154,7 +142,7 @@ describe('SyncControls', () => {
   })
 
   it('FR-SYNC-06, FR-UX-03, QA-SAFE-01 force push on a protected branch confirms first, naming it protected', async () => {
-    mockRefs.mockReturnValue({ branches: [branch({ name: 'main' })], remotes: [], tags: [] })
+    mockRefs.mockReturnValue({ branches: [branchFixture({ name: 'main' })], remotes: [], tags: [] })
     mockSettings.mockReturnValue(defaultSettingsFixture({ protectedBranches: ['main'] }))
     const wrapper = mount(SyncControls, { props: { wt: '/repo' } })
     useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
@@ -173,7 +161,7 @@ describe('SyncControls', () => {
   })
 
   it('FR-SYNC-06 force push on an unprotected branch confirms with no "protected" text', async () => {
-    mockRefs.mockReturnValue({ branches: [branch({ name: 'main' })], remotes: [], tags: [] })
+    mockRefs.mockReturnValue({ branches: [branchFixture({ name: 'main' })], remotes: [], tags: [] })
     mockSettings.mockReturnValue(defaultSettingsFixture({ protectedBranches: [] }))
     const wrapper = mount(SyncControls, { props: { wt: '/repo' } })
     useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
@@ -215,5 +203,17 @@ describe('SyncControls', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-test="push-rejection"]').exists()).toBe(false)
+  })
+
+  it('FR-UX-01 a rejected Fetch renders ErrorBanner with the error', async () => {
+    mockFetch.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'network unreachable' } }),
+    )
+    const wrapper = mount(SyncControls, { props: { wt: '/repo' } })
+
+    await findButton(wrapper, 'Fetch')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.error-banner').text()).toContain('network unreachable')
   })
 })

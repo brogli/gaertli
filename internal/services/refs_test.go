@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -188,11 +187,10 @@ func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
-	bare := initBare(t)
-	gittest.Run(t, repo.Dir, "remote", "add", "origin", bare)
+	bare := bareRemote(t, repo, "origin")
 	gittest.Run(t, repo.Dir, "push", "-u", "origin", "feature")
 	gittest.Commit(t, repo.Dir, "local.txt", "local", "local-only")
-	clonePush(t, bare, "feature", "remote.txt", "remote", "remote-only")
+	remoteAppendCommitOnBranch(t, bare, "feature", "remote.txt", "remote", "remote-only")
 	gittest.Run(t, repo.Dir, "fetch", "origin")
 
 	c := New(func(core.Event) {})
@@ -217,8 +215,7 @@ func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
 func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	bare := initBare(t)
-	gittest.Run(t, repo.Dir, "remote", "add", "origin", bare)
+	bare := bareRemote(t, repo, "origin")
 	gittest.Run(t, repo.Dir, "push", "-u", "origin", "master")
 	gittest.Run(t, bare, "update-ref", "-d", "refs/heads/master")
 	gittest.Run(t, repo.Dir, "fetch", "--prune", "origin")
@@ -237,29 +234,6 @@ func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
 	if branch == nil || !branch.UpstreamGone {
 		t.Errorf("master = %+v, want UpstreamGone true", branch)
 	}
-}
-
-// initBare creates a bare repo (a fake remote) and returns its path.
-func initBare(t *testing.T) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "bare.git")
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Args: []string{"init", "--bare", dir}}); err != nil {
-		t.Fatal(err)
-	}
-	return dir
-}
-
-// clonePush clones bareDir at branch, adds one commit, and pushes it back
-// — simulating a second contributor moving the remote ahead of the caller's
-// own local repo.
-func clonePush(t *testing.T, bareDir, branch, file, content, msg string) {
-	t.Helper()
-	clone := filepath.Join(t.TempDir(), "clone")
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Args: []string{"clone", "--branch", branch, bareDir, clone}}); err != nil {
-		t.Fatal(err)
-	}
-	gittest.Commit(t, clone, file, content, msg)
-	gittest.Run(t, clone, "push", "origin", branch)
 }
 
 func findBranch(branches []core.Branch, name string) *core.Branch {

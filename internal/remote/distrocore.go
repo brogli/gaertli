@@ -8,10 +8,9 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// DistroCore owns one distro's headless core process (ADR-3: "One RPC core
-// per distro in use"): spawns it (deploying first if needed), holds the
-// live client, and respawns transparently if the process dies (reconnect,
-// ADR-4).
+// DistroCore owns one distro's headless core process: spawns it (deploying
+// first if needed), holds the live client, and respawns transparently if
+// the process dies.
 type DistroCore struct {
 	distro, version string
 	run             wslRunner
@@ -24,8 +23,7 @@ type DistroCore struct {
 	onConnect func(context.Context, *Client)
 }
 
-// OnConnect registers fn to run once per fresh connect (TR-13: "the shell
-// pushes the relevant subset to each core on connect"), after the version
+// OnConnect registers fn to run once per fresh connect, after the version
 // handshake succeeds and before Ensure returns to its caller.
 func (d *DistroCore) OnConnect(fn func(context.Context, *Client)) {
 	d.mu.Lock()
@@ -49,7 +47,7 @@ func NewDistroCore(distro, version string, run wslRunner, consent Consent, sink 
 // Ensure returns a live client, (re)spawning the core process if none is
 // running or the last one exited. respawned is true only when a spawn just
 // happened; the caller then re-opens every worktree it had open against
-// this distro, since a fresh core has no sessions (ADR-4). Concurrent
+// this distro, since a fresh core has no sessions. Concurrent
 // callers during a spawn share the one attempt.
 func (d *DistroCore) Ensure(ctx context.Context) (*Client, bool, error) {
 	client, respawned, onConnect, err := d.ensure(ctx)
@@ -101,17 +99,14 @@ func (d *DistroCore) ensure(ctx context.Context) (client *Client, respawned bool
 	return client, true, d.onConnect, nil
 }
 
-// discard kills cmd before closing client: Close's underlying channel does
-// not close the pipes (remote.go: "the caller owns stdout and pipes"), so
-// without the kill it would block forever waiting for the still-running
-// process to close its own stdout.
+// discard kills cmd before closing client: Close does not close the pipes,
+// so without the kill it would block until the process closes its stdout.
 func discard(client *Client, cmd *exec.Cmd) {
 	_ = cmd.Process.Kill()
 	_ = client.Close()
 }
 
-// versionOK checks the connected client's protocol against this build's own
-// (ADR-3: "Version is checked on connect").
+// versionOK checks the connected client's protocol against this build's.
 func (d *DistroCore) versionOK(ctx context.Context, client *Client) bool {
 	v, err := client.Version(ctx)
 	return err == nil && v.Protocol == core.Protocol

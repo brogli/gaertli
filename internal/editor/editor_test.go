@@ -1,13 +1,13 @@
 package editor
 
 import (
-	"errors"
 	"os"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
@@ -93,10 +93,7 @@ func TestFR_ED_06_OpenFolderReturnsEditorNotFoundWhenNotOnPath(t *testing.T) {
 
 	err := OpenFolder(profile, "/tmp/x")
 
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != core.EditorNotFound {
-		t.Fatalf("err = %v, want *core.Error{Code: EditorNotFound}", err)
-	}
+	coretest.AssertCode(t, err, core.EditorNotFound)
 }
 
 func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {

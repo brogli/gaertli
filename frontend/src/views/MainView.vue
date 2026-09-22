@@ -4,16 +4,12 @@ import SelectorPanel from '../components/SelectorPanel.vue'
 import SettingsPanel from '../components/SettingsPanel.vue'
 import WorktreeContent from './WorktreeContent.vue'
 
-// MainView is every window's root content (ADR-9): the selector panel
-// always renders, whether or not this window has a worktree selected
-// (FR-UX-04's "Settings reachable with no selection too"); WorktreeContent
-// renders only once one is. There is no distinct "no worktree" view, just
-// the panel's own empty state.
+// MainView is every window's root content: the selector panel always
+// renders; WorktreeContent only once a worktree is selected.
 defineProps<{ path: string }>()
 
-// showSettings lives here, not in WorktreeContent: it must be reachable
-// with no selection too, and it is shared by the panel's own entry point
-// and a selected worktree's ErrorBanner link (FR-ED-06).
+// showSettings lives here: settings are reachable with no selection too,
+// from the panel and from a worktree's ErrorBanner link.
 const showSettings = ref(false)
 </script>
 
@@ -29,8 +25,8 @@ const showSettings = ref(false)
 </template>
 
 <style scoped>
-/* FR-UX-07/08: the panel is the left column; the rest fills the window
-   (style.css's height chain). */
+/* The panel is the left column; the rest fills the window (style.css's
+   height chain). */
 .main-window {
   display: flex;
   height: 100%;

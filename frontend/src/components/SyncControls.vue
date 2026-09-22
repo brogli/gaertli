@@ -4,28 +4,24 @@ import { useRefsStore } from '../stores/refs'
 import { useSettingsStore } from '../stores/settings'
 import { useJobsStore } from '../stores/jobs'
 import { useConfirmAction } from '../composables/useConfirmAction'
+import { useCoreCall, type CoreError } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Code, PullMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import type { CoreError } from '../composables/useCoreCall'
 import ErrorBanner from './ErrorBanner.vue'
 
-// SyncControls is the Fetch/Pull/Push top-bar controls, plus force push
-// with its protected-branch warning and the push-rejection recovery
-// banner. Mounted beside WorktreeContent's branch summary. This component
-// only starts jobs; the jobs strip (JobsStrip.vue) owns progress and
-// cancel, feeding every "job:update" into the shared jobs store that this
-// component's own rejection banner reads.
+// SyncControls is the Fetch/Pull/Push controls, plus force push with its
+// protected-branch warning and the push-rejection recovery banner. It only
+// starts jobs; JobsStrip.vue shows their progress.
 const props = defineProps<{ wt: string }>()
 const refs = useRefsStore()
 const settings = useSettingsStore()
 const jobs = useJobsStore()
 const { confirmAction } = useConfirmAction()
+const { error, run } = useCoreCall()
 
 const currentBranch = computed(() => refs.refs?.branches?.find((b) => b.current))
 
-// Seeded once from the default pull-mode setting, then just local
-// component state for "last choice preselected".
+// seeded from the default pull-mode setting, then keeps the last choice
 const pullMode = ref<PullMode>(
   settings.settings?.defaultPullMode === PullMode.PullRebase
     ? PullMode.PullRebase
@@ -34,13 +30,13 @@ const pullMode = ref<PullMode>(
 const upstreamRemote = ref('')
 
 function onFetch(): void {
-  void Facade.Fetch(props.wt, '')
+  void run(() => Facade.Fetch(props.wt, ''))
 }
 function onPull(): void {
-  void Facade.Pull(props.wt, pullMode.value)
+  void run(() => Facade.Pull(props.wt, pullMode.value))
 }
 function onPush(): void {
-  void Facade.Push(props.wt, currentBranch.value?.upstream ? '' : upstreamRemote.value)
+  void run(() => Facade.Push(props.wt, currentBranch.value?.upstream ? '' : upstreamRemote.value))
 }
 function onForcePush(): void {
   const branchName = currentBranch.value?.name ?? ''
@@ -49,21 +45,14 @@ function onForcePush(): void {
   confirmAction(
     'Force push',
     `Force push "${branchName}"?${warning} This can overwrite work on the remote.`,
-    () => void Facade.ForcePush(props.wt),
+    () => void run(() => Facade.ForcePush(props.wt)),
   )
 }
 
-// The rejection banner, offering Pull or Force push, driven by the most
-// recently started push/force-push job in the shared jobs store — a fresh
-// attempt (state "running") naturally clears a stale banner, since it
-// becomes the latest job and isn't "failed".
-const latestPushJob = computed(() =>
-  jobs.items
-    .filter((j) => j.kind === 'push' || j.kind === 'force-push')
-    .reduce<JobInfo | undefined>((latest, j) => (!latest || j.startedAt > latest.startedAt ? j : latest), undefined),
-)
+// The rejection banner, offering Pull or Force push, reads the latest
+// push job, so a fresh attempt clears a stale banner.
 const rejection = computed<CoreError | null>(() => {
-  const job = latestPushJob.value
+  const job = jobs.latest((kind) => kind === 'push' || kind === 'force-push')
   if (!job || job.state !== 'failed' || !job.error) return null
   if (job.error.code !== Code.PushRejected && job.error.code !== Code.NotFastForward) return null
   return job.error
@@ -72,6 +61,7 @@ const rejection = computed<CoreError | null>(() => {
 
 <template>
   <div class="sync-controls">
+    <ErrorBanner v-if="error" :error="error" />
     <button type="button" @click="onFetch">Fetch</button>
     <template v-if="currentBranch?.upstream">
       <select v-model="pullMode">

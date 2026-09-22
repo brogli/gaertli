@@ -44,7 +44,7 @@ tasks:
       - task: common:install:frontend:deps
 
   test:
-    summary: Runs Go and frontend tests offline (QA-MNT-03)
+    summary: Runs Go and frontend tests offline
     deps:
       - task: common:build:frontend
     env:
@@ -68,19 +68,19 @@ tasks:
         vars: { SCRIPT: type-check }
 
   trace:
-    summary: Every MUST/QA ID has a test name or a manual checklist entry (TR-30)
+    summary: Every MUST/QA ID has a test name or a manual checklist entry
     cmds:
       - go run ./tools/trace
 
   bench:
-    summary: Builds/refreshes the reference repo and runs the perf checks (QA-PERF-02/06/07 + research diagnostics; on demand, also nightly)
+    summary: Builds/refreshes the reference repo and runs the perf checks (on demand, also nightly)
     env: { GOPROXY: off, GOFLAGS: -mod=readonly, GOTOOLCHAIN: local }
     cmds:
       - go run ./tools/mkrepo/cmd/mkrepo --out .bench/reference-repo
       - go test -tags=bench -v ./tools/bench
 
   e2e:
-    summary: Playwright against the Vite dev server with a mocked Go layer (TR-31)
+    summary: Playwright against the Vite dev server with a mocked Go layer
     deps:
       - task: common:install:frontend:deps
       - task: common:generate:bindings
@@ -89,14 +89,14 @@ tasks:
         vars: { SCRIPT: test:e2e }
 
   build:core:
-    summary: Builds the headless core as pure Go (TR-07)
+    summary: Builds the headless core as pure Go
     env:
       CGO_ENABLED: "0"
     cmds:
       - go build -o {{.BIN_DIR}}/nebegit-core{{exeExt}} ./cmd/nebegit-core
 
   build:core:embed:
-    summary: Cross-compiles the headless core for linux/amd64 into internal/remote, for the Windows build to embed (ADR-3)
+    summary: Cross-compiles the headless core for linux/amd64 into internal/remote, for the Windows build to embed
     sources: [cmd/nebegit-core/**/*.go, internal/**/*.go]
     generates: [internal/remote/nebegit-core-linux]
     env: { GOOS: linux, GOARCH: amd64, CGO_ENABLED: "0" }

@@ -1,5 +1,4 @@
-// Package jobs runs and tracks background tasks for one repo session
-// (ADR-9: "repo session ... remote jobs").
+// Package jobs runs and tracks background tasks for one repo session.
 package jobs
 
 import (
@@ -43,6 +42,7 @@ type Job struct {
 	StartedAt time.Time
 	EndedAt   time.Time // zero until State is terminal
 	Err       error     // set only when State is Failed
+	Result    any       // set from fn's first return value when State ends Done; nil otherwise
 }
 
 // progressInterval throttles progress emission (same value and reasoning as
@@ -53,14 +53,12 @@ const progressInterval = 100 * time.Millisecond
 // is never trimmed regardless of count.
 const historyCap = 20
 
-// Manager runs and tracks jobs for one repo session (ADR-9). One per
-// session.Repo — a job's repo scope is which Manager you call, not a
-// parameter to Start.
+// Manager runs and tracks jobs for one repo session: a job's repo scope is
+// which Manager you call, not a parameter to Start.
 //
-// No concurrency cap of its own: ADR-6 already splits what may run at once
-// by what a job's own fn locks. Manager only orchestrates state, progress,
-// cancellation, and history — identically whether zero, one, or ten jobs
-// are in flight.
+// It has no concurrency cap: what may run at once is decided by the locks
+// a job's fn takes. Manager only tracks state, progress, cancellation, and
+// history.
 type Manager struct {
 	onUpdate func(Job)
 
@@ -84,15 +82,15 @@ func NewManager(onUpdate func(Job)) *Manager {
 // Start runs fn in its own goroutine under a fresh context, detached from
 // any request context (a job outlives the RPC call that started it). Returns
 // immediately with the job's id; fn's own return decides the terminal
-// state: nil -> Done, a plain error -> Failed (Err set), ctx cancelled via
-// this job's own Cancel -> Cancelled, classified by ctx.Err() after fn
-// returns.
+// state: nil error -> Done (its first return value stored as Result), a
+// plain error -> Failed (Err set), ctx cancelled via this job's own Cancel
+// -> Cancelled, classified by ctx.Err() after fn returns.
 //
 // A kind already queued or running on this Manager is not started twice:
-// Start returns that job's id instead of launching a second process (spec
-// 70 review amendment — two fetches of one repo at once only race git's own
-// ref locks, so a second one is redundant, not unsafe).
-func (m *Manager) Start(kind string, fn func(ctx context.Context, progress Progress) error) ID {
+// Start returns that job's id instead of launching a second process (two
+// fetches of one repo at once only race git's ref locks, so a second one is
+// redundant).
+func (m *Manager) Start(kind string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
 	m.mu.Lock()
 	if id, ok := m.activeKindLocked(kind); ok {
 		m.mu.Unlock()
@@ -124,10 +122,10 @@ func (m *Manager) activeKindLocked(kind string) (ID, bool) {
 	return "", false
 }
 
-func (m *Manager) run(id ID, ctx context.Context, fn func(context.Context, Progress) error) {
+func (m *Manager) run(id ID, ctx context.Context, fn func(context.Context, Progress) (any, error)) {
 	m.setState(id, Running)
-	err := fn(ctx, func(percent int, message string) { m.updateProgress(id, percent, message) })
-	m.finish(id, ctx, err)
+	result, err := fn(ctx, func(percent int, message string) { m.updateProgress(id, percent, message) })
+	m.finish(id, ctx, result, err)
 }
 
 func (m *Manager) setState(id ID, state State) {
@@ -155,7 +153,7 @@ func (m *Manager) updateProgress(id ID, percent int, message string) {
 
 // finish classifies fn's outcome, trims history, and emits unconditionally,
 // regardless of the progress throttle.
-func (m *Manager) finish(id ID, ctx context.Context, err error) {
+func (m *Manager) finish(id ID, ctx context.Context, result any, err error) {
 	m.mu.Lock()
 	e, ok := m.jobs[id]
 	if !ok {
@@ -169,7 +167,7 @@ func (m *Manager) finish(id ID, ctx context.Context, err error) {
 	case err != nil:
 		e.job.State, e.job.Err = Failed, err
 	default:
-		e.job.State = Done
+		e.job.State, e.job.Result = Done, result
 	}
 	job := e.job
 	m.trimHistoryLocked()

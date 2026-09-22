@@ -1,30 +1,35 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { EditorState } from '@codemirror/state'
+import { EditorState, type Text } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { goToNextChunk, goToPreviousChunk, MergeView, unifiedMergeView } from '@codemirror/merge'
+import {
+  type Chunk,
+  getChunks,
+  getOriginalDoc,
+  goToNextChunk,
+  goToPreviousChunk,
+  MergeView,
+  unifiedMergeView,
+} from '@codemirror/merge'
 import { useDiffStore } from '../stores/diff'
 import { useSettingsStore } from '../stores/settings'
 import { useLogStore } from '../stores/log'
+import { useChangesStore } from '../stores/changes'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile, LineSelection } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // DiffView renders a file's two-sided content: the log store's selected
-// file at its selected commit (FR-LOG-04, ADR-7), a compare's file between
-// two arbitrary commits when range is given (FR-CMP-02), or a working-tree
-// change when working is given (FR-CHG-04) — the three are mutually
-// exclusive, decided by the caller. CodeMirror computes the diff
-// client-side from the store's fetched old/new content. Read-only;
-// unified/side-by-side is Settings.DiffMode (FR-DIFF-01).
+// file at its selected commit, a compare's file between two commits when
+// range is given, or a working-tree change when working is given.
+// CodeMirror computes the diff from the fetched old/new content. Read-only;
+// unified/side-by-side is Settings.DiffMode.
 //
-// files is the compare diff window's own ordered file list, meaningful only
-// together with range. DiffView doesn't own range, so stepping through
-// files emits update:range instead of mutating the prop. Working-tree mode
-// has no file-stepping (no FR asks for it).
+// files is the compare window's ordered file list, used only with range;
+// stepping through it emits update:range.
 type DiffRange = { from: string; to: string; path: string; oldPath: string }
-type WorkingTarget = { path: string; oldPath: string; staged: boolean }
+type WorkingTarget = { path: string; oldPath: string; staged: boolean; status: string }
 
 const props = defineProps<{
   wt: string
@@ -37,10 +42,19 @@ const emit = defineEmits<{ 'update:range': [range: DiffRange] }>()
 const diff = useDiffStore()
 const settings = useSettingsStore()
 const log = useLogStore()
-const { error, run } = useCoreCall()
+const changes = useChangesStore()
+const { error, run, runAndClose } = useCoreCall()
 
 const container = ref<HTMLElement | null>(null)
 let view: EditorView | MergeView | null = null
+
+// hunks and selectedLinesEnabled mirror CodeMirror state, which lives
+// outside Vue's reactivity: hunks is the mounted view's chunks (one
+// Stage/Unstage hunk button each), refreshed by mountView;
+// selectedLinesEnabled is selectedLines() !== null, refreshed on every
+// selection change.
+const hunks = ref<readonly Chunk[]>([])
+const selectedLinesEnabled = ref(false)
 
 type Target =
   | { kind: 'commit'; sha: string; path: string; oldPath: string }
@@ -69,9 +83,7 @@ function load(force = false): void {
 
 watch(target, () => load(), { immediate: true })
 
-// FR-ED-02: open the file currently shown, commit or range mode alike —
-// both Target kinds carry the same path. Line is always 0 (FR-ED-09's "at
-// the line shown" is a SHOULD, still open).
+// openEditor opens the file shown, at no particular line.
 function openEditor(): void {
   const t = target.value
   if (t) void run(() => Facade.OpenFile(props.wt, t.path, 0))
@@ -88,6 +100,12 @@ function toggleMode(): void {
 function destroyView(): void {
   view?.destroy()
   view = null
+  hunks.value = []
+  selectedLinesEnabled.value = false
+}
+
+function updateSelectedLinesEnabled(): void {
+  selectedLinesEnabled.value = selectedLines() !== null
 }
 
 function mountView(): void {
@@ -106,6 +124,9 @@ function mountView(): void {
             extensions: [
               readOnly,
               unifiedMergeView({ original: file.oldContent ?? '', mergeControls: false }),
+              EditorView.updateListener.of((update) => {
+                if (update.selectionSet) updateSelectedLinesEnabled()
+              }),
             ],
           }),
         })
@@ -114,6 +135,8 @@ function mountView(): void {
           a: { doc: file.oldContent ?? '', extensions: [readOnly] },
           b: { doc: file.newContent ?? '', extensions: [readOnly] },
         })
+  hunks.value = view instanceof MergeView ? view.chunks : (getChunks(view.state)?.chunks ?? [])
+  updateSelectedLinesEnabled()
 }
 
 // flush: 'post' so the target branch's DOM (the .cm-container div) has
@@ -122,9 +145,8 @@ watch([() => diff.file, mode], mountView, { flush: 'post' })
 
 onBeforeUnmount(destroyView)
 
-// Next/previous change (FR-DIFF-02) run CodeMirror's own chunk commands
-// against the side a reviewer reads top-to-bottom: the unified view's
-// single editor, or the side-by-side view's b (new/right) editor.
+// Next/previous change run CodeMirror's chunk commands against the unified
+// view's editor, or the side-by-side view's b (new/right) editor.
 function changeTarget(): EditorView | null {
   if (view instanceof MergeView) return view.b
   return view
@@ -140,9 +162,82 @@ function prevChange(): void {
   if (target) goToPreviousChunk(target)
 }
 
-// stepRangeFile is files' own next/previous-file (FR-CMP-02), a no-op past
-// either end like the log store's nextFile/prevFile. File and change
-// navigation stay two independent controls.
+// stageLines stages or unstages sel, whichever matches the side shown
+// (working.staged). On success the changes panel and this diff reload at
+// once rather than after the watcher's debounce.
+function stageLines(sel: LineSelection | null): void {
+  if (!sel || !props.working) return
+  const { path, staged } = props.working
+  void runAndClose(
+    () => Facade.StageLines(props.wt, path, sel, staged),
+    () => {
+      void changes.load(props.wt)
+      load(true)
+    },
+  )
+}
+
+// lineRange returns the inclusive 1-based line numbers from first to last.
+function lineRange(first: number, last: number): number[] {
+  const lines: number[] = []
+  for (let n = first; n <= last; n++) lines.push(n)
+  return lines
+}
+
+// linesInRange returns the 1-based line numbers doc's [from, to] range
+// covers, or [] if the range is empty (a pure insert has no old-side
+// lines, a pure delete no new-side lines).
+function linesInRange(doc: Text, from: number, to: number): number[] {
+  return from === to ? [] : lineRange(doc.lineAt(from).number, doc.lineAt(to).number)
+}
+
+// chunkDocs returns the mounted view's old/new documents: a MergeView's
+// a/b editors, or a unified view's document and its getOriginalDoc.
+function chunkDocs(): { old: Text; new: Text } | null {
+  if (!view) return null
+  if (view instanceof MergeView) return { old: view.a.state.doc, new: view.b.state.doc }
+  return { old: getOriginalDoc(view.state), new: view.state.doc }
+}
+
+// canStagePartially gates the hunk/line controls to a plain modification.
+// Untracked files have no diff to re-diff; git refuses a partial patch for
+// an added or deleted file; a rename's file header would need rewriting.
+// Those are staged whole from the changes panel.
+function canStagePartially(status: string): boolean {
+  return status === 'M'
+}
+
+// hunkSelection names every changed line of chunk, by its line number on
+// each diff side. endA/endB, not toA/toB: toA/toB may point past the
+// chunk's last line, which lineAt would misread.
+function hunkSelection(chunk: Chunk): LineSelection | null {
+  const docs = chunkDocs()
+  if (!docs) return null
+  return {
+    old: linesInRange(docs.old, chunk.fromA, chunk.endA),
+    new: linesInRange(docs.new, chunk.fromB, chunk.endB),
+  }
+}
+
+// selectedLines names the text selection's line numbers, or null if the
+// selection isn't entirely inside one chunk. Unified mode only. The
+// unified document is the new content (deleted lines are decorations), so
+// this selects new-side lines only.
+function selectedLines(): LineSelection | null {
+  if (!(view instanceof EditorView)) return null
+  const sel = view.state.selection.main
+  // toB, not endB: a selection through a chunk's whole last line extends
+  // past endB, up to the next line's start.
+  if (!hunks.value.some((c) => sel.from >= c.fromB && sel.to <= c.toB)) return null
+
+  const doc = view.state.doc
+  const selStartLine = doc.lineAt(sel.from).number
+  const selEndLine = doc.lineAt(Math.max(sel.to - 1, sel.from)).number
+  return { old: [], new: lineRange(selStartLine, selEndLine) }
+}
+
+// stepRangeFile steps through files, a no-op past either end like the log
+// store's nextFile/prevFile.
 function stepRangeFile(step: 1 | -1): void {
   if (!props.range || !props.files) return
   const i = props.files.findIndex(
@@ -181,6 +276,25 @@ function stepRangeFile(step: 1 | -1): void {
         <button type="button" data-test="next-file" @click="log.nextFile()">Next file</button>
       </template>
       <button type="button" data-test="open-editor" @click="openEditor">Open in editor</button>
+      <div v-if="working && canStagePartially(working.status)" class="hunk-actions">
+        <button
+          v-for="(chunk, i) in hunks"
+          :key="i"
+          type="button"
+          data-test="stage-hunk"
+          @click="stageLines(hunkSelection(chunk))"
+        >
+          {{ working.staged ? 'Unstage hunk' : 'Stage hunk' }}
+        </button>
+        <button
+          type="button"
+          data-test="stage-selected-lines"
+          :disabled="!selectedLinesEnabled"
+          @click="stageLines(selectedLines())"
+        >
+          {{ working.staged ? 'Unstage selected lines' : 'Stage selected lines' }}
+        </button>
+      </div>
       <div ref="container" class="cm-container"></div>
     </template>
   </section>

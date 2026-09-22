@@ -2,7 +2,7 @@ package app
 
 import "github.com/brogli/nebegit/internal/core"
 
-// Router picks the core for a call (ADR-3): the local one, the one owning a
+// Router picks the core for a call: the local one, the one owning a
 // worktree, or the one for a path. Implemented by the window registry.
 type Router interface {
 	Local() core.API

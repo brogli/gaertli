@@ -7,10 +7,9 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// windowTitle formats a window's title (FR-WT-09): the worktree's display
-// name (its last path segment) and, once known, the branch. branch is ""
-// until a later spec supplies one; path is "" for the no-argument
-// placeholder window, kept as plain "nebegit".
+// windowTitle formats a window's title: the worktree's display name (its
+// last path segment) and, once known, the branch. path is "" for the
+// empty-selection window, titled plain "nebegit".
 func windowTitle(path, branch string) string {
 	if path == "" {
 		return "nebegit"
@@ -28,9 +27,7 @@ func compareWindowTitle(path, a, b string) string {
 	return filepath.Base(path) + ": compare " + shortSHA(a) + ".." + shortSHA(b)
 }
 
-// shortSHA bounds-checks rather than assuming len >= 7: this runs on
-// whatever sha string the frontend already has, and a test fixture (or a
-// future abbreviated hash) may be shorter.
+// shortSHA is sha's first 7 characters, or all of a shorter sha.
 func shortSHA(sha string) string {
 	if len(sha) > 7 {
 		return sha[:7]

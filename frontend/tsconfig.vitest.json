@@ -8,7 +8,7 @@
   // __tests__ layout), so this project needs the same source globs as
   // tsconfig.app.json plus the test files that config excludes. "extends"
   // merges compilerOptions but not include/exclude, so both are restated
-  // here rather than inherited (spec 07, TR-33 case 6).
+  // here rather than inherited.
   "include": ["src/**/*.ts", "src/**/*.vue", "bindings/**/*.ts", "src/**/*.test.ts"],
   "exclude": []
 }

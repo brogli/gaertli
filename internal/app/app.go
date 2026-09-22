@@ -1,5 +1,5 @@
 // Package app wires the Wails application. It is the only package that
-// imports Wails (TR-07).
+// imports Wails.
 package app
 
 import (
@@ -33,8 +33,7 @@ func pathArg(args []string) (path string, ok bool) {
 	}
 }
 
-// errorNotifier shows a message outside any specific window — the
-// FR-REPO-05 "say so, do nothing else" failure path.
+// errorNotifier shows a message outside any specific window.
 type errorNotifier interface{ Show(title, msg string) }
 
 // wailsNotifier shows a native error dialog.
@@ -54,7 +53,7 @@ type shell struct {
 }
 
 // open validates path, opens or focuses its window, and records it in
-// settings. On failure it shows a message and does nothing else (FR-REPO-05).
+// settings. On failure it shows a message and does nothing else.
 func (sh shell) open(ctx context.Context, path string) {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {
@@ -70,9 +69,8 @@ func (sh shell) open(ctx context.Context, path string) {
 	})
 }
 
-// restore is the no-path launch (FR-REPO-02): a window per worktree
-// selected at last quit, or one fresh empty-selection window if there were
-// none (ADR-9).
+// restore is the no-path launch: a window per worktree selected at last
+// quit, or one empty-selection window if there were none.
 func (sh shell) restore(ctx context.Context) {
 	open := sh.store.Get().OpenWorktrees
 	if len(open) == 0 {
@@ -94,24 +92,18 @@ func (sh shell) launch(ctx context.Context, path string) {
 }
 
 // callingWindow is the part of the ctx-carried calling window
-// (application.WindowKey) this package needs; satisfied by
-// application.Window, a fake in tests. Deliberately smaller than
-// application.Window, which declares unexported methods no type outside
-// package application can implement — asserting against it directly would
-// make SelectWorktree/UpdateWindowTitle untestable.
+// (application.WindowKey) this package needs. application.Window itself
+// has unexported methods, so no test fake could implement it.
 type callingWindow interface {
 	ID() uint
 	SetURL(s string) application.Window
 	SetTitle(title string) application.Window
 }
 
-// switchTo implements FR-WT-05/FR-WT-08's panel-triggered switch: validates
-// path through the same CoreFor routing as open, moves this window's own
-// selection, navigates it (SetURL reloads the window), records settings,
-// and — if no other window still selects the worktree just left — closes
-// its session. Unlike open(), which runs before any window exists, a switch
-// failure is returned rather than shown: the panel that asked for it has an
-// ErrorBanner (FR-UX-01).
+// switchTo moves w's selection to path: validates it like open, navigates
+// the window (SetURL reloads it), records settings, and releases the
+// worktree just left. Unlike open, a failure is returned rather than shown:
+// the panel that asked has an ErrorBanner.
 func (sh shell) switchTo(ctx context.Context, w callingWindow, path string) error {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {
@@ -135,8 +127,7 @@ func selectionURL(path string) string {
 	return "/?path=" + url.QueryEscape(path)
 }
 
-// openFailedMessage is FR-REPO-05's user-facing text for a validation
-// failure.
+// openFailedMessage is the user-facing text for a validation failure.
 func openFailedMessage(err error) string {
 	var ce *core.Error
 	if errors.As(err, &ce) {
@@ -146,9 +137,8 @@ func openFailedMessage(err error) string {
 }
 
 // options builds the Wails application options: the Facade as the one
-// service (ADR-3), single instance relaying its path through
-// onSecondInstance. Builds no window and starts nothing, so it is
-// unit-testable without a display.
+// service, single instance relaying its path through onSecondInstance.
+// Builds no window and starts nothing, so it is testable without a display.
 func options(assets fs.FS, reg *Registry, onSecondInstance func(path string)) application.Options {
 	return application.Options{
 		Name:        "nebegit",
@@ -200,7 +190,7 @@ func Run(assets fs.FS, args []string) error {
 	reg := NewRegistry()
 	reg.SetStore(store)
 	reg.SetLocal(services.New(reg.Dispatch))
-	reg.PushEditorProfiles(context.Background()) // TR-13: the local core's own profile, at startup
+	reg.PushEditorProfiles(context.Background())
 
 	var sh shell
 	onPath := func(path string) { sh.launch(context.Background(), path) }

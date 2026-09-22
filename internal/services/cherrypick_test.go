@@ -4,11 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 	"github.com/brogli/nebegit/internal/session"
@@ -38,20 +40,20 @@ func TestFR_CP_02_OrderedSHAsSortsByCommitDateBothDirectionsWithTieBreak(t *test
 	byDate := []pickCandidate{
 		{SHA: "c30", CommitAt: 30}, {SHA: "c10", CommitAt: 10}, {SHA: "c20", CommitAt: 20},
 	}
-	if got := orderedSHAs(byDate, true); !equalSHAs(got, []string{"c10", "c20", "c30"}) {
+	if got := orderedSHAs(byDate, true); !slices.Equal(got, []string{"c10", "c20", "c30"}) {
 		t.Errorf("oldest-first = %v, want [c10 c20 c30]", got)
 	}
-	if got := orderedSHAs(byDate, false); !equalSHAs(got, []string{"c30", "c20", "c10"}) {
+	if got := orderedSHAs(byDate, false); !slices.Equal(got, []string{"c30", "c20", "c10"}) {
 		t.Errorf("newest-first = %v, want [c30 c20 c10]", got)
 	}
 
 	tied := []pickCandidate{
 		{SHA: "n3", CommitAt: 5}, {SHA: "n2", CommitAt: 5}, {SHA: "n1", CommitAt: 5},
 	}
-	if got := orderedSHAs(tied, true); !equalSHAs(got, []string{"n1", "n2", "n3"}) {
+	if got := orderedSHAs(tied, true); !slices.Equal(got, []string{"n1", "n2", "n3"}) {
 		t.Errorf("tied oldest-first = %v, want [n1 n2 n3] (given order reversed)", got)
 	}
-	if got := orderedSHAs(tied, false); !equalSHAs(got, []string{"n3", "n2", "n1"}) {
+	if got := orderedSHAs(tied, false); !slices.Equal(got, []string{"n3", "n2", "n1"}) {
 		t.Errorf("tied newest-first = %v, want [n3 n2 n1] (given order kept)", got)
 	}
 }
@@ -73,15 +75,12 @@ func TestFR_CP_05_FirstMergeFindsTheMergeCandidateOrReportsNone(t *testing.T) {
 }
 
 func TestFR_CP_01_RunSequenceRejectsEmptyShasBeforeAnyGitCall(t *testing.T) {
-	// A bare session.Worktree{} (no gittest repo): real git is on PATH in
-	// every test, and a bare "git log --no-walk --end-of-options" with no
-	// trailing revision silently defaults to HEAD, so this
-	// guard needs a real regression test, not a tautology.
+	// without the guard, "git log --no-walk" with no revision defaults to HEAD
 	wt := &session.Worktree{}
 
 	err := runSequence(context.Background(), wt, nil, "cherry-pick", "CHERRY_PICK_HEAD", true, "cherry-pick", "--end-of-options")
 
-	_ = assertCode(t, err, core.Internal)
+	coretest.AssertCode(t, err, core.Internal)
 }
 
 func TestFR_CP_01_CherryPickAppliesACommitOntoCurrentHEAD(t *testing.T) {
@@ -126,7 +125,7 @@ func TestFR_CP_04_CherryPickRefusesWithADirtyFileInTheWay(t *testing.T) {
 
 	err = c.CherryPick(context.Background(), wt.ID, []string{pickSHA})
 
-	ce := assertCode(t, err, core.GitFailed)
+	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "would be overwritten") {
 		t.Errorf("GitStderr = %q, want it to say the file would be overwritten", ce.GitStderr)
 	}
@@ -251,7 +250,7 @@ func TestFR_CP_02_CherryPickAppliesOldestFirstRegardlessOfCallOrder(t *testing.T
 		t.Fatal(err)
 	}
 
-	if got := commitSubjects(t, repo.Dir, "master", "fresh"); !equalSHAs(got, []string{"A", "B", "C"}) {
+	if got := commitSubjects(t, repo.Dir, "master", "fresh"); !slices.Equal(got, []string{"A", "B", "C"}) {
 		t.Errorf("commit order on fresh = %v, want [A B C] (oldest first)", got)
 	}
 	content, readErr := os.ReadFile(filepath.Join(repo.Dir, "chain.txt"))
@@ -276,7 +275,7 @@ func TestFR_CP_05_CherryPickRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t
 
 	err = c.CherryPick(context.Background(), wt.ID, []string{x1SHA, mSHA, x2SHA})
 
-	_ = assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s (the pre-check must run before any real cherry-pick)", got, beforeHEAD)
 	}
@@ -295,7 +294,7 @@ func TestFR_RV_03_RevertRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t *te
 
 	err = c.Revert(context.Background(), wt.ID, []string{x1SHA, mSHA, x2SHA})
 
-	_ = assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s (the pre-check must run before any real revert)", got, beforeHEAD)
 	}
@@ -371,7 +370,7 @@ func TestFR_RV_03_RevertRefusesWithADirtyFileInTheWay(t *testing.T) {
 
 	err = c.Revert(context.Background(), wt.ID, []string{revertSHA})
 
-	ce := assertCode(t, err, core.GitFailed)
+	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "would be overwritten") {
 		t.Errorf("GitStderr = %q, want it to say the file would be overwritten", ce.GitStderr)
 	}
@@ -395,7 +394,7 @@ func TestFR_CP_01_CherryPickReportsCodeConflictsOnARealStopLeftInPlace(t *testin
 
 	err = c.CherryPick(context.Background(), wt.ID, []string{featureSHA})
 
-	_ = assertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicts)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD")) {
 		t.Error("CHERRY_PICK_HEAD missing, want it left in place for the conflict flow")
 	}
@@ -413,41 +412,49 @@ func TestFR_RV_01_RevertReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T)
 
 	err = c.Revert(context.Background(), wt.ID, []string{c1SHA})
 
-	_ = assertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicts)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "REVERT_HEAD")) {
 		t.Error("REVERT_HEAD missing, want it left in place for the conflict flow")
 	}
 }
 
-// realConflictFixture builds case 15's own fixture for verb ("cherry-pick"
-// or "revert"): both sides genuinely edit the same line, so the call stops
-// with a real content conflict rather than the
-// dirty-worktree-class refusal cases 7/14 exercise.
-func realConflictFixture(t *testing.T, dir, verb string) (sha string) {
+// realConflictFixture builds a fixture for verb ("cherry-pick" or "revert")
+// across files ("conflict.txt" if none given) where both sides edit the
+// same lines, so the call stops with a real content conflict rather than a
+// dirty-worktree refusal.
+func realConflictFixture(t *testing.T, dir, verb string, files ...string) (sha string) {
 	t.Helper()
+	if len(files) == 0 {
+		files = []string{"conflict.txt"}
+	}
+	commitAll := func(msg, content string) {
+		for _, f := range files {
+			writeFile(t, dir, f, content)
+		}
+		gittest.Run(t, dir, "add", "-A")
+		gittest.CommitAll(t, dir, msg)
+	}
 	if verb == "cherry-pick" {
-		gittest.Commit(t, dir, "conflict.txt", "orig\n", "base")
+		commitAll("base", "orig\n")
 		gittest.Run(t, dir, "branch", "feature")
 		gittest.Run(t, dir, "checkout", "feature")
-		gittest.Commit(t, dir, "conflict.txt", "feature\n", "feature change")
+		commitAll("feature change", "feature\n")
 		sha = gittest.HeadSHA(t, dir)
 		gittest.Run(t, dir, "checkout", "master")
-		gittest.Commit(t, dir, "conflict.txt", "master\n", "master change")
+		commitAll("master change", "master\n")
 		return sha
 	}
-	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")
-	gittest.Commit(t, dir, "conflict.txt", "applied\n", "applies the change")
+	commitAll("base", "base\n")
+	commitAll("applies the change", "applied\n")
 	sha = gittest.HeadSHA(t, dir)
-	gittest.Commit(t, dir, "conflict.txt", "applied2\n", "further change")
+	commitAll("further change", "applied2\n")
 	return sha
 }
 
-// revertConflictFixture builds case 14's own fixture: linear history where
-// HEAD's own commit changed conflict.txt, and an uncommitted, differing
-// edit to the same file sits on top — so reverting HEAD's commit is
-// refused as "would be overwritten" (exit 128). Cherry-pick's two-branch
-// shape would make this a no-op revert: the target branch never carried the
-// change being reverted.
+// revertConflictFixture builds linear history where HEAD's commit changed
+// conflict.txt, with an uncommitted, differing edit to the same file on
+// top, so reverting HEAD's commit is refused as "would be overwritten"
+// (exit 128).
 func revertConflictFixture(t *testing.T, dir string) (revertSHA, beforeHEAD string) {
 	t.Helper()
 	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")
@@ -460,11 +467,10 @@ func revertConflictFixture(t *testing.T, dir string) (revertSHA, beforeHEAD stri
 	return revertSHA, beforeHEAD
 }
 
-// cherryPickConflictFixture builds case 7's own fixture: a commit on
-// branch "feature" that changes conflict.txt, while the current branch
-// "master" has an uncommitted, conflicting edit to the same file — so
-// cherry-picking feature's own commit is refused as "would be overwritten"
-// (exit 128).
+// cherryPickConflictFixture builds a commit on branch "feature" that
+// changes conflict.txt, while "master" has an uncommitted, conflicting edit
+// to the same file, so cherry-picking feature's commit is refused as "would
+// be overwritten" (exit 128).
 func cherryPickConflictFixture(t *testing.T, dir string) (pickSHA, beforeHEAD string) {
 	t.Helper()
 	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")
@@ -489,10 +495,8 @@ func commitExists(t *testing.T, dir, sha string) bool {
 	return err == nil
 }
 
-// mergeCommitFixture builds cases 9/13's own fixture on master: a normal
-// commit x1, a real 2-parent merge commit m (merging a side branch back
-// in), then another normal commit x2 — a merge commit buried inside an
-// otherwise normal run of commits.
+// mergeCommitFixture builds, on master, a commit x1, a 2-parent merge
+// commit m, then a commit x2: a merge buried in a normal run of commits.
 func mergeCommitFixture(t *testing.T, dir string) (x1SHA, mSHA, x2SHA string) {
 	t.Helper()
 	gittest.Commit(t, dir, "base.txt", "base", "base")
@@ -510,11 +514,8 @@ func mergeCommitFixture(t *testing.T, dir string) (x1SHA, mSHA, x2SHA string) {
 	return x1SHA, mSHA, x2SHA
 }
 
-// commitDated commits like commit, but at an explicit, well-separated
-// author/committer date: git's own commit timestamp has 1s resolution, so
-// a fast test run can otherwise land two commits in the same second,
-// defeating an ordering test's own point (proving the date-based sort, not
-// its given-order tie-break).
+// commitDated commits like gittest.Commit, but at an explicit date: git's
+// timestamps have 1s resolution, so two fast commits could otherwise tie.
 func commitDated(t *testing.T, dir, name, content, msg string, at time.Time) {
 	t.Helper()
 	iso := at.Format(time.RFC3339)
@@ -524,27 +525,8 @@ func commitDated(t *testing.T, dir, name, content, msg string, at time.Time) {
 }
 
 // commitSubjects returns the subjects of the commits reachable from to but
-// not from, oldest first — the commits a cherry-pick/revert call itself
-// added on top of a shared base.
+// not from, oldest first.
 func commitSubjects(t *testing.T, dir, from, to string) []string {
 	t.Helper()
-	result, err := (git.Runner{}).Run(context.Background(), git.Call{
-		Dir: dir, ReadOnly: true, Args: []string{"log", "--reverse", "--format=%s", from + ".." + to},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return strings.Split(strings.TrimSpace(string(result.Stdout)), "\n")
-}
-
-func equalSHAs(got, want []string) bool {
-	if len(got) != len(want) {
-		return false
-	}
-	for i := range got {
-		if got[i] != want[i] {
-			return false
-		}
-	}
-	return true
+	return strings.Split(gittest.Out(t, dir, "log", "--reverse", "--format=%s", from+".."+to), "\n")
 }

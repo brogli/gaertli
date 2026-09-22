@@ -4,10 +4,9 @@ import { Events } from '@wailsio/runtime'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { Refs } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// refs holds the sidebar's branches, remotes, and tags (FR-LOG-01),
-// reloaded only when a ref actually moved (the "refs" scope) — unlike
-// repo/log, a state-only change such as an in-progress rebase leaves refs
-// untouched.
+// refs holds the sidebar's branches, remotes, and tags, reloaded only when
+// a ref actually moved (the "refs" scope) — unlike repo/log, a state-only
+// change such as an in-progress rebase leaves refs untouched.
 export const useRefsStore = defineStore('refs', () => {
   const refs = ref<Refs | null>(null)
   let wt = ''
@@ -27,8 +26,7 @@ export const useRefsStore = defineStore('refs', () => {
       if (scope === 'refs') void refresh()
     })
 
-    // core:reconnected (ADR-4): the window's distro core respawned, so its
-    // data starts over, as on mount.
+    // the window's distro core respawned: its data starts over, as on mount
     unlistenReconnected?.()
     unlistenReconnected = Events.On('core:reconnected', () => void refresh())
 

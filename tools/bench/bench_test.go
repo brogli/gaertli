@@ -1,13 +1,12 @@
 //go:build bench
 
-// Package bench proves the literal QA-PERF-02/06/07 numbers against the
-// real reference repo, through the in-process services.Core — the same call
-// path the shell uses, no mock.
+// Package bench proves the literal performance numbers against the real
+// reference repo, through the in-process services.Core: the same call path
+// the shell uses, no mock.
 //
 // The build tag keeps a 100k-commit fixture out of the fast, offline
-// default run (QA-MNT-03). tools/trace scans source text, not compiled
-// output, so these test names still count as coverage (TR-30). Run via
-// `task bench` = `go test -tags=bench ...`.
+// default run. tools/trace scans source text, so these test names still
+// count as coverage. Run via `task bench`.
 package bench
 
 import (
@@ -127,9 +126,8 @@ func timeTopoOrderLog(t *testing.T, r git.Runner) time.Duration {
 }
 
 // TestLogRowsWindowLatency records one LogRows(from, from+50) call's
-// latency on the fully-loaded reference repo — the Go-side cost a single
-// virtual-scroll tick pays. Not QA-PERF-03 itself (real frame cost includes
-// JS/DOM/IPC this measures none of) — a bound on one input to it.
+// latency on the fully-loaded reference repo: the Go-side cost a single
+// virtual-scroll tick pays, not the whole frame cost.
 func TestLogRowsWindowLatency(t *testing.T) {
 	c, id := openReference(t)
 	if err := c.LoadLog(t.Context(), id); err != nil {

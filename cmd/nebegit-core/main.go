@@ -1,6 +1,6 @@
-// Command nebegit-core is the headless core (ADR-3): started by the shell
-// inside a WSL distro, it serves core.API over JSON-RPC on stdio. Pure Go
-// (TR-07). Logs go to stderr; stdout is the wire.
+// Command nebegit-core is the headless core: started by the shell inside a
+// WSL distro, it serves core.API over JSON-RPC on stdio. Pure Go. Logs go
+// to stderr; stdout is the wire.
 package main
 
 import (
@@ -44,8 +44,8 @@ func usage() int {
 	return 2
 }
 
-// launch is nebegit-core's "given a path instead of --stdio" mode (ADR-3):
-// it resolves path, reads $WSL_DISTRO_NAME and the gui-path marker
+// launch is nebegit-core's "given a path instead of --stdio" mode: it
+// resolves path, reads $WSL_DISTRO_NAME and the gui-path marker
 // InstallLauncher wrote next to this binary's own symlink-resolved
 // location, and hands the UNC path to the single Windows instance exactly
 // like a native `nebegit.exe <path>` launch.
@@ -70,7 +70,7 @@ func launch(path string) int {
 		return fail(fmt.Errorf("run \"Install nebegit command in this distro\" from the app first: %w", err))
 	}
 	cmd := exec.Command(strings.TrimSpace(string(guiExe)), remote.BuildWSLPath(distro, abs))
-	proc.Detach(cmd) // TR-12
+	proc.Detach(cmd)
 	if err := cmd.Start(); err != nil {
 		return fail(err)
 	}

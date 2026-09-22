@@ -23,7 +23,7 @@ func (c *Core) CancelJob(ctx context.Context, id core.WorktreeID, jobID string) 
 		return err
 	}
 	wt.Repo.Jobs().Cancel(jobs.ID(jobID))
-	return nil // Cancel's own false (unknown/finished) is not an error, Design
+	return nil // an unknown or finished job is not an error
 }
 
 func toJobInfos(list []jobs.Job) []core.JobInfo {

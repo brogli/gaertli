@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
@@ -58,7 +59,7 @@ func TestFR_BR_02_ResetFlagMapsModeToGitFlag(t *testing.T) {
 	}
 
 	_, err := resetFlag(core.ResetMode("bogus"))
-	_ = assertCode(t, err, core.Internal)
+	coretest.AssertCode(t, err, core.Internal)
 }
 
 func TestFR_BR_01_CreateBranchWithoutCheckoutLeavesCurrentBranchAlone(t *testing.T) {
@@ -124,7 +125,7 @@ func TestFR_BR_01_CreateBranchRejectsADuplicateNameAsGitFailed(t *testing.T) {
 
 	err = c.CreateBranch(context.Background(), wt.ID, "feature", sha, false)
 
-	ce := assertCode(t, err, core.GitFailed)
+	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "already exists") {
 		t.Errorf("GitStderr = %q, want it to say the branch already exists", ce.GitStderr)
 	}
@@ -146,7 +147,7 @@ func TestFR_BR_01_CreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T
 
 	err = c.CreateBranch(context.Background(), wt.ID, "-bad", sha, false)
 
-	_ = assertCode(t, err, core.InvalidName)
+	coretest.AssertCode(t, err, core.InvalidName)
 	if branchExists(t, repo.Dir, "-bad") {
 		t.Error("branch -bad was created, want none")
 	}
@@ -165,7 +166,7 @@ func TestFR_BR_01_CreateBranchWithCheckoutIsAtomicOnADirtyConflict(t *testing.T)
 
 	err = c.CreateBranch(context.Background(), wt.ID, "old", olderSHA, true)
 
-	_ = assertCode(t, err, core.DirtyWorktree)
+	coretest.AssertCode(t, err, core.DirtyWorktree)
 	if branchExists(t, repo.Dir, "old") {
 		t.Error("branch old was created despite the atomic checkout failing, want none")
 	}
@@ -222,13 +223,7 @@ func TestFR_BR_05_CheckoutDWIMsARemoteTrackingBranchIntoALocalOne(t *testing.T) 
 	if got := currentBranch(t, repo.Dir); got != "shared" {
 		t.Errorf("current branch = %s, want shared", got)
 	}
-	upstream, err := (git.Runner{}).Run(context.Background(), git.Call{
-		Dir: repo.Dir, ReadOnly: true, Args: []string{"for-each-ref", "--format=%(upstream:short)", "refs/heads/shared"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.TrimSpace(string(upstream.Stdout)); got != "origin/shared" {
+	if got := gittest.Out(t, repo.Dir, "for-each-ref", "--format=%(upstream:short)", "refs/heads/shared"); got != "origin/shared" {
 		t.Errorf("upstream = %q, want origin/shared", got)
 	}
 }
@@ -247,7 +242,7 @@ func TestFR_BR_05_CheckoutRefusesADirtyConflictAsDirtyWorktree(t *testing.T) {
 
 	err = c.Checkout(context.Background(), wt.ID, "feature")
 
-	_ = assertCode(t, err, core.DirtyWorktree)
+	coretest.AssertCode(t, err, core.DirtyWorktree)
 	if got := currentBranch(t, repo.Dir); got != before {
 		t.Errorf("current branch = %s, want unchanged %s", got, before)
 	}
@@ -269,7 +264,7 @@ func TestFR_BR_05_CheckoutNamesTheOtherWorktreeWhenABranchIsAlreadyCheckedOutThe
 
 	err = c.Checkout(context.Background(), wt.ID, "feature")
 
-	ce := assertCode(t, err, core.GitFailed)
+	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, linked) {
 		t.Errorf("GitStderr = %q, want it to name the other worktree's path %q", ce.GitStderr, linked)
 	}
@@ -315,7 +310,7 @@ func TestFR_BR_08_CheckoutCommitRefusesADirtyConflictAsDirtyWorktree(t *testing.
 
 	err = c.CheckoutCommit(context.Background(), wt.ID, olderSHA)
 
-	_ = assertCode(t, err, core.DirtyWorktree)
+	coretest.AssertCode(t, err, core.DirtyWorktree)
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
 	}
@@ -351,19 +346,19 @@ func TestQA_REL_02_BranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
 	if err := c.CreateBranch(context.Background(), wt.ID, "feature", "HEAD", false); err == nil {
 		t.Error("CreateBranch on an empty repo = nil, want an error")
 	} else {
-		_ = assertCode(t, err, core.GitFailed)
+		coretest.AssertCode(t, err, core.GitFailed)
 	}
 
 	if err := c.Checkout(context.Background(), wt.ID, "anything"); err == nil {
 		t.Error("Checkout on an empty repo = nil, want an error")
 	} else {
-		_ = assertCode(t, err, core.GitFailed)
+		coretest.AssertCode(t, err, core.GitFailed)
 	}
 
 	if err := c.CheckoutCommit(context.Background(), wt.ID, "HEAD"); err == nil {
 		t.Error("CheckoutCommit on an empty repo = nil, want an error")
 	} else {
-		_ = assertCode(t, err, core.GitFailed)
+		coretest.AssertCode(t, err, core.GitFailed)
 	}
 }
 
@@ -587,7 +582,7 @@ func TestFR_BR_02_ResetSoftRefusesDuringAnUnresolvedConflict(t *testing.T) {
 
 	_, err = c.Reset(context.Background(), wt.ID, baseSHA, core.ResetSoft)
 
-	_ = assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 	if !mergeInProgress(repo.Dir) {
 		t.Error("MERGE_HEAD gone, want still present (--soft refuses mid-merge)")
 	}
@@ -633,7 +628,7 @@ func TestFR_BR_02_ResetRefusesANonexistentSHAAsGitFailed(t *testing.T) {
 
 	_, err = c.Reset(context.Background(), wt.ID, "0000000000000000000000000000000000000000", core.ResetHard)
 
-	_ = assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 }
 
 // mergeConflictFixture builds a merge conflict in dir left unresolved
@@ -655,11 +650,9 @@ func mergeInProgress(dir string) bool {
 	return operation(filepath.Join(dir, ".git")) == "merge"
 }
 
-// resetFixture builds three commits and a dirty working tree cases 2, 3, and
-// 4 share: firstSHA's own tree has only seed.txt; the second commit adds
-// extra.txt (absent from firstSHA, so --mixed/--hard both drop it); the
-// third further edits seed.txt, then a staged-then-further-modified change on
-// top of that is the "dirty tree (staged + unstaged)" the cases ask for.
+// resetFixture builds three commits and a dirty working tree: firstSHA's
+// tree has only seed.txt; the second commit adds extra.txt; the third edits
+// seed.txt, which then gets a staged change and an unstaged one on top.
 func resetFixture(t *testing.T, dir string) (firstSHA string) {
 	t.Helper()
 	gittest.Commit(t, dir, "seed.txt", "a", "first")
@@ -677,7 +670,7 @@ func resetFixture(t *testing.T, dir string) (firstSHA string) {
 	return firstSHA
 }
 
-// readFile returns name's own working-tree content in dir.
+// readFile returns name's working-tree content in dir.
 func readFile(t *testing.T, dir, name string) string {
 	t.Helper()
 	got, err := os.ReadFile(filepath.Join(dir, name))
@@ -687,16 +680,10 @@ func readFile(t *testing.T, dir, name string) string {
 	return string(got)
 }
 
-// indexBlob returns name's own staged content in dir.
+// indexBlob returns name's staged content in dir.
 func indexBlob(t *testing.T, dir, name string) string {
 	t.Helper()
-	result, err := (git.Runner{}).Run(context.Background(), git.Call{
-		Dir: dir, ReadOnly: true, Args: []string{"show", ":" + name},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(result.Stdout)
+	return gittest.Out(t, dir, "show", ":"+name)
 }
 
 // trackedInIndex reports whether name is in dir's index right now.
@@ -715,10 +702,10 @@ func trackedInIndex(t *testing.T, dir, name string) bool {
 	return false
 }
 
-// conflictingCheckoutFixture builds the shared fixture cases 6, 9, and 12
-// need: an older commit (returned) whose own version of conflict.txt differs
-// from an uncommitted change made on top of a newer commit, so any switch to
-// the older commit is refused as "would be overwritten" (exit 1).
+// conflictingCheckoutFixture builds an older commit (returned) whose
+// conflict.txt differs from an uncommitted change made on top of a newer
+// commit, so any switch to the older commit is refused as "would be
+// overwritten" (exit 1).
 func conflictingCheckoutFixture(t *testing.T, dir string) (olderSHA string) {
 	t.Helper()
 	gittest.Commit(t, dir, "conflict.txt", "old", "older")
@@ -746,16 +733,10 @@ func branchExists(t *testing.T, dir, name string) bool {
 	return false
 }
 
-// branchTip returns name's own commit sha in dir.
+// branchTip returns local branch name's commit sha in dir.
 func branchTip(t *testing.T, dir, name string) string {
 	t.Helper()
-	result, err := (git.Runner{}).Run(context.Background(), git.Call{
-		Dir: dir, ReadOnly: true, Args: []string{"rev-parse", "refs/heads/" + name},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return strings.TrimSpace(string(result.Stdout))
+	return gittest.Out(t, dir, "rev-parse", "refs/heads/"+name)
 }
 
 // currentBranch returns dir's current branch name, "" if detached.
@@ -768,15 +749,4 @@ func currentBranch(t *testing.T, dir string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(result.Stdout))
-}
-
-// assertCode fails t unless err is a *core.Error with code want, returning it
-// for further inspection (e.g. GitStderr).
-func assertCode(t *testing.T, err error, want core.Code) *core.Error {
-	t.Helper()
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != want {
-		t.Fatalf("err = %v, want *core.Error{Code: %s}", err, want)
-	}
-	return ce
 }

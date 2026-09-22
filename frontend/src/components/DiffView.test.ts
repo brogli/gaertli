@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { EditorSelection } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { getChunks } from '@codemirror/merge'
 
@@ -14,6 +15,8 @@ const {
   mockLogRows,
   mockLogIndexOf,
   mockOpenFile,
+  mockStageLines,
+  mockStatus,
 } = vi.hoisted(() => ({
   mockDiffFile: vi.fn(),
   mockDiffRange: vi.fn(),
@@ -24,6 +27,8 @@ const {
   mockLogRows: vi.fn(),
   mockLogIndexOf: vi.fn(),
   mockOpenFile: vi.fn(),
+  mockStageLines: vi.fn(),
+  mockStatus: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -36,6 +41,8 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     CommitDetails: vi.fn(),
     LogIndexOf: mockLogIndexOf,
     OpenFile: mockOpenFile,
+    StageLines: mockStageLines,
+    Status: mockStatus,
   },
   SettingsService: { Get: mockSettingsGet, Set: mockSettingsSet },
 }))
@@ -84,6 +91,9 @@ describe('DiffView', () => {
     mockSettingsSet.mockResolvedValue(undefined)
     mockOpenFile.mockReset()
     mockOpenFile.mockResolvedValue(undefined)
+    mockStageLines.mockReset()
+    mockStatus.mockReset()
+    mockStatus.mockResolvedValue({ staged: [], unstaged: [], untracked: [], conflicted: [] })
     open('a.txt')
   })
 
@@ -337,7 +347,7 @@ describe('DiffView', () => {
     })
 
     const wrapper = mount(DiffView, {
-      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: true } },
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: true, status: 'M' } },
     })
     await flushPromises()
 
@@ -358,7 +368,7 @@ describe('DiffView', () => {
     })
 
     const wrapper = mount(DiffView, {
-      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false } },
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: 'M' } },
     })
     await flushPromises()
 
@@ -366,5 +376,194 @@ describe('DiffView', () => {
     expect(wrapper.find('[data-test="next-file"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="prev-change"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="next-change"]').exists()).toBe(true)
+  })
+
+  it('FR-CHG-03 with an unstaged working prop, clicking a hunk\'s "Stage hunk" button stages it and reloads', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2 old\nline3\nline4\nline5\nline6 old\nline7\n',
+      newContent: 'line1\nline2 new\nline3\nline4\nline5\nline6 new\nline7\n',
+    })
+    mockStageLines.mockResolvedValue(undefined)
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: 'M' } },
+    })
+    await flushPromises()
+
+    const buttons = wrapper.findAll('[data-test="stage-hunk"]')
+    expect(buttons.length).toBeGreaterThanOrEqual(2)
+    expect(buttons[0]!.text()).toBe('Stage hunk')
+
+    await buttons[0]!.trigger('click')
+    await flushPromises()
+
+    // The first hunk is the single-line substitution at line 2, the same
+    // line number on both diff sides.
+    expect(mockStageLines).toHaveBeenCalledTimes(1)
+    expect(mockStageLines).toHaveBeenCalledWith('/repo', 'a.txt', { old: [2], new: [2] }, false)
+    expect(mockStatus).toHaveBeenCalledTimes(1)
+    expect(mockDiffWorking).toHaveBeenCalledTimes(2)
+  })
+
+  it('FR-CHG-03 with a staged working prop, a hunk button reads "Unstage hunk" and calls StageLines reversed', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2 old\nline3\nline4\nline5\nline6 old\nline7\n',
+      newContent: 'line1\nline2 new\nline3\nline4\nline5\nline6 new\nline7\n',
+    })
+    mockStageLines.mockResolvedValue(undefined)
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: true, status: 'M' } },
+    })
+    await flushPromises()
+
+    const buttons = wrapper.findAll('[data-test="stage-hunk"]')
+    expect(buttons[0]!.text()).toBe('Unstage hunk')
+
+    await buttons[0]!.trigger('click')
+    await flushPromises()
+
+    expect(mockStageLines).toHaveBeenCalledWith('/repo', 'a.txt', { old: [2], new: [2] }, true)
+  })
+
+  it('FR-CHG-03 a renamed working file (status "R") gets no hunk controls', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: 'old.txt', staged: false, status: 'R' } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="stage-hunk"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="stage-selected-lines"]').exists()).toBe(false)
+  })
+
+  it('FR-CHG-03 an untracked working file (status "?") gets no hunk controls', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: '',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: '?' } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="stage-hunk"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="stage-selected-lines"]').exists()).toBe(false)
+  })
+
+  it('FR-CHG-03 a newly added staged working file (status "A") gets no hunk controls', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: '',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: true, status: 'A' } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="stage-hunk"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="stage-selected-lines"]').exists()).toBe(false)
+  })
+
+  it('FR-CHG-03 a deleted working file (status "D") gets no hunk controls', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: '',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: 'D' } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="stage-hunk"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="stage-selected-lines"]').exists()).toBe(false)
+  })
+
+  it('FR-CHG-03 with a selection spanning some but not all of a hunk\'s changed lines, "Stage selected lines" sends exactly those line numbers', async () => {
+    // One block-substitution hunk: old lines 2-4 (A,B,C) replaced by new
+    // lines 2-4 (X,Y,Z). Selecting "Y\nZ" (new lines 3-4) should send
+    // new: [3, 4], not the whole hunk's [2, 3, 4] — and no old-side lines,
+    // since a unified-mode text selection can only land on new content.
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nA\nB\nC\nline5\n',
+      newContent: 'line1\nX\nY\nZ\nline5\n',
+    })
+    mockStageLines.mockResolvedValue(undefined)
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: 'M' } },
+    })
+    await flushPromises()
+
+    const view = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!view) throw new Error('no EditorView mounted')
+    // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10); "Z\n"=2 (10-12).
+    view.dispatch({ selection: EditorSelection.range(8, 12) })
+    await flushPromises() // lets the disabled attribute clear before the click below
+
+    await wrapper.get('[data-test="stage-selected-lines"]').trigger('click')
+    await flushPromises()
+
+    expect(mockStageLines).toHaveBeenCalledTimes(1)
+    expect(mockStageLines).toHaveBeenCalledWith('/repo', 'a.txt', { old: [], new: [3, 4] }, false)
+  })
+
+  it('FR-CHG-03 "Stage selected lines" is disabled unless the selection falls entirely inside one chunk', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nA\nB\nC\nline5\n',
+      newContent: 'line1\nX\nY\nZ\nline5\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: 'M' } },
+    })
+    await flushPromises()
+
+    // The default cursor position (0) sits in "line1", outside the chunk.
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
+
+    const view = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!view) throw new Error('no EditorView mounted')
+    // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10); "Z\n"=2 (10-12): inside the chunk.
+    view.dispatch({ selection: EditorSelection.range(8, 12) })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeUndefined()
+
+    view.dispatch({ selection: EditorSelection.range(0, 0) }) // back outside the chunk
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
   })
 })

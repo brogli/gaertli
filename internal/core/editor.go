@@ -1,8 +1,7 @@
 package core
 
-// EditorProfile is one environment's editor launch configuration
-// (git-mapping.md), reused verbatim by internal/settings and
-// internal/editor.
+// EditorProfile is one environment's editor launch configuration, reused
+// verbatim by internal/settings and internal/editor.
 type EditorProfile struct {
 	Name          string `json:"name"`
 	FolderCmd     string `json:"folderCmd"`

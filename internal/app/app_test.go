@@ -232,7 +232,7 @@ func TestFR_REPO_05_OpenWorktreePathNotifiesAndOpensNoWindowOnFailure(t *testing
 }
 
 // The WSL failures need no bespoke handling: openFailedMessage's generic
-// *core.Error path (FR-UX-01) already names each situation.
+// *core.Error path already names each situation.
 func TestOpenFailedMessageNamesWSLFailures(t *testing.T) {
 	cases := []struct {
 		name string

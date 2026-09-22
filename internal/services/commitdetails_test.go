@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -57,10 +56,7 @@ func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T)
 	gittest.Run(t, repo.Dir, "switch", "side")
 	gittest.Commit(t, repo.Dir, "side.txt", "s", "on side")
 	gittest.Run(t, repo.Dir, "switch", "master")
-	_, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: repo.Dir, Args: []string{"merge", "--no-ff", "-m", "merge side", "side"}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	gittest.Run(t, repo.Dir, "merge", "--no-ff", "-m", "merge side", "side")
 	mergeSHA := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})

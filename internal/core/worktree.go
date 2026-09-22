@@ -1,6 +1,6 @@
 package core
 
-// Worktree is one row of ListWorktrees/AddWorktree's result (FR-WT-01).
+// Worktree is one row of ListWorktrees/AddWorktree's result.
 type Worktree struct {
 	Path     string `json:"path"`
 	Branch   string `json:"branch,omitempty"` // "" when Detached

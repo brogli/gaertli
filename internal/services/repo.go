@@ -32,7 +32,7 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 		Args: []string{"symbolic-ref", "--short", "-q", "HEAD"},
 	})
 	// exit 1 with empty stdout = detached HEAD (symbolic-ref -q); any other
-	// failure is returned as-is (QA-REL-02).
+	// failure is returned as-is.
 	detached := quietFailure(err, result)
 	if err != nil && !detached {
 		return core.Summary{}, err
@@ -46,13 +46,12 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 	}
 	return core.Summary{
 		Path: wt.Path, Branch: branch, Detached: detached, Operation: operation(wt.GitDir), SHA: sha,
-		EditorName: c.currentProfile().Name,
+		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(),
 	}, nil
 }
 
-// resolveHeadSHA resolves HEAD's own commit (QA-REL-02): "" for an unborn
-// HEAD, never an error — the same exit-1/empty-stdout shape quietFailure
-// covers.
+// resolveHeadSHA resolves HEAD's own commit: "" for an unborn HEAD, never
+// an error — the same exit-1/empty-stdout shape quietFailure covers.
 func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
@@ -67,7 +66,7 @@ func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, erro
 // quietFailure reports whether err is git's own "-q ... nothing to report"
 // shape — Code GitFailed, exit 1, empty stdout — rather than a real
 // failure: an unattached HEAD's symbolic-ref, an unborn HEAD's rev-parse.
-// Classified from the exit code, never stderr text (TR-08).
+// Classified from the exit code, never stderr text.
 func quietFailure(err error, result git.Result) bool {
 	return gitExited(err, result, 1) && len(result.Stdout) == 0
 }

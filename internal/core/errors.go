@@ -15,9 +15,10 @@ const (
 	Conflicts      Code = "CONFLICTS"
 	Locked         Code = "LOCKED"
 	InvalidName    Code = "INVALID_NAME"
+	NoUpstream     Code = "NO_UPSTREAM"
 	EditorNotFound Code = "EDITOR_NOT_FOUND"
 	// FileNotFound: OpenFile's path no longer exists in the worktree (a
-	// deleted or since-renamed file shown from a historical diff, FR-ED-02).
+	// deleted or since-renamed file shown from a historical diff).
 	FileNotFound Code = "FILE_NOT_FOUND"
 	Cancelled    Code = "CANCELLED"
 	GitFailed    Code = "GIT_FAILED"
@@ -31,15 +32,17 @@ const (
 	// wsl.exe -d <name> itself refuses it.
 	DistroNotFound Code = "DISTRO_NOT_FOUND"
 	// DeployRefused: the consent dialog to copy the core into a distro was
-	// declined (QA-PORT-02).
+	// declined.
 	DeployRefused Code = "DEPLOY_REFUSED"
 )
 
 // Error is the one error type that crosses the core boundary. GitStderr and
-// Command feed the UI's "show details" (FR-UX-01).
+// Command feed the UI's "show details".
 type Error struct {
-	Code      Code   `json:"code"`
-	Message   string `json:"message"`
+	Code    Code   `json:"code"`
+	Message string `json:"message"`
+	// GitStderr is git's own explanation of the failure: stderr, or stdout
+	// when stderr is empty.
 	GitStderr string `json:"gitStderr,omitempty"`
 	Command   string `json:"command,omitempty"`
 }

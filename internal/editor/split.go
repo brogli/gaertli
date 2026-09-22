@@ -3,9 +3,9 @@ package editor
 import "fmt"
 
 // splitCommand splits template into argv using POSIX-style shell word
-// splitting (quotes, backslash escapes) — no shell is invoked (TR-10). Own
-// code: the shlex libraries fail TR-19. Errors on an empty template or an
-// unterminated quote.
+// splitting (quotes, backslash escapes); no shell is invoked. Own code: no
+// shlex library meets the dependency criteria. Errors on an empty template
+// or an unterminated quote.
 func splitCommand(template string) ([]string, error) {
 	var argv []string
 	var cur []byte

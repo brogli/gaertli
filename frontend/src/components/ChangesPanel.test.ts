@@ -2,16 +2,25 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockStageFile, mockUnstageFile, mockStageAll, mockUnstageAll, mockStatus, mockOpenFile } = vi.hoisted(
-  () => ({
-    mockStageFile: vi.fn(),
-    mockUnstageFile: vi.fn(),
-    mockStageAll: vi.fn(),
-    mockUnstageAll: vi.fn(),
-    mockStatus: vi.fn(),
-    mockOpenFile: vi.fn(),
-  }),
-)
+const {
+  mockStageFile,
+  mockUnstageFile,
+  mockStageAll,
+  mockUnstageAll,
+  mockStatus,
+  mockOpenFile,
+  mockCommit,
+  mockSetMessageDraft,
+} = vi.hoisted(() => ({
+  mockStageFile: vi.fn(),
+  mockUnstageFile: vi.fn(),
+  mockStageAll: vi.fn(),
+  mockUnstageAll: vi.fn(),
+  mockStatus: vi.fn(),
+  mockOpenFile: vi.fn(),
+  mockCommit: vi.fn(),
+  mockSetMessageDraft: vi.fn(),
+}))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade: {
@@ -21,10 +30,13 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     UnstageAll: mockUnstageAll,
     Status: mockStatus,
     OpenFile: mockOpenFile,
+    Commit: mockCommit,
+    SetMessageDraft: mockSetMessageDraft,
   },
 }))
 
 import ChangesPanel from './ChangesPanel.vue'
+import CommitBox from './CommitBox.vue'
 import { useChangesStore } from '../stores/changes'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 
@@ -40,6 +52,26 @@ describe('ChangesPanel', () => {
     mockUnstageAll.mockReset().mockResolvedValue(undefined)
     mockStatus.mockReset().mockResolvedValue(empty)
     mockOpenFile.mockReset().mockResolvedValue(undefined)
+    mockCommit.mockReset().mockResolvedValue(undefined)
+    mockSetMessageDraft.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('FR-CHG-05 CommitBox renders between the header and the Staged group', () => {
+    const wrapper = mount(ChangesPanel, { props })
+
+    expect(wrapper.findComponent(CommitBox).exists()).toBe(true)
+    const html = wrapper.html()
+    expect(html.indexOf('</header>')).toBeLessThan(html.indexOf('class="commit-box"'))
+    expect(html.indexOf('class="commit-box"')).toBeLessThan(html.indexOf('Staged'))
+  })
+
+  it('FR-CHG-08 switching worktree remounts CommitBox, so worktree A\'s typed text never carries into worktree B\'s draft', async () => {
+    const wrapper = mount(ChangesPanel, { props })
+    await wrapper.get('textarea').setValue('worktree A text')
+
+    await wrapper.setProps({ wt: '/other' })
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
   })
 
   it('FR-CHG-02 clicking an unstaged row\'s Stage button calls Facade.StageFile with its path', async () => {
@@ -71,7 +103,7 @@ describe('ChangesPanel', () => {
     const wrapper = mount(ChangesPanel, { props })
     await wrapper.get('li').trigger('click')
 
-    expect(changes.selectedFile).toEqual({ path: 'a.txt', oldPath: '', staged: false })
+    expect(changes.selectedFile).toEqual({ path: 'a.txt', oldPath: '', staged: false, status: 'M' })
   })
 
   it('FR-ED-02 clicking a row\'s "Open in editor" control calls Facade.OpenFile, not select', async () => {
@@ -96,5 +128,36 @@ describe('ChangesPanel', () => {
 
     expect(mockStageAll).toHaveBeenCalledWith('/repo')
     expect(mockStatus).not.toHaveBeenCalled()
+  })
+
+  it('FR-CONF-02 double-clicking a conflicted row calls Facade.OpenFile with its path', async () => {
+    const changes = useChangesStore()
+    changes.files = { ...empty, conflicted: [{ path: 'c.txt', status: 'UU' }] }
+
+    const wrapper = mount(ChangesPanel, { props })
+    await wrapper.get('li').trigger('dblclick')
+
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'c.txt', 0)
+  })
+
+  it('FR-CONF-03 clicking a conflicted row\'s "Mark resolved" button calls Facade.StageFile with its path', async () => {
+    const changes = useChangesStore()
+    changes.files = { ...empty, conflicted: [{ path: 'c.txt', status: 'UU' }] }
+
+    const wrapper = mount(ChangesPanel, { props })
+    expect(wrapper.get('[data-test="action"]').text()).toBe('Mark resolved')
+    await wrapper.get('[data-test="action"]').trigger('click')
+
+    expect(mockStageFile).toHaveBeenCalledWith('/repo', 'c.txt')
+  })
+
+  it('FR-CONF-02, FR-CONF-03 a conflicted row is not selectable (no working diff to show)', async () => {
+    const changes = useChangesStore()
+    changes.files = { ...empty, conflicted: [{ path: 'c.txt', status: 'UU' }] }
+
+    const wrapper = mount(ChangesPanel, { props })
+    await wrapper.get('li').trigger('click')
+
+    expect(changes.selectedFile).toBeNull()
   })
 })

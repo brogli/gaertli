@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/testbin"
 )
@@ -23,8 +24,7 @@ func TestMain(m *testing.M) {
 	)
 }
 
-// acceptConsent always accepts (cases 9-12 don't assert consent behaviour;
-// deploy.go's own tests cover that).
+// acceptConsent always accepts; deploy_test.go covers consent behaviour.
 type acceptConsent struct{}
 
 func (acceptConsent) Ask(string, string) bool { return true }
@@ -83,10 +83,7 @@ func TestADR_3_EnsureForcesARedeployOnAProtocolMismatch(t *testing.T) {
 
 	_, _, err := dc.Ensure(context.Background())
 
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != core.Internal {
-		t.Fatalf("err = %v, want *core.Error{Code: Internal}", err)
-	}
+	coretest.AssertCode(t, err, core.Internal)
 }
 
 func TestADR_3_OpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
@@ -131,7 +128,7 @@ func TestADR_4_EnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Kill the underlying process (ADR-4: simulates `wsl --shutdown`).
+	// kill the underlying process, as `wsl --shutdown` would
 	if err := spawns[len(spawns)-1].Process.Kill(); err != nil {
 		t.Fatal(err)
 	}

@@ -2,13 +2,13 @@ package services_test
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 	"github.com/brogli/nebegit/internal/services"
@@ -65,7 +65,7 @@ func TestFR_REPO_05_OpenWorktreeRejectsPlainDirectory(t *testing.T) {
 
 	_, err := c.OpenWorktree(context.Background(), core.RepoPath(t.TempDir()))
 
-	assertCode(t, err, core.NotARepo)
+	coretest.AssertCode(t, err, core.NotARepo)
 }
 
 func TestFR_REPO_05_OpenWorktreeRejectsMissingPath(t *testing.T) {
@@ -73,7 +73,7 @@ func TestFR_REPO_05_OpenWorktreeRejectsMissingPath(t *testing.T) {
 
 	_, err := c.OpenWorktree(context.Background(), core.RepoPath(filepath.Join(t.TempDir(), "missing")))
 
-	assertCode(t, err, core.NotARepo)
+	coretest.AssertCode(t, err, core.NotARepo)
 }
 
 func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
@@ -337,13 +337,5 @@ func TestFR_REPO_04_RefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
 		case <-deadline:
 			t.Fatal("no repo:changed(refs) event after Refresh (the watcher's CheckNow)")
 		}
-	}
-}
-
-func assertCode(t *testing.T, err error, want core.Code) {
-	t.Helper()
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != want {
-		t.Errorf("err = %v, want *core.Error{Code: %s}", err, want)
 	}
 }

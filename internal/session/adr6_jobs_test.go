@@ -9,19 +9,19 @@ import (
 )
 
 // TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock proves a
-// job whose fn takes the worktree-queue lock (ADR-6) is not a bypass: a
-// concurrent direct Lock() waits for it, exactly like any other write.
+// job whose fn takes the worktree lock is not a bypass: a concurrent direct
+// Lock() waits for it, like any other write.
 func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
 
 	locked := make(chan struct{})
-	m.Start("test", func(ctx context.Context, progress jobs.Progress) error {
+	m.Start("test", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		wt.Lock()
 		defer wt.Unlock()
 		close(locked)
 		time.Sleep(150 * time.Millisecond)
-		return nil
+		return nil, nil
 	})
 	<-locked
 	time.Sleep(10 * time.Millisecond)
@@ -37,9 +37,8 @@ func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T
 }
 
 // TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock proves
-// the "outside the queues" class (ADR-6: fetch/push touch refs and objects
-// only) — a job whose fn takes no lock at all runs to completion regardless
-// of a concurrent Worktree.Lock()-held section.
+// a job whose fn takes no lock (fetch/push touch refs and objects only)
+// runs to completion regardless of a concurrent Worktree.Lock() section.
 func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
@@ -54,9 +53,9 @@ func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing
 	}()
 
 	jobDone := make(chan time.Duration, 1)
-	m.Start("test", func(ctx context.Context, progress jobs.Progress) error {
+	m.Start("test", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		jobDone <- time.Since(start)
-		return nil
+		return nil, nil
 	})
 
 	select {
@@ -73,20 +72,20 @@ func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing
 	}
 }
 
-// TestQA_SAFE_04_CancelReleasesAWorktreeLockHeldByTheJob proves QA-SAFE-04:
-// cancelling a job whose fn is holding wt.Lock() still releases it — the
-// fn's own deferred Unlock runs once ctx.Done() unblocks it.
+// TestQA_SAFE_04_CancelReleasesAWorktreeLockHeldByTheJob proves cancelling
+// a job whose fn holds wt.Lock() releases it: the fn's deferred Unlock runs
+// once ctx.Done() unblocks it.
 func TestQA_SAFE_04_CancelReleasesAWorktreeLockHeldByTheJob(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
 
 	locked := make(chan struct{})
-	id := m.Start("test", func(ctx context.Context, progress jobs.Progress) error {
+	id := m.Start("test", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		wt.Lock()
 		defer wt.Unlock()
 		close(locked)
 		<-ctx.Done()
-		return ctx.Err()
+		return nil, ctx.Err()
 	})
 	<-locked
 

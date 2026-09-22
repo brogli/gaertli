@@ -62,6 +62,14 @@ func (f *fake) StageAll(context.Context, core.WorktreeID) error { return nil }
 
 func (f *fake) UnstageAll(context.Context, core.WorktreeID) error { return nil }
 
+func (f *fake) StageLines(context.Context, core.WorktreeID, string, core.LineSelection, bool) error {
+	return nil
+}
+
+func (f *fake) Commit(context.Context, core.WorktreeID, string, bool) error { return nil }
+
+func (f *fake) SetMessageDraft(context.Context, core.WorktreeID, string) error { return nil }
+
 func (f *fake) DiffWorking(context.Context, core.WorktreeID, string, string, bool, bool) (core.DiffFile, error) {
 	return core.DiffFile{}, nil
 }
@@ -139,6 +147,13 @@ func (f *fake) Pull(context.Context, core.WorktreeID, core.PullMode) (string, er
 func (f *fake) Push(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
 
 func (f *fake) ForcePush(context.Context, core.WorktreeID) (string, error) { return "", nil }
+
+func (f *fake) UpdateBranch(context.Context, core.WorktreeID, string) (string, error) {
+	return "", nil
+}
+func (f *fake) ContinueOperation(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) AbortOperation(context.Context, core.WorktreeID) error { return nil }
 
 // pipeClient serves f over an in-memory pipe and returns a client on it.
 func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {

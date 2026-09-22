@@ -7,17 +7,15 @@ import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/inter
 import ChangedFileList from './ChangedFileList.vue'
 import ErrorBanner from './ErrorBanner.vue'
 
-// CommitDetailsPanel shows the log store's selected commit (FR-LOG-03):
-// message, committer info, parents, and changed files. Empty until a row
-// is selected. wt (FR-ED-02) is this window's own worktree, needed
-// to resolve a file's editor-open call against it.
+// CommitDetailsPanel shows the log store's selected commit: message,
+// committer info, parents, and changed files. Empty until a row is
+// selected.
 const props = defineProps<{ wt: string }>()
 const log = useLogStore()
 const changes = useChangesStore()
 const { error, run } = useCoreCall()
 
-// FR-UX-07: selecting one of this commit's files wins over a stale
-// changes-panel diff, the same rule LogList's own row click applies.
+// selecting one of this commit's files wins over a stale changes-panel diff
 function selectFile(f: ChangedFile): void {
   changes.clearSelection()
   log.selectFile(f)

@@ -6,13 +6,15 @@ import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ChangedFileList from './ChangedFileList.vue'
+import CommitBox from './CommitBox.vue'
 import ErrorBanner from './ErrorBanner.vue'
 
-// ChangesPanel lists a worktree's current changes in four groups (FR-CHG-01)
-// and stages/unstages them (FR-CHG-02); selecting a row drives the diff
-// pane via the changes store, replacing any active compare selection.
-// Conflicted files get no action button and no selection (FR-CONF-* is
-// spec 72's own delivery).
+// ChangesPanel lists a worktree's current changes in four groups and
+// stages/unstages them; selecting a row drives the diff pane via the
+// changes store, replacing any active compare selection. Conflicted files
+// get no selection: an unmerged path has no working-tree diff view to
+// show. Its own "Mark resolved" button reuses stageFile — resolving a
+// conflict is git add, the same call an ordinary stage is.
 const props = defineProps<{ wt: string }>()
 const collapsed = ref(false)
 const changes = useChangesStore()
@@ -50,17 +52,18 @@ function unstageFile(file: ChangedFile): void {
   write(() => Facade.UnstageFile(props.wt, file.path))
 }
 
-// The four groups differ only in label, action and which side the diff
-// shows; conflicted files get no action until the conflict flow lands.
+// The three selectable groups differ only in label, action and which side
+// the diff shows. Conflicted (below, in the template) is not one of them:
+// it takes no @select.
 const groups = computed(() => {
   const f = changes.files
   return [
     { title: 'Staged', empty: 'No staged changes', files: f?.staged ?? [], staged: true, actionLabel: 'Unstage', action: unstageFile },
     { title: 'Unstaged', empty: 'No unstaged changes', files: f?.unstaged ?? [], staged: false, actionLabel: 'Stage', action: stageFile },
     { title: 'Untracked', empty: 'No untracked files', files: f?.untracked ?? [], staged: false, actionLabel: 'Stage', action: stageFile },
-    { title: 'Conflicted', empty: 'No conflicts', files: f?.conflicted ?? [], staged: false, actionLabel: '', action: () => {} },
   ]
 })
+const conflicted = computed(() => changes.files?.conflicted ?? [])
 </script>
 
 <template>
@@ -74,6 +77,7 @@ const groups = computed(() => {
       <button type="button" @click="stageAll">Stage all</button>
       <button type="button" @click="unstageAll">Unstage all</button>
     </header>
+    <CommitBox :key="wt" :wt="wt" />
     <ErrorBanner v-if="error" :error="error" />
 
     <template v-for="g in groups" :key="g.title">
@@ -87,6 +91,16 @@ const groups = computed(() => {
         @action="g.action"
       />
     </template>
+
+    <h3>Conflicted</h3>
+    <p v-if="!conflicted.length">No conflicts</p>
+    <ChangedFileList
+      :files="conflicted"
+      action-label="Mark resolved"
+      @open="openEditor"
+      @open-editor="openEditor"
+      @action="stageFile"
+    />
     </section>
   </aside>
 </template>

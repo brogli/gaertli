@@ -1,13 +1,8 @@
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// buildCommitMenuItems is the commit row's right-click menu (FR-LOG-11):
-// copy hash/subject (FR-LOG-12), new branch/check out commit (FR-BR-01,
-// FR-BR-08), reset (FR-BR-02), cherry-pick/revert (FR-CP-01, FR-RV-01),
-// create worktree here (FR-WT-06) and, when provided, compare with the
-// previously selected commit (FR-CMP-01) — absent rather than disabled when
-// there is nothing to pair with. Items use OpenVue's own {label, command}
-// shape. actions opens the dialogs the view owns, or runs a stateless write
-// action directly.
+// buildCommitMenuItems is the commit row's right-click menu. "Compare with
+// selected" is absent rather than disabled when there is nothing to pair
+// with. Items use OpenVue's {label, command} shape.
 export function buildCommitMenuItems(
   row: LogCommit,
   actions: {

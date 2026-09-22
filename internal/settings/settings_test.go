@@ -167,9 +167,8 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 	}
 }
 
-// TestFR_ED_11_EditorProfilesRoundTripPerEnvironment is case 10's round-trip
-// half: one profile for local ("") and one for a WSL distro (FR-ED-11's ""
-// = local convention, same as RecentRepo.Distro).
+// TestFR_ED_11_EditorProfilesRoundTripPerEnvironment round-trips one
+// profile for local ("") and one for a WSL distro.
 func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	want := settings.Settings{

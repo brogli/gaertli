@@ -2,13 +2,13 @@ package session
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 	"github.com/brogli/nebegit/internal/watch"
@@ -65,9 +65,9 @@ func TestFR_REPO_05_ManagerOpenRejectsNonRepoPathSayingSo(t *testing.T) {
 
 	_, err := m.Open(context.Background(), core.RepoPath(dir))
 
-	ce := assertCode(t, err, core.NotARepo)
+	ce := coretest.AsError(t, err, core.NotARepo)
 	if want := dir + " is not a git repository"; ce.Message != want {
-		t.Errorf("Message = %q, want %q (FR-REPO-05: say so clearly)", ce.Message, want)
+		t.Errorf("Message = %q, want %q", ce.Message, want)
 	}
 }
 
@@ -76,7 +76,7 @@ func TestManagerOpenRejectsMissingPath(t *testing.T) {
 
 	_, err := m.Open(context.Background(), core.RepoPath(filepath.Join(t.TempDir(), "missing")))
 
-	_ = assertCode(t, err, core.NotARepo)
+	coretest.AssertCode(t, err, core.NotARepo)
 }
 
 func TestManagerGetReturnsInternalErrorForUnknownID(t *testing.T) {
@@ -84,7 +84,7 @@ func TestManagerGetReturnsInternalErrorForUnknownID(t *testing.T) {
 
 	_, err := m.Get("bogus")
 
-	_ = assertCode(t, err, core.Internal)
+	coretest.AssertCode(t, err, core.Internal)
 }
 
 func TestWorktreeRunnerAppendsToCommandLogAndEmitsSink(t *testing.T) {
@@ -310,13 +310,4 @@ func TestQA_PERF_06_ManagerCloseTearsDownThePollerAndTheLastWorktreesWatcher(t *
 	if pollers[1].closeCount != 1 {
 		t.Errorf("second worktree's poller Close() called %d times, want 1", pollers[1].closeCount)
 	}
-}
-
-func assertCode(t *testing.T, err error, want core.Code) *core.Error {
-	t.Helper()
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != want {
-		t.Fatalf("err = %v, want *core.Error{Code: %s}", err, want)
-	}
-	return ce
 }

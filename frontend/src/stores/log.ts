@@ -36,11 +36,10 @@ function cachedWindow(view: RowView, from: number, to: number): LogCommit[] | nu
   return rows
 }
 
-// log holds one repo session's commit log (FR-LOG-01/09): loaded once per
-// LoadLog, row windows cached by index, one commit's details cached by sha.
-// It also holds this window's own filtered view (FR-LOG-05..08): a filter
-// never replaces the base loaded/done pair — filterLoaded/filterDone track
-// the filtered stream, and activeLoaded/activeDone pick the current pair.
+// log holds one repo session's commit log: loaded once per LoadLog, row
+// windows cached by index, commit details cached by sha. It also holds this
+// window's filtered view: filterLoaded/filterDone track the filtered
+// stream beside the base loaded/done pair.
 export const useLogStore = defineStore('log', () => {
   const loaded = ref(0)
   const done = ref(false)
@@ -52,9 +51,9 @@ export const useLogStore = defineStore('log', () => {
   const selectedFile = ref<ChangedFile | null>(null)
   const pendingScrollTo = ref<number | null>(null)
 
-  // multiSelect is a Shift-click contiguous range (FR-LOG-11), independent
-  // of selectedRow (single-row details) and of the compare store's
-  // Ctrl-click pair.
+  // multiSelect is a Shift-click contiguous range, independent of
+  // selectedRow (single-row details) and of the compare store's Ctrl-click
+  // pair.
   const multiSelect = ref<LogCommit[]>([])
   let anchorIndex: number | null = null
 
@@ -64,27 +63,22 @@ export const useLogStore = defineStore('log', () => {
   let unlistenChanged: (() => void) | undefined
   let unlistenReconnected: (() => void) | undefined
 
-  // filterActive mirrors core.LogFilter.Empty(): whether filter narrows
-  // anything at all. activeLoaded/activeDone read the filtered pair while
-  // active, the base pair otherwise — what LogList's virtualizer counts on.
+  // filterActive is !core.LogFilter.Empty(). activeLoaded is the row count
+  // LogList's virtualizer shows.
   const filterActive = computed(() => {
     const f = filter.value
     return !!(f.query || f.author || (f.branches && f.branches.length > 0) || f.path)
   })
   const activeLoaded = computed(() => (filterActive.value ? filterLoaded.value : loaded.value))
-  const activeDone = computed(() => (filterActive.value ? filterDone.value : done.value))
-  // flat is true while a text/author search narrows the view (FR-LOG-02):
-  // the graph column is hidden. Mirrors the Go side's own rule.
+  // flat hides the graph column while a text/author search narrows the
+  // view, the same rule as the Go side.
   const flat = computed(() => !!(filter.value.query || filter.value.author))
 
   // One row-window cache per view (base log, filtered view): clearing a
-  // filter shows the base rows already fetched, and a slow response from the
-  // other view lands in that view's cache, never the one on screen.
-  // generation is LogRowsResult.Generation as last seen for that view; a
-  // change means the view restarted from row 0 (reload, new filter).
-  // pending dedupes a window already in flight: the same [from, to) can be
-  // requested twice (e.g. two watchEffect ticks) before the first LogRows
-  // call fills the cache.
+  // filter shows the base rows already fetched, and a slow response lands
+  // in its own view's cache. generation is LogRowsResult.Generation as last
+  // seen for that view; a change means the view restarted from row 0.
+  // pending dedupes a window already in flight.
   const baseView = newRowView()
   const filterView = newRowView()
   const activeView = computed(() => (filterActive.value ? filterView : baseView))
@@ -129,9 +123,8 @@ export const useLogStore = defineStore('log', () => {
       if (scope === 'refs') void Facade.ReloadLog(wt)
     })
 
-    // core:reconnected (ADR-4): a fresh core's session/generation numbers
-    // have no relationship to the old ones, so the log starts over rather
-    // than reloading.
+    // a respawned core's generation numbers are unrelated to the old ones,
+    // so the log starts over rather than reloading
     unlistenReconnected?.()
     unlistenReconnected = Events.On('core:reconnected', () => void Facade.LoadLog(wt))
 
@@ -139,7 +132,7 @@ export const useLogStore = defineStore('log', () => {
   }
 
   // applyFilter starts (f non-empty) or clears (f = {}) this window's
-  // filtered view (FR-LOG-05..08).
+  // filtered view.
   async function applyFilter(f: LogFilter): Promise<void> {
     filter.value = f
     filterLoaded.value = 0
@@ -151,7 +144,6 @@ export const useLogStore = defineStore('log', () => {
     await Facade.SetLogFilter(wt, f)
   }
 
-  // clearFilter is FR-LOG-08's "one action clears them all".
   function clearFilter(): Promise<void> {
     return applyFilter({})
   }
@@ -203,8 +195,8 @@ export const useLogStore = defineStore('log', () => {
     selectedFile.value = file
   }
 
-  // nextFile/prevFile step through the selected commit's already-loaded
-  // file list (FR-DIFF-02); a no-op at either end, or with no file selected.
+  // nextFile/prevFile step through the selected commit's file list; a no-op
+  // at either end, or with no file selected.
   function stepFile(step: 1 | -1): void {
     const files = details.value?.files ?? []
     const i = files.findIndex((f) => f.path === selectedFile.value?.path)
@@ -220,9 +212,8 @@ export const useLogStore = defineStore('log', () => {
     stepFile(-1)
   }
 
-  // jumpTo selects sha's row and asks LogList to scroll to it (FR-LOG-01,
-  // a sidebar ref click). A sha not found — not yet streamed, or absent —
-  // is a deliberate no-op.
+  // jumpTo selects sha's row and asks LogList to scroll to it. A sha not
+  // found (not yet streamed, or absent) is a no-op.
   async function jumpTo(sha: string): Promise<void> {
     const { index, found } = await Facade.LogIndexOf(wt, sha)
     if (!found) return
@@ -239,9 +230,8 @@ export const useLogStore = defineStore('log', () => {
   }
 
   // shiftSelectTo extends/creates a range from the last plain-clicked row
-  // to toIndex (FR-LOG-11). It goes through rows(), not rowCache: a fast
-  // fling-scroll can shift-click far past rows that were never rendered, so
-  // the whole [lo, hi] window may need a fresh LogRows call.
+  // to toIndex. It goes through rows(), not rowCache: the range may span
+  // rows never rendered.
   async function shiftSelectTo(toIndex: number): Promise<void> {
     if (anchorIndex === null) anchorIndex = toIndex
     const [lo, hi] = anchorIndex <= toIndex ? [anchorIndex, toIndex] : [toIndex, anchorIndex]
@@ -262,7 +252,6 @@ export const useLogStore = defineStore('log', () => {
     filterDone,
     filterActive,
     activeLoaded,
-    activeDone,
     knownAuthors,
     selectedRow,
     details,

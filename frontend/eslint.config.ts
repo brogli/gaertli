@@ -3,7 +3,7 @@ import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescri
 import eslintConfigPrettier from 'eslint-config-prettier'
 import oxlint from 'eslint-plugin-oxlint'
 
-// vue-tsc --build (composite project mode, TR-33) needs a nameable
+// vue-tsc --build (composite project mode) needs a nameable
 // declaration type for every exported value; defineConfigWithVueTs's
 // inferred return type resolves into pnpm's unstable .pnpm/ store path,
 // which isn't portable, hence the explicit annotation.
@@ -15,7 +15,7 @@ const config: ReturnType<typeof defineConfigWithVueTs> = defineConfigWithVueTs(
   {
     rules: {
       // Matches tsconfig's noUnusedParameters, which already exempts a
-      // leading underscore: mocked bindings (TR-31) keep unused positional
+      // leading underscore: mocked bindings keep unused positional
       // params to match the real Facade's call signature.
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },

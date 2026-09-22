@@ -1,6 +1,7 @@
 package services
 
 import (
+	"cmp"
 	"context"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func (c *Core) StageFile(ctx context.Context, id core.WorktreeID, path string) e
 	if err != nil {
 		return err
 	}
-	wt.Lock() // ADR-6: staging writes this worktree's index
+	wt.Lock() // staging writes this worktree's index
 	defer wt.Unlock()
 	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"add", "--", path}})
 	return err
@@ -73,8 +74,39 @@ func (c *Core) UnstageAll(ctx context.Context, id core.WorktreeID) error {
 	return err
 }
 
-// parseStatus splits git status --porcelain=v2 -z output into FR-CHG-01's
-// four groups: each record is placed by its X (staged, vs HEAD) and Y
+// Commit implements core.API.
+func (c *Core) Commit(ctx context.Context, id core.WorktreeID, message string, amend bool) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	wt.Lock() // commit writes this worktree's index and HEAD
+	defer wt.Unlock()
+
+	args := []string{"commit"}
+	if amend {
+		args = append(args, "--amend")
+	}
+	args = append(args, "-F", "-")
+	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args, Stdin: []byte(message)}); err != nil {
+		return err
+	}
+	wt.SetMessageDraft("") // cleared only on success
+	return nil
+}
+
+// SetMessageDraft implements core.API.
+func (c *Core) SetMessageDraft(ctx context.Context, id core.WorktreeID, message string) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	wt.SetMessageDraft(message)
+	return nil
+}
+
+// parseStatus splits git status --porcelain=v2 -z output into four
+// groups: each record is placed by its X (staged, vs HEAD) and Y
 // (unstaged, vs the index) halves independently, so a file changed both
 // ways (a "MM" record) lands in both groups with its two distinct letters.
 // Header lines ("# ...") are skipped by prefix, not position — a
@@ -152,7 +184,7 @@ func (c *Core) DiffWorking(ctx context.Context, id core.WorktreeID, path, oldPat
 	if err != nil {
 		return core.DiffFile{}, err
 	}
-	old := firstNonEmpty(oldPath, path)
+	old := cmp.Or(oldPath, path)
 	if !staged {
 		return diffWorkingTree(ctx, wt.Runner, wt.Path, path, old, force)
 	}

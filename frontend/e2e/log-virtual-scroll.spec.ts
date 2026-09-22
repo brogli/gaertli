@@ -1,11 +1,9 @@
 import { test, expect } from '@playwright/test'
 
-// FR-LOG-09, TR-31: a component test runs in happy-dom, which has no real
-// layout or scrolling, so it cannot exercise the virtual list's actual
-// behaviour. This drives the real, rendered app instead: only the
-// visible window loads up front, and scrolling past it pulls in further,
-// higher-index rows (window.__e2eLogRowsCalls, set by
-// src/testing/e2e-mock-bindings.ts).
+// happy-dom has no real layout or scrolling, so a component test cannot
+// exercise the virtual list. This drives the rendered app instead: only
+// the visible window loads up front, and scrolling pulls in further rows
+// (window.__e2eLogRowsCalls, set by src/testing/e2e-mock-bindings.ts).
 test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful', async ({ page }) => {
   await page.goto('/?path=/mock/repo')
   await page.waitForSelector('.row')
@@ -38,10 +36,8 @@ test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful'
   expect(afterScroll).toBeGreaterThan(baseline)
 })
 
-// A streamed load must leave the list at its top, newest commit first
-// (FR-LOG-01): rows are fixed-height, so the virtualizer never remeasures
-// and never shifts scrollTop while rows arrive (the drift left the list
-// scrolled, or blank, after every load of a real repo).
+// A streamed load must leave the list at its top, newest commit first: the
+// virtualizer must not shift scrollTop while rows arrive.
 test('FR-LOG-01 after a streamed load the list is still at the top with row 0 visible', async ({ page }) => {
   await page.goto('/?path=/mock/repo')
   await page.waitForSelector('.row')

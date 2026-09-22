@@ -5,11 +5,9 @@ import (
 	"testing"
 )
 
-// TestFR_LOG_02_MergeOpensTwoLanesForItsParents covers case 1: A is the
-// common ancestor of B and C, which merge into M. Topo-order (newest
-// first) requires M's parents to be fed after M, so the call sequence is
-// M, B, C, A — not the Given column's left-to-right (oldest-to-newest)
-// diagram order.
+// TestFR_LOG_02_MergeOpensTwoLanesForItsParents: A is the common ancestor
+// of B and C, which merge into M. Topo-order (newest first) feeds M, B, C,
+// A.
 func TestFR_LOG_02_MergeOpensTwoLanesForItsParents(t *testing.T) {
 	l := NewLayout()
 
@@ -31,7 +29,6 @@ func TestFR_LOG_02_MergeOpensTwoLanesForItsParents(t *testing.T) {
 	}
 }
 
-// TestFR_LOG_02_ForkClosesBothLanesAtSharedRoot covers case 2.
 func TestFR_LOG_02_ForkClosesBothLanesAtSharedRoot(t *testing.T) {
 	l := NewLayout()
 
@@ -47,8 +44,8 @@ func TestFR_LOG_02_ForkClosesBothLanesAtSharedRoot(t *testing.T) {
 	}
 }
 
-// TestFR_LOG_02_WideForkOverflowsPastCap covers case 3: 40 branches share
-// one root, Cap 32.
+// TestFR_LOG_02_WideForkOverflowsPastCap: 40 branches share one root, Cap
+// 32.
 func TestFR_LOG_02_WideForkOverflowsPastCap(t *testing.T) {
 	l := &Layout{Cap: 32}
 

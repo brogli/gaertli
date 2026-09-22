@@ -8,8 +8,8 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// InstallLauncher makes `nebegit <path>` work inside d's own distro shell
-// (ADR-3): it deploys the core binary if needed, records guiExePath's
+// InstallLauncher makes `nebegit <path>` work inside d's distro shell: it
+// deploys the core binary if needed, records guiExePath's
 // WSL-mount form next to it so a later launch knows which Windows binary to
 // hand off to, then symlinks ~/.local/bin/nebegit to the deployed core.
 func (d *DistroCore) InstallLauncher(ctx context.Context, guiExePath string) error {

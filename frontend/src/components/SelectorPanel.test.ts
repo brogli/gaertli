@@ -51,10 +51,10 @@ vi.mock('@wailsio/runtime', () => ({ Events: { On: mockEventsOn } }))
 
 import SelectorPanel from './SelectorPanel.vue'
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
+import ErrorBanner from './ErrorBanner.vue'
 import { worktreeFixture } from '../testing/fixtures/worktree'
 
-// aRepoNode returns the treeitem for repo, by its path label (top-level
-// nodes are labelled with the recent repo's own path, Design: "SelectorPanel.vue").
+// repoTreeItem returns the top-level treeitem labelled with path.
 function repoTreeItem(wrapper: ReturnType<typeof mount>, path: string) {
   return wrapper.findAll('[role="treeitem"]').find((n) => n.attributes('aria-label') === path)
 }
@@ -90,8 +90,8 @@ describe('SelectorPanel', () => {
   })
 
   // openWSLDialog mounts SelectorPanel, clicks "Open WSL folder…", and
-  // hands back a DOMWrapper on the dialog's teleported content (shared by
-  // cases 18-20); wslWrapper is unmounted in afterEach.
+  // hands back a DOMWrapper on the dialog's teleported content; wslWrapper
+  // is unmounted in afterEach.
   async function openWSLDialog(): Promise<DOMWrapper<HTMLElement>> {
     wslWrapper = mount(SelectorPanel, { props: { selectedPath: '' }, attachTo: document.body })
     await wslWrapper.get('[data-test="open-wsl-folder"]').trigger('click')
@@ -366,5 +366,20 @@ describe('SelectorPanel', () => {
 
     expect(mockListWorktrees).toHaveBeenCalledTimes(1)
     expect(mockListWorktrees).toHaveBeenCalledWith('/repoA')
+  })
+
+  it('FR-UX-01 a rejected PickAndOpen renders ErrorBanner with the error', async () => {
+    mockPickAndOpen.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'dialog cancelled' } }),
+    )
+    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
+
+    const openFolderButton = wrapper.findAll('button').find((b) => b.text() === 'Open folder…')
+    await openFolderButton!.trigger('click')
+    await flushPromises()
+
+    const error = wrapper.findComponent(ErrorBanner)
+    expect(error.exists()).toBe(true)
+    expect(error.props('error')).toEqual({ message: 'dialog cancelled' })
   })
 })

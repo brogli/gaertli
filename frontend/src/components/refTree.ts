@@ -1,21 +1,20 @@
 // buildRefTree turns a flat list of namespaced refs (e.g. "feature/a",
 // "feature/b", "main") into OpenVue's TreeNode[] shape, folding shared
-// `/`-separated prefixes into folder nodes — the usual git-GUI convention
-// for namespaced branches (FR-LOG-01). No library does this transform
-// (TR-17).
+// `/`-separated prefixes into folder nodes.
 
 export interface RefTreeLeaf {
   name: string
   sha: string
   current?: boolean
   checkedOutIn?: string
+  upstream?: string
 }
 
 export interface RefTreeNode {
   key: string
   label: string
   children?: RefTreeNode[]
-  data?: { sha: string; current: boolean; checkedOutIn: string }
+  data?: { sha: string; current: boolean; checkedOutIn: string; upstream: string }
 }
 
 export function buildRefTree(refs: RefTreeLeaf[]): RefTreeNode[] {
@@ -39,6 +38,7 @@ export function buildRefTree(refs: RefTreeLeaf[]): RefTreeNode[] {
           sha: ref.sha,
           current: ref.current ?? false,
           checkedOutIn: ref.checkedOutIn ?? '',
+          upstream: ref.upstream ?? '',
         }
       } else {
         node.children ??= []

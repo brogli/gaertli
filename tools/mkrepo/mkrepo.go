@@ -105,9 +105,7 @@ func worktreeDir(dir string, n int) string {
 }
 
 // addWorktrees adds cfg.Worktrees sibling worktrees: one on an existing
-// feature branch, the rest detached at an older commit on main — varied on
-// purpose, FR-LOG-10/FR-BR-05-shaped data for any later spec benchmarking
-// against this repo.
+// feature branch, the rest detached at an older commit on main.
 func addWorktrees(ctx context.Context, dir string, cfg Config) error {
 	for i := 1; i <= cfg.Worktrees; i++ {
 		wt := worktreeDir(dir, i)
@@ -239,9 +237,8 @@ func schedulePositions(rng *rand.Rand, total, count int) []int {
 	return positions
 }
 
-// fastImport writes a git fast-import stream (Own code vs library: no
-// maintained Go library builds one under a permissive licence, Research
-// used).
+// fastImport writes a git fast-import stream. Own code: no maintained Go
+// library builds one under a permissive licence.
 type fastImport struct {
 	w    io.Writer
 	mark int

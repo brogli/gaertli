@@ -11,10 +11,9 @@ import (
 	"github.com/brogli/nebegit/internal/proc"
 )
 
-// ListDistros runs wsl.exe --list --verbose and parses it (FR-REPO-07's
-// picker). WSL_UTF8=1 (Microsoft-documented, WSL >= 0.64) makes the output
-// UTF-8 on a current build; decodeWSLText remains the fallback for older
-// ones. CREATE_NO_WINDOW (TR-12) hides its console.
+// ListDistros runs wsl.exe --list --verbose and parses it. WSL_UTF8=1 (WSL
+// >= 0.64) makes the output UTF-8; decodeWSLText remains the fallback for
+// older builds.
 func ListDistros(ctx context.Context) ([]Distro, error) {
 	if !wslPresent() {
 		return nil, core.Errorf(core.WslNotFound, "WSL is not installed (wsl.exe not found on PATH)")

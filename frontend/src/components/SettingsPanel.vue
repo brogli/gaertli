@@ -7,9 +7,8 @@ import type { EditorProfile } from '../../bindings/github.com/brogli/nebegit/int
 import type { Distro } from '../../bindings/github.com/brogli/nebegit/internal/remote'
 import ErrorBanner from './ErrorBanner.vue'
 
-// DEFAULT_PROFILE mirrors editor.Default() (FR-ED-05): the built-in
-// fallback a newly added distro profile starts from, client-side, so it
-// looks pre-filled before the user ever saves.
+// DEFAULT_PROFILE mirrors editor.Default(), so a newly added profile form
+// starts pre-filled.
 const DEFAULT_PROFILE: EditorProfile = {
   name: 'Zed',
   folderCmd: 'zed {path}',
@@ -28,9 +27,8 @@ const form = reactive({
   autoFetchIntervalMinutes: 0,
 })
 
-// editorProfiles is edited directly, keyed the same way
-// Settings.EditorProfiles is ("" = local, else a WSL distro name, FR-ED-11):
-// one independently editable form per environment (FR-ED-04).
+// editorProfiles is edited directly, one form per environment, keyed like
+// Settings.EditorProfiles ("" = local, else a WSL distro name).
 const editorProfiles = reactive<Record<string, EditorProfile>>({})
 
 const distros = ref<Distro[]>([])
@@ -49,7 +47,6 @@ function addDistroProfile(name: string): void {
   editorProfiles[name] = { ...DEFAULT_PROFILE }
 }
 
-// installLauncher is FR-REPO-06's "one-click" install action, per distro.
 function installLauncher(distro: string): void {
   void run(() => AppService.InstallWSLLauncher(distro))
 }
@@ -73,7 +70,7 @@ onMounted(async () => {
 
 async function submit(): Promise<void> {
   if (!store.settings) return
-  await store.save({
+  const updated = {
     ...store.settings,
     editorProfiles: { ...editorProfiles },
     protectedBranches: form.protectedBranches
@@ -83,7 +80,8 @@ async function submit(): Promise<void> {
     defaultPullMode: form.defaultPullMode,
     diffMode: form.diffMode,
     autoFetchIntervalMinutes: form.autoFetchIntervalMinutes,
-  })
+  }
+  await run(() => store.save(updated))
 }
 </script>
 

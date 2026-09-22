@@ -8,10 +8,9 @@ import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/ap
 import type { Distro } from '../../bindings/github.com/brogli/nebegit/internal/remote'
 import ErrorBanner from './ErrorBanner.vue'
 
-// OpenWSLFolderDialog is FR-REPO-07's "Open WSL folder": pick an installed
-// distro, then either browse (the native picker, seeded at its UNC root)
-// or type a folder inside it. WSL 1 distros list but cannot be picked
-// (ADR-3 scopes running a core inside one out, not knowing it exists).
+// OpenWSLFolderDialog is "Open WSL folder": pick an installed distro, then
+// either browse (the native picker, seeded at its UNC root) or type a
+// folder inside it. WSL 1 distros are listed but cannot be picked.
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 

@@ -18,6 +18,7 @@ vi.mock('@wailsio/runtime', () => ({
 }))
 
 import JobsStrip from './JobsStrip.vue'
+import ErrorBanner from './ErrorBanner.vue'
 
 describe('JobsStrip', () => {
   beforeEach(() => {
@@ -42,7 +43,14 @@ describe('JobsStrip', () => {
 
   it('FR-SYNC-07 Cancel calls Facade.CancelJob, and a cancelled job:update removes the row', async () => {
     mockJobs.mockResolvedValue([
-      { id: 'j1', kind: 'fetch', state: 'running', progress: 45, message: 'halfway', startedAt: '' },
+      {
+        id: 'j1',
+        kind: 'fetch',
+        state: 'running',
+        progress: 45,
+        message: 'halfway',
+        startedAt: '',
+      },
     ])
     const wrapper = mount(JobsStrip, { props: { wt: '/repo' } })
     await flushPromises()
@@ -56,10 +64,53 @@ describe('JobsStrip', () => {
 
     const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'job:update')?.[1]
     handler?.({
-      data: { id: 'j1', kind: 'fetch', state: 'cancelled', progress: 45, message: 'halfway', startedAt: '' },
+      data: {
+        id: 'j1',
+        kind: 'fetch',
+        state: 'cancelled',
+        progress: 45,
+        message: 'halfway',
+        startedAt: '',
+      },
     })
     await wrapper.vm.$nextTick()
 
     expect(wrapper.findAll('.job-row')).toHaveLength(0)
+  })
+
+  it("FR-UPD-02 an update-branch job's row shows a friendly label naming the branch, not the raw kind", async () => {
+    mockJobs.mockResolvedValue([
+      {
+        id: 'j1',
+        kind: 'update-branch:feature',
+        state: 'running',
+        progress: 40,
+        message: '',
+        startedAt: '',
+      },
+    ])
+    const wrapper = mount(JobsStrip, { props: { wt: '/repo' } })
+    await flushPromises()
+
+    expect(wrapper.get('.job-row').text()).toContain('Update feature')
+    expect(wrapper.get('.job-row').text()).not.toContain('update-branch:feature')
+  })
+
+  it('FR-UX-01 a rejected Cancel renders ErrorBanner with the error', async () => {
+    mockJobs.mockResolvedValue([
+      { id: 'j1', kind: 'fetch', state: 'running', progress: 45, message: '', startedAt: '' },
+    ])
+    mockCancelJob.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'cancel failed' } }),
+    )
+    const wrapper = mount(JobsStrip, { props: { wt: '/repo' } })
+    await flushPromises()
+
+    await wrapper.get('[data-test="job-cancel"]').trigger('click')
+    await flushPromises()
+
+    const error = wrapper.findComponent(ErrorBanner)
+    expect(error.exists()).toBe(true)
+    expect(error.props('error')).toEqual({ message: 'cancel failed' })
   })
 })

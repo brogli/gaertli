@@ -410,8 +410,7 @@ func TestADR_9_SwitchingReleasesThePreviousSelectionThroughItsRealCore(t *testin
 	}
 }
 
-// Two windows sharing a selection (ADR-9) both receive a worktree-scoped
-// event.
+// Two windows sharing a selection both receive a worktree-scoped event.
 func TestADR_9_DispatchReachesEveryWindowSharingASelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
@@ -424,7 +423,7 @@ func TestADR_9_DispatchReachesEveryWindowSharingASelection(t *testing.T) {
 	r.Dispatch(core.Event{Worktree: "A"})
 
 	if opener.windows[0].emitCount != 1 || opener.windows[1].emitCount != 1 {
-		t.Errorf("emitCount = %d, %d, want 1, 1 (sharing, ADR-9)", opener.windows[0].emitCount, opener.windows[1].emitCount)
+		t.Errorf("emitCount = %d, %d, want 1, 1", opener.windows[0].emitCount, opener.windows[1].emitCount)
 	}
 }
 
@@ -443,7 +442,7 @@ func TestADR_9_StillSelectedIsTrueWhenAnotherWindowSharesTheSelection(t *testing
 	}
 
 	if !r.StillSelected(previous) {
-		t.Error("StillSelected(A) = false, want true — another window still selects it (ADR-9)")
+		t.Error("StillSelected(A) = false, want true — another window still selects it")
 	}
 }
 

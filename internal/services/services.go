@@ -18,9 +18,8 @@ type Core struct {
 	sessions *session.Manager
 	discover git.Runner // no Log, no session: ListWorktrees/ListBranches's stateless reads
 
-	// editorProfile is the profile pushed by SetEditorProfile (TR-13); an
-	// atomic.Value since it is set from a different goroutine than the one
-	// serving OpenFolder/OpenFile/Summary.
+	// editorProfile is the profile pushed by SetEditorProfile, set from a
+	// different goroutine than the ones reading it.
 	editorProfile atomic.Value
 }
 

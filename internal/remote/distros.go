@@ -68,8 +68,7 @@ func parseDistroRow(row string) (Distro, error) {
 
 // decodeWSLText undoes wsl.exe's own UTF-16LE-when-piped behaviour: a BOM
 // if present, else the "every other byte is 0x00" pattern, else the bytes
-// are already UTF-8/ASCII. The heuristic still awaits a real capture
-// (testing.md's manual row).
+// are already UTF-8/ASCII.
 func decodeWSLText(raw []byte) string {
 	if len(raw) >= 2 && raw[0] == 0xFF && raw[1] == 0xFE {
 		return utf16LEToString(raw[2:])

@@ -39,6 +39,7 @@ Run by the owner per platform before a release. `tools/trace` accepts these IDs 
 | ADR-9, FR-WT-05 | With a repo open in a window, select a different worktree in the panel: the window's title and content swap in place, no new OS window; switching away and back shows the previous worktree's state was reloaded fresh, not stale. | Windows, Linux |
 | FR-WT-11 | Open two different repos, each once, one worktree of each in its own window: both windows work independently at the same time (log, refs, worktree list all stay correct per window). | Windows, Linux |
 | FR-WT-02, FR-WT-03 | The panel's "+ New worktree": create one from an existing branch, then one with a new branch — both succeed and show up in the panel; try a target folder that already has files in it — rejected with git's own clear message. | Windows, Linux |
+| FR-CONF-05 | Resolve a conflict from a pull, merge, cherry-pick, or revert stop, opened from the banner or the changes panel: nebegit shows no merge editor of its own anywhere in the flow — resolution happens entirely in the external editor. | all |
 
 CI: GitHub Actions (`actions/setup-go`, `actions/setup-node` with pnpm cache, golangci-lint's action). Matrix windows-latest and ubuntu-24.04 (`libgtk-4-dev`, `libwebkitgtk-6.0-dev`). Two steps per job: install dependencies with network; then lint (`golangci-lint`, `oxlint`, `eslint`, `vue-tsc`), tests, build, offline (TR-14). The Linux job runs the Go tests against git 2.40 and the runner's current git. macos-latest: build only (QA-PORT-04).
 

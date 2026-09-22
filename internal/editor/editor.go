@@ -1,6 +1,6 @@
-// Package editor builds and starts the external editor command (FR-ED-*,
-// git-mapping.md). Pure Go (TR-07): used identically whether running
-// in-process (local) or inside nebegit-core --stdio (a WSL distro).
+// Package editor builds and starts the external editor command. Pure Go:
+// used identically in-process (local) and inside nebegit-core --stdio (a
+// WSL distro).
 package editor
 
 import (
@@ -10,14 +10,13 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// Default is FR-ED-05's built-in fallback (git-mapping.md's preset row).
+// Default is the built-in editor profile.
 func Default() core.EditorProfile {
 	return core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"}
 }
 
-// OrDefault returns profile if it names a folder command, else Default()
-// (FR-ED-05). A zero-value profile — an unconfigured environment, or none
-// ever pushed — has an empty FolderCmd.
+// OrDefault returns profile if it names a folder command, else Default().
+// An unconfigured or never-pushed profile has an empty FolderCmd.
 func OrDefault(profile core.EditorProfile) core.EditorProfile {
 	if profile.FolderCmd != "" {
 		return profile
@@ -25,7 +24,7 @@ func OrDefault(profile core.EditorProfile) core.EditorProfile {
 	return Default()
 }
 
-// OpenFolder starts profile's folder command for path, detached (TR-12).
+// OpenFolder starts profile's folder command for path, detached.
 func OpenFolder(profile core.EditorProfile, path string) error {
 	argv, err := buildCommand(profile.FolderCmd, path, 0)
 	if err != nil {
@@ -34,8 +33,7 @@ func OpenFolder(profile core.EditorProfile, path string) error {
 	return start(argv)
 }
 
-// OpenFile starts profile's file command for path, at line if line > 0
-// (FileAtLineCmd, falling back to FileCmd if empty — git-mapping.md).
+// OpenFile starts profile's file command for path, at line if line > 0.
 func OpenFile(profile core.EditorProfile, path string, line int) error {
 	argv, err := buildCommand(fileTemplate(profile, line), path, line)
 	if err != nil {
@@ -54,7 +52,7 @@ func fileTemplate(profile core.EditorProfile, line int) string {
 }
 
 // buildCommand splits template and fills {path}/{line}. An empty template
-// is EditorNotFound: nothing configured (FR-ED-06).
+// is EditorNotFound: nothing configured.
 func buildCommand(template, path string, line int) ([]string, error) {
 	if template == "" {
 		return nil, core.Errorf(core.EditorNotFound, "no editor command configured")
@@ -67,8 +65,7 @@ func buildCommand(template, path string, line int) ([]string, error) {
 }
 
 // fillPlaceholders replaces {path} in every argv element, and {line} too
-// when line > 0 — a template's own {line} token with line == 0 is left
-// literal, a custom-command misconfiguration the user is responsible for.
+// when line > 0; otherwise {line} is left literal.
 func fillPlaceholders(argv []string, path string, line int) []string {
 	out := make([]string, len(argv))
 	for i, a := range argv {

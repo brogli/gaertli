@@ -20,10 +20,8 @@ import (
 // delayed stream.
 var fakegit string
 
-// argvWriterBin is internal/editor/testdata/argvwriter, used by
-// editor_test.go: a stand-in editor that writes its received argv
-// to a file next to itself and exits. Built here, the package's one
-// TestMain, alongside fakegit.
+// argvWriterBin is internal/editor/testdata/argvwriter, the stand-in editor
+// editor_test.go uses: it writes its argv to a file next to itself.
 var argvWriterBin string
 
 func TestMain(m *testing.M) {
@@ -499,9 +497,7 @@ func commitOrphan(t *testing.T, dir, branch, file, msg string) {
 		t.Fatal(err)
 	}
 	gittest.Run(t, dir, "add", "--", file)
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"commit", "-F", "-"}, Stdin: []byte(msg)}); err != nil {
-		t.Fatal(err)
-	}
+	gittest.CommitAll(t, dir, msg)
 }
 
 func TestFR_UX_02_AppDrivenReadsAreBackgroundCommands(t *testing.T) {
@@ -529,7 +525,7 @@ func TestFR_UX_02_AppDrivenReadsAreBackgroundCommands(t *testing.T) {
 	}
 	for _, e := range entries {
 		if !e.Background {
-			t.Errorf("%q logged as a user command, want background (FR-UX-02: automatic reads are hidden by default)", e.Command)
+			t.Errorf("%q logged as a user command, want background", e.Command)
 		}
 	}
 }

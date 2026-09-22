@@ -13,6 +13,6 @@ Requirements: FR-WT-05, FR-WT-08 to FR-WT-11, FR-WT-13. Revised 2026-09-22 (owne
 - A repo session is dropped when no window selects any of its worktrees. Closing the last window quits.
 - The panel's own data (recent repos, each repo's worktrees and branches) comes from the settings file (recents) and the repo sessions of the repos it shows; a repo not yet opened in this process gets a session on first expansion.
 
-Consequences: the home window (spec 04/05) becomes the empty state of the panel, not a separate view. `Registry` maps selections to windows rather than windows to fixed paths (spec 50). Nothing changes in `core.API`.
+Consequences: the home window becomes the empty state of the panel, not a separate view. `Registry` maps selections to windows rather than windows to fixed paths. Nothing changes in `core.API`.
 
 ---

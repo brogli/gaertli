@@ -12,9 +12,8 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-// TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration proves the
-// streaming mechanism QA-PERF-02 depends on: a row is usable long before
-// the whole (delayed) stream finishes, not just after it.
+// TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration proves a row
+// is usable long before the whole (delayed) stream finishes.
 func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c := New(func(core.Event) {})
@@ -64,10 +63,9 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 	waitForLogDone(t, c, info.ID) // drain the background stream so it doesn't leak noise into later tests
 }
 
-// TestQA_PERF_07_LogMemoryStaysBoundedPerRow proves the per-row memory
-// shape QA-PERF-07 depends on, at a scale a unit test can run fast and
-// deterministically. The literal 500MB-at-100k-commits target is the
-// benchmark's job, not this test's.
+// TestQA_PERF_07_LogMemoryStaysBoundedPerRow checks per-row memory at a
+// scale a unit test runs fast. The 500MB-at-100k-commits target is the
+// benchmark's job.
 func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	const rows = 20000
 	repo := gittest.New(t)
@@ -103,7 +101,7 @@ func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	runtime.GC()
 	runtime.ReadMemStats(&after)
 
-	const perRowBudget = 2000                                 // generous multiple of ADR-5's "a few hundred bytes"
+	const perRowBudget = 2000                                 // generous multiple of "a few hundred bytes"
 	grown := int64(after.HeapAlloc) - int64(before.HeapAlloc) // may go negative: concurrent GC of other tests' garbage
 	if grown > int64(rows*perRowBudget) {
 		t.Errorf("heap grew %d bytes for %d rows (%d bytes/row), want under %d bytes/row",

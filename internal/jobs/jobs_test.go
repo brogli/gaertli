@@ -68,9 +68,9 @@ func TestQA_RESP_01_StartReturnsImmediatelyWithARunningJobRecorded(t *testing.T)
 	m := NewManager(log.record)
 
 	start := time.Now()
-	id := m.Start("test", func(ctx context.Context, progress Progress) error {
+	id := m.Start("test", func(ctx context.Context, progress Progress) (any, error) {
 		<-release
-		return nil
+		return nil, nil
 	})
 	elapsed := time.Since(start)
 
@@ -98,13 +98,13 @@ func TestFR_SYNC_07_ProgressEmitsImmediatelyThenThrottled(t *testing.T) {
 	m := NewManager(mu.record)
 
 	start := time.Now()
-	m.Start("test", func(ctx context.Context, progress Progress) error {
+	m.Start("test", func(ctx context.Context, progress Progress) (any, error) {
 		for range 20 {
 			progress(50, "burst")
 		}
 		time.Sleep(150 * time.Millisecond)
 		progress(100, "final")
-		return nil
+		return nil, nil
 	})
 
 	waitFor(t, func() bool { return mu.terminalSeen() }, 2*time.Second)
@@ -144,9 +144,9 @@ func TestFR_SYNC_07_CancelledJobEndsInCancelledNotFailed(t *testing.T) {
 	var mu updateLog
 	m := NewManager(mu.record)
 
-	id := m.Start("test", func(ctx context.Context, progress Progress) error {
+	id := m.Start("test", func(ctx context.Context, progress Progress) (any, error) {
 		<-ctx.Done()
-		return ctx.Err()
+		return nil, ctx.Err()
 	})
 
 	waitFor(t, func() bool { return len(mu.snapshot()) >= 1 }, time.Second)
@@ -192,11 +192,11 @@ func TestFR_SYNC_07_FnErrorEndsFailedFnNilEndsDone(t *testing.T) {
 	var mu updateLog
 	m := NewManager(mu.record)
 
-	failID := m.Start("fail", func(ctx context.Context, progress Progress) error {
-		return errors.New("boom")
+	failID := m.Start("fail", func(ctx context.Context, progress Progress) (any, error) {
+		return nil, errors.New("boom")
 	})
-	okID := m.Start("ok", func(ctx context.Context, progress Progress) error {
-		return nil
+	okID := m.Start("ok", func(ctx context.Context, progress Progress) (any, error) {
+		return nil, nil
 	})
 
 	waitFor(t, func() bool {
@@ -215,14 +215,14 @@ func TestQA_RESP_01_NoManagerImposedConcurrencyCap(t *testing.T) {
 	m := NewManager(func(Job) {})
 	block := make(chan struct{})
 
-	m.Start("first", func(ctx context.Context, progress Progress) error {
+	m.Start("first", func(ctx context.Context, progress Progress) (any, error) {
 		<-block
-		return nil
+		return nil, nil
 	})
 	secondDone := make(chan struct{})
-	m.Start("second", func(ctx context.Context, progress Progress) error {
+	m.Start("second", func(ctx context.Context, progress Progress) (any, error) {
 		close(secondDone)
-		return nil
+		return nil, nil
 	})
 
 	select {
@@ -246,10 +246,10 @@ func TestFR_SYNC_07_StartDedupesAKindAlreadyQueuedOrRunning(t *testing.T) {
 	})
 
 	release := make(chan struct{})
-	fn := func(ctx context.Context, progress Progress) error {
+	fn := func(ctx context.Context, progress Progress) (any, error) {
 		calls.Add(1)
 		<-release
-		return nil
+		return nil, nil
 	}
 
 	first := m.Start("fetch", fn)
@@ -276,18 +276,18 @@ func TestQA_RESP_02_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing
 
 	for range historyCap + 3 {
 		done := make(chan struct{})
-		id := m.Start("fast", func(ctx context.Context, progress Progress) error {
+		id := m.Start("fast", func(ctx context.Context, progress Progress) (any, error) {
 			close(done)
-			return nil
+			return nil, nil
 		})
 		<-done
 		waitFor(t, func() bool { return findID(m.List(), id).State == Done }, time.Second)
 	}
 
 	block := make(chan struct{})
-	blockedID := m.Start("blocked", func(ctx context.Context, progress Progress) error {
+	blockedID := m.Start("blocked", func(ctx context.Context, progress Progress) (any, error) {
 		<-block
-		return nil
+		return nil, nil
 	})
 	waitFor(t, func() bool { return findID(m.List(), blockedID).State == Running }, time.Second)
 

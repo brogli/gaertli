@@ -8,6 +8,14 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
+func (f *Facade) AbortOperation(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.AbortOperation(ctx, wt)
+}
+
 func (f *Facade) AddWorktree(ctx context.Context, path core.RepoPath, target string, branch string, start string, newBranch bool) (core.Worktree, error) {
 	c, err := f.router.CoreFor(path)
 	if err != nil {
@@ -66,6 +74,14 @@ func (f *Facade) CommandLog(ctx context.Context, wt core.WorktreeID) ([]core.Com
 	return c.CommandLog(ctx, wt)
 }
 
+func (f *Facade) Commit(ctx context.Context, wt core.WorktreeID, message string, amend bool) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.Commit(ctx, wt, message, amend)
+}
+
 func (f *Facade) CommitDetails(ctx context.Context, wt core.WorktreeID, sha string) (core.CommitDetails, error) {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -82,6 +98,14 @@ func (f *Facade) CompareCommits(ctx context.Context, wt core.WorktreeID, a strin
 		return zero, err
 	}
 	return c.CompareCommits(ctx, wt, a, b)
+}
+
+func (f *Facade) ContinueOperation(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.ContinueOperation(ctx, wt)
 }
 
 func (f *Facade) CreateBranch(ctx context.Context, wt core.WorktreeID, name string, start string, checkout bool) error {
@@ -303,6 +327,14 @@ func (f *Facade) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter co
 	return c.SetLogFilter(ctx, wt, filter)
 }
 
+func (f *Facade) SetMessageDraft(ctx context.Context, wt core.WorktreeID, message string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.SetMessageDraft(ctx, wt, message)
+}
+
 func (f *Facade) StageAll(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -317,6 +349,14 @@ func (f *Facade) StageFile(ctx context.Context, wt core.WorktreeID, path string)
 		return err
 	}
 	return c.StageFile(ctx, wt, path)
+}
+
+func (f *Facade) StageLines(ctx context.Context, wt core.WorktreeID, path string, sel core.LineSelection, reverse bool) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.StageLines(ctx, wt, path, sel, reverse)
 }
 
 func (f *Facade) Status(ctx context.Context, wt core.WorktreeID) (core.ChangedFiles, error) {
@@ -360,6 +400,15 @@ func (f *Facade) UnstageFile(ctx context.Context, wt core.WorktreeID, path strin
 		return err
 	}
 	return c.UnstageFile(ctx, wt, path)
+}
+
+func (f *Facade) UpdateBranch(ctx context.Context, wt core.WorktreeID, branch string) (string, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero string
+		return zero, err
+	}
+	return c.UpdateBranch(ctx, wt, branch)
 }
 
 func (f *Facade) Version(ctx context.Context) (core.Version, error) {

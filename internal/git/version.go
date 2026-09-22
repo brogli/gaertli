@@ -12,7 +12,7 @@ import (
 // Version is git's own version, as reported by "git --version".
 type Version struct{ Major, Minor, Patch int }
 
-// MinVersion is the floor from TR-04.
+// MinVersion is the oldest supported git.
 var MinVersion = Version{Major: 2, Minor: 40, Patch: 0}
 
 // Less reports whether v is older than o.

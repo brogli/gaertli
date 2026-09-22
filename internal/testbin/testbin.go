@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// Bin is one helper binary: Pkg is built pure Go (TR-07) and its path
-// stored in *Path.
+// Bin is one helper binary: Pkg is built pure Go (CGO_ENABLED=0) and its
+// path stored in *Path.
 type Bin struct {
 	Path *string
 	Pkg  string // package path, relative to the calling test's directory

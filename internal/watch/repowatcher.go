@@ -12,16 +12,14 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// RepoWatcher watches one repo's common git dir (ADR-9: repo-session-
-// level; FR-REPO-04's git-state half). fsnotify is the primary signal
-// (near-zero idle cost — no busy loop, QA-PERF-06); a low-frequency
-// directory-mtime poll is an insurance backstop for what fsnotify can
-// miss: a dropped inotify event, an exhausted per-user watch count, or a
-// filesystem fsnotify doesn't support at all.
+// RepoWatcher watches one repo's common git dir. fsnotify is the primary
+// signal (near-zero idle cost); a low-frequency directory-mtime poll backs
+// it up for what fsnotify can miss: a dropped event, an exhausted watch
+// count, or an unsupported filesystem.
 //
-// Bursts (git's own lockfile-then-rename per write, several refs from one
-// fetch) are debounced ~300ms; onChange fires once per distinct Scope
-// touched in the window, not once per fs event.
+// Bursts (git's lockfile-then-rename per write, several refs from one
+// fetch) are debounced; onChange fires once per distinct Scope touched in
+// the window, not once per fs event.
 type RepoWatcher struct {
 	commonDir string
 	onChange  func(Scope)

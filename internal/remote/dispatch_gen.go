@@ -11,6 +11,9 @@ import (
 
 func handlers(api core.API) handler.Map {
 	return handler.Map{
+		"AbortOperation": handler.New(func(ctx context.Context, p abortOperationParams) error {
+			return api.AbortOperation(ctx, p.Wt)
+		}),
 		"AddWorktree": handler.New(func(ctx context.Context, p addWorktreeParams) (core.Worktree, error) {
 			return api.AddWorktree(ctx, p.Path, p.Target, p.Branch, p.Start, p.NewBranch)
 		}),
@@ -32,11 +35,17 @@ func handlers(api core.API) handler.Map {
 		"CommandLog": handler.New(func(ctx context.Context, p commandLogParams) ([]core.CommandLogEntry, error) {
 			return api.CommandLog(ctx, p.Wt)
 		}),
+		"Commit": handler.New(func(ctx context.Context, p commitParams) error {
+			return api.Commit(ctx, p.Wt, p.Message, p.Amend)
+		}),
 		"CommitDetails": handler.New(func(ctx context.Context, p commitDetailsParams) (core.CommitDetails, error) {
 			return api.CommitDetails(ctx, p.Wt, p.Sha)
 		}),
 		"CompareCommits": handler.New(func(ctx context.Context, p compareCommitsParams) ([]core.ChangedFile, error) {
 			return api.CompareCommits(ctx, p.Wt, p.A, p.B)
+		}),
+		"ContinueOperation": handler.New(func(ctx context.Context, p continueOperationParams) error {
+			return api.ContinueOperation(ctx, p.Wt)
 		}),
 		"CreateBranch": handler.New(func(ctx context.Context, p createBranchParams) error {
 			return api.CreateBranch(ctx, p.Wt, p.Name, p.Start, p.Checkout)
@@ -116,11 +125,17 @@ func handlers(api core.API) handler.Map {
 		"SetLogFilter": handler.New(func(ctx context.Context, p setLogFilterParams) error {
 			return api.SetLogFilter(ctx, p.Wt, p.Filter)
 		}),
+		"SetMessageDraft": handler.New(func(ctx context.Context, p setMessageDraftParams) error {
+			return api.SetMessageDraft(ctx, p.Wt, p.Message)
+		}),
 		"StageAll": handler.New(func(ctx context.Context, p stageAllParams) error {
 			return api.StageAll(ctx, p.Wt)
 		}),
 		"StageFile": handler.New(func(ctx context.Context, p stageFileParams) error {
 			return api.StageFile(ctx, p.Wt, p.Path)
+		}),
+		"StageLines": handler.New(func(ctx context.Context, p stageLinesParams) error {
+			return api.StageLines(ctx, p.Wt, p.Path, p.Sel, p.Reverse)
 		}),
 		"Status": handler.New(func(ctx context.Context, p statusParams) (core.ChangedFiles, error) {
 			return api.Status(ctx, p.Wt)
@@ -136,6 +151,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"UnstageFile": handler.New(func(ctx context.Context, p unstageFileParams) error {
 			return api.UnstageFile(ctx, p.Wt, p.Path)
+		}),
+		"UpdateBranch": handler.New(func(ctx context.Context, p updateBranchParams) (string, error) {
+			return api.UpdateBranch(ctx, p.Wt, p.Branch)
 		}),
 		"Version": handler.New(func(ctx context.Context) (core.Version, error) {
 			return api.Version(ctx)

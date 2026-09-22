@@ -9,19 +9,17 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ResetMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
-// ResetDialog is FR-BR-02's mode picker (soft/mixed/hard), opened from the
-// commit-row context menu (FR-LOG-11). Soft/mixed run immediately;
-// hard goes through useConfirmAction's shared confirmation (FR-BR-03,
-// FR-UX-03, QA-SAFE-01), naming how many uncommitted changes would be lost.
-// After a successful reset the dialog stays open and shows the previous
-// HEAD instead of closing itself (FR-BR-04): it's the one thing the user
-// might want to copy or reset back to.
+// ResetDialog is the reset mode picker (soft/mixed/hard). Soft/mixed run
+// immediately; hard asks for confirmation, naming how many uncommitted
+// changes would be lost. After a successful reset the dialog stays open
+// and shows the previous HEAD, which the user might want to copy or reset
+// back to.
 const props = defineProps<{ wt: string; branch: string; sha: string; subject: string; visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 
 const mode = ref<ResetMode>(ResetMode.ResetMixed) // git's own default
-const uncommittedCount = ref<number | null>(null) // null while FR-BR-03's count is still loading
-const previousHead = ref<string | null>(null) // set once a reset has succeeded (FR-BR-04)
+const uncommittedCount = ref<number | null>(null) // null while loading
+const previousHead = ref<string | null>(null) // set once a reset has succeeded
 const { error, run } = useCoreCall()
 const { confirmAction } = useConfirmAction()
 

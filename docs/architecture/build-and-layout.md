@@ -1,6 +1,6 @@
 # Build, packaging, repository layout
 
-- Wails v3 Taskfile builds. On Windows: first the `linux/amd64` core, then the GUI that embeds it — `task build:core:embed` (spec 30) cross-compiles it into `internal/remote/nebegit-core-linux`, a dependency of `build:native`/`build:docker` in `build/windows/Taskfile.yml`, so `task build` runs it automatically; a bare `go build` on Windows needs `task build:core:embed` run first (`go:embed` cannot reach outside its own package directory).
+- Wails v3 Taskfile builds. On Windows: first the `linux/amd64` core, then the GUI that embeds it — `task build:core:embed` cross-compiles it into `internal/remote/nebegit-core-linux`, a dependency of `build:native`/`build:docker` in `build/windows/Taskfile.yml`, so `task build` runs it automatically; a bare `go build` on Windows needs `task build:core:embed` run first (`go:embed` cannot reach outside its own package directory).
 - Run-time prerequisites: git; WebView2 (Windows); GTK4 + WebKitGTK 6.0 as system packages (Linux). The AppImage does not bundle WebKitGTK (QA-INST-01).
 - Windows: single `.exe`, zipped, embedding the Linux core. Linux: AppImage first, `.deb` later. macOS: `.app` zipped, unsigned, labelled untested. No installer, no auto-update (QA-INST-03).
 - Releases: GitHub Actions builds from a version tag and attaches artifacts and `SHA256SUMS` to a GitHub Release (QA-INST-02). Unsigned Windows binaries trigger SmartScreen; documented.
@@ -47,13 +47,13 @@ CLAUDE.md              entry point for Claude sessions: rules + pointer to the p
 /tools/mkrepo          builds test and benchmark repos
 /tools/trace           requirement-ID traceability check (TR-30)
 /tools/gencore         go generate: RPC client + dispatcher + shell facade from internal/core (TR-28)
-/.github/workflows     ci.yml, release.yml, bench.yml (nightly perf bench + e2e, spec 13)
+/.github/workflows     ci.yml, release.yml, bench.yml (nightly perf bench + e2e)
 LICENSE  README.md  CONTRIBUTING.md  CHANGELOG.md
 flake.nix  flake.lock  .envrc  .golangci.yml
 Taskfile.yml           setup · test · lint · build · dev · ci (+ Wails tasks)
 ```
 
-`.bench/`: the generated 100k-commit reference repo `tools/mkrepo` builds and `tools/bench`/`task bench` read (spec 13). Gitignored, cached by a fingerprint file, rebuilt only when `tools/mkrepo`'s `Config` changes.
+`.bench/`: the generated 100k-commit reference repo `tools/mkrepo` builds and `tools/bench`/`task bench` read. Gitignored, cached by a fingerprint file, rebuilt only when `tools/mkrepo`'s `Config` changes.
 
 Milestones and the spec list: plans dir `ROADMAP.md`.
 

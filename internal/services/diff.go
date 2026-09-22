@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"strconv"
 	"strings"
@@ -11,9 +12,8 @@ import (
 	"github.com/brogli/nebegit/internal/git"
 )
 
-// maxDiffFileSize caps DiffFile's auto-loaded content (FR-DIFF-04): 5x
-// QA-PERF-05's 1MB "fast" anchor. force bypasses it; nothing bypasses
-// Binary.
+// maxDiffFileSize caps DiffFile's auto-loaded content. force bypasses it;
+// nothing bypasses Binary.
 const maxDiffFileSize = 5 * 1024 * 1024
 
 // parseCatFileBatch reads cat-file --batch's own framing: per object,
@@ -59,11 +59,10 @@ func blobSize(line string) (int64, error) {
 	return n, nil
 }
 
-// diffIsBinary asks git's own diff machinery whether path is binary
-// (FR-DIFF-03, QA-COMP-01): a NUL-byte sniff of our own would ignore
-// .gitattributes overrides that change git's classification without
-// changing file content. Both the old-side and new-side path are passed so
-// -M's rename detection still applies when path-restricted.
+// diffIsBinary asks git's own diff machinery whether path is binary: a
+// NUL-byte sniff of our own would ignore .gitattributes overrides. Both the
+// old-side and new-side path are passed so -M's rename detection still
+// applies when path-restricted.
 func diffIsBinary(ctx context.Context, r git.Runner, dir, sha, oldPath, path string) (bool, error) {
 	return numstatIsBinary(ctx, r, dir, oldPath, path,
 		"show", "--format=", "--numstat", "-z", "-M", "--first-parent", "--end-of-options", sha)
@@ -71,11 +70,11 @@ func diffIsBinary(ctx context.Context, r git.Runner, dir, sha, oldPath, path str
 
 // numstatIsBinary runs gitArgs (a show or diff command producing one
 // --numstat -z record) scoped to the file's old and new path and reads the
-// record's binary marker. Shared by diffIsBinary and diffIsBinaryBetween.
+// record's binary marker.
 func numstatIsBinary(ctx context.Context, r git.Runner, dir, oldPath, path string, gitArgs ...string) (bool, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
-		Args: append(gitArgs, "--", firstNonEmpty(oldPath, path), path),
+		Args: append(gitArgs, "--", cmp.Or(oldPath, path), path),
 	})
 	if err != nil {
 		return false, err
@@ -91,15 +90,6 @@ func parseBinaryNumstat(record []byte) bool {
 	return len(fields) >= 2 && string(fields[0]) == "-" && string(fields[1]) == "-"
 }
 
-// firstNonEmpty returns a, or b if a is empty (a renamed file's old path
-// falls back to its current path when there was no rename).
-func firstNonEmpty(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
-}
-
 // DiffFile implements core.API.
 func (c *Core) DiffFile(ctx context.Context, id core.WorktreeID, sha, path, oldPath string, force bool) (core.DiffFile, error) {
 	wt, err := c.sessions.Get(id)
@@ -107,7 +97,7 @@ func (c *Core) DiffFile(ctx context.Context, id core.WorktreeID, sha, path, oldP
 		return core.DiffFile{}, err
 	}
 	spec := diffSidesSpec{
-		oldRev: sha + "^:" + firstNonEmpty(oldPath, path), newRev: sha + ":" + path,
+		oldRev: sha + "^:" + cmp.Or(oldPath, path), newRev: sha + ":" + path,
 		path: path, oldPath: oldPath, force: force,
 		isBinary: func() (bool, error) { return diffIsBinary(ctx, wt.Runner, wt.Path, sha, oldPath, path) },
 	}
@@ -124,8 +114,8 @@ type diffSidesSpec struct {
 }
 
 // diffSides runs the size cap, the binary check, the content fetch, and the
-// UTF-8 check shared by DiffFile and DiffRange (ADR-7: Go fetches,
-// classifies and caps; CodeMirror computes the visual diff).
+// UTF-8 check shared by DiffFile and DiffRange. The frontend computes the
+// visual diff.
 func diffSides(ctx context.Context, r git.Runner, dir string, s diffSidesSpec) (core.DiffFile, error) {
 	sizes, err := diffBlobSizes(ctx, r, dir, s.oldRev, s.newRev)
 	if err != nil {
@@ -169,10 +159,9 @@ func missing(line string) bool {
 	return strings.HasSuffix(line, " missing")
 }
 
-// diffBlobSizes runs one cat-file --batch-check for both sides (FR-DIFF-04):
-// cheap, no content read, so the size cap is enforced before any content
-// byte is fetched. Object specs go on stdin, so no --end-of-options is
-// needed here, unlike the numstat/show call.
+// diffBlobSizes runs one cat-file --batch-check for both sides, so the size
+// cap is enforced before any content byte is fetched. Object specs go on
+// stdin, so no --end-of-options is needed.
 func diffBlobSizes(ctx context.Context, r git.Runner, dir, oldRev, newRev string) (blobSizes, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,

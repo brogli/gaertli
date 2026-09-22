@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { GraphRow } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// GraphCell renders one row's GraphRow as a small inline SVG strip (ADR-5):
+// GraphCell renders one row's GraphRow as a small inline SVG strip:
 // a vertical line per edge, a dot at the row's own lane, a "+k" badge when
 // lanes overflowed Layout's cap.
 const props = defineProps<{ graph: GraphRow }>()

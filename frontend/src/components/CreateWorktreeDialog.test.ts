@@ -26,8 +26,7 @@ describe('CreateWorktreeDialog', () => {
   })
 
   // createFollowUp submits with an existing branch and a successful
-  // AddWorktree (case 11's own "Given"), landing on the FR-WT-12 follow-up
-  // state shared by cases 11-15.
+  // AddWorktree, landing on the "open the result" follow-up.
   async function createFollowUp(): Promise<DOMWrapper<HTMLElement>> {
     mockAddWorktree.mockResolvedValue({ path: '/repo-wt' })
     wrapper = mount(CreateWorktreeDialog, {

@@ -9,10 +9,9 @@ import { useLogStore } from '../stores/log'
 import { useRefsStore } from '../stores/refs'
 import type { LogFilter } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// FilterBar is FR-LOG-05..08's filter UI: free-text query/author/path
-// (debounced 300ms, the repo watcher's own debounce number), branches (a
-// discrete MultiSelect choice, applied immediately), active-filter chips,
-// and one clear action (button or Escape).
+// FilterBar is the log filter: free-text query/author/path (debounced
+// 300ms), branches (applied immediately), active-filter chips, and one
+// clear action (button or Escape).
 const log = useLogStore()
 const refs = useRefsStore()
 
@@ -32,7 +31,7 @@ const branchOptions = computed(() => {
   return [...local, ...remote]
 })
 
-// Active-filter chips, one per non-empty field (FR-LOG-08).
+// Active-filter chips, one per non-empty field.
 const chips = computed(() => {
   const f = log.filter
   return [

@@ -3,7 +3,6 @@ package remote
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
 func TestADR_3_DeployTarget(t *testing.T) {
@@ -21,9 +21,9 @@ func TestADR_3_DeployTarget(t *testing.T) {
 	}
 }
 
-// localRunner is the fake wslRunner cases 6-8 use: it ignores distro and
-// runs args as a real local command, so ensureDeployed's own "sh -c ..."
-// scripts run for real against a test-sandboxed $HOME.
+// localRunner is a fake wslRunner: it ignores distro and runs args as a
+// local command, so ensureDeployed's "sh -c ..." scripts run for real
+// against a test-sandboxed $HOME.
 func localRunner(ctx context.Context, distro string, args ...string) (*exec.Cmd, error) {
 	return exec.CommandContext(ctx, args[0], args[1:]...), nil
 }
@@ -81,10 +81,7 @@ func TestQA_PORT_02_EnsureDeployedDeclinedConsentCopiesNothing(t *testing.T) {
 
 	err := ensureDeployed(context.Background(), localRunner, consent, "Ubuntu-22.04", "1.0.0")
 
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != core.DeployRefused {
-		t.Fatalf("err = %v, want *core.Error{Code: DeployRefused}", err)
-	}
+	coretest.AssertCode(t, err, core.DeployRefused)
 	if _, statErr := os.Stat(deployedPath(t, "1.0.0")); !os.IsNotExist(statErr) {
 		t.Errorf("target exists after a declined consent")
 	}

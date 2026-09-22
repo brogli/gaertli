@@ -15,6 +15,7 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 }))
 
 import SettingsPanel from './SettingsPanel.vue'
+import ErrorBanner from './ErrorBanner.vue'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
 
 const filled = defaultSettingsFixture({ protectedBranches: ['main'] })
@@ -118,5 +119,19 @@ describe('SettingsPanel', () => {
     expect(added.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value).toBe('zed {path}')
 
     expect(mockSet).not.toHaveBeenCalled()
+  })
+
+  it('FR-UX-01 a rejected save renders ErrorBanner with the error', async () => {
+    mockSet.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'settings write failed' } }),
+    )
+    const wrapper = await mountPanel()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const error = wrapper.findComponent(ErrorBanner)
+    expect(error.exists()).toBe(true)
+    expect(error.props('error')).toEqual({ message: 'settings write failed' })
   })
 })

@@ -15,11 +15,9 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 
 import CompareView from './CompareView.vue'
 import { useCompareStore } from '../stores/compare'
-import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { commitRow } from '../testing/fixtures/log-rows'
 
-function row(sha: string, shortSha: string): LogCommit {
-  return { sha, shortSha, author: '', authorAt: 0, subject: '', graph: { lane: 0, colour: 0, edges: [] } }
-}
+const row = (sha: string, shortSha: string) => commitRow({ sha, shortSha })
 
 const props = { wt: '/repo' }
 

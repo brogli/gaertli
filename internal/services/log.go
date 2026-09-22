@@ -18,8 +18,7 @@ import (
 )
 
 // largeRepoRows is the loaded-row threshold above which streamLog writes
-// git's own commit-graph file once (QA-PERF-02). A package var, not a
-// const, so tests can lower it.
+// git's own commit-graph file once. A var so tests can lower it.
 var largeRepoRows = 20_000
 
 const progressInterval = 100 * time.Millisecond
@@ -73,7 +72,7 @@ func (c *Core) ReloadLog(ctx context.Context, id core.WorktreeID) error {
 		return err
 	}
 	if maps.Equal(tips, wt.Repo.LogTips()) {
-		return nil // git-mapping.md: reload only if tips changed
+		return nil // no ref moved
 	}
 	gen, ok := wt.Repo.LogBeginReload()
 	if !ok {
@@ -155,8 +154,8 @@ func streamCommits(ctx context.Context, wt *session.Worktree, args []string, fla
 // writeCommitGraphIfLarge runs `git commit-graph write --reachable` after
 // the load's done signal, the first time a load reaches largeRepoRows rows:
 // it cuts git log's time-to-first-record and peak memory at real scale.
-// Skipped once the file exists. A failure is never surfaced — the file is
-// an optimisation, not app state (ADR-4's git-own-cache exception).
+// Skipped once the file exists. A failure is never surfaced: the file is an
+// optimisation, not app state.
 func writeCommitGraphIfLarge(wt *session.Worktree, loaded int) {
 	if loaded < largeRepoRows {
 		return
@@ -174,9 +173,7 @@ func writeCommitGraphIfLarge(wt *session.Worktree, loaded int) {
 // refTips is the cheap "did anything move" signature: every
 // refs/heads|tags|remotes ref's SHA, plus a synthetic "HEAD" entry —
 // "ref:<branch>" if HEAD is on a branch (even unborn), or HEAD's own
-// resolved SHA if detached. A plain branch switch with no new commit moves
-// no ref's SHA but does change which branch HEAD names, which is exactly
-// what this entry catches.
+// resolved SHA if detached, so a plain branch switch counts as a change.
 func refTips(ctx context.Context, r git.Runner, dir string) (map[string]string, error) {
 	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Background: true,
 		Args: []string{"for-each-ref", "--format=%(refname)%1f%(objectname)%00", "refs/heads", "refs/tags", "refs/remotes"}})
@@ -289,8 +286,7 @@ func toGraphRow(row graph.Row) core.GraphRow {
 }
 
 // worktreeCheckouts maps a commit SHA to every worktree path currently at
-// that HEAD (FR-LOG-10), from "git worktree list --porcelain -z" run in
-// dir (any worktree of the repo lists every worktree of it).
+// that HEAD. Any worktree of the repo lists every worktree of it.
 func worktreeCheckouts(r git.Runner, dir string, background bool) (map[string][]string, error) {
 	result, err := r.Run(context.Background(), git.Call{
 		Dir: dir, ReadOnly: true, Background: background,

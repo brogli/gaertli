@@ -1,4 +1,4 @@
-// Package remote carries core.API over JSON-RPC 2.0 on stdio (ADR-3): Serve
+// Package remote carries core.API over JSON-RPC 2.0 on stdio: Serve
 // runs a core behind a dispatcher, Client is the generated core.API that
 // talks to it. Messages are LF-delimited JSON (channel.Line).
 package remote

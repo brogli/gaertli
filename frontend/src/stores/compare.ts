@@ -3,9 +3,8 @@ import { computed, ref } from 'vue'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { ChangedFile, LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// compare tracks a Ctrl/Cmd-click two-commit selection (FR-CMP-01) and the
-// changed files between them (FR-CMP-02). from/to are click order, not list
-// order (FR-CMP-03: "from → to" is what the user picked, not chronology).
+// compare tracks a Ctrl/Cmd-click two-commit selection and the changed
+// files between them. from/to are click order, not list order.
 export const useCompareStore = defineStore('compare', () => {
   const selection = ref<LogCommit[]>([])
   const files = ref<ChangedFile[]>([])
@@ -27,15 +26,14 @@ export const useCompareStore = defineStore('compare', () => {
     files.value = []
   }
 
-  // load throws on purpose: CompareView.vue owns the useCoreCall/
-  // ErrorBanner wrapping, not the store.
+  // load throws: CompareView.vue reports the error
   async function load(wt: string): Promise<void> {
     if (!from.value || !to.value) return
     files.value = (await Facade.CompareCommits(wt, from.value.sha, to.value.sha)) ?? []
   }
 
   function swap(): void {
-    selection.value.reverse() // CompareView's own watcher re-fetches
+    selection.value.reverse() // CompareView's watcher re-fetches
   }
 
   function selectFile(f: ChangedFile): void {

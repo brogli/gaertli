@@ -2,12 +2,8 @@
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // ChangedFileList renders one row per changed file (status, and oldPath ->
-// path for a rename), shared by CommitDetailsPanel (FR-LOG-03), CompareView
-// (FR-CMP-01), CompareDiffView and ChangesPanel (FR-CHG-02). Only CompareView
-// listens for the double-click that opens the compare diff window
-// (FR-CMP-02); open-editor (FR-ED-02) is every caller's "open this file in
-// the editor" control. actionLabel is ChangesPanel's own per-row
-// stage/unstage button, unused (so hidden) by every other caller.
+// path for a rename). actionLabel, when set, adds a per-row action button
+// (the changes panel's stage/unstage).
 defineProps<{ files: ChangedFile[]; selected?: ChangedFile | null; actionLabel?: string }>()
 const emit = defineEmits<{
   select: [file: ChangedFile]

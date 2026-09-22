@@ -1,4 +1,4 @@
-// Package git executes the system git as a subprocess (ADR-1).
+// Package git executes the system git as a subprocess.
 package git
 
 import (
@@ -20,9 +20,9 @@ type Call struct {
 	Args  []string // git's arguments; "git" itself is not included
 	Stdin []byte   // piped to the process, e.g. "commit -F -"
 
-	ReadOnly   bool // adds GIT_OPTIONAL_LOCKS=0 (TR-09): the call performs no writes
-	Continue   bool // adds GIT_EDITOR=true (TR-09): a --continue/--abort/--skip call
-	Background bool // hidden by default in the command log (FR-UX-02)
+	ReadOnly   bool // adds GIT_OPTIONAL_LOCKS=0: the call performs no writes
+	Continue   bool // adds GIT_EDITOR=true: a --continue/--abort/--skip call
+	Background bool // hidden by default in the command log
 
 	// Timeout bounds this call when ctx has no deadline. Zero means 30s.
 	Timeout time.Duration
@@ -35,8 +35,8 @@ type Result struct {
 	ExitCode int
 }
 
-// Entry is one command-log row (FR-UX-02). Never carries environment
-// variables; a URL with embedded credentials in Command is masked.
+// Entry is one command-log row. Never carries environment variables; a URL
+// with embedded credentials in Command is masked.
 type Entry struct {
 	Command    string // "git " + args, masked
 	Dir        string
@@ -46,8 +46,8 @@ type Entry struct {
 	Err        error // the *core.Error Run returned, or nil
 }
 
-// Runner executes the system git as a subprocess (ADR-1). The zero value
-// runs "git" resolved via PATH with no log.
+// Runner executes the system git. The zero value runs "git" resolved via
+// PATH with no log.
 type Runner struct {
 	Git string      // git executable; "" resolves "git" via exec.LookPath
 	Log func(Entry) // called once per Run, success or failure; nil is fine
@@ -141,7 +141,7 @@ func withTimeout(ctx context.Context, timeout time.Duration) (context.Context, c
 
 // classify turns cmd's outcome into Run's error: Cancelled beats every
 // other cause, a nil ProcessState means git never started, and everything
-// else is a plain exit-code failure (TR-08 — never inspects Stderr text).
+// else is a plain exit-code failure; Stderr text is never inspected.
 func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, command string) error {
 	switch {
 	case ctx.Err() != nil:
@@ -150,7 +150,7 @@ func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, comm
 		return core.Errorf(core.Internal, "%v", err)
 	case err != nil:
 		gitErr := core.Errorf(core.GitFailed, "git exited %d", result.ExitCode)
-		gitErr.GitStderr = string(result.Stderr)
+		gitErr.GitStderr = gitDetails(result)
 		gitErr.Command = command
 		return gitErr
 	default:
@@ -158,10 +158,20 @@ func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, comm
 	}
 }
 
-// buildEnv is the child's environment (TR-09): the user's own environment
-// unchanged, plus scripting-safety variables. Never LC_ALL, HOME,
-// GIT_CONFIG_GLOBAL, or GIT_CONFIG_SYSTEM (QA-COMP-01, QA-SAFE-03) — those
-// come from os.Environ() as inherited.
+// gitDetails is the text for GitStderr: git's stderr, or stdout when
+// stderr is empty — some refusals (rebase --continue with an unresolved
+// file, and merge/cherry-pick conflicts in general) print their message on
+// stdout instead.
+func gitDetails(result Result) string {
+	if strings.TrimSpace(string(result.Stderr)) != "" {
+		return string(result.Stderr)
+	}
+	return string(result.Stdout)
+}
+
+// buildEnv is the user's own environment unchanged, plus scripting-safety
+// variables. Never sets LC_ALL, HOME, GIT_CONFIG_GLOBAL, or
+// GIT_CONFIG_SYSTEM: the user's hooks and config apply as inherited.
 func buildEnv(call Call) []string {
 	env := append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "LC_MESSAGES=C", "LANGUAGE=C")
 	if call.ReadOnly {
@@ -173,9 +183,9 @@ func buildEnv(call Call) []string {
 	return env
 }
 
-// formatCommand renders args for the command log (FR-UX-02), with
-// credentials masked and a stdin marker if hasStdin. Display only: never
-// re-parsed or re-executed.
+// formatCommand renders args for the command log, with credentials masked
+// and a stdin marker if hasStdin. Display only: never re-parsed or
+// re-executed.
 func formatCommand(args []string, hasStdin bool) string {
 	quoted := make([]string, len(args))
 	for i, a := range maskCredentials(args) {

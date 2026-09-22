@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
 func TestADR_5_StreamCallsOnRecordAsRecordsArrive(t *testing.T) {
@@ -62,7 +63,7 @@ func TestADR_5_StreamOnRecordErrorKillsProcessAndReturnsIt(t *testing.T) {
 		return errors.New("stop here")
 	})
 
-	assertCode(t, err, core.Internal)
+	coretest.AssertCode(t, err, core.Internal)
 	if !strings.Contains(err.Error(), "stop here") {
 		t.Errorf("err = %v, want it to mention %q", err, "stop here")
 	}
@@ -77,7 +78,7 @@ func TestADR_5_StreamCapturesStderrAndExitCode(t *testing.T) {
 
 	result, err := (Runner{Git: fakegit}).Stream(context.Background(), Call{Args: []string{"log"}}, func([]byte) error { return nil })
 
-	assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 	if string(result.Stderr) != "warning: x" {
 		t.Errorf("Stderr = %q, want %q", result.Stderr, "warning: x")
 	}

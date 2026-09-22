@@ -29,9 +29,10 @@ import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { commitRow } from '../testing/fixtures/log-rows'
+import { clickMenuItem } from '../testing/contextMenu'
 
 function row(sha: string): LogCommit {
-  return { sha, shortSha: sha, author: '', authorAt: 0, subject: sha, graph: { lane: 0, colour: 0, edges: [] } }
+  return commitRow({ sha, shortSha: sha, subject: sha })
 }
 
 const sampleRow = commitRow()
@@ -81,15 +82,6 @@ describe('LogList', () => {
     mockRevert.mockReset()
     mockRevert.mockResolvedValue(undefined)
   })
-
-  // clickMenuItem finds the context-menu item content by its label text and
-  // clicks it, so it survives changes to the menu's order and length.
-  async function clickMenuItem(body: DOMWrapper<Element>, label: string): Promise<void> {
-    const labels = body.findAll('.p-contextmenu-item-label')
-    const index = labels.findIndex((l) => l.text() === label)
-    const items = body.findAll('.p-contextmenu-item-content')
-    await items[index]!.trigger('click')
-  }
 
   it('FR-LOG-11 right-click opens a context menu with copy, branch, checkout-commit, reset, cherry-pick, and revert items', async () => {
     const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })

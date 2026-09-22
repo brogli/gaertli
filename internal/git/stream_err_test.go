@@ -2,7 +2,6 @@ package git
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
 func TestFR_SYNC_07_StreamErrCallsOnLinePerRecordStdoutUntouched(t *testing.T) {
@@ -69,7 +69,7 @@ func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
 	_, err := (Runner{Git: fakegit}).StreamErr(ctx, Call{Args: []string{"fetch"}}, func([]byte) error { return nil })
 	elapsed := time.Since(start)
 
-	assertCode(t, err, core.Cancelled)
+	coretest.AssertCode(t, err, core.Cancelled)
 	if elapsed > time.Second {
 		t.Errorf("StreamErr() took %s, want well under 5s", elapsed)
 	}
@@ -87,10 +87,7 @@ func TestFR_SYNC_07_StreamErrKeepsStderrForAFailedCall(t *testing.T) {
 
 	result, err := (Runner{Git: fakegit}).StreamErr(context.Background(), Call{Args: []string{"fetch"}}, func([]byte) error { return nil })
 
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != core.GitFailed {
-		t.Fatalf("err = %v, want GitFailed", err)
-	}
+	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "could not read from remote") {
 		t.Errorf("GitStderr = %q, want git's own message", ce.GitStderr)
 	}

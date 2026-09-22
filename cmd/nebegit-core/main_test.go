@@ -29,8 +29,8 @@ func TestMain(m *testing.M) {
 
 // envWithout drops every existing entry for key from os.Environ(), so a
 // caller can append its own override without relying on which duplicate a
-// child process's libc happens to resolve first (this sandbox already runs
-// inside WSL2, so WSL_DISTRO_NAME is typically set in the host environment).
+// child process's libc resolves first (under WSL, WSL_DISTRO_NAME is
+// already set).
 func envWithout(key string) []string {
 	prefix := key + "="
 	var out []string

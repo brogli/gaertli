@@ -8,11 +8,9 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 }))
 
 import { useCompareStore } from './compare'
-import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { commitRow } from '../testing/fixtures/log-rows'
 
-function row(sha: string): LogCommit {
-  return { sha, shortSha: sha.slice(0, 7), author: '', authorAt: 0, subject: '', graph: { lane: 0, colour: 0, edges: [] } }
-}
+const row = (sha: string) => commitRow({ sha, shortSha: sha.slice(0, 7) })
 
 describe('compare store', () => {
   beforeEach(() => {

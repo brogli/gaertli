@@ -2,11 +2,11 @@ package remote
 
 import "strings"
 
-// Distro is one installed WSL distro (FR-REPO-07's picker), bound to the
-// frontend by AppService.ListWSLDistros.
+// Distro is one installed WSL distro, bound to the frontend by
+// AppService.ListWSLDistros.
 type Distro struct {
 	Name    string `json:"name"`
-	Version int    `json:"version"` // 1 or 2; ADR-3: WSL 1 is out of scope
+	Version int    `json:"version"` // 1 or 2; WSL 1 is unsupported
 	Default bool   `json:"default"`
 }
 
@@ -14,14 +14,11 @@ type Distro struct {
 // documented as deprecated, so both are accepted.
 var wslPrefixes = []string{`\\wsl.localhost\`, `\\wsl$\`}
 
-// ClassifyWSLPath reports whether path names a location inside a WSL
-// distro — \\wsl.localhost\<distro>\... or the older \\wsl$\<distro>\...,
-// both accepted — and, if so, the distro name as given (distro names are
-// case-sensitive to wsl.exe) and the POSIX path inside it. The UNC prefix
-// itself and the backslash separators are matched case-insensitively
-// (Windows path convention). false if path has no such prefix, or names the
-// distro root with no folder inside it (FR-REPO-07 always opens a folder,
-// never a distro's own root).
+// ClassifyWSLPath reports whether path names a folder inside a WSL distro
+// (\\wsl.localhost\<distro>\... or \\wsl$\<distro>\...) and, if so, the
+// distro name as given (case-sensitive to wsl.exe) and the POSIX path
+// inside it. The UNC prefix is matched case-insensitively. A distro root
+// with no folder inside it is not a match.
 func ClassifyWSLPath(path string) (distro, linuxPath string, ok bool) {
 	rest, ok := trimWSLPrefix(path)
 	if !ok {
@@ -35,9 +32,7 @@ func ClassifyWSLPath(path string) (distro, linuxPath string, ok bool) {
 }
 
 // BuildWSLPath is ClassifyWSLPath's inverse: the \\wsl.localhost\<distro>\...
-// UNC form of a distro and a POSIX path inside it — the same form
-// AppService.OpenPath produces and the single-instance launch path
-// classifies. Pure, no I/O.
+// UNC form of a distro and a POSIX path inside it.
 func BuildWSLPath(distro, linuxPath string) string {
 	return `\\wsl.localhost\` + distro + strings.ReplaceAll(linuxPath, "/", `\`)
 }

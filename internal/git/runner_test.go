@@ -2,7 +2,6 @@ package git
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 
 func TestTR_09_DefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
 	t.Setenv("NEBEGIT_TEST_MARKER", "present")
-	unsetenvForTest(t, "GIT_EDITOR") // the sandbox itself sets this; isolate from it
+	unsetenvForTest(t, "GIT_EDITOR")
 	env := runEnvDump(t, Call{})
 	assertEnv(t, env, "GIT_TERMINAL_PROMPT", "0")
 	assertEnv(t, env, "LC_MESSAGES", "C")
@@ -45,9 +45,8 @@ func TestTR_09_ContinueAddsGitEditor(t *testing.T) {
 }
 
 // unsetenvForTest clears key for the duration of the test, restoring it
-// afterward. Some environments (this sandbox included) set GIT_EDITOR
-// globally; the TR-09 tests need a clean baseline to prove what buildEnv
-// itself adds.
+// afterward. Some environments set GIT_EDITOR globally; the env tests need a
+// clean baseline to prove what buildEnv itself adds.
 func unsetenvForTest(t *testing.T, key string) {
 	t.Helper()
 	orig, had := os.LookupEnv(key)
@@ -129,7 +128,7 @@ func TestTR_08_ExitNonZeroFailsDespiteBenignStdout(t *testing.T) {
 	t.Setenv("FAKEGIT_EXIT", "1")
 	t.Setenv("FAKEGIT_STDOUT", "all fine")
 	_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
-	assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 }
 
 func TestTR_11_CancelKillsAndReturnsQuickly(t *testing.T) {
@@ -144,9 +143,30 @@ func TestTR_11_CancelKillsAndReturnsQuickly(t *testing.T) {
 	_, err := (Runner{Git: fakegit}).Run(ctx, Call{Args: []string{"whatever"}})
 	elapsed := time.Since(start)
 
-	assertCode(t, err, core.Cancelled)
+	coretest.AssertCode(t, err, core.Cancelled)
 	if elapsed > time.Second {
 		t.Errorf("Run() took %s, want well under 5s", elapsed)
+	}
+}
+
+func TestFR_UX_01_GitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
+	t.Setenv("FAKEGIT_STDOUT", "conflict.txt: needs merge\n")
+	t.Setenv("FAKEGIT_EXIT", "1")
+	_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+	gitErr := coretest.AsError(t, err, core.GitFailed)
+	if gitErr.GitStderr != "conflict.txt: needs merge\n" {
+		t.Errorf("GitStderr = %q, want the stdout fallback", gitErr.GitStderr)
+	}
+}
+
+func TestFR_UX_01_GitStderrPrefersStderrOverStdoutWhenBothArePresent(t *testing.T) {
+	t.Setenv("FAKEGIT_STDOUT", "on stdout")
+	t.Setenv("FAKEGIT_STDERR", "on stderr")
+	t.Setenv("FAKEGIT_EXIT", "1")
+	_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+	gitErr := coretest.AsError(t, err, core.GitFailed)
+	if gitErr.GitStderr != "on stderr" {
+		t.Errorf("GitStderr = %q, want stderr, not the stdout fallback", gitErr.GitStderr)
 	}
 }
 
@@ -167,7 +187,7 @@ func TestQA_REL_01_NeverPanics(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := tt.runner.Run(tt.ctx, tt.call)
-			assertCode(t, err, tt.want)
+			coretest.AssertCode(t, err, tt.want)
 		})
 	}
 }
@@ -233,12 +253,4 @@ func mtime(t *testing.T, path string) time.Time {
 		t.Fatal(err)
 	}
 	return info.ModTime()
-}
-
-func assertCode(t *testing.T, err error, want core.Code) {
-	t.Helper()
-	var gitErr *core.Error
-	if !errors.As(err, &gitErr) || gitErr.Code != want {
-		t.Errorf("err = %v, want *core.Error{Code: %s}", err, want)
-	}
 }

@@ -14,10 +14,9 @@ import (
 )
 
 // candidateFormat resolves everything CherryPick/Revert need about each
-// selected sha in one process: %ct for FR-CP-02/FR-RV-02's ordering, %P's
-// field count for FR-CP-05/FR-RV-03's merge refusal. It is used with
-// --no-walk — a plain lookup of exactly these commits, never a walk of the
-// history reachable from them, so cousin and unrelated commits work too.
+// selected sha in one process: %ct for the apply order, %P's field count
+// for the merge refusal. It is used with --no-walk, a lookup of exactly
+// these commits, so cousin and unrelated commits work too.
 const candidateFormat = "%H%x1f%h%x1f%ct%x1f%P"
 
 // pickCandidate is one selected commit's own resolved facts: ordering
@@ -49,8 +48,7 @@ func parseCandidates(out []byte) ([]pickCandidate, error) {
 	return candidates, nil
 }
 
-// firstMerge returns the first merge commit among candidates, if any
-// (FR-CP-05/FR-RV-03).
+// firstMerge returns the first merge commit among candidates, if any.
 func firstMerge(candidates []pickCandidate) (pickCandidate, bool) {
 	for _, c := range candidates {
 		if c.Merge {
@@ -99,9 +97,9 @@ func resolveCandidates(ctx context.Context, r git.Runner, dir string, shas []str
 }
 
 // runSequence is CherryPick's and Revert's shared body: resolve shas,
-// refuse the whole call up front if any is a merge commit (FR-CP-05/
-// FR-RV-03), then run the one real git call under wt's per-worktree write
-// lock (ADR-6: cherry-pick/revert write this worktree's index and files).
+// refuse the whole call up front if any is a merge commit, then run the one
+// real git call under wt's write lock (it writes this worktree's index and
+// files).
 func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb, headFile string, oldestFirst bool, gitArgs ...string) error {
 	if len(shas) == 0 {
 		return core.Errorf(core.Internal, "no commits given")

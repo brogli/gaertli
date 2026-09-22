@@ -14,17 +14,15 @@ import (
 )
 
 // hashPattern is what resolveHash checks a query against before spending a
-// git process on it (FR-LOG-05): 4-40 lowercase hex characters — git itself
-// accepts a 4-char unambiguous prefix, and lowercase-only keeps ordinary
-// text queries from costing a rev-parse.
+// git process on it: git accepts a 4-char unambiguous prefix, and
+// lowercase-only keeps ordinary text queries from costing a rev-parse.
 var hashPattern = regexp.MustCompile(`^[0-9a-f]{4,40}$`)
 
-// LogArgs builds the git log call for filter (FR-LOG-05..08); the empty
-// filter is the unfiltered load, also what tools/bench times. Query and
-// Author land only as the value half of one '='-joined token (--grep=<q>,
-// --author=<a>), so no content can turn them into an option. Branches and
-// Path are separate tokens, so --end-of-options (before the branches) and
-// -- (before the path) protect them (TR-10).
+// LogArgs builds the git log call for filter; the empty filter is the
+// unfiltered load, also what tools/bench times. Query and Author land only
+// as the value half of one '='-joined token (--grep=<q>, --author=<a>), so
+// no content can turn them into an option. Branches and Path are separate
+// tokens, protected by --end-of-options and -- respectively.
 func LogArgs(f core.LogFilter) []string {
 	args := []string{"log", "--topo-order", "--parents", "--decorate=full"}
 	if f.Query != "" {
@@ -34,9 +32,8 @@ func LogArgs(f core.LogFilter) []string {
 		args = append(args, "--author="+f.Author)
 	}
 	if f.Query != "" || f.Author != "" {
-		// --fixed-strings: plain substring, not a regex (an ordinary query
-		// containing "(", ".", etc. must not fail or silently mis-match).
-		// --regexp-ignore-case: matches FR-LOG-05's plain "search" framing.
+		// plain case-insensitive substring: a query containing "(" or "."
+		// must not fail or silently mis-match as a regex
 		args = append(args, "--regexp-ignore-case", "--fixed-strings")
 	}
 	if len(f.Branches) == 0 {
@@ -60,7 +57,7 @@ func (c *Core) SetLogFilter(ctx context.Context, id core.WorktreeID, filter core
 		wt.FilterClear()
 		return nil
 	}
-	flat := filter.Query != "" || filter.Author != "" // FR-LOG-02: a text/author search is active
+	flat := filter.Query != "" || filter.Author != "" // a search result has no graph
 	filterCtx, cancel := context.WithCancel(context.Background())
 	gen := wt.FilterBegin(flat, cancel)
 	go c.streamFilteredLog(filterCtx, wt, filter, gen, flat)
@@ -107,10 +104,7 @@ func (c *Core) emitFilterProgress(wtID core.WorktreeID, loaded int, done bool) {
 }
 
 // resolveHash checks whether q looks like, and resolves to, an existing
-// commit (git-mapping.md's Search row: "hash via git rev-parse --verify").
-// ok is false for anything that doesn't parse as 4-40 lowercase hex
-// characters (avoids a wasted git process for every ordinary text query) or
-// that parses but does not resolve to a real commit.
+// commit.
 func resolveHash(ctx context.Context, r git.Runner, dir, q string) (sha string, ok bool) {
 	if !hashPattern.MatchString(q) {
 		return "", false

@@ -9,12 +9,10 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// TestQA_PERF_04_FirstFilteredLogRowUnder2s proves the literal QA-PERF-04
-// number against the real 100k-commit reference repo: a query narrowing to
-// a small, known subset of commits ("merge feature-1", plus the
-// substring-adjacent "feature-10".."feature-19") still surfaces its first
-// matching row within budget. internal/services proves the mechanism at
-// synthetic scale; this is the literal number.
+// TestQA_PERF_04_FirstFilteredLogRowUnder2s checks against the 100k-commit
+// reference repo that a query narrowing to a small subset of commits
+// ("merge feature-1", plus the substring-adjacent "feature-10".."feature-19")
+// surfaces its first matching row within budget.
 func TestQA_PERF_04_FirstFilteredLogRowUnder2s(t *testing.T) {
 	c, id := openReference(t)
 	start := time.Now()

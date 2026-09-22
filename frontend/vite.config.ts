@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     strictPort: true,
   },
   plugins: [vue(), wails('./bindings')],
-  // e2e mode (TR-31, spec 13): swap the generated Wails Facade for a mock
+  // e2e mode: swap the generated Wails Facade for a mock
   // backed by a canned fixture, so Playwright drives the real Vue app
   // without a live Go core. A RegExp match, not a literal path, because the
   // bindings import's `../..` prefix differs by caller depth.

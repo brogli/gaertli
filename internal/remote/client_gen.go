@@ -10,6 +10,14 @@ import (
 
 var _ core.API = (*Client)(nil)
 
+type abortOperationParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) AbortOperation(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "AbortOperation", abortOperationParams{Wt: wt}, nil)
+}
+
 type addWorktreeParams struct {
 	Path      core.RepoPath `json:"path"`
 	Target    string        `json:"target"`
@@ -78,6 +86,16 @@ func (c *Client) CommandLog(ctx context.Context, wt core.WorktreeID) ([]core.Com
 	return result, err
 }
 
+type commitParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Message string          `json:"message"`
+	Amend   bool            `json:"amend"`
+}
+
+func (c *Client) Commit(ctx context.Context, wt core.WorktreeID, message string, amend bool) error {
+	return c.call(ctx, "Commit", commitParams{Wt: wt, Message: message, Amend: amend}, nil)
+}
+
 type commitDetailsParams struct {
 	Wt  core.WorktreeID `json:"wt"`
 	Sha string          `json:"sha"`
@@ -99,6 +117,14 @@ func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a strin
 	var result []core.ChangedFile
 	err := c.call(ctx, "CompareCommits", compareCommitsParams{Wt: wt, A: a, B: b}, &result)
 	return result, err
+}
+
+type continueOperationParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) ContinueOperation(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "ContinueOperation", continueOperationParams{Wt: wt}, nil)
 }
 
 type createBranchParams struct {
@@ -368,6 +394,15 @@ func (c *Client) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter co
 	return c.call(ctx, "SetLogFilter", setLogFilterParams{Wt: wt, Filter: filter}, nil)
 }
 
+type setMessageDraftParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Message string          `json:"message"`
+}
+
+func (c *Client) SetMessageDraft(ctx context.Context, wt core.WorktreeID, message string) error {
+	return c.call(ctx, "SetMessageDraft", setMessageDraftParams{Wt: wt, Message: message}, nil)
+}
+
 type stageAllParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -383,6 +418,17 @@ type stageFileParams struct {
 
 func (c *Client) StageFile(ctx context.Context, wt core.WorktreeID, path string) error {
 	return c.call(ctx, "StageFile", stageFileParams{Wt: wt, Path: path}, nil)
+}
+
+type stageLinesParams struct {
+	Wt      core.WorktreeID    `json:"wt"`
+	Path    string             `json:"path"`
+	Sel     core.LineSelection `json:"sel"`
+	Reverse bool               `json:"reverse"`
+}
+
+func (c *Client) StageLines(ctx context.Context, wt core.WorktreeID, path string, sel core.LineSelection, reverse bool) error {
+	return c.call(ctx, "StageLines", stageLinesParams{Wt: wt, Path: path, Sel: sel, Reverse: reverse}, nil)
 }
 
 type statusParams struct {
@@ -430,6 +476,17 @@ type unstageFileParams struct {
 
 func (c *Client) UnstageFile(ctx context.Context, wt core.WorktreeID, path string) error {
 	return c.call(ctx, "UnstageFile", unstageFileParams{Wt: wt, Path: path}, nil)
+}
+
+type updateBranchParams struct {
+	Wt     core.WorktreeID `json:"wt"`
+	Branch string          `json:"branch"`
+}
+
+func (c *Client) UpdateBranch(ctx context.Context, wt core.WorktreeID, branch string) (string, error) {
+	var result string
+	err := c.call(ctx, "UpdateBranch", updateBranchParams{Wt: wt, Branch: branch}, &result)
+	return result, err
 }
 
 func (c *Client) Version(ctx context.Context) (core.Version, error) {

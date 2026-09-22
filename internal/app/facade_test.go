@@ -54,6 +54,14 @@ func (s stubCore) StageAll(context.Context, core.WorktreeID) error { return nil 
 
 func (s stubCore) UnstageAll(context.Context, core.WorktreeID) error { return nil }
 
+func (s stubCore) StageLines(context.Context, core.WorktreeID, string, core.LineSelection, bool) error {
+	return nil
+}
+
+func (s stubCore) Commit(context.Context, core.WorktreeID, string, bool) error { return nil }
+
+func (s stubCore) SetMessageDraft(context.Context, core.WorktreeID, string) error { return nil }
+
 func (s stubCore) DiffWorking(context.Context, core.WorktreeID, string, string, bool, bool) (core.DiffFile, error) {
 	return core.DiffFile{}, nil
 }
@@ -131,6 +139,13 @@ func (s stubCore) Pull(context.Context, core.WorktreeID, core.PullMode) (string,
 func (s stubCore) Push(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
 
 func (s stubCore) ForcePush(context.Context, core.WorktreeID) (string, error) { return "", nil }
+
+func (s stubCore) UpdateBranch(context.Context, core.WorktreeID, string) (string, error) {
+	return "", nil
+}
+func (s stubCore) ContinueOperation(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) AbortOperation(context.Context, core.WorktreeID) error { return nil }
 
 type stubRouter struct {
 	local core.API

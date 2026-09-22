@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -383,10 +382,8 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 }
 
 // TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration
-// proves the streaming mechanism QA-PERF-04 depends on: a filtered row is
-// usable long before the whole (delayed) stream finishes, here for
-// Core.LogRows serving a window's own active filtered view. The literal
-// ≤2s-at-100k-commits number is tools/bench's own case.
+// proves a filtered row is usable long before the whole (delayed) stream
+// finishes. The ≤2s-at-100k-commits number is tools/bench's case.
 func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c := New(func(core.Event) {})
@@ -454,18 +451,12 @@ func waitForFilterRows(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsRe
 	return core.LogRowsResult{}
 }
 
-// commitAs commits content to file with an explicit author (unlike commit,
-// which always uses gittest.New's fixed default identity).
+// commitAs commits content to file with an explicit author.
 func commitAs(t *testing.T, dir, file, content, msg, authorName, authorEmail string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	gittest.Run(t, dir, "add", "--", file)
-	author := fmt.Sprintf("%s <%s>", authorName, authorEmail)
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{
-		Dir: dir, Args: []string{"commit", "--author=" + author, "-F", "-"}, Stdin: []byte(msg),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	gittest.Run(t, dir, "commit", fmt.Sprintf("--author=%s <%s>", authorName, authorEmail), "-m", msg)
 }

@@ -7,8 +7,8 @@ import (
 	"github.com/brogli/nebegit/internal/proc"
 )
 
-// start launches argv[0] with argv[1:], detached (TR-12) — the caller never
-// waits for the editor to exit.
+// start launches argv[0] with argv[1:], detached: the caller never waits
+// for the editor to exit.
 func start(argv []string) error {
 	bin, err := exec.LookPath(argv[0])
 	if err != nil {

@@ -5,9 +5,8 @@ import (
 	"os/exec"
 )
 
-// gitPresent reports whether a git executable is on PATH (QA-INST-01).
-// Not a version check: TR-04's ≥ 2.40 minimum is enforced when a repo is
-// opened.
+// gitPresent reports whether a git executable is on PATH. The minimum
+// version is checked when a repo is opened.
 func gitPresent() bool {
 	_, err := exec.LookPath("git")
 	return err == nil
@@ -19,7 +18,7 @@ func missingGitMessage() string {
 }
 
 // startupFailedMessage is shown when a.Run() fails after git was already
-// confirmed present: the webview prerequisite (QA-INST-01).
+// confirmed present: the webview prerequisite.
 func startupFailedMessage(err error) string {
 	return fmt.Sprintf("nebegit could not start its web view. On Windows, install the WebView2 runtime; on Linux, install the webkitgtk package. (%v)", err)
 }

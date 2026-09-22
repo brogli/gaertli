@@ -1,9 +1,7 @@
 package core
 
-// JobInfo is one job's current state, matching components.md's "job:update
-// {id, state, progress, message}" (plus Kind/StartedAt/EndedAt/Error, which
-// that shorthand omits the same way "repo:changed {scope}" omits the Event
-// envelope's own Repo/Worktree fields).
+// JobInfo is one job's current state, as Jobs lists it and "job:update"
+// carries it.
 type JobInfo struct {
 	ID        string `json:"id"`
 	Kind      string `json:"kind"`
@@ -12,5 +10,6 @@ type JobInfo struct {
 	Message   string `json:"message"`
 	StartedAt string `json:"startedAt"` // RFC3339Nano
 	EndedAt   string `json:"endedAt,omitempty"`
-	Error     *Error `json:"error,omitempty"` // set only when State is "failed"
+	Error     *Error `json:"error,omitempty"`  // set only when State is "failed"
+	Result    any    `json:"result,omitempty"` // job-kind-specific payload, set only when State is "done"
 }

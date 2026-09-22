@@ -1,8 +1,6 @@
-// Command badcore is a test fixture only (excluded from the module's own
-// build: go tooling ignores testdata/ directories): a core.API that reports
-// a wrong Protocol on Version, everything else delegating to the real
-// services.Core. Built by internal/remote's own tests (case 10) to exercise
-// DistroCore.Ensure's version-mismatch handling without a real distro.
+// Command badcore is a test fixture: a core.API that reports a wrong
+// Protocol on Version, everything else delegating to services.Core. It
+// exercises DistroCore.Ensure's version-mismatch handling without a distro.
 package main
 
 import (

@@ -1,5 +1,5 @@
 // Package settings persists nebegit's own configuration as JSON in the OS
-// user config directory (TR-13). No Wails/cgo import (TR-07).
+// user config directory. No Wails/cgo import.
 package settings
 
 import (
@@ -16,35 +16,33 @@ const maxRecent = 10
 
 // Settings is the whole persisted file.
 type Settings struct {
-	RecentRepos   []RecentRepo `json:"recentRepos"`   // FR-REPO-02, most-recent-first, capped at maxRecent
-	OpenWorktrees []string     `json:"openWorktrees"` // FR-REPO-02: windows open at last quit
+	RecentRepos   []RecentRepo `json:"recentRepos"`   // most-recent-first, capped at maxRecent
+	OpenWorktrees []string     `json:"openWorktrees"` // windows open at last quit
 
-	// EditorProfiles is keyed by environment: "" for local (Windows/Linux/
-	// macOS native), else a WSL distro name (FR-ED-11) — the same "" = local
-	// convention as RecentRepo.Distro.
+	// EditorProfiles is keyed by environment: "" for local, else a WSL
+	// distro name.
 	EditorProfiles map[string]core.EditorProfile `json:"editorProfiles,omitempty"`
 
-	ProtectedBranches        []string `json:"protectedBranches"`        // FR-UX-04
-	DefaultPullMode          string   `json:"defaultPullMode"`          // FR-UX-04: "merge" | "rebase"
-	DiffMode                 string   `json:"diffMode"`                 // FR-UX-04: "unified" | "side-by-side"
-	AutoFetchIntervalMinutes int      `json:"autoFetchIntervalMinutes"` // FR-UX-04; 0 = disabled
+	ProtectedBranches        []string `json:"protectedBranches"`
+	DefaultPullMode          string   `json:"defaultPullMode"`          // "merge" | "rebase"
+	DiffMode                 string   `json:"diffMode"`                 // "unified" | "side-by-side"
+	AutoFetchIntervalMinutes int      `json:"autoFetchIntervalMinutes"` // 0 = disabled
 }
 
 // RecentRepo is one entry of Settings.RecentRepos.
 type RecentRepo struct {
 	Path       string `json:"path"`
 	LastOpened string `json:"lastOpened"`       // RFC3339
-	Distro     string `json:"distro,omitempty"` // "" = local; else the WSL distro name (FR-REPO-07)
+	Distro     string `json:"distro,omitempty"` // "" = local; else the WSL distro name
 }
 
 // Default is a fresh install's settings: no recents, nothing open, git's own
-// pull default (--no-rebase), unified diffs, and no unasked-for network
-// traffic (QA-SEC-01).
+// pull default (--no-rebase), unified diffs, and no auto-fetch.
 func Default() Settings {
 	return Settings{DefaultPullMode: "merge", DiffMode: "unified"}
 }
 
-// Path is <os.UserConfigDir()>/nebegit/settings.json (TR-13).
+// Path is <os.UserConfigDir()>/nebegit/settings.json.
 func Path() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -89,7 +87,7 @@ func Save(path string, s Settings) error {
 
 // AddRecent inserts path at the front with LastOpened = now, removing any
 // earlier entry for the same path, capped at maxRecent. distro is "" for a
-// local repo, else the WSL distro it was opened from (FR-REPO-07).
+// local repo, else the WSL distro it was opened from.
 func (s *Settings) AddRecent(path string, now time.Time, distro string) {
 	entries := []RecentRepo{{Path: path, LastOpened: now.Format(time.RFC3339), Distro: distro}}
 	for _, r := range s.RecentRepos {
@@ -103,7 +101,7 @@ func (s *Settings) AddRecent(path string, now time.Time, distro string) {
 	s.RecentRepos = entries
 }
 
-// SetOpenWorktrees replaces the FR-REPO-02 restore snapshot.
+// SetOpenWorktrees replaces the restore-at-launch snapshot.
 func (s *Settings) SetOpenWorktrees(paths []string) {
 	s.OpenWorktrees = paths
 }

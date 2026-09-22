@@ -5,14 +5,25 @@ import ContextMenu from 'openvue/contextmenu'
 import type { TreeNode } from 'openvue/treenode'
 import { useRefsStore } from '../stores/refs'
 import { useLogStore } from '../stores/log'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useJobsStore } from '../stores/jobs'
+import { useCoreCall, type CoreError } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { buildBranchMenuItems } from '../menus/branchMenu'
 import ErrorBanner from './ErrorBanner.vue'
 import { buildRefTree, type RefTreeNode } from './refTree'
 
+// UpdateBranchResult is core.UpdateBranchResult, UpdateBranch's
+// JobInfo.result; the bindings type JobInfo.result as `any`.
+interface UpdateBranchResult {
+  outcome: 'updated' | 'upToDate'
+  from: string
+  to: string
+  commits: number
+}
+
 // RefsSidebar shows the open worktree's branches, remotes, and tags as
-// OpenVue trees (FR-LOG-01).
+// OpenVue trees.
+const updateKindPrefix = 'update-branch:'
 const props = defineProps<{ wt: string }>()
 const emit = defineEmits<{ 'create-worktree': [name: string, isRemote: boolean] }>()
 const refs = useRefsStore()
@@ -28,9 +39,8 @@ const remoteGroups = computed(() =>
   })),
 )
 
-// The current-branch marker (data.current) is kept independent of Tree's
-// own selectionKeys, which holds the transient "just clicked this" state,
-// not the persistent "this is HEAD" fact.
+// The current-branch marker is independent of Tree's selectionKeys, which
+// hold the transient "just clicked" state.
 function isCurrent(node: TreeNode): boolean {
   return (node as RefTreeNode).data?.current === true
 }
@@ -42,32 +52,51 @@ function onNodeSelect(node: TreeNode): void {
   if (sha) void log.jumpTo(sha)
 }
 
-// Right-click a branch leaf (local or remote): FR-BR-05's "Checkout" item,
-// FR-BR-06's "Create worktree here…". A folder node carries no
-// data and offers no menu. node.key is the branch's own name (buildRefTree's
-// namespaced path — for a remote branch, already the short name with no
-// remote prefix, since each remote's own leaf list already excludes it).
-// isRemote (each call site below) tells buildBranchMenuItems which of
-// AddWorktree's two modes the create-worktree item should pre-fill.
+// Right-click a branch leaf (local or remote) for its menu; a folder node
+// has none. node.key is the branch name, without the remote prefix for a
+// remote branch.
 const menuRef = ref<InstanceType<typeof ContextMenu>>()
 const menuItems = ref<ReturnType<typeof buildBranchMenuItems>>([])
 
 function onNodeContextMenu(event: MouseEvent, node: TreeNode, isRemote: boolean): void {
   const data = (node as RefTreeNode).data
   if (!data) return
-  menuItems.value = buildBranchMenuItems(node.key, data.current, isRemote, checkout, (name, remote) =>
-    emit('create-worktree', name, remote),
+  menuItems.value = buildBranchMenuItems(
+    node.key,
+    data.current,
+    isRemote,
+    !!data.upstream,
+    checkout,
+    (name, remote) => emit('create-worktree', name, remote),
+    updateBranch,
   )
   menuRef.value?.show(event)
 }
 
-// Checkout is a stateless write action reported through ErrorBanner alone
-// (WorktreeView.vue's own refresh() pattern) — the refs/log stores reload
-// themselves from the resulting repo:changed event, no store round-trip
-// needed here.
+// The refs and log stores reload themselves from the resulting
+// repo:changed event.
 function checkout(name: string): void {
   void run(() => Facade.Checkout(props.wt, name))
 }
+
+// updateBranch starts the job; its outcome shows in updateResult below.
+// A synchronous refusal (no upstream, etc.) shows in error/ErrorBanner
+// instead of ever starting a job.
+function updateBranch(name: string): void {
+  void run(() => Facade.UpdateBranch(props.wt, name))
+}
+
+// The result banner for the latest update-branch job; a running retry
+// hides the stale result.
+const jobs = useJobsStore()
+const updateResult = computed<{ branch: string; result?: UpdateBranchResult; error?: CoreError } | null>(() => {
+  const job = jobs.latest((kind) => kind.startsWith(updateKindPrefix))
+  if (!job) return null
+  const branch = job.kind.slice(updateKindPrefix.length)
+  if (job.state === 'done') return { branch, result: job.result as UpdateBranchResult }
+  if (job.state === 'failed') return job.error ? { branch, error: job.error } : { branch }
+  return null
+})
 </script>
 
 <template>
@@ -75,10 +104,8 @@ function checkout(name: string): void {
     <ErrorBanner v-if="error" :error="error" />
     <section>
       <h2>Branches</h2>
-      <!-- OpenVue's Tree needs a v-if guard, not just an empty `value`: its
-           empty-message slot reads global config this app never installs
-           (no ThemeProvider is wired), and an empty repo must still
-           render. -->
+      <!-- v-if: an empty Tree's empty-message slot reads global config this
+           app never installs -->
       <Tree
         v-if="branchNodes.length"
         :value="branchNodes"
@@ -126,6 +153,14 @@ function checkout(name: string): void {
       />
     </section>
     <ContextMenu ref="menuRef" :model="menuItems" />
+    <div v-if="updateResult" data-test="update-result">
+      <ErrorBanner v-if="updateResult.error" :error="updateResult.error" />
+      <p v-else-if="updateResult.result?.outcome === 'updated'">
+        Updated "{{ updateResult.branch }}": {{ updateResult.result.commits }} commit(s), now at
+        {{ updateResult.result.to.slice(0, 7) }}.
+      </p>
+      <p v-else>"{{ updateResult.branch }}" is already up to date.</p>
+    </div>
   </aside>
 </template>
 

@@ -12,7 +12,7 @@ import (
 )
 
 // Stream runs call like Run, but calls onRecord once per record as output
-// arrives instead of buffering stdout (ADR-5). call.Args must build a
+// arrives instead of buffering stdout. call.Args must build a
 // --format that ends each record with a literal NUL; Stream only frames on
 // 0x00.
 //
@@ -64,11 +64,8 @@ func (r Runner) Stream(ctx context.Context, call Call, onRecord func([]byte) err
 
 // StreamErr runs call like Run, but instead of buffering stderr, calls
 // onLine once per stderr record as it arrives, framed on the first \r or
-// \n byte (git's own progress convention when run with --progress: \r
-// overwrites the line currently being drawn, \n ends a completed one —
-// confirmed empirically against git 2.43.0's own clone/fetch --progress
-// output). Unlike Stream, stdout is buffered as Run's normally is — no job
-// in scope needs both streamed at once.
+// \n byte (git's --progress convention: \r overwrites the line being drawn,
+// \n ends a completed one). stdout is buffered as in Run.
 //
 // onLine's slice aliases an internal buffer and is only valid until onLine
 // returns; copy anything kept past that. A non-nil error from onLine stops
@@ -148,9 +145,8 @@ func splitNUL(data []byte, atEOF bool) (advance int, token []byte, err error) {
 }
 
 // splitCRLF is a bufio.SplitFunc that frames on the first \r or \n byte,
-// dropping the delimiter — git's own progress-line convention, not
-// bufio.ScanLines' \r\n-pair handling: git's intermediate updates end in a
-// bare \r with no following \n.
+// dropping the delimiter. Unlike bufio.ScanLines it treats a bare \r as an
+// end: git's intermediate progress updates end in one.
 func splitCRLF(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if i := bytes.IndexAny(data, "\r\n"); i >= 0 {
 		return i + 1, data[:i], nil

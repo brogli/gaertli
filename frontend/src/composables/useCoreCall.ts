@@ -9,7 +9,7 @@ export interface CoreError {
   code?: string
 }
 
-// useCoreCall wraps a bound-method call (FR-UX-01): run(call) awaits it,
+// useCoreCall wraps a bound-method call: run(call) awaits it,
 // catching a rejection and exposing it as a CoreError for ErrorBanner.
 export function useCoreCall() {
   const error = ref<CoreError | null>(null)

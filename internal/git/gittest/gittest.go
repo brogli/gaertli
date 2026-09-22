@@ -1,4 +1,4 @@
-// Package gittest builds isolated temp git repositories for tests (TR-14).
+// Package gittest builds isolated temp git repositories for tests.
 package gittest
 
 import (
@@ -12,7 +12,7 @@ import (
 )
 
 // Repo is a temp git repository for tests: real git, isolated HOME and
-// GIT_CONFIG_GLOBAL (TR-14). Removed by t.Cleanup.
+// GIT_CONFIG_GLOBAL. Removed by t.Cleanup.
 type Repo struct {
 	Dir string // the repo's working directory
 }

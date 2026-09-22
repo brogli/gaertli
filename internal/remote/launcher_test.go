@@ -2,12 +2,12 @@ package remote
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
 func TestFR_REPO_06_InstallLauncherWritesGuiPathAndSymlinksNebegit(t *testing.T) {
@@ -49,10 +49,7 @@ func TestFR_REPO_06_InstallLauncherDeclinedConsentWritesNothing(t *testing.T) {
 
 	err := dc.InstallLauncher(context.Background(), `C:\nebegit.exe`)
 
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != core.DeployRefused {
-		t.Fatalf("err = %v, want *core.Error{Code: DeployRefused}", err)
-	}
+	coretest.AssertCode(t, err, core.DeployRefused)
 
 	target := deployedPath(t, "1.0.0")
 	if _, statErr := os.Stat(filepath.Join(filepath.Dir(target), "gui-path")); !os.IsNotExist(statErr) {

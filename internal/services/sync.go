@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,9 +48,9 @@ func (c *Core) Fetch(ctx context.Context, id core.WorktreeID, remote string) (st
 	} else {
 		args = append(args, remote)
 	}
-	jobID := wt.Repo.Jobs().Start("fetch", func(ctx context.Context, progress jobs.Progress) error {
+	jobID := wt.Repo.Jobs().Start("fetch", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		result, err := runWithProgress(ctx, wt.Runner, wt.Path, args, progress)
-		return remapAuthFailed(err, result)
+		return nil, remapAuthFailed(err, result)
 	})
 	return string(jobID), nil
 }
@@ -63,16 +65,16 @@ func (c *Core) Pull(ctx context.Context, id core.WorktreeID, mode core.PullMode)
 	if err != nil {
 		return "", err
 	}
-	jobID := wt.Repo.Jobs().Start("pull", func(ctx context.Context, progress jobs.Progress) error {
+	jobID := wt.Repo.Jobs().Start("pull", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		fetchResult, err := runWithProgress(ctx, wt.Runner, wt.Path, []string{"fetch", "--prune", "--progress"}, progress)
 		if err := remapAuthFailed(err, fetchResult); err != nil {
-			return err
+			return nil, err
 		}
 
 		wt.Lock() // only the local integration step writes this worktree's index/files
 		defer wt.Unlock()
 		_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: integrateArgs})
-		return remapPullConflict(err, wt.GitDir)
+		return nil, remapOperationConflict(err, wt.GitDir)
 	})
 	return string(jobID), nil
 }
@@ -85,7 +87,7 @@ func (c *Core) Push(ctx context.Context, id core.WorktreeID, remote string) (str
 	}
 	args := []string{"push", "--porcelain", "--progress"}
 	if remote != "" {
-		args = append(args, "--set-upstream", remote, "HEAD") // HEAD as the source sets up tracking against a same-named branch on the far side, with no extra call to resolve the current branch's own name
+		args = append(args, "--set-upstream", remote, "HEAD") // tracks a same-named remote branch
 	}
 	return startPushJob(wt, "push", args), nil
 }
@@ -102,21 +104,148 @@ func (c *Core) ForcePush(ctx context.Context, id core.WorktreeID) (string, error
 	return startPushJob(wt, "force-push", args), nil
 }
 
+// UpdateBranch implements core.API.
+func (c *Core) UpdateBranch(ctx context.Context, id core.WorktreeID, branch string) (string, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return "", err
+	}
+	sha, remote, upstreamRef, checkedOutIn, err := c.branchUpstreamInfo(ctx, wt.Runner, wt.Path, branch)
+	if err != nil {
+		return "", err
+	}
+	if upstreamRef == "" {
+		return "", core.Errorf(core.NoUpstream, "%q has no upstream configured.", branch)
+	}
+
+	jobID := wt.Repo.Jobs().Start("update-branch:"+branch, func(ctx context.Context, progress jobs.Progress) (any, error) {
+		toDir, toRunner := wt.Path, wt.Runner
+		if checkedOutIn == "" {
+			if err := c.fetchIntoLocalBranch(ctx, wt, remote, upstreamRef, branch, progress); err != nil {
+				return nil, err
+			}
+		} else {
+			other, err := c.sessions.Open(ctx, core.RepoPath(checkedOutIn))
+			if err != nil {
+				return nil, err
+			}
+			if err := c.fetchAndMergeElsewhere(ctx, other, remote, upstreamRef, branch, progress); err != nil {
+				return nil, err
+			}
+			toDir, toRunner = other.Path, other.Runner
+		}
+
+		newSHA, err := revParse(ctx, toRunner, toDir, branch)
+		if err != nil {
+			return nil, err
+		}
+		commits := 0
+		if newSHA != sha {
+			commits, err = revListCount(ctx, toRunner, toDir, sha+".."+newSHA)
+			if err != nil {
+				return nil, err
+			}
+		}
+		outcome := "upToDate"
+		if commits > 0 {
+			outcome = "updated"
+		}
+		return core.UpdateBranchResult{Outcome: outcome, From: sha, To: newSHA, Commits: commits}, nil
+	})
+	return string(jobID), nil
+}
+
+// fetchIntoLocalBranch is UpdateBranch's case where branch is checked out
+// nowhere: fetched straight into it. Fast-forward-only by git's own
+// refspec rule; a diverged refusal is reclassified NotFastForward, anything
+// else stays plain GitFailed.
+func (c *Core) fetchIntoLocalBranch(ctx context.Context, wt *session.Worktree, remote, upstreamRef, branch string, progress jobs.Progress) error {
+	args := []string{"fetch", "--progress", remote, upstreamRef + ":refs/heads/" + branch}
+	result, err := runWithProgress(ctx, wt.Runner, wt.Path, args, progress)
+	return classifyDivergedFetch(remapAuthFailed(err, result), result, branch)
+}
+
+// fetchAndMergeElsewhere is UpdateBranch's case where branch is checked out
+// in other, a different worktree: refused early if other is dirty — no
+// network spent on a call already known to be refused. Otherwise fetches
+// only the shared remote-tracking ref (no destination refspec, so the
+// checked-out-branch fetch refusal never applies here) and merges --ff-only
+// under other's own write queue, updating its files too.
+func (c *Core) fetchAndMergeElsewhere(ctx context.Context, other *session.Worktree, remote, upstreamRef, branch string, progress jobs.Progress) error {
+	if c.isDirty(ctx, other.Path) {
+		return core.Errorf(core.DirtyWorktree, "%q is checked out in %s, which has uncommitted changes.", branch, other.Path)
+	}
+	result, err := runWithProgress(ctx, other.Runner, other.Path, []string{"fetch", "--progress", remote, upstreamRef}, progress)
+	if err := remapAuthFailed(err, result); err != nil {
+		return err
+	}
+
+	other.Lock()
+	defer other.Unlock()
+	_, err = other.Runner.Run(ctx, git.Call{Dir: other.Path, Args: []string{"merge", "--ff-only", "@{upstream}"}})
+	return err // a non-nil err here is a race: something changed between the dirty check and now
+}
+
+// branchUpstreamFormat reads one branch's SHA, its upstream's remote ("."
+// for a local upstream) and ref on that remote, and the worktree it is
+// checked out in.
+const branchUpstreamFormat = "%(objectname)%1f%(upstream:remotename)%1f%(upstream:remoteref)%1f%(worktreepath)%00"
+
+// branchUpstreamInfo reads branch's SHA, upstream remote and ref (both ""
+// if none configured), and the worktree it is checked out in ("" if none),
+// in one read-only for-each-ref call.
+func (c *Core) branchUpstreamInfo(ctx context.Context, r git.Runner, dir, branch string) (sha, remote, upstreamRef, checkedOutIn string, err error) {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true,
+		Args: []string{"for-each-ref", "--format=" + branchUpstreamFormat, "refs/heads/" + branch},
+	})
+	if err != nil {
+		return "", "", "", "", err
+	}
+	records := nulRecords(result.Stdout)
+	if len(records) == 0 {
+		return "", "", "", "", core.Errorf(core.Internal, "branch %q not found", branch)
+	}
+	f := strings.Split(records[0], "\x1f")
+	return f[0], f[1], f[2], f[3], nil
+}
+
+// revParse resolves ref to its SHA, read-only.
+func revParse(ctx context.Context, r git.Runner, dir, ref string) (string, error) {
+	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: []string{"rev-parse", "--verify", "--end-of-options", ref}})
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(result.Stdout)), nil
+}
+
+// revListCount counts the commits in rangeExpr (e.g. "<old>..<new>"), read-only.
+func revListCount(ctx context.Context, r git.Runner, dir, rangeExpr string) (int, error) {
+	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: []string{"rev-list", "--count", rangeExpr}})
+	if err != nil {
+		return 0, err
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(string(result.Stdout)))
+	if err != nil {
+		return 0, core.Errorf(core.Internal, "parsing rev-list --count output: %v", err)
+	}
+	return n, nil
+}
+
 // startPushJob starts kind ("push" or "force-push") running args as a job,
 // sharing Push's and ForcePush's classification: a rejection read from
 // --porcelain's own machine-readable summary line on stdout, and a failed
 // sign-in read from stderr.
 func startPushJob(wt *session.Worktree, kind string, args []string) string {
-	jobID := wt.Repo.Jobs().Start(kind, func(ctx context.Context, progress jobs.Progress) error {
+	jobID := wt.Repo.Jobs().Start(kind, func(ctx context.Context, progress jobs.Progress) (any, error) {
 		result, err := runWithProgress(ctx, wt.Runner, wt.Path, args, progress)
-		return classifyPushRejection(remapAuthFailed(err, result), result)
+		return nil, classifyPushRejection(remapAuthFailed(err, result), result)
 	})
 	return string(jobID)
 }
 
-// pullIntegrateArgs maps mode to its git call. mode is a closed UI choice
-// (a two-option picker), never free text — an unrecognised value is this
-// app's own bug, Code Internal, same convention as branch.go's resetFlag.
+// pullIntegrateArgs maps mode to its git call. mode is a closed UI choice,
+// so an unrecognised value is this app's own bug: Code Internal.
 func pullIntegrateArgs(mode core.PullMode) ([]string, error) {
 	switch mode {
 	case core.PullMerge:
@@ -128,13 +257,6 @@ func pullIntegrateArgs(mode core.PullMode) ([]string, error) {
 	}
 }
 
-// remapPullConflict classifies a failed merge/rebase step: a state file
-// left behind (MERGE_HEAD or rebase-merge/rebase-apply) means it stopped
-// mid-way, left in place for the resolve flow.
-func remapPullConflict(err error, gitDir string) error {
-	return remapIfPending(err, operation(gitDir) != "")
-}
-
 // pushRejectPrefix is --porcelain's own rejected-ref line prefix, always on
 // stdout.
 const pushRejectPrefix = "!\t"
@@ -144,9 +266,8 @@ const pushRejectPrefix = "!\t"
 // NotFastForward. Every other explained rejection is PushRejected.
 var ffReasons = []string{"fetch first", "non-fast-forward", "stale info", "remote ref updated since checkout"}
 
-// classifyPushRejection reads Push/ForcePush's own git.Result after
-// remapAuthFailed has already had a chance at it (an auth failure never
-// reaches the per-ref summary line at all, so the two never compete).
+// classifyPushRejection reads a push's git.Result after remapAuthFailed (an
+// auth failure never reaches the per-ref summary line).
 func classifyPushRejection(err error, result git.Result) error {
 	var ce *core.Error
 	if !errors.As(err, &ce) || ce.Code != core.GitFailed {
@@ -162,6 +283,24 @@ func classifyPushRejection(err error, result git.Result) error {
 			ce.Code = core.NotFastForward
 			break
 		}
+	}
+	return err
+}
+
+// nonFastForwardFetch marks a fetch into a local branch refused as
+// non-fast-forward. fetch has no --porcelain form, so this matches stderr.
+const nonFastForwardFetch = "(non-fast-forward)"
+
+// classifyDivergedFetch reclassifies a diverged UpdateBranch fetch as
+// NotFastForward. Any other GitFailed refusal is left unchanged.
+func classifyDivergedFetch(err error, result git.Result, branch string) error {
+	var ce *core.Error
+	if !errors.As(err, &ce) || ce.Code != core.GitFailed {
+		return err
+	}
+	if bytes.Contains(result.Stderr, []byte(nonFastForwardFetch)) {
+		ce.Code = core.NotFastForward
+		ce.Message = fmt.Sprintf("%q has diverged from its upstream and can't be fast-forwarded.", branch)
 	}
 	return err
 }
@@ -186,11 +325,8 @@ func rejectReason(stdout []byte) (string, bool) {
 // matching is unavoidable.
 var authFailurePrefixes = []string{"fatal: could not read Username for", "fatal: Authentication failed for"}
 
-// remapAuthFailed classifies a failed sign-in. The message points at the
-// user's own git credential setup and names no URL or credential text —
-// git's own stderr, already carrying whatever it printed, stays available
-// unchanged in GitStderr for "show details"; this replaces only the short
-// summary shown up front.
+// remapAuthFailed classifies a failed sign-in. Its message names no URL or
+// credential; git's own stderr stays in GitStderr.
 func remapAuthFailed(err error, result git.Result) error {
 	var ce *core.Error
 	if !errors.As(err, &ce) || ce.Code != core.GitFailed {

@@ -22,10 +22,10 @@ func (c *Core) CreateBranch(ctx context.Context, id core.WorktreeID, name, start
 	}
 
 	if checkout {
-		wt.Lock() // ADR-6: create+checkout writes this worktree's HEAD/index
+		wt.Lock() // create+checkout writes this worktree's HEAD/index
 		defer wt.Unlock()
 	} else {
-		wt.Repo.Lock() // ADR-6: a plain ref create is a repo-wide one-off
+		wt.Repo.Lock() // a plain ref create is a repo-wide one-off
 		defer wt.Repo.Unlock()
 	}
 
@@ -37,9 +37,8 @@ func (c *Core) CreateBranch(ctx context.Context, id core.WorktreeID, name, start
 	return remapDirty(err, result)
 }
 
-// validateBranchName rejects an invalid name before any mutating call
-// (FR-BR-01) as Code InvalidName, from check-ref-format's own exit code,
-// never from stderr text (TR-08).
+// validateBranchName rejects an invalid name before any mutating call as
+// Code InvalidName, from check-ref-format's exit code.
 func validateBranchName(ctx context.Context, r git.Runner, dir, name string) error {
 	_, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
@@ -63,8 +62,8 @@ func (c *Core) CheckoutCommit(ctx context.Context, id core.WorktreeID, sha strin
 	return c.switchWorktree(ctx, id, []string{"switch", "--detach", "--end-of-options", sha})
 }
 
-// switchWorktree runs a git switch call under id's worktree write lock
-// (ADR-6) and applies remapDirty.
+// switchWorktree runs a git switch call under id's worktree write lock and
+// applies remapDirty.
 func (c *Core) switchWorktree(ctx context.Context, id core.WorktreeID, args []string) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -88,18 +87,15 @@ func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha string, mode c
 		return core.ResetResult{}, err
 	}
 
-	wt.Lock() // ADR-6: reset writes this worktree's index/files
+	wt.Lock() // reset writes this worktree's index/files
 	defer wt.Unlock()
 
 	previous, err := resolveHeadSHA(ctx, wt.Runner, wt.Path) // "" only for an unborn HEAD
 	if err != nil {
 		return core.ResetResult{}, err
 	}
-	if _, err := wt.Runner.Run(ctx, git.Call{
-		Dir: wt.Path, Args: []string{"reset", flag, sha},
-		// no ReadOnly (this writes), no --end-of-options/-- (sha is always
-		// an already-resolved hash)
-	}); err != nil {
+	// no --end-of-options: sha is always an already-resolved hash
+	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"reset", flag, sha}}); err != nil {
 		return core.ResetResult{}, err
 	}
 	return core.ResetResult{PreviousHead: previous}, nil
@@ -144,7 +140,7 @@ func resetFlag(mode core.ResetMode) (string, error) {
 // in the way of a switch. Every other failure (exit 128 "fatal:": bad or
 // duplicate branch name, an ambiguous multi-remote DWIM match, the branch
 // already checked out elsewhere) stays plain GitFailed with git's own
-// message, per FR-BR-05.
+// message.
 func remapDirty(err error, result git.Result) error {
 	if gitExited(err, result, 1) {
 		var ce *core.Error

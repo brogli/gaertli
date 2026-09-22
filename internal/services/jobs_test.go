@@ -38,14 +38,14 @@ func TestFR_SYNC_07_QA_RESP_02_JobsPollsGrowingProgressThenCancelKillsProcess(t 
 	t.Setenv("FAKEGIT_STDERR_DELAY_MS", "200")
 	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
 
-	sess.Repo.Jobs().Start("fetch", func(ctx context.Context, progress jobs.Progress) error {
+	sess.Repo.Jobs().Start("fetch", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		_, err := (git.Runner{Git: fakegit}).StreamErr(ctx, git.Call{Args: []string{"fetch"}}, func(line []byte) error {
 			if percent, message, ok := git.ParseProgressLine(line); ok {
 				progress(percent, message)
 			}
 			return nil
 		})
-		return err
+		return nil, err
 	})
 
 	job := waitForJob(t, c, wt.ID, func(j core.JobInfo) bool { return j.Progress > 0 })

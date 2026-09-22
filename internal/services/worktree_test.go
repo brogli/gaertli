@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -234,7 +235,7 @@ func TestFR_WT_02_AddWorktreeRejectsAnInvalidNewBranchNameBeforeTouchingGit(t *t
 	c := New(func(core.Event) {})
 	_, err := c.AddWorktree(context.Background(), core.RepoPath(repo.Dir), target, "-weird", "", true)
 
-	_ = assertCode(t, err, core.InvalidName)
+	coretest.AssertCode(t, err, core.InvalidName)
 	if branchExists(t, repo.Dir, "-weird") {
 		t.Error("branch -weird was created, want none")
 	}
@@ -254,7 +255,7 @@ func TestFR_WT_02_AddWorktreeRejectsADuplicateBranchNameAsGitFailed(t *testing.T
 	c := New(func(core.Event) {})
 	_, err := c.AddWorktree(context.Background(), core.RepoPath(repo.Dir), target, "dup", sha, true)
 
-	_ = assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 	if got := branchTip(t, repo.Dir, "dup"); got != originalTip {
 		t.Errorf("dup = %s, want unchanged %s", got, originalTip)
 	}
@@ -275,7 +276,7 @@ func TestFR_WT_03_AddWorktreeRefusesAnExistingNonEmptyTargetAsGitFailed(t *testi
 	c := New(func(core.Event) {})
 	_, err := c.AddWorktree(context.Background(), core.RepoPath(repo.Dir), target, "feature", "", false)
 
-	ce := assertCode(t, err, core.GitFailed)
+	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "already exists") {
 		t.Errorf("GitStderr = %q, want it to say %s already exists", ce.GitStderr, target)
 	}

@@ -11,10 +11,9 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-// renameWithEdit stages a git-mv rename of name to newName plus a small
-// content edit, in one commit — a large shared body keeps -M's rename
-// similarity well above its 50% default threshold despite the edit
-// (TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath's own finding).
+// renameWithEdit commits a git-mv rename of name to newName plus a small
+// content edit; a large shared body keeps -M's rename similarity above its
+// 50% default threshold.
 func renameWithEdit(t *testing.T, dir, name, newName, ending string) {
 	t.Helper()
 	gittest.Run(t, dir, "mv", name, newName)

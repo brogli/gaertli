@@ -3,13 +3,13 @@ package gittest
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git"
 )
 
@@ -69,7 +69,7 @@ func TestQA_SEC_03_EndOfOptionsBlocksRevisionInjection(t *testing.T) {
 		Args: []string{"log", "--end-of-options", "$(touch pwn)"},
 	})
 
-	assertCode(t, err, core.GitFailed)
+	coretest.AssertCode(t, err, core.GitFailed)
 	assertAbsent(t, marker)
 }
 
@@ -143,13 +143,5 @@ func assertAbsent(t *testing.T, path string) {
 	t.Helper()
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("%s exists: command injection occurred", path)
-	}
-}
-
-func assertCode(t *testing.T, err error, want core.Code) {
-	t.Helper()
-	var gitErr *core.Error
-	if !errors.As(err, &gitErr) || gitErr.Code != want {
-		t.Errorf("err = %v, want *core.Error{Code: %s}", err, want)
 	}
 }

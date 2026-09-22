@@ -1,5 +1,5 @@
 // Package session mints and reuses per-worktree and per-repo sessions from
-// a validated path (ADR-9).
+// a validated path.
 package session
 
 import (
@@ -34,8 +34,8 @@ type worktreePoller interface {
 	Close()
 }
 
-// Worktree is a per-window session (ADR-9): identity, a git.Runner scoped
-// to it, and the per-window log state below.
+// Worktree is a per-window session: identity, a git.Runner scoped to it,
+// and the per-window log state below.
 type Worktree struct {
 	ID     core.WorktreeID
 	Path   string
@@ -43,17 +43,23 @@ type Worktree struct {
 	Repo   *Repo
 	Runner git.Runner // Log emits a "command" event scoped to ID and appends to log
 
-	poller worktreePoller // FR-REPO-04's working-file half, focused while the window is
+	poller worktreePoller // the working-file half of outside-change detection, focused while the window is
 
 	// writeMu serialises everything that writes this worktree's index or
-	// files (ADR-6: "one at a time per worktree" — stage, commit, reset,
-	// checkout, cherry-pick, revert, merge/rebase steps, discard). A distinct
-	// mutex from mu below, which guards the unrelated command-log ring buffer
-	// and filter state.
+	// files, one at a time per worktree — stage, commit, reset, checkout,
+	// cherry-pick, revert, merge/rebase steps, discard. A distinct mutex
+	// from mu below, which guards the unrelated command-log ring buffer and
+	// filter state.
 	writeMu sync.Mutex
 
 	mu  sync.Mutex
 	log []core.CommandLogEntry // ring buffer, capped at logCap
+
+	// messageMu guards messageDraft, kept separate from writeMu: reading or
+	// replacing the draft is not a git write and must never contend with a
+	// running commit/stage/reset call.
+	messageMu    sync.Mutex
+	messageDraft string
 
 	// Per-window filtered log view, not per-repo: shaped like Repo's own log
 	// cache but scoped to this window alone, so one window's search never
@@ -71,10 +77,25 @@ type Worktree struct {
 // Poller is the worktree's status poller (internal/services.Refresh/SetFocused).
 func (w *Worktree) Poller() worktreePoller { return w.poller }
 
-// Lock/Unlock serialise this worktree's own writes (ADR-6's per-worktree
+// Lock/Unlock serialise this worktree's own writes (the per-worktree
 // queue), held for the duration of one write call.
 func (w *Worktree) Lock()   { w.writeMu.Lock() }
 func (w *Worktree) Unlock() { w.writeMu.Unlock() }
+
+// SetMessageDraft replaces the stored commit message draft, shared by
+// every window currently selecting this worktree.
+func (w *Worktree) SetMessageDraft(message string) {
+	w.messageMu.Lock()
+	defer w.messageMu.Unlock()
+	w.messageDraft = message
+}
+
+// MessageDraft returns the stored commit message draft, "" if none.
+func (w *Worktree) MessageDraft() string {
+	w.messageMu.Lock()
+	defer w.messageMu.Unlock()
+	return w.messageDraft
+}
 
 // CommandLog returns a copy of the buffered entries, oldest first.
 func (w *Worktree) CommandLog() []core.CommandLogEntry {
@@ -92,18 +113,17 @@ func (w *Worktree) append(e core.CommandLogEntry) {
 	}
 }
 
-// Repo is a per-repo session (ADR-9), shared by every Worktree with the
-// same Key.
+// Repo is a per-repo session, shared by every Worktree with the same Key.
 type Repo struct {
 	Key string
 
-	watcher repoWatcher   // FR-REPO-04's git-state half
-	jobs    *jobs.Manager // remote jobs (ADR-9)
+	watcher repoWatcher   // the git-state half of outside-change detection
+	jobs    *jobs.Manager // remote jobs
 
-	// writeMu serialises this repo's write one-offs (ADR-6: "worktree
-	// add/remove/prune, branch delete/rename", plus branch create without
+	// writeMu serialises this repo's write one-offs: worktree
+	// add/remove/prune, branch delete/rename, plus branch create without
 	// checkout — a plain ref create touches no worktree's index or files, so
-	// it belongs here, not on a worktree's queue). Distinct from mu below
+	// it belongs here, not on a worktree's queue. Distinct from mu below
 	// (log cache/refcount state).
 	writeMu sync.Mutex
 
@@ -123,7 +143,7 @@ func (r *Repo) Watcher() repoWatcher { return r.watcher }
 // Jobs is the repo's job manager (internal/services.Jobs/CancelJob).
 func (r *Repo) Jobs() *jobs.Manager { return r.jobs }
 
-// Lock/Unlock serialise this repo's write one-offs (ADR-6's per-repo queue),
+// Lock/Unlock serialise this repo's write one-offs (the per-repo queue),
 // held for the duration of one write call.
 func (r *Repo) Lock()   { r.writeMu.Lock() }
 func (r *Repo) Unlock() { r.writeMu.Unlock() }
@@ -340,7 +360,7 @@ func (w *Worktree) FilterSnapshot(from, to int) (view LogView, ok bool) {
 }
 
 // FilterClear cancels any running filtered stream and reverts LogRows to
-// wt.Repo's shared cache — instant, no git call (FR-LOG-08).
+// wt.Repo's shared cache — instant, no git call.
 func (w *Worktree) FilterClear() {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
@@ -363,8 +383,8 @@ func clamp(v, lo, hi int) int {
 }
 
 // Manager mints and reuses sessions: opening the same worktree twice (by
-// any path that resolves to it, FR-REPO-01) returns the same *Worktree, and
-// worktrees sharing a repo share one *Repo.
+// any path that resolves to it) returns the same *Worktree, and worktrees
+// sharing a repo share one *Repo.
 type Manager struct {
 	sink     core.EventSink
 	discover git.Runner // no Log: discovery calls predate any session
@@ -508,9 +528,9 @@ func changedPayload(scope watch.Scope) json.RawMessage {
 	return b
 }
 
-// Close ends wt's session (FR-REPO-04, ADR-9): stops its poller, and, if wt
-// was the last worktree referencing its repo, stops the repo's watcher and
-// drops the repo session. A no-op for an unknown id.
+// Close ends wt's session: stops its poller, and, if wt was the last
+// worktree referencing its repo, stops the repo's watcher and drops the
+// repo session. A no-op for an unknown id.
 func (m *Manager) Close(id core.WorktreeID) {
 	m.mu.Lock()
 	wt, ok := m.worktrees[id]
@@ -533,7 +553,7 @@ func (m *Manager) Close(id core.WorktreeID) {
 }
 
 // remapNotARepo turns a discovery failure into Code NotARepo with
-// FR-REPO-05's own message, keeping GitStderr/Command for the details.
+// notARepo's own message, keeping GitStderr/Command for the details.
 func remapNotARepo(err error, path core.RepoPath) error {
 	var src *core.Error
 	if errors.As(err, &src) {
@@ -543,7 +563,7 @@ func remapNotARepo(err error, path core.RepoPath) error {
 	return notARepo(path)
 }
 
-// notARepo is FR-REPO-05's message: the folder, and that it is not a repo.
+// notARepo builds the message: the folder, and that it is not a repo.
 func notARepo(path core.RepoPath) *core.Error {
 	return core.Errorf(core.NotARepo, "%s is not a git repository", path)
 }
@@ -578,8 +598,8 @@ func marshalEntry(entry core.CommandLogEntry) json.RawMessage {
 // marshalJob is a "job:update" event's payload (components.md), converting
 // a jobs.Job to the JSON DTO the same way toCommandLogEntry/marshalEntry
 // convert a git.Entry — internal/services' toJobInfo does the same
-// conversion again for Jobs' read path (Design: internal/services is where
-// every other leaf-package-to-DTO conversion for a read already lives).
+// conversion again for Jobs' read path: internal/services is where every
+// other leaf-package-to-DTO conversion for a read already lives.
 func marshalJob(j jobs.Job) json.RawMessage {
 	b, err := json.Marshal(jobs.Info(j))
 	if err != nil {

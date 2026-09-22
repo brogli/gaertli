@@ -1,6 +1,6 @@
 package core
 
-// Refs is the repo's branches, remotes, and tags for the sidebar (FR-LOG-01).
+// Refs is the repo's branches, remotes, and tags for the sidebar.
 type Refs struct {
 	Branches []Branch `json:"branches"`
 	Remotes  []Remote `json:"remotes"`
@@ -16,14 +16,12 @@ type Branch struct {
 	Behind       int    `json:"behind"`
 	UpstreamGone bool   `json:"upstreamGone"` // upstream configured but its ref no longer exists
 	Current      bool   `json:"current"`      // this worktree's own HEAD
-	// CheckedOutIn is the one worktree with this branch checked out, ""
-	// if none — a single string, not a slice: a branch is checked out in
-	// at most one worktree at a time, unlike a detached commit SHA
-	// (LogCommit.CheckedOutIn).
+	// CheckedOutIn is the worktree with this branch checked out, "" if
+	// none; git checks a branch out in at most one worktree.
 	CheckedOutIn string `json:"checkedOutIn,omitempty"`
 }
 
-// Remote is one remote's tracking branches, grouped (FR-LOG-01).
+// Remote is one remote's tracking branches, grouped.
 type Remote struct {
 	Name     string         `json:"name"`
 	Branches []RemoteBranch `json:"branches"`
@@ -36,9 +34,8 @@ type RemoteBranch struct {
 	SHA  string `json:"sha"`
 }
 
-// Tag is one tag. SHA is always the commit it points to: for an
-// annotated tag the tag object's own SHA is dereferenced — otherwise
-// "jump to this commit" would search the log for a SHA no commit row has.
+// Tag is one tag. SHA is always the commit it points to, also for an
+// annotated tag.
 type Tag struct {
 	Name string `json:"name"`
 	SHA  string `json:"sha"`

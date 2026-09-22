@@ -90,7 +90,7 @@ func TestTR_25_GoModPinsToolchainAndTools(t *testing.T) {
 	}
 
 	if m.Go != "1.26.0" {
-		t.Errorf("go line = %q, want 1.26.0 (TR-01)", m.Go)
+		t.Errorf("go line = %q, want 1.26.0", m.Go)
 	}
 	if m.Toolchain == "" {
 		t.Error("toolchain line missing")
@@ -163,7 +163,7 @@ func TestTR_23_PnpmIsTheOnlyPackageManager(t *testing.T) {
 	}
 }
 
-// offlineEnv is what a test run must set so it can never reach the network (TR-14).
+// offlineEnv is what a test run must set so it can never reach the network.
 var offlineEnv = []string{"GOPROXY: off", "GOFLAGS: -mod=readonly", "GOTOOLCHAIN: local"}
 
 // taskBody returns the YAML block of one top-level task in a Taskfile.
@@ -213,8 +213,8 @@ func TestTR_31_PerfBenchAndPlaywrightWiring(t *testing.T) {
 	}
 }
 
-// Spec 07 (frontend scaffold alignment, TR-33): the frontend's config files
-// and package.json match what the official create-vue scaffold generates.
+// The frontend's config files and package.json match what the official
+// create-vue scaffold generates.
 
 type packageJSON struct {
 	DevDependencies map[string]string `json:"devDependencies"`
@@ -349,7 +349,7 @@ func TestTR_33_EslintConfigPrettierReplacesVueWrapper(t *testing.T) {
 }
 
 // tsconfigCompilerOptions is the subset of a leaf tsconfig's compilerOptions
-// this spec cares about.
+// these checks read.
 type tsconfigCompilerOptions struct {
 	Composite       bool   `json:"composite"`
 	TsBuildInfoFile string `json:"tsBuildInfoFile"`

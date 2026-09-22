@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -74,7 +75,7 @@ func TestFR_WT_04_OpenFolderAtRejectsANonRepoPathStartingNoEditor(t *testing.T) 
 
 	err := c.OpenFolderAt(context.Background(), core.RepoPath(t.TempDir()))
 
-	_ = assertCode(t, err, core.NotARepo)
+	coretest.AssertCode(t, err, core.NotARepo)
 	assertNoEditorStarted(t, outFile)
 }
 
@@ -118,7 +119,7 @@ func TestFR_ED_02_OpenFileReturnsFileNotFoundForAMissingPathStartingNoEditor(t *
 
 	err = c.OpenFile(context.Background(), wt.ID, "gone.txt", 0)
 
-	_ = assertCode(t, err, core.FileNotFound)
+	coretest.AssertCode(t, err, core.FileNotFound)
 	assertNoEditorStarted(t, outFile)
 }
 
@@ -135,6 +136,6 @@ func TestFR_ED_02_OpenFileRejectsAPathEscapingTheWorktreeStartingNoEditor(t *tes
 
 	err = c.OpenFile(context.Background(), wt.ID, "../../etc/passwd", 0)
 
-	_ = assertCode(t, err, core.Internal)
+	coretest.AssertCode(t, err, core.Internal)
 	assertNoEditorStarted(t, outFile)
 }

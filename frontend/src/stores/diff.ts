@@ -3,10 +3,8 @@ import { ref } from 'vue'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { DiffFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// diff holds the currently viewed file's two-sided content (FR-LOG-04,
-// ADR-7), cached per path for the commit being viewed so stepping between
-// its files is free; the cache empties when the commit changes, so it
-// never outgrows one commit's files.
+// diff holds the currently viewed file's two-sided content, cached per path
+// for the commit being viewed; the cache empties when the commit changes.
 export const useDiffStore = defineStore('diff', () => {
   const file = ref<DiffFile | null>(null)
   const loading = ref(false)
@@ -15,10 +13,13 @@ export const useDiffStore = defineStore('diff', () => {
   let cachedSha = ''
 
   // loadInto shares load's and loadRange's cache logic. sha is what the
-  // cache is keyed on: a single commit, or a range's "a..b".
+  // cache clears on: a single commit, or a range's "a..b". key is the
+  // cache slot within that sha; load/loadRange key on path alone,
+  // loadWorking also keys on staged since the same path has a staged and
+  // an unstaged diff at once.
   async function loadInto(
     sha: string,
-    path: string,
+    key: string,
     force: boolean,
     fetch: () => Promise<DiffFile>,
   ): Promise<void> {
@@ -27,7 +28,7 @@ export const useDiffStore = defineStore('diff', () => {
       cachedSha = sha
     }
     if (!force) {
-      const cached = cache.get(path)
+      const cached = cache.get(key)
       if (cached) {
         file.value = cached
         return
@@ -36,7 +37,7 @@ export const useDiffStore = defineStore('diff', () => {
     loading.value = true
     try {
       const result = await fetch()
-      cache.set(path, result)
+      cache.set(key, result)
       file.value = result
     } finally {
       loading.value = false
@@ -53,7 +54,7 @@ export const useDiffStore = defineStore('diff', () => {
     return loadInto(sha, path, force, () => Facade.DiffFile(wt, sha, path, oldPath, force))
   }
 
-  // loadRange is DiffFile's counterpart for two arbitrary commits (FR-CMP-02).
+  // loadRange is load's counterpart for two arbitrary commits.
   async function loadRange(
     wt: string,
     a: string,
@@ -65,10 +66,8 @@ export const useDiffStore = defineStore('diff', () => {
     return loadInto(`${a}..${b}`, path, force, () => Facade.DiffRange(wt, a, b, path, oldPath, force))
   }
 
-  // loadWorking is DiffFile's counterpart for a working-tree change
-  // (FR-CHG-04), keyed on the literal string "working" — there is no
-  // commit/range to key by, and a stage/unstage action reloads the
-  // changes panel anyway, so a coarser cache key costs nothing observable.
+  // loadWorking is load's counterpart for a working-tree change, keyed on
+  // the literal "working": there is no commit or range to key by.
   async function loadWorking(
     wt: string,
     path: string,
@@ -76,7 +75,9 @@ export const useDiffStore = defineStore('diff', () => {
     staged: boolean,
     force = false,
   ): Promise<void> {
-    return loadInto('working', path, force, () => Facade.DiffWorking(wt, path, oldPath, staged, force))
+    return loadInto('working', `${staged}:${path}`, force, () =>
+      Facade.DiffWorking(wt, path, oldPath, staged, force),
+    )
   }
 
   return { file, loading, load, loadRange, loadWorking }

@@ -1,9 +1,11 @@
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 
-const { mockJumpTo, mockCheckout } = vi.hoisted(() => ({
+const { mockJumpTo, mockCheckout, mockUpdateBranch } = vi.hoisted(() => ({
   mockJumpTo: vi.fn(),
   mockCheckout: vi.fn(),
+  mockUpdateBranch: vi.fn(),
 }))
 
 const mockRefs = vi.fn()
@@ -17,10 +19,27 @@ vi.mock('../stores/log', () => ({
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { Checkout: mockCheckout },
+  Facade: { Checkout: mockCheckout, UpdateBranch: mockUpdateBranch },
 }))
 
 import RefsSidebar from './RefsSidebar.vue'
+import ErrorBanner from './ErrorBanner.vue'
+import { useJobsStore } from '../stores/jobs'
+import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { branchFixture } from '../testing/fixtures/branch'
+import { clickMenuItem } from '../testing/contextMenu'
+
+function updateJob(fields: Partial<JobInfo>): JobInfo {
+  return {
+    id: '1',
+    kind: 'update-branch:feature',
+    state: 'running',
+    progress: -1,
+    message: '',
+    startedAt: '2024-01-01T00:00:00Z',
+    ...fields,
+  }
+}
 
 function treeItem(wrapper: ReturnType<typeof mount>, label: string) {
   return wrapper
@@ -39,18 +58,14 @@ describe('RefsSidebar', () => {
     mockJumpTo.mockReset()
     mockCheckout.mockReset()
     mockCheckout.mockResolvedValue(undefined)
+    mockUpdateBranch.mockReset()
+    mockUpdateBranch.mockResolvedValue(undefined)
+    setActivePinia(createPinia())
     mockRefs.mockReset()
     mockRefs.mockReturnValue({
       branches: [
-        { name: 'main', sha: 'sha-main', current: true, ahead: 0, behind: 0, upstreamGone: false },
-        {
-          name: 'feature',
-          sha: 'sha-feature',
-          current: false,
-          ahead: 0,
-          behind: 0,
-          upstreamGone: false,
-        },
+        branchFixture(),
+        branchFixture({ name: 'feature', sha: 'sha-feature', current: false }),
       ],
       remotes: [],
       tags: [],
@@ -87,7 +102,7 @@ describe('RefsSidebar', () => {
     const labels = body.findAll('.p-contextmenu-item-label').map((n) => n.text())
     expect(labels).toEqual(['Checkout', 'Create worktree here…'])
 
-    await body.get('.p-contextmenu-item-content').trigger('click')
+    await clickMenuItem(body, 'Checkout')
     await flushPromises()
 
     expect(mockCheckout).toHaveBeenCalledTimes(1)
@@ -96,7 +111,7 @@ describe('RefsSidebar', () => {
     wrapper.unmount()
   })
 
-  it('FR-BR-05 the current branch\'s own menu has no Checkout item', async () => {
+  it("FR-BR-05 the current branch's own menu has no Checkout item", async () => {
     const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
     await openContextMenu(wrapper, 'main')
 
@@ -117,7 +132,7 @@ describe('RefsSidebar', () => {
     await openContextMenu(wrapper, 'feature')
 
     const body = new DOMWrapper(document.body)
-    await body.get('.p-contextmenu-item-content').trigger('click')
+    await clickMenuItem(body, 'Checkout')
     await flushPromises()
 
     expect(mockCheckout).toHaveBeenCalledTimes(1)
@@ -131,8 +146,7 @@ describe('RefsSidebar', () => {
     await openContextMenu(wrapper, 'feature')
     const body = new DOMWrapper(document.body)
 
-    const items = body.findAll('.p-contextmenu-item-content')
-    await items[1]!.trigger('click')
+    await clickMenuItem(body, 'Create worktree here…')
 
     expect(wrapper.emitted('create-worktree')).toEqual([['feature', false]])
 
@@ -149,10 +163,88 @@ describe('RefsSidebar', () => {
     await openContextMenu(wrapper, 'feature')
     const body = new DOMWrapper(document.body)
 
-    const items = body.findAll('.p-contextmenu-item-content')
-    await items[1]!.trigger('click')
+    await clickMenuItem(body, 'Create worktree here…')
 
     expect(wrapper.emitted('create-worktree')).toEqual([['feature', true]])
+
+    wrapper.unmount()
+  })
+
+  it('FR-UPD-01 right-clicking a non-current local branch with an upstream offers "Update from upstream", calling Facade.UpdateBranch', async () => {
+    mockRefs.mockReturnValue({
+      branches: [
+        branchFixture(),
+        branchFixture({ name: 'feature', sha: 'sha-feature', current: false, upstream: 'origin/feature' }),
+      ],
+      remotes: [],
+      tags: [],
+    })
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    await openContextMenu(wrapper, 'feature')
+
+    const body = new DOMWrapper(document.body)
+    const labels = body.findAll('.p-contextmenu-item-label').map((n) => n.text())
+    expect(labels).toEqual(['Checkout', 'Create worktree here…', 'Update from upstream'])
+
+    await clickMenuItem(body, 'Update from upstream')
+    await flushPromises()
+
+    expect(mockUpdateBranch).toHaveBeenCalledTimes(1)
+    expect(mockUpdateBranch).toHaveBeenCalledWith('/repo', 'feature')
+
+    wrapper.unmount()
+  })
+
+  it('FR-UPD-05 a done update-branch job renders a result message naming the branch and commit count', async () => {
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' } })
+    useJobsStore().upsert(
+      updateJob({
+        state: 'done',
+        result: { outcome: 'updated', from: 'aaa', to: 'bbbbbbbcccc', commits: 3 },
+      }),
+    )
+    await flushPromises()
+
+    const banner = wrapper.get('[data-test="update-result"]')
+    expect(banner.text()).toContain('feature')
+    expect(banner.text()).toContain('3')
+    expect(wrapper.findComponent(ErrorBanner).exists()).toBe(false)
+  })
+
+  it('FR-UPD-05 a failed update-branch job renders ErrorBanner with the job\'s error', async () => {
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' } })
+    useJobsStore().upsert(
+      updateJob({ state: 'failed', error: { code: 'NOT_FAST_FORWARD', message: 'diverged' } } as Partial<JobInfo>),
+    )
+    await flushPromises()
+
+    const error = wrapper.findComponent(ErrorBanner)
+    expect(error.exists()).toBe(true)
+    expect(error.props('error')).toEqual({ code: 'NOT_FAST_FORWARD', message: 'diverged' })
+  })
+
+  it('FR-UX-01 a rejected UpdateBranch call renders ErrorBanner with the error, no job started', async () => {
+    mockRefs.mockReturnValue({
+      branches: [
+        branchFixture(),
+        branchFixture({ name: 'feature', sha: 'sha-feature', current: false, upstream: 'origin/feature' }),
+      ],
+      remotes: [],
+      tags: [],
+    })
+    mockUpdateBranch.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'no upstream configured', code: 'NO_UPSTREAM' } }),
+    )
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    await openContextMenu(wrapper, 'feature')
+    const body = new DOMWrapper(document.body)
+
+    await clickMenuItem(body, 'Update from upstream')
+    await flushPromises()
+
+    const error = wrapper.findComponent(ErrorBanner)
+    expect(error.exists()).toBe(true)
+    expect(error.props('error')).toEqual({ message: 'no upstream configured', code: 'NO_UPSTREAM' })
 
     wrapper.unmount()
   })

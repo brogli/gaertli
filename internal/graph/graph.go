@@ -1,6 +1,5 @@
 // Package graph assigns lanes to a streamed commit sequence for the commit
-// graph (ADR-5). No project imports (TR-18: own code, standard library
-// only).
+// graph. Standard library only.
 package graph
 
 // Commit is the minimal input one layout step needs.
@@ -23,7 +22,7 @@ type Edge struct {
 	Kind EdgeKind
 }
 
-// Row is one commit's lane data (ADR-5: "each row carries its lane data").
+// Row is one commit's lane data.
 type Row struct {
 	Lane     int    // the lane this row's own commit sits in
 	Colour   int    // 0-based palette index, stable for Lane's lifetime
@@ -31,7 +30,7 @@ type Row struct {
 	Overflow int    // lanes beyond Layout's cap collapsed into a "+k" marker at this row; 0 = none
 }
 
-// DefaultCap is Layout's lane cap when Cap is zero (git-mapping.md).
+// DefaultCap is Layout's lane cap when Cap is zero.
 const DefaultCap = 32
 
 // openLane is one lane's state: the SHA it is waiting for next, and its
@@ -41,7 +40,7 @@ type openLane struct {
 	colour int
 }
 
-// Layout assigns lanes to a streamed commit sequence (ADR-5), ported from
+// Layout assigns lanes to a streamed commit sequence, ported from
 // lazygit's getNextPipes. Stateful, one per repo load, not for concurrent
 // use.
 type Layout struct {

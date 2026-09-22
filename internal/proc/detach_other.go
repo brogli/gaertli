@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-// Detach makes cmd survive its parent's exit (TR-12): its own session, so
+// Detach makes cmd survive its parent's exit: its own session, so
 // an editor or the handed-off GUI keeps running after nebegit is gone.
 func Detach(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

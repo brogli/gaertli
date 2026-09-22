@@ -5,10 +5,8 @@ import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
-// DetachWarningDialog is FR-BR-08's own one-off confirmation, opened from
-// the commit-row context menu's "Check out commit" (FR-LOG-11). Its wording
-// is not in FR-UX-03's fixed list, so it does not use the shared
-// confirmation rule.
+// DetachWarningDialog confirms "Check out commit". A warning, not a hard
+// action, so it does not use useConfirmAction.
 const props = defineProps<{ wt: string; sha: string; visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 

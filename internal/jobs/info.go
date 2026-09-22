@@ -16,6 +16,7 @@ func Info(j Job) core.JobInfo {
 		Progress:  j.Percent,
 		Message:   j.Message,
 		StartedAt: j.StartedAt.Format(time.RFC3339Nano),
+		Result:    j.Result,
 	}
 	if !j.EndedAt.IsZero() {
 		info.EndedAt = j.EndedAt.Format(time.RFC3339Nano)

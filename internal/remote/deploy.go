@@ -16,14 +16,14 @@ import (
 // distrocore_windows.go/distrocore_other.go), tests wire it to a fake.
 type wslRunner func(ctx context.Context, distro string, args ...string) (*exec.Cmd, error)
 
-// Consent asks before the shell places its helper program inside a distro
-// (QA-PORT-02), naming exactly where. Implemented by the shell (wailsConsent,
-// internal/app) since internal/remote may not depend on Wails (TR-07).
+// Consent asks before the shell places its helper program inside a distro,
+// naming exactly where. Implemented by internal/app, since this package may
+// not depend on Wails.
 type Consent interface {
 	Ask(distro, targetPath string) bool
 }
 
-// deployTarget is where the core lands (ADR-3): scoped by app version, so a
+// deployTarget is where the core lands, scoped by app version, so a
 // version bump lands at a fresh path needing its own consent and copy.
 // $HOME is expanded by the distro's own sh, not here; shown to the user as
 // "~/...".

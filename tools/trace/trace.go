@@ -1,4 +1,4 @@
-// Command trace checks the traceability rule from TR-30: every required
+// Command trace checks requirement traceability: every required
 // requirement ID must be named by a Go test, a Vitest test, or a manual
 // checklist entry.
 package main
@@ -49,8 +49,8 @@ func run(cfg Config, out io.Writer) (int, error) {
 	return report(out, required, covered, pending, cfg.PendingPath), nil
 }
 
-// pendingIDs reads the allow-list of IDs whose tests are still owed (spec
-// 03, decision 6). A missing file is an empty list.
+// pendingIDs reads the allow-list of IDs whose tests are still owed. A
+// missing file is an empty list.
 func pendingIDs(path string) (map[string]bool, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {

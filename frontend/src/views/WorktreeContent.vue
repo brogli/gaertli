@@ -16,6 +16,7 @@ import LogList from '../components/LogList.vue'
 import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
 import CompareView from '../components/CompareView.vue'
 import ChangesPanel from '../components/ChangesPanel.vue'
+import ConflictBanner from '../components/ConflictBanner.vue'
 import DiffView from '../components/DiffView.vue'
 import RefsSidebar from '../components/RefsSidebar.vue'
 import FilterBar from '../components/FilterBar.vue'
@@ -36,8 +37,8 @@ const log = useLogStore()
 const compare = useCompareStore()
 const changes = useChangesStore()
 
-// The compared file's diff range (FR-CMP-02); null outside compare mode or
-// before a file is picked, so the template needs no non-null assertions.
+// The compared file's diff range; null outside compare mode or before a
+// file is picked.
 const compareRange = computed(() => {
   const { from, to, selectedFile } = compare
   return from && to && selectedFile
@@ -45,12 +46,9 @@ const compareRange = computed(() => {
     : null
 })
 
-// Three mutually exclusive diff sources (FR-UX-07): a compared file, a
-// changes-panel selection, or a commit's file — compare wins while active,
-// the changes panel's own selection wins over a stale commit diff
-// otherwise. LogList's row click and CommitDetailsPanel's file click each
-// clear the other two sources themselves (component-level coordination, no
-// store importing another).
+// Three mutually exclusive diff sources: a compared file wins while compare
+// is active, then a changes-panel selection, then a commit's file. LogList
+// and CommitDetailsPanel clear the changes selection themselves.
 const workingTarget = computed(() => changes.selectedFile)
 const showChangesDiff = computed(() => !compare.active && !!workingTarget.value)
 const showCommitDiff = computed(() => !compare.active && !workingTarget.value && !!log.selectedFile)
@@ -59,24 +57,24 @@ const showDiff = computed(
 )
 const { error, run } = useCoreCall()
 
-// The dialogs LogList's context menu opens (FR-BR-01, FR-BR-02, FR-BR-08):
-// one instance each, owned here rather than by LogList itself.
+// The dialogs LogList's context menu opens, one instance each.
 const createBranchSha = ref<string | null>(null)
 const checkoutCommitSha = ref<string | null>(null)
 const resetTarget = ref<{ sha: string; subject: string } | null>(null)
 
-// FR-WT-06: "Create worktree here…" from the log's commit menu or the refs
-// sidebar's branch menu, pre-filling CreateWorktreeDialog.
+// "Create worktree here…" from the log's commit menu or the refs sidebar's
+// branch menu, pre-filling CreateWorktreeDialog.
 const createWorktreeStart = ref<WorktreeStart | null>(null)
 const createWorktreeBranches = ref<BranchSummary[]>([])
 
 async function openCreateWorktree(start: WorktreeStart): Promise<void> {
-  createWorktreeBranches.value = (await Facade.ListBranches(props.path)) ?? []
+  const branches = await run(() => Facade.ListBranches(props.path))
+  if (branches === undefined) return
+  createWorktreeBranches.value = branches ?? []
   createWorktreeStart.value = start
 }
 
-// FR-BR-02: the branch ResetDialog names — "" while detached, shown there
-// as "HEAD" (same as the summary panel just above it).
+// The branch ResetDialog names; "" while detached, shown there as "HEAD".
 const currentBranch = computed(() => (repo.summary?.detached ? '' : (repo.summary?.branch ?? '')))
 
 onMounted(() => {
@@ -85,10 +83,8 @@ onMounted(() => {
   void changes.load(props.path)
 })
 
-// repo:changed{scope:"index"} (spec 12) covers both this worktree's own
-// staging writes and an outside change to the working tree; the changes
-// panel reloads on it the same way the log/refs stores already do for
-// their own scopes.
+// repo:changed{scope:"index"} covers this worktree's staging writes and
+// outside changes to the working tree.
 let unlistenChanged: (() => void) | undefined
 onMounted(() => {
   unlistenChanged = Events.On('repo:changed', (ev) => {
@@ -98,31 +94,26 @@ onMounted(() => {
 })
 onUnmounted(() => unlistenChanged?.())
 
-// FR-REPO-04: manual refresh. No loading/disabled state — repo:changed, if
-// anything actually differs, arrives the normal way.
+// Manual refresh: if anything differs, repo:changed arrives the normal way.
 function refresh(): void {
   void run(() => Facade.Refresh(props.path))
 }
 
-// FR-ED-01, FR-ED-05: labelled with the effective profile's name once the
-// summary has loaded; a generic fallback only before then.
+// labelled with the effective editor profile's name once the summary loads
 const editorLabel = computed(() => `Open in ${repo.summary?.editorName || 'editor'}`)
 
 function openInEditor(): void {
   void run(() => Facade.OpenFolder(props.path))
 }
 
-// FR-REPO-03: the refs store already carries the current branch's upstream
-// state; nothing to count without an upstream, and a gone upstream has no
-// meaningful ahead/behind either.
+// The current branch, if it tracks an upstream that still exists.
 const tracked = computed(() => {
   const current = refs.refs?.branches?.find((b) => b.current)
   return current?.upstream && !current.upstreamGone ? current : undefined
 })
 
-// FR-BR-08's "offer 'create branch here'" while detached: only reachable
-// from the button that already requires repo.summary to be loaded, and its
-// sha is always populated once the summary panel shows detached at all.
+// "Create branch here" while detached: its button renders only with a
+// loaded summary.
 function openCreateBranchHere(): void {
   createBranchSha.value = repo.summary!.sha ?? null
 }
@@ -146,6 +137,7 @@ function openCreateBranchHere(): void {
       </button>
       <SyncControls :wt="path" />
     </p>
+    <ConflictBanner :wt="path" />
     <div class="worktree-body">
       <RefsSidebar
         :wt="path"
@@ -207,10 +199,9 @@ function openCreateBranchHere(): void {
 </template>
 
 <style scoped>
-/* FR-UX-08: refs left, log in the middle, details and diff in a column to
-   its right. LogList's virtual scroll (QA-PERF-03) needs a bounded viewport
-   to clip against: fill the app (style.css's height chain), give the body
-   the leftover space, everything else its natural size. */
+/* Refs left, log in the middle, details and diff in a column to its right.
+   LogList's virtual scroll needs a bounded viewport: fill the app
+   (style.css's height chain), give the body the leftover space. */
 main {
   display: flex;
   flex-direction: column;
@@ -234,7 +225,4 @@ main {
 .side-column {
   overflow: auto;
 }
-/* The changes column (FR-UX-07): between refs and the log, resizable and
-   collapsible like the selector panel (SelectorPanel.vue's own pattern) —
-   the browser's own resize handle, no splitter component. */
 </style>

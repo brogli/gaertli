@@ -11,7 +11,7 @@ import (
 )
 
 // SetEditorProfile implements core.API: installs the profile this core uses
-// for every OpenFolder/OpenFile call it serves (TR-13).
+// for every OpenFolder/OpenFile call it serves.
 func (c *Core) SetEditorProfile(ctx context.Context, profile core.EditorProfile) error {
 	c.editorProfile.Store(profile)
 	return nil
@@ -24,7 +24,7 @@ func (c *Core) currentProfile() core.EditorProfile {
 	return editor.OrDefault(p)
 }
 
-// OpenFolder implements core.API (FR-ED-01, FR-ED-03).
+// OpenFolder implements core.API.
 func (c *Core) OpenFolder(ctx context.Context, id core.WorktreeID) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -33,7 +33,7 @@ func (c *Core) OpenFolder(ctx context.Context, id core.WorktreeID) error {
 	return editor.OpenFolder(c.currentProfile(), wt.Path)
 }
 
-// OpenFolderAt implements core.API (FR-WT-04).
+// OpenFolderAt implements core.API.
 func (c *Core) OpenFolderAt(ctx context.Context, path core.RepoPath) error {
 	toplevel, _, _, err := c.sessions.Resolve(ctx, path)
 	if err != nil {
@@ -42,8 +42,8 @@ func (c *Core) OpenFolderAt(ctx context.Context, path core.RepoPath) error {
 	return editor.OpenFolder(c.currentProfile(), toplevel)
 }
 
-// OpenFile implements core.API (FR-ED-02, FR-ED-04). path is a
-// ChangedFile.Path, relative to the worktree. FileNotFound covers a file
+// OpenFile implements core.API. path is a ChangedFile.Path, relative to the
+// worktree. FileNotFound covers a file
 // deleted or moved away since the diff being viewed; a rename's Path is
 // already the current name, so only Path is ever opened, never OldPath.
 func (c *Core) OpenFile(ctx context.Context, id core.WorktreeID, path string, line int) error {
@@ -62,9 +62,8 @@ func (c *Core) OpenFile(ctx context.Context, id core.WorktreeID, path string, li
 }
 
 // worktreeFile joins path onto dir and rejects one that resolves outside
-// it — defense in depth (path is caller-supplied UI state, not a
-// git-validated argument the way a revision or pathspec is, TR-10's spirit
-// applied to a filesystem path instead).
+// it: path is caller-supplied and, unlike a revision or pathspec, never
+// validated by git.
 func worktreeFile(dir, path string) (string, error) {
 	full := filepath.Join(dir, path)
 	rel, err := filepath.Rel(dir, full)
