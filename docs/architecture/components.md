@@ -12,7 +12,7 @@
 | `internal/proc` | Child-process attributes (TR-12): `HiddenConsole()`, the `CREATE_NO_WINDOW` flag every Windows child (git, `wsl.exe`) starts with, nil elsewhere; `Detach(cmd)`, a new session/process group so an editor or the handed-off GUI outlives nebegit. |
 | `internal/testbin` | Test support: `Build(out, pkg)` compiles a helper binary from a `TestMain` (`nebegit-core`, the editor's argv writer, the protocol-mismatch core). |
 | `internal/graph` | Lane layout. Pure function over a commit stream. Delivered. |
-| `internal/jobs` | Long-running tasks: id, state, progress, cancel. Emits events. |
+| `internal/jobs` | Long-running tasks: id, state, progress, cancel. Emits events. Delivered. |
 | `internal/watch` | Debounced "changed" signals with a scope (refs, index, worktrees, state): a repo-dir watcher (fsnotify + poll fallback) and a worktree status poller. Delivered. |
 | `internal/settings` | Settings JSON load/save (TR-13): recent repos, windows open at last quit, per-environment editor profiles (FR-ED-11), and the FR-UX-04 fields. |
 | `internal/editor` | Editor profiles (presets + custom); builds and starts the editor command. Delivered. |
@@ -25,14 +25,14 @@ Services and the requirements they serve:
 |---|---|
 | `RepoService` | FR-REPO-*: open, recent, summary (branch, ahead/behind, state). `OpenWorktree`/`Summary` delivered; ahead/behind come from `LogService`'s `Refs`; `Refresh`/`SetFocused`/`CloseWorktree` (manual refresh, focus-driven poll, session teardown) delivered |
 | `LogService` | FR-LOG-*: load, row window, details, search, filters. `LoadLog`/`LogRows`/`CommitDetails`, `ReloadLog` (reload only if ref tips changed), `Refs` (branches/remotes/tags for the sidebar), `LogIndexOf` (a ref's row index, for click-to-jump) and `SetLogFilter` (text/hash, author, branch, path search, all combinable — a window's own filtered view, independent of the shared unfiltered cache) delivered, as is the commit-row context-menu shell (FR-LOG-11: copy hash/subject only; the branch, compare, cherry-pick and worktree items belong to their own features) |
-| `DiffService` | FR-CMP-*, FR-DIFF-*, FR-LOG-04, FR-CHG-04: file lists, file contents, hunks. `DiffFile` (one file's two-sided content at a commit, size cap, binary detection) and `CompareCommits`/`DiffRange` (changed files and content between two arbitrary commits) delivered; changes-view hunks still open |
+| `DiffService` | FR-CMP-*, FR-DIFF-*, FR-LOG-04, FR-CHG-04: file lists, file contents, hunks. `DiffFile` (one file's two-sided content at a commit, size cap, binary detection), `CompareCommits`/`DiffRange` (changed files and content between two arbitrary commits) and `DiffWorking` (a working-tree change's two-sided content: staged against the index, unstaged/untracked against the literal file on disk) delivered; changes-view hunks still open |
 | `BranchService` | FR-BR-*, FR-UPD-*, FR-CP-*, FR-RV-*: create, reset, checkout, rename, delete, update in background, cherry-pick, revert, checkout commit. `CreateBranch` (a commit, an existing branch, or HEAD as the start point; optional atomic checkout), `Checkout` (local or remote-tracking, git's own DWIM), `CheckoutCommit` (detach HEAD), `Reset` (soft/mixed/hard, moves the current branch or a detached HEAD, returns the pre-reset HEAD), `UncommittedCount` (the hard-reset confirmation's count) and `CherryPick`/`Revert` (one or more commits onto the current worktree's HEAD, app-sorted oldest/newest-first, merge commits refused up front) delivered; rename/delete still open |
 | `WorktreeService` | FR-WT-*: list, add, remove, prune. `ListWorktrees`/`ListBranches` (stateless reads, `session.Manager.Resolve`, no session minted) and `AddWorktree` (existing or new branch, `check-ref-format` validated first) delivered. "Open in app window" (FR-WT-08) is a shell action in `internal/app`; a core has no windows. FR-WT-04 ("switch to worktree" = open in the editor via `EditorService.OpenFolderAt`, a path, no session), FR-WT-06 ("create worktree here…" from a log commit or a sidebar branch, pre-filling `AddWorktree`) and FR-WT-12 (after a create, offer to open the result in a window, the editor, both, or neither) delivered. Remove/prune still open. |
-| `ChangesService` | FR-CHG-*: status, stage/unstage (file, hunk, lines), commit, amend, discard |
-| `SyncService` | FR-SYNC-*: fetch, pull, push, force push, auto-fetch |
+| `ChangesService` | FR-CHG-*: status, stage/unstage (file, hunk, lines), commit, amend, discard. `Status` (FR-CHG-01, one `git status --porcelain=v2` call grouped into staged/unstaged/untracked/conflicted) and `StageFile`/`UnstageFile`/`StageAll`/`UnstageAll` (FR-CHG-02) delivered; hunk/line staging (FR-CHG-03), commit, amend, and discard still open |
+| `SyncService` | FR-SYNC-*: fetch, pull, push, force push, auto-fetch. `Fetch`/`Pull`/`Push`/`ForcePush` (FR-SYNC-01, 02, 03, 05) delivered, each a job; rejection classification (FR-SYNC-04) and sign-in failure classification (FR-SYNC-08, QA-SEC-02) delivered with them. `SyncControls.vue` (Fetch/Pull/Push top-bar controls, force-push confirmation with its protected-branch warning FR-SYNC-06, the push-rejection banner) mounted in `WorktreeContent.vue`. Auto-fetch (FR-SYNC-10) still open |
 | `ConflictService` | FR-CONF-*: state, mark resolved, continue, abort |
 | `EditorService` | FR-ED-*: editor profiles and launch. `SetEditorProfile`/`OpenFolder`/`OpenFile` (FR-ED-01, 03, 04, 05, 06, 11), `OpenFolderAt` (a path, no session) and `OpenFile`'s path resolved against the worktree with `FILE_NOT_FOUND` for a since-deleted or renamed file (FR-ED-02: the commit-details, compare and compare-diff-window file lists and the diff pane's toolbar; the conflict list is still open) delivered; the presets picker, the "test" button, open-at-line/column from the diff view, and the git-editor/OS-opener fallback chain (FR-ED-07..10) still open |
-| `JobService` | list jobs, cancel |
+| `JobService` | list jobs, cancel. Delivered; fetch/pull/push/force push (spec 71) are its first real job kinds. |
 | `CommandLogService` | FR-UX-02. Delivered |
 
 Settings (FR-UX-04) are a shell service (TR-13), not part of `core.API`.
@@ -46,26 +46,24 @@ Settings (FR-UX-04) are a shell service (TR-13), not part of `core.API`.
 Main layout:
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│ Toolbar: selected worktree | branch ↑2 ↓1 | Fetch Pull Push       │
-├──────────────┬─────────────────────────────────────────────────┤
-│ Selector     │  Changes (working tree)   │ Log                 │
-│ ▾ repo A     │  ┌─────────────────────────────┬──────────────┐ │
-│   ● wt main  │  │ commit list + graph         │ details /    │ │
-│   ○ wt feat  │  │ (virtual scroll)            │ changed files│ │
-│   + worktree │  ├─────────────────────────────┴──────────────┤ │
-│ ▸ repo B     │  │ diff (side-by-side | unified)              │ │
-│ ⚙ Settings   │  │                                            │ │
-│ ─────────    │  │                                            │ │
-│ Branches     │  │                                            │ │
-│ Remotes      │  │                                            │ │
-│ Tags         │  │                                            │ │
-├──────────────┴─┴────────────────────────────────────────────┤ │
-│ Status bar: running jobs · last result · command log          │
-└────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ project name | branch ↑2 ↓1 | Refresh  Open in editor                    │
+├───────────┬───────────┬────────────┬─────────────────┬───────────────────┤
+│ Selector  │ Refs      │ Changes    │ Log             │ Commit details /  │
+│ ▾ repo A  │ Branches  │ Staged     │ (graph + virtual│ compare, changed  │
+│  ● wt main│ Remotes   │ Unstaged   │  scroll)        │ files             │
+│  ○ wt feat│ Tags      │ Untracked  │                 ├───────────────────┤
+│  + wt     │           │ Conflicted │                 │ Diff              │
+│ ▸ repo B  │           │            │                 │ (unified |        │
+│ ⚙ Settings│           │            │                 │  side-by-side)    │
+├───────────┴───────────┴────────────┴─────────────────┴───────────────────┤
+│ Status bar: running jobs · last result · command log                     │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-The left column is the selector panel (FR-WT-13, ADR-9 as revised 2026-09-22, delivered): `SelectorPanel.vue`, present in every window (not gated behind a selection, FR-UX-04), replacing the old dedicated home window — "Open folder…"/"Open WSL folder…"/the recent-repos list moved in unchanged, an OpenVue `Tree` below them lists each recent repo's worktrees (● = this window's own selection, ○ otherwise, `ListWorktrees`) and branches (`ListBranches`), lazily fetched on first expand; "+ New worktree" (`CreateWorktreeDialog.vue`, `AddWorktree`) and "New branch…"/per-branch "Checkout" (reusing `CreateBranchDialog.vue`/`Facade.Checkout`, scoped to the repo matching this window's own selection) sit under each repo node, and a "Settings" entry point (`SettingsPanel.vue`) needs no selection. Clicking a worktree row switches this window's own selection (`AppService.SelectWorktree`) in place; a small control opens it in a new window instead (`OpenRecent`, FR-WT-08's existing dedup). `MainView.vue` hosts the panel beside the selected worktree's own content (`WorktreeContent.vue`) or its empty state, wrapped in an OpenVue `Splitter` (FR-UX-07's "resized" half); the panel's own "collapsed" toggle is local state, not persisted. Selecting a worktree switches the whole window, no new OS window. FR-UX-07: no tabs or views — the working-tree changes get their own panel beside the log, placement decided with them; every panel is resizable and collapsible, never navigated to. FR-UX-08: `WorktreeContent.vue` lays out a `.log-column` (filter bar, log) and a `.side-column` (commit details or compare view, then the diff) side by side; the details never sit below the log.
+The left column is the selector panel (FR-WT-13, ADR-9 as revised 2026-09-22, delivered): `SelectorPanel.vue`, present in every window (not gated behind a selection, FR-UX-04), replacing the old dedicated home window — "Open folder…"/"Open WSL folder…"/the recent-repos list moved in unchanged, an OpenVue `Tree` below them lists each recent repo's worktrees (● = this window's own selection, ○ otherwise, `ListWorktrees`) and branches (`ListBranches`), lazily fetched on first expand; "+ New worktree" (`CreateWorktreeDialog.vue`, `AddWorktree`) and "New branch…"/per-branch "Checkout" (reusing `CreateBranchDialog.vue`/`Facade.Checkout`, scoped to the repo matching this window's own selection) sit under each repo node, and a "Settings" entry point (`SettingsPanel.vue`) needs no selection. Clicking a worktree row switches this window's own selection (`AppService.SelectWorktree`) in place; a small control opens it in a new window instead (`OpenRecent`, FR-WT-08's existing dedup). `MainView.vue` hosts the panel beside the selected worktree's own content (`WorktreeContent.vue`) or its empty state, a resizable/collapsible left column (CSS `resize: horizontal`, no splitter component — OpenVue's `Splitter` renders unstyled, so every resizable panel in this app uses this same plain pattern instead, spec 50/60); the panel's own "collapsed" toggle is local state, not persisted. Selecting a worktree switches the whole window, no new OS window.
+
+FR-UX-07: no tabs or views — every panel is resizable and collapsible, never navigated to. The working-tree changes get their own `.changes-column` (`ChangesPanel.vue`, `stores/changes.ts`, delivered spec 60), between `RefsSidebar` and `.log-column` inside `WorktreeContent.vue`'s own flex row — left of the log, right of the selector/refs zone. Placed there rather than inside the details+diff column because this diagram already sketched it there; because FR-UX-08's three fixed relationships (refs leftmost, the log between two other things, the details+diff pairing one unbroken column immediately right of the log) stay literally true only to the log's left; and because selector, refs, and changes are all facts about the worktree's *current* state, kept apart from the log/details/diff cluster's own *history* facts. FR-UX-08: `WorktreeContent.vue` lays out a `.log-column` (filter bar, log) and a `.side-column` (commit details or compare view, then the diff) side by side; the details never sit below the log.
 
 Sidebar's Branches/Remotes/Tags trees, the current-branch marker, click-to-jump into the log, and the toolbar's ahead/behind counts are delivered (`RefsSidebar.vue`, `stores/refs.ts`) — a different, richer view of the *selected* worktree's own refs (full upstream/ahead-behind detail) than the selector panel's lightweight per-repo branches list above.
 

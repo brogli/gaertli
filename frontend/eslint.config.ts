@@ -21,7 +21,7 @@ const config: ReturnType<typeof defineConfigWithVueTs> = defineConfigWithVueTs(
     },
   },
   // Must be last: turns off the ESLint rules oxlint already covers, so it
-  // has to win over everything before it (spec 07, TR-33).
+  // has to win over everything before it.
   oxlint.configs['flat/recommended'],
 )
 

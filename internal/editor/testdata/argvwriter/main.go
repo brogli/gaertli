@@ -1,6 +1,6 @@
 // Command argvwriter is a test fixture only (excluded from the module's own
 // build): a stand-in editor that writes its own received argv to a file
-// next to itself and exits (spec 31 case 15).
+// next to itself and exits.
 package main
 
 import (

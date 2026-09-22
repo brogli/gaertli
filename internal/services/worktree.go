@@ -64,12 +64,12 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 	if err != nil {
 		return core.Worktree{}, err
 	}
-	wt.Repo.Lock() // ADR-6: worktree add is a repo-wide one-off, same bucket as branch create-without-checkout (spec 40)
+	wt.Repo.Lock() // worktree add writes repo-wide refs, like creating a branch
 	defer wt.Repo.Unlock()
 
 	args := []string{"worktree", "add", "--", target, branch}
 	if newBranch {
-		if err := validateBranchName(ctx, wt.Runner, wt.Path, branch); err != nil { // spec 40, reused unchanged — required here: worktree add -b's own name argument is not protected by --
+		if err := validateBranchName(ctx, wt.Runner, wt.Path, branch); err != nil { // worktree add -b's name argument is not protected by --
 			return core.Worktree{}, err
 		}
 		args = []string{"worktree", "add", "-b", branch, "--", target, start}
@@ -99,11 +99,9 @@ func (c *Core) describeWorktree(ctx context.Context, wt *session.Worktree, targe
 }
 
 // parseWorktreeRecords parses "git worktree list --porcelain -z" output
-// (Research used: each field is its own "key[ value]" line, NUL-terminated;
-// a record ends with a second, empty NUL-terminated field). The first
-// record is git's own main worktree (Research used: "list" documents the
-// main worktree listed first, porcelain carries no explicit marker for it)
-// — Main is set from position alone. Dirty is always false here: it needs a
+// (each field is its own NUL-terminated "key[ value]"; an empty field ends
+// a record). git lists the main worktree first and porcelain has no marker
+// for it, so Main is set from position alone. Dirty is always false here: it needs a
 // git call this pure parser does not make, filled in by the caller
 // (ListWorktrees) for every non-missing row.
 func parseWorktreeRecords(out []byte) []core.Worktree {
@@ -133,7 +131,7 @@ func parseWorktreeRecord(block []byte, main bool) core.Worktree {
 		case "locked":
 			wt.Locked = true
 		case "prunable":
-			wt.Missing = true // git's own "prunable" (Research used)
+			wt.Missing = true
 		}
 	}
 	return wt

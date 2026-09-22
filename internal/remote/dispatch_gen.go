@@ -14,6 +14,9 @@ func handlers(api core.API) handler.Map {
 		"AddWorktree": handler.New(func(ctx context.Context, p addWorktreeParams) (core.Worktree, error) {
 			return api.AddWorktree(ctx, p.Path, p.Target, p.Branch, p.Start, p.NewBranch)
 		}),
+		"CancelJob": handler.New(func(ctx context.Context, p cancelJobParams) error {
+			return api.CancelJob(ctx, p.Wt, p.Id)
+		}),
 		"Checkout": handler.New(func(ctx context.Context, p checkoutParams) error {
 			return api.Checkout(ctx, p.Wt, p.Branch)
 		}),
@@ -44,6 +47,18 @@ func handlers(api core.API) handler.Map {
 		"DiffRange": handler.New(func(ctx context.Context, p diffRangeParams) (core.DiffFile, error) {
 			return api.DiffRange(ctx, p.Wt, p.A, p.B, p.Path, p.OldPath, p.Force)
 		}),
+		"DiffWorking": handler.New(func(ctx context.Context, p diffWorkingParams) (core.DiffFile, error) {
+			return api.DiffWorking(ctx, p.Wt, p.Path, p.OldPath, p.Staged, p.Force)
+		}),
+		"Fetch": handler.New(func(ctx context.Context, p fetchParams) (string, error) {
+			return api.Fetch(ctx, p.Wt, p.Remote)
+		}),
+		"ForcePush": handler.New(func(ctx context.Context, p forcePushParams) (string, error) {
+			return api.ForcePush(ctx, p.Wt)
+		}),
+		"Jobs": handler.New(func(ctx context.Context, p jobsParams) ([]core.JobInfo, error) {
+			return api.Jobs(ctx, p.Wt)
+		}),
 		"ListBranches": handler.New(func(ctx context.Context, p listBranchesParams) ([]core.BranchSummary, error) {
 			return api.ListBranches(ctx, p.Path)
 		}),
@@ -71,6 +86,12 @@ func handlers(api core.API) handler.Map {
 		"OpenWorktree": handler.New(func(ctx context.Context, p openWorktreeParams) (core.WorktreeInfo, error) {
 			return api.OpenWorktree(ctx, p.Path)
 		}),
+		"Pull": handler.New(func(ctx context.Context, p pullParams) (string, error) {
+			return api.Pull(ctx, p.Wt, p.Mode)
+		}),
+		"Push": handler.New(func(ctx context.Context, p pushParams) (string, error) {
+			return api.Push(ctx, p.Wt, p.Remote)
+		}),
 		"Refresh": handler.New(func(ctx context.Context, p refreshParams) error {
 			return api.Refresh(ctx, p.Wt)
 		}),
@@ -95,11 +116,26 @@ func handlers(api core.API) handler.Map {
 		"SetLogFilter": handler.New(func(ctx context.Context, p setLogFilterParams) error {
 			return api.SetLogFilter(ctx, p.Wt, p.Filter)
 		}),
+		"StageAll": handler.New(func(ctx context.Context, p stageAllParams) error {
+			return api.StageAll(ctx, p.Wt)
+		}),
+		"StageFile": handler.New(func(ctx context.Context, p stageFileParams) error {
+			return api.StageFile(ctx, p.Wt, p.Path)
+		}),
+		"Status": handler.New(func(ctx context.Context, p statusParams) (core.ChangedFiles, error) {
+			return api.Status(ctx, p.Wt)
+		}),
 		"Summary": handler.New(func(ctx context.Context, p summaryParams) (core.Summary, error) {
 			return api.Summary(ctx, p.Wt)
 		}),
 		"UncommittedCount": handler.New(func(ctx context.Context, p uncommittedCountParams) (int, error) {
 			return api.UncommittedCount(ctx, p.Wt)
+		}),
+		"UnstageAll": handler.New(func(ctx context.Context, p unstageAllParams) error {
+			return api.UnstageAll(ctx, p.Wt)
+		}),
+		"UnstageFile": handler.New(func(ctx context.Context, p unstageFileParams) error {
+			return api.UnstageFile(ctx, p.Wt, p.Path)
 		}),
 		"Version": handler.New(func(ctx context.Context) (core.Version, error) {
 			return api.Version(ctx)

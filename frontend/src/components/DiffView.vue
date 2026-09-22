@@ -11,21 +11,25 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// DiffView renders a file's two-sided content: either the log store's
-// selected file at its selected commit (FR-LOG-04, ADR-7) or, when range is
-// given, a compare's file between two arbitrary commits (FR-CMP-02).
-// CodeMirror computes the diff client-side from the store's fetched
-// old/new content. Read-only; unified/side-by-side is Settings.DiffMode
-// (FR-DIFF-01).
+// DiffView renders a file's two-sided content: the log store's selected
+// file at its selected commit (FR-LOG-04, ADR-7), a compare's file between
+// two arbitrary commits when range is given (FR-CMP-02), or a working-tree
+// change when working is given (FR-CHG-04) — the three are mutually
+// exclusive, decided by the caller. CodeMirror computes the diff
+// client-side from the store's fetched old/new content. Read-only;
+// unified/side-by-side is Settings.DiffMode (FR-DIFF-01).
 //
 // files is the compare diff window's own ordered file list, meaningful only
 // together with range. DiffView doesn't own range, so stepping through
-// files emits update:range instead of mutating the prop.
+// files emits update:range instead of mutating the prop. Working-tree mode
+// has no file-stepping (no FR asks for it).
 type DiffRange = { from: string; to: string; path: string; oldPath: string }
+type WorkingTarget = { path: string; oldPath: string; staged: boolean }
 
 const props = defineProps<{
   wt: string
   range?: DiffRange | null
+  working?: WorkingTarget | null
   files?: ChangedFile[]
 }>()
 const emit = defineEmits<{ 'update:range': [range: DiffRange] }>()
@@ -41,9 +45,11 @@ let view: EditorView | MergeView | null = null
 type Target =
   | { kind: 'commit'; sha: string; path: string; oldPath: string }
   | { kind: 'range'; from: string; to: string; path: string; oldPath: string }
+  | ({ kind: 'working' } & WorkingTarget)
 
 const target = computed<Target | null>(() => {
   if (props.range) return { kind: 'range', ...props.range }
+  if (props.working) return { kind: 'working', ...props.working }
   const file = log.selectedFile
   const sha = log.details?.sha
   return file && sha ? { kind: 'commit', sha, path: file.path, oldPath: file.oldPath ?? '' } : null
@@ -54,6 +60,8 @@ function load(force = false): void {
   if (!t) return
   if (t.kind === 'range') {
     void run(() => diff.loadRange(props.wt, t.from, t.to, t.path, t.oldPath, force))
+  } else if (t.kind === 'working') {
+    void run(() => diff.loadWorking(props.wt, t.path, t.oldPath, t.staged, force))
   } else {
     void run(() => diff.load(props.wt, t.sha, t.path, t.oldPath, force))
   }
@@ -168,7 +176,7 @@ function stepRangeFile(step: 1 | -1): void {
         <button type="button" data-test="prev-file" @click="stepRangeFile(-1)">Previous file</button>
         <button type="button" data-test="next-file" @click="stepRangeFile(1)">Next file</button>
       </template>
-      <template v-else-if="!range">
+      <template v-else-if="!range && !working">
         <button type="button" data-test="prev-file" @click="log.prevFile()">Previous file</button>
         <button type="button" data-test="next-file" @click="log.nextFile()">Next file</button>
       </template>

@@ -20,8 +20,8 @@ import (
 // delayed stream.
 var fakegit string
 
-// argvWriterBin is internal/editor/testdata/argvwriter (spec 31), reused by
-// editor_test.go (spec 51): a stand-in editor that writes its received argv
+// argvWriterBin is internal/editor/testdata/argvwriter, used by
+// editor_test.go: a stand-in editor that writes its received argv
 // to a file next to itself and exits. Built here, the package's one
 // TestMain, alongside fakegit.
 var argvWriterBin string

@@ -17,6 +17,14 @@ func (f *Facade) AddWorktree(ctx context.Context, path core.RepoPath, target str
 	return c.AddWorktree(ctx, path, target, branch, start, newBranch)
 }
 
+func (f *Facade) CancelJob(ctx context.Context, wt core.WorktreeID, id string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.CancelJob(ctx, wt, id)
+}
+
 func (f *Facade) Checkout(ctx context.Context, wt core.WorktreeID, branch string) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -102,6 +110,42 @@ func (f *Facade) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b 
 	return c.DiffRange(ctx, wt, a, b, path, oldPath, force)
 }
 
+func (f *Facade) DiffWorking(ctx context.Context, wt core.WorktreeID, path string, oldPath string, staged bool, force bool) (core.DiffFile, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
+	return c.DiffWorking(ctx, wt, path, oldPath, staged, force)
+}
+
+func (f *Facade) Fetch(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero string
+		return zero, err
+	}
+	return c.Fetch(ctx, wt, remote)
+}
+
+func (f *Facade) ForcePush(ctx context.Context, wt core.WorktreeID) (string, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero string
+		return zero, err
+	}
+	return c.ForcePush(ctx, wt)
+}
+
+func (f *Facade) Jobs(ctx context.Context, wt core.WorktreeID) ([]core.JobInfo, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero []core.JobInfo
+		return zero, err
+	}
+	return c.Jobs(ctx, wt)
+}
+
 func (f *Facade) ListBranches(ctx context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
 	c, err := f.router.CoreFor(path)
 	if err != nil {
@@ -179,6 +223,24 @@ func (f *Facade) OpenWorktree(ctx context.Context, path core.RepoPath) (core.Wor
 	return c.OpenWorktree(ctx, path)
 }
 
+func (f *Facade) Pull(ctx context.Context, wt core.WorktreeID, mode core.PullMode) (string, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero string
+		return zero, err
+	}
+	return c.Pull(ctx, wt, mode)
+}
+
+func (f *Facade) Push(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero string
+		return zero, err
+	}
+	return c.Push(ctx, wt, remote)
+}
+
 func (f *Facade) Refresh(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -241,6 +303,31 @@ func (f *Facade) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter co
 	return c.SetLogFilter(ctx, wt, filter)
 }
 
+func (f *Facade) StageAll(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.StageAll(ctx, wt)
+}
+
+func (f *Facade) StageFile(ctx context.Context, wt core.WorktreeID, path string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.StageFile(ctx, wt, path)
+}
+
+func (f *Facade) Status(ctx context.Context, wt core.WorktreeID) (core.ChangedFiles, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.ChangedFiles
+		return zero, err
+	}
+	return c.Status(ctx, wt)
+}
+
 func (f *Facade) Summary(ctx context.Context, wt core.WorktreeID) (core.Summary, error) {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -257,6 +344,22 @@ func (f *Facade) UncommittedCount(ctx context.Context, wt core.WorktreeID) (int,
 		return zero, err
 	}
 	return c.UncommittedCount(ctx, wt)
+}
+
+func (f *Facade) UnstageAll(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.UnstageAll(ctx, wt)
+}
+
+func (f *Facade) UnstageFile(ctx context.Context, wt core.WorktreeID, path string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.UnstageFile(ctx, wt, path)
 }
 
 func (f *Facade) Version(ctx context.Context) (core.Version, error) {

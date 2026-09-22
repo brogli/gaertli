@@ -445,10 +445,9 @@ func realConflictFixture(t *testing.T, dir, verb string) (sha string) {
 // revertConflictFixture builds case 14's own fixture: linear history where
 // HEAD's own commit changed conflict.txt, and an uncommitted, differing
 // edit to the same file sits on top — so reverting HEAD's commit is
-// refused as "would be overwritten" (exit 128, verified empirically: a
-// revert's forward-diff fixture like cherry-pick's two-branch shape would
-// instead be a no-op revert here, since the target branch never carried
-// the change being reverted).
+// refused as "would be overwritten" (exit 128). Cherry-pick's two-branch
+// shape would make this a no-op revert: the target branch never carried the
+// change being reverted.
 func revertConflictFixture(t *testing.T, dir string) (revertSHA, beforeHEAD string) {
 	t.Helper()
 	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")

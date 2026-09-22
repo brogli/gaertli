@@ -7,6 +7,7 @@ import { getChunks } from '@codemirror/merge'
 const {
   mockDiffFile,
   mockDiffRange,
+  mockDiffWorking,
   mockSettingsGet,
   mockSettingsSet,
   mockLoadLog,
@@ -16,6 +17,7 @@ const {
 } = vi.hoisted(() => ({
   mockDiffFile: vi.fn(),
   mockDiffRange: vi.fn(),
+  mockDiffWorking: vi.fn(),
   mockSettingsGet: vi.fn(),
   mockSettingsSet: vi.fn(),
   mockLoadLog: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade: {
     DiffFile: mockDiffFile,
     DiffRange: mockDiffRange,
+    DiffWorking: mockDiffWorking,
     LoadLog: mockLoadLog,
     LogRows: mockLogRows,
     CommitDetails: vi.fn(),
@@ -74,6 +77,7 @@ describe('DiffView', () => {
     setActivePinia(createPinia())
     mockDiffFile.mockReset()
     mockDiffRange.mockReset()
+    mockDiffWorking.mockReset()
     mockSettingsGet.mockReset()
     mockSettingsSet.mockReset()
     mockSettingsGet.mockResolvedValue(settings)
@@ -321,5 +325,46 @@ describe('DiffView', () => {
 
     expect(mockOpenFile).toHaveBeenCalledTimes(1)
     expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
+  })
+
+  it('FR-CHG-04 with a working prop, loads via DiffWorking and renders the fetched content', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'shared line\nold only line\n',
+      newContent: 'shared line\nnew only line\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: true } },
+    })
+    await flushPromises()
+
+    expect(mockDiffWorking).toHaveBeenCalledTimes(1)
+    expect(mockDiffWorking).toHaveBeenCalledWith('/repo', 'a.txt', '', true, false)
+    expect(mockDiffFile).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('old only line')
+    expect(wrapper.text()).toContain('new only line')
+  })
+
+  it('FR-CHG-04 with a working prop, hides next/previous-file but keeps next/previous-change', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="prev-file"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="next-file"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="prev-change"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="next-change"]').exists()).toBe(true)
   })
 })

@@ -7,6 +7,10 @@
 //     0x00-terminated records to stdout one at a time, sleeping
 //     FAKEGIT_STREAM_DELAY_MS between each, so a test can point Runner.Git
 //     at fakegit for a whole session while only the log call streams.
+//   - FAKEGIT_STDERR_FILE set (any argv): copies that file's \r/\n-terminated
+//     records to stderr one at a time, sleeping FAKEGIT_STDERR_DELAY_MS
+//     between each — the stderr counterpart of FAKEGIT_STREAM_FILE, for
+//     Runner.StreamErr.
 //   - otherwise: while sleeping FAKEGIT_SLEEP_MS (if set), touches
 //     FAKEGIT_HEARTBEAT (if set) every 50ms; then writes FAKEGIT_STDOUT to
 //     stdout and FAKEGIT_STDERR to stderr, then exits FAKEGIT_EXIT.
@@ -18,6 +22,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -58,11 +63,15 @@ func run(isLog bool) {
 		time.Sleep(time.Duration(ms) * time.Millisecond)
 	}
 	if file := os.Getenv("FAKEGIT_STREAM_FILE"); isLog && file != "" {
-		streamRecords(file)
+		streamFile(file, "\x00", "FAKEGIT_STREAM_DELAY_MS", os.Stdout)
 	} else {
 		fmt.Print(os.Getenv("FAKEGIT_STDOUT"))
 	}
-	fmt.Fprint(os.Stderr, os.Getenv("FAKEGIT_STDERR"))
+	if file := os.Getenv("FAKEGIT_STDERR_FILE"); file != "" {
+		streamFile(file, "\r\n", "FAKEGIT_STDERR_DELAY_MS", os.Stderr)
+	} else {
+		fmt.Fprint(os.Stderr, os.Getenv("FAKEGIT_STDERR"))
+	}
 	code, _ := strconv.Atoi(os.Getenv("FAKEGIT_EXIT"))
 	os.Exit(code)
 }
@@ -85,30 +94,32 @@ func sleepOnce() (ms int, ok bool) {
 	return n, true
 }
 
-// streamRecords copies path's 0x00-terminated records to stdout one at a
-// time, sleeping FAKEGIT_STREAM_DELAY_MS between each.
-func streamRecords(path string) {
+// streamFile copies path's records — each ending in one of delims — to w
+// one at a time, sleeping the duration named by delayEnv between each. The
+// shared implementation of FAKEGIT_STREAM_FILE (stdout, NUL-delimited) and
+// FAKEGIT_STDERR_FILE (stderr, \r/\n-delimited).
+func streamFile(path, delims, delayEnv string, w io.Writer) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	delayMS, _ := strconv.Atoi(os.Getenv("FAKEGIT_STREAM_DELAY_MS"))
+	delayMS, _ := strconv.Atoi(os.Getenv(delayEnv))
 	delay := time.Duration(delayMS) * time.Millisecond
-	for _, record := range splitRecords(data) {
-		os.Stdout.Write(record)
+	for _, record := range splitRecords(data, delims) {
+		w.Write(record)
 		if delay > 0 {
 			time.Sleep(delay)
 		}
 	}
 }
 
-// splitRecords splits data into pieces ending at (and including) each 0x00
-// byte, with any unterminated remainder as a final piece.
-func splitRecords(data []byte) [][]byte {
+// splitRecords splits data into pieces ending at (and including) each byte
+// in delims, with any unterminated remainder as a final piece.
+func splitRecords(data []byte, delims string) [][]byte {
 	var records [][]byte
 	for {
-		i := bytes.IndexByte(data, 0)
+		i := bytes.IndexAny(data, delims)
 		if i < 0 {
 			if len(data) > 0 {
 				records = append(records, data)

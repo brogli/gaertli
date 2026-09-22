@@ -162,7 +162,7 @@ const (
 	authorEmail = "mkrepo@nebegit.invalid"
 	baseTime    = 1_700_000_000 // fixed epoch, deterministic across runs
 
-	branchAdvanceEvery = 137 // "advances every 137th main-line step" (Design)
+	branchAdvanceEvery = 137 // a side branch advances every 137th main-line step
 )
 
 func featureBranchName(n int) string { return fmt.Sprintf("feature-%d", n) }

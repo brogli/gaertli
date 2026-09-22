@@ -3,11 +3,18 @@ import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/inter
 
 // ChangedFileList renders one row per changed file (status, and oldPath ->
 // path for a rename), shared by CommitDetailsPanel (FR-LOG-03), CompareView
-// (FR-CMP-01) and CompareDiffView. Only CompareView listens for the
-// double-click that opens the compare diff window (FR-CMP-02); open-editor
-// (FR-ED-02) is every caller's "open this file in the editor" control.
-defineProps<{ files: ChangedFile[]; selected?: ChangedFile | null }>()
-const emit = defineEmits<{ select: [file: ChangedFile]; open: [file: ChangedFile]; 'open-editor': [file: ChangedFile] }>()
+// (FR-CMP-01), CompareDiffView and ChangesPanel (FR-CHG-02). Only CompareView
+// listens for the double-click that opens the compare diff window
+// (FR-CMP-02); open-editor (FR-ED-02) is every caller's "open this file in
+// the editor" control. actionLabel is ChangesPanel's own per-row
+// stage/unstage button, unused (so hidden) by every other caller.
+defineProps<{ files: ChangedFile[]; selected?: ChangedFile | null; actionLabel?: string }>()
+const emit = defineEmits<{
+  select: [file: ChangedFile]
+  open: [file: ChangedFile]
+  'open-editor': [file: ChangedFile]
+  action: [file: ChangedFile]
+}>()
 </script>
 
 <template>
@@ -24,6 +31,9 @@ const emit = defineEmits<{ select: [file: ChangedFile]; open: [file: ChangedFile
       {{ file.path }}
       <button type="button" data-test="open-editor" @click.stop="emit('open-editor', file)">
         Open in editor
+      </button>
+      <button v-if="actionLabel" type="button" data-test="action" @click.stop="emit('action', file)">
+        {{ actionLabel }}
       </button>
     </li>
   </ul>

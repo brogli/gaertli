@@ -83,6 +83,7 @@ tasks:
     summary: Playwright against the Vite dev server with a mocked Go layer (TR-31)
     deps:
       - task: common:install:frontend:deps
+      - task: common:generate:bindings
     cmds:
       - task: common:frontend:run
         vars: { SCRIPT: test:e2e }

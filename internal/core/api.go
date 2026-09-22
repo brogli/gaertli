@@ -61,6 +61,37 @@ type API interface {
 	// and changed files vs. its first parent (FR-LOG-03).
 	CommitDetails(ctx context.Context, wt WorktreeID, sha string) (CommitDetails, error)
 
+	// Status lists wt's current uncommitted changes, grouped (FR-CHG-01):
+	// staged, unstaged, untracked, conflicted. A file changed both ways
+	// (git's own "MM"-shaped record) appears once in Staged and once in
+	// Unstaged, from that one record's two independent halves.
+	Status(ctx context.Context, wt WorktreeID) (ChangedFiles, error)
+
+	// StageFile / UnstageFile move one path between the working tree and the
+	// index in wt (FR-CHG-02): git add for staging (a modified tracked file
+	// or an untracked one alike — no intent-to-add step needed at file
+	// granularity), git restore --staged for unstaging. A refusal (the path
+	// no longer matches anything, a race with an outside change) is git's
+	// own, passed through as plain GitFailed — no pre-check.
+	StageFile(ctx context.Context, wt WorktreeID, path string) error
+	UnstageFile(ctx context.Context, wt WorktreeID, path string) error
+
+	// StageAll / UnstageAll act on every changed file at once (FR-CHG-02):
+	// git add -A for staging (tracked and untracked alike); git restore
+	// --staged -- . for unstaging, chosen over a bare git reset for an
+	// identical result with no incidental human-readable stdout.
+	StageAll(ctx context.Context, wt WorktreeID) error
+	UnstageAll(ctx context.Context, wt WorktreeID) error
+
+	// DiffWorking returns path's two-sided content outside a commit
+	// (FR-CHG-04), a sibling of DiffFile/DiffRange: staged compares HEAD to
+	// the index — both git objects. !staged compares the index (or nothing,
+	// if path has no index entry at all — untracked) to the literal
+	// working-tree file, which is not a git object until staged. Binary,
+	// size-cap, and UTF-8 rules match DiffFile exactly either way. oldPath
+	// is the rename source for a staged rename.
+	DiffWorking(ctx context.Context, wt WorktreeID, path, oldPath string, staged, force bool) (DiffFile, error)
+
 	// DiffFile returns path's content on both sides of sha (FR-LOG-04): at
 	// sha^ (oldPath if the file was renamed into path, else path) and at sha
 	// itself — first-parent semantics, matching CommitDetails: a merge
@@ -251,6 +282,57 @@ type API interface {
 	// call — required here, unlike CreateBranch's switch -c, because
 	// worktree add -b's own argument is not protected by --.
 	AddWorktree(ctx context.Context, path RepoPath, target, branch, start string, newBranch bool) (Worktree, error)
+
+	// Jobs lists wt's repo's jobs (JobService, components.md): every
+	// queued/running one, plus a bounded history of recently finished ones.
+	// Cheap and repeatable, same reasoning as Summary (spec 05) — the strip
+	// re-polls it on mount and otherwise lives off "job:update" events.
+	Jobs(ctx context.Context, wt WorktreeID) ([]JobInfo, error)
+
+	// CancelJob cancels id if it is still running (FR-SYNC-07, QA-RESP-02):
+	// cancels the job's context, which — for any job whose fn runs a git
+	// call through it — kills the child process (TR-11). A no-op for an
+	// unknown or already-finished id, same convention as CloseWorktree
+	// (spec 12).
+	CancelJob(ctx context.Context, wt WorktreeID, id string) error
+
+	// Fetch fetches wt's repo from remote, or every remote when remote == ""
+	// (git fetch --prune --progress <remote>|--all), pruning remote-tracking
+	// branches gone on the far side. Runs as a job, outside the write queues:
+	// touches only refs/objects, never this worktree's index or files, so it
+	// never blocks and is never blocked by a concurrent stage/commit/checkout.
+	// Returns the new job's id; progress and the result arrive via
+	// "job:update", not this call's return.
+	Fetch(ctx context.Context, wt WorktreeID, remote string) (string, error)
+
+	// Pull fetches wt's current branch's upstream, then integrates it by
+	// merge or rebase, as one job: the fetch runs first, holding no lock,
+	// then wt.Lock()s only for the local integration step. Requires an
+	// attached branch with an upstream configured; while detached, or with
+	// none, git's own plain refusal surfaces as-is. A stop mid-way is Code
+	// Conflicts (MERGE_HEAD, or rebase-merge/rebase-apply, left behind), left
+	// in place for the resolve flow, same convention as CherryPick/Revert.
+	Pull(ctx context.Context, wt WorktreeID, mode PullMode) (string, error)
+
+	// Push pushes wt's current branch (git push --progress), as a job,
+	// outside the write queues. remote == "" pushes plainly (the branch must
+	// already have an upstream, or this is git's own plain refusal); a
+	// non-empty remote instead runs git push --progress --set-upstream
+	// <remote> HEAD. A rejection is classified from the push's own
+	// --porcelain summary line on stdout: Code NotFastForward for the
+	// "fetch/integrate first" class of reasons, Code PushRejected for every
+	// other explained one; GitStderr carries git's own explanation unchanged
+	// either way.
+	Push(ctx context.Context, wt WorktreeID, remote string) (string, error)
+
+	// ForcePush force-pushes wt's current branch in the one safe form: git
+	// push --progress --force-with-lease --force-if-includes — bare
+	// --force-with-lease, never the =<ref>:<expect> form, which would
+	// silently disable --force-if-includes; plain --force is never offered.
+	// No app-level refusal for a protected branch: the confirmation and its
+	// warning are entirely the UI's job. Rejection classified the same way
+	// as Push's.
+	ForcePush(ctx context.Context, wt WorktreeID) (string, error)
 }
 
 // Version of a core. App is "dev" until a release build stamps it.

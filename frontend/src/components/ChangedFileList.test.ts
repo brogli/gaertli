@@ -40,4 +40,21 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('open-editor')?.[0]).toEqual([files[1]])
     expect(wrapper.emitted('select')).toBeUndefined()
   })
+
+  it('FR-CHG-02 renders no action button without actionLabel', () => {
+    const wrapper = mount(ChangedFileList, { props: { files } })
+
+    expect(wrapper.find('[data-test="action"]').exists()).toBe(false)
+  })
+
+  it('FR-CHG-02 clicking a row\'s action button emits action with that file, not select', async () => {
+    const wrapper = mount(ChangedFileList, { props: { files, actionLabel: 'Stage' } })
+
+    const button = wrapper.findAll('[data-test="action"]')[1]!
+    expect(button.text()).toBe('Stage')
+    await button.trigger('click')
+
+    expect(wrapper.emitted('action')?.[0]).toEqual([files[1]])
+    expect(wrapper.emitted('select')).toBeUndefined()
+  })
 })

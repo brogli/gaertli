@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -143,17 +142,10 @@ func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []string) er
 }
 
 // remapConflicts classifies a failed cherry-pick/revert: a state file left
-// behind under gitDir means the sequencer stopped mid-way, so Code
-// Conflicts and the state stays for the conflict flow. No state file means
-// git refused before changing anything (a dirty file in the way, another
-// operation running): plain GitFailed with git's own message (FR-CP-04).
+// behind under gitDir means the sequencer stopped mid-way, left in place
+// for the conflict flow. No state file means git refused before changing
+// anything (a dirty file in the way, another operation running): plain
+// GitFailed with git's own message.
 func remapConflicts(err error, gitDir, headFile string) error {
-	if err == nil {
-		return nil
-	}
-	var ce *core.Error
-	if errors.As(err, &ce) && ce.Code == core.GitFailed && fileExists(filepath.Join(gitDir, headFile)) {
-		ce.Code = core.Conflicts
-	}
-	return err
+	return remapIfPending(err, fileExists(filepath.Join(gitDir, headFile)))
 }

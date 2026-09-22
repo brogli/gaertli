@@ -94,12 +94,9 @@ func TestQA_PERF_06_RefreshUnder1s(t *testing.T) {
 	}
 }
 
-// TestTopoOrderCommitGraphCost records (never fails) the ROADMAP research
-// item's numbers directly, via internal/git.Runner, independent of
-// services.Core: the app's exact log call, with and without a git
-// commit-graph write'd file on the reference repo. Feeds the Critical
-// decision recorded in ADR-4 and the spec; not itself a requirement with
-// its own budget.
+// TestTopoOrderCommitGraphCost records (never fails) the app's exact log
+// call on the reference repo, with and without a commit-graph file, via
+// internal/git.Runner. It measures; it has no budget of its own.
 func TestTopoOrderCommitGraphCost(t *testing.T) {
 	if err := mkrepo.Build(t.Context(), refDir, mkrepo.Params); err != nil {
 		t.Fatal(err)

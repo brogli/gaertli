@@ -46,6 +46,10 @@ func (f fakeAPI) SetEditorProfile(_ context.Context, profile core.EditorProfile)
 // a panic would take the test binary down with it.
 func (f fakeAPI) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
 
+func (f fakeAPI) Jobs(context.Context, core.WorktreeID) ([]core.JobInfo, error) { return nil, nil }
+
+func (f fakeAPI) CancelJob(context.Context, core.WorktreeID, string) error { return nil }
+
 // fakeNotifier is an errorNotifier that counts its calls.
 type fakeNotifier struct{ calls int }
 

@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { Events } from '@wailsio/runtime'
 import { useRepoStore } from '../stores/repo'
 import { useRefsStore } from '../stores/refs'
 import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
+import { useChangesStore } from '../stores/changes'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { BranchSummary } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from '../components/ErrorBanner.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
+import JobsStrip from '../components/JobsStrip.vue'
 import LogList from '../components/LogList.vue'
 import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
 import CompareView from '../components/CompareView.vue'
+import ChangesPanel from '../components/ChangesPanel.vue'
 import DiffView from '../components/DiffView.vue'
 import RefsSidebar from '../components/RefsSidebar.vue'
 import FilterBar from '../components/FilterBar.vue'
@@ -19,6 +23,7 @@ import CreateBranchDialog from '../components/CreateBranchDialog.vue'
 import DetachWarningDialog from '../components/DetachWarningDialog.vue'
 import ResetDialog from '../components/ResetDialog.vue'
 import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
+import SyncControls from '../components/SyncControls.vue'
 import type { WorktreeStart } from '../components/worktreeStart'
 import { basename } from '../lib/path'
 
@@ -29,6 +34,7 @@ const repo = useRepoStore()
 const refs = useRefsStore()
 const log = useLogStore()
 const compare = useCompareStore()
+const changes = useChangesStore()
 
 // The compared file's diff range (FR-CMP-02); null outside compare mode or
 // before a file is picked, so the template needs no non-null assertions.
@@ -39,10 +45,17 @@ const compareRange = computed(() => {
     : null
 })
 
-// One decision for the diff pane: a compared file, or a commit's file
-// outside compare mode — never a stale commit diff under CompareView.
+// Three mutually exclusive diff sources (FR-UX-07): a compared file, a
+// changes-panel selection, or a commit's file — compare wins while active,
+// the changes panel's own selection wins over a stale commit diff
+// otherwise. LogList's row click and CommitDetailsPanel's file click each
+// clear the other two sources themselves (component-level coordination, no
+// store importing another).
+const workingTarget = computed(() => changes.selectedFile)
+const showChangesDiff = computed(() => !compare.active && !!workingTarget.value)
+const showCommitDiff = computed(() => !compare.active && !workingTarget.value && !!log.selectedFile)
 const showDiff = computed(
-  () => compareRange.value !== null || (!compare.active && !!log.selectedFile),
+  () => (compare.active && compareRange.value !== null) || showChangesDiff.value || showCommitDiff.value,
 )
 const { error, run } = useCoreCall()
 
@@ -69,7 +82,21 @@ const currentBranch = computed(() => (repo.summary?.detached ? '' : (repo.summar
 onMounted(() => {
   void run(() => repo.loadSummary(props.path))
   void refs.load(props.path)
+  void changes.load(props.path)
 })
+
+// repo:changed{scope:"index"} (spec 12) covers both this worktree's own
+// staging writes and an outside change to the working tree; the changes
+// panel reloads on it the same way the log/refs stores already do for
+// their own scopes.
+let unlistenChanged: (() => void) | undefined
+onMounted(() => {
+  unlistenChanged = Events.On('repo:changed', (ev) => {
+    const { scope } = ev.data as { scope: string }
+    if (scope === 'index') void changes.load(props.path)
+  })
+})
+onUnmounted(() => unlistenChanged?.())
 
 // FR-REPO-04: manual refresh. No loading/disabled state — repo:changed, if
 // anything actually differs, arrives the normal way.
@@ -106,6 +133,7 @@ function openCreateBranchHere(): void {
     <h1>{{ name }}</h1>
     <button type="button" @click="refresh">Refresh</button>
     <button type="button" @click="openInEditor">{{ editorLabel }}</button>
+    <JobsStrip :wt="path" />
     <ErrorBanner v-if="error" :error="error" @open-settings="emit('open-settings')" />
     <p v-else-if="repo.summary">
       {{ repo.summary.detached ? 'detached HEAD' : repo.summary.branch }}
@@ -116,6 +144,7 @@ function openCreateBranchHere(): void {
       <button v-if="repo.summary.detached" type="button" @click="openCreateBranchHere">
         Create branch here
       </button>
+      <SyncControls :wt="path" />
     </p>
     <div class="worktree-body">
       <RefsSidebar
@@ -125,6 +154,7 @@ function openCreateBranchHere(): void {
             openCreateWorktree(isRemote ? { newBranch: true, start: name } : { newBranch: false, branch: name })
         "
       />
+      <ChangesPanel :wt="path" />
       <div class="log-column">
         <FilterBar />
         <LogList
@@ -138,7 +168,7 @@ function openCreateBranchHere(): void {
       <div class="side-column">
         <CompareView v-if="compare.active" :wt="path" />
         <CommitDetailsPanel v-else :wt="path" />
-        <DiffView v-if="showDiff" :wt="path" :range="compareRange" />
+        <DiffView v-if="showDiff" :wt="path" :range="compareRange" :working="workingTarget" />
       </div>
     </div>
     <CommandLogPanel :wt="path" />
@@ -204,4 +234,7 @@ main {
 .side-column {
   overflow: auto;
 }
+/* The changes column (FR-UX-07): between refs and the log, resizable and
+   collapsible like the selector panel (SelectorPanel.vue's own pattern) —
+   the browser's own resize handle, no splitter component. */
 </style>

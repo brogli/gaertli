@@ -12,6 +12,7 @@ import (
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/nebegit/internal/jobs"
 	"github.com/brogli/nebegit/internal/watch"
 )
 
@@ -96,7 +97,8 @@ func (w *Worktree) append(e core.CommandLogEntry) {
 type Repo struct {
 	Key string
 
-	watcher repoWatcher // FR-REPO-04's git-state half
+	watcher repoWatcher   // FR-REPO-04's git-state half
+	jobs    *jobs.Manager // remote jobs (ADR-9)
 
 	// writeMu serialises this repo's write one-offs (ADR-6: "worktree
 	// add/remove/prune, branch delete/rename", plus branch create without
@@ -117,6 +119,9 @@ type Repo struct {
 
 // Watcher is the repo's git-dir watcher (internal/services.Refresh).
 func (r *Repo) Watcher() repoWatcher { return r.watcher }
+
+// Jobs is the repo's job manager (internal/services.Jobs/CancelJob).
+func (r *Repo) Jobs() *jobs.Manager { return r.jobs }
 
 // Lock/Unlock serialise this repo's write one-offs (ADR-6's per-repo queue),
 // held for the duration of one write call.
@@ -471,6 +476,9 @@ func (m *Manager) newRepo(key string) *Repo {
 	repo.watcher, _ = m.newWatcher(key, func(scope watch.Scope) {
 		m.sink(core.Event{Name: "repo:changed", Repo: key, Payload: changedPayload(scope)})
 	})
+	repo.jobs = jobs.NewManager(func(j jobs.Job) {
+		m.sink(core.Event{Name: "job:update", Repo: key, Payload: marshalJob(j)})
+	})
 	return repo
 }
 
@@ -561,6 +569,19 @@ func toCommandLogEntry(e git.Entry) core.CommandLogEntry {
 
 func marshalEntry(entry core.CommandLogEntry) json.RawMessage {
 	b, err := json.Marshal(entry)
+	if err != nil {
+		return nil
+	}
+	return b
+}
+
+// marshalJob is a "job:update" event's payload (components.md), converting
+// a jobs.Job to the JSON DTO the same way toCommandLogEntry/marshalEntry
+// convert a git.Entry — internal/services' toJobInfo does the same
+// conversion again for Jobs' read path (Design: internal/services is where
+// every other leaf-package-to-DTO conversion for a read already lives).
+func marshalJob(j jobs.Job) json.RawMessage {
+	b, err := json.Marshal(jobs.Info(j))
 	if err != nil {
 		return nil
 	}

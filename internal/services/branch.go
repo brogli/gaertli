@@ -146,8 +146,9 @@ func resetFlag(mode core.ResetMode) (string, error) {
 // already checked out elsewhere) stays plain GitFailed with git's own
 // message, per FR-BR-05.
 func remapDirty(err error, result git.Result) error {
-	var ce *core.Error
-	if errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == 1 {
+	if gitExited(err, result, 1) {
+		var ce *core.Error
+		errors.As(err, &ce)
 		ce.Code = core.DirtyWorktree
 	}
 	return err

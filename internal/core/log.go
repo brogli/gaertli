@@ -59,11 +59,15 @@ type CommitDetails struct {
 	Files          []ChangedFile `json:"files"`
 }
 
-// ChangedFile is one file touched by a commit.
+// ChangedFile is one file touched by a commit, or (FR-CHG-01) one entry in a
+// worktree's current changes.
 type ChangedFile struct {
 	Path    string `json:"path"`
 	OldPath string `json:"oldPath,omitempty"` // rename/copy source
-	Status  string `json:"status"`            // "A" | "M" | "D" | "R" | "C" | "T" | "U"
+	// Status is "A" | "M" | "D" | "R" | "C" | "T" | "U" for a commit's own
+	// file; "?" for an untracked entry, or a two-letter unmerged code (e.g.
+	// "UU", "AU", "DD") for a conflicted entry.
+	Status string `json:"status"`
 }
 
 // LogFilter is FR-LOG-05..08's combined filter. Every non-empty field

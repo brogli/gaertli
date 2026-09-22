@@ -69,8 +69,13 @@ func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, erro
 // failure: an unattached HEAD's symbolic-ref, an unborn HEAD's rev-parse.
 // Classified from the exit code, never stderr text (TR-08).
 func quietFailure(err error, result git.Result) bool {
+	return gitExited(err, result, 1) && len(result.Stdout) == 0
+}
+
+// gitExited reports whether err is git's own failure with exit code code.
+func gitExited(err error, result git.Result, code int) bool {
 	var ce *core.Error
-	return errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == 1 && len(result.Stdout) == 0
+	return errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == code
 }
 
 // operation checks the state files git-mapping.md names, in the worktree's
@@ -94,6 +99,21 @@ func operation(gitDir string) string {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// remapIfPending reclassifies a failed GitFailed err as Code Conflicts when
+// pending is true — an operation-state file was left behind, so the caller
+// stopped mid-way rather than refusing outright. Shared by pull's own
+// merge/rebase step and cherry-pick/revert.
+func remapIfPending(err error, pending bool) error {
+	if err == nil || !pending {
+		return err
+	}
+	var ce *core.Error
+	if errors.As(err, &ce) && ce.Code == core.GitFailed {
+		ce.Code = core.Conflicts
+	}
+	return err
 }
 
 // Refresh implements core.API.

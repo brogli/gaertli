@@ -9,9 +9,9 @@ import (
 	"github.com/brogli/nebegit/internal/git"
 )
 
-// statusArgs is git-mapping.md's existing Status row, reused as-is for the
-// working-file poll.
-var statusArgs = []string{"status", "--porcelain=v2", "-z", "--branch", "--untracked-files=all"}
+// StatusArgs is the one status call shape (git-mapping.md's Status row):
+// the poll here and the changes list read the same records.
+var StatusArgs = []string{"status", "--porcelain=v2", "-z", "--branch", "--untracked-files=all"}
 
 // WorktreePoller polls one worktree's git status while its window has
 // focus (ADR-9: worktree-session-level; FR-REPO-04's working-file half).
@@ -110,7 +110,7 @@ func (p *WorktreePoller) CheckNow() {
 	defer p.endPoll()
 
 	result, err := p.runner.Run(context.Background(), git.Call{
-		Dir: p.dir, ReadOnly: true, Background: true, Args: statusArgs,
+		Dir: p.dir, ReadOnly: true, Background: true, Args: StatusArgs,
 	})
 	if err != nil {
 		return

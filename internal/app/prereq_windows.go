@@ -5,7 +5,7 @@ package app
 import "golang.org/x/sys/windows"
 
 // showFatal shows msg before any window exists. No Wails window can be
-// assumed working in either failure case (Design), so this is a native
+// assumed working in either failure case, so this is a native
 // message box.
 func showFatal(title, msg string) {
 	t, _ := windows.UTF16PtrFromString(title)

@@ -42,6 +42,22 @@ func (s stubCore) DiffFile(context.Context, core.WorktreeID, string, string, str
 	return core.DiffFile{}, nil
 }
 
+func (s stubCore) Status(context.Context, core.WorktreeID) (core.ChangedFiles, error) {
+	return core.ChangedFiles{}, nil
+}
+
+func (s stubCore) StageFile(context.Context, core.WorktreeID, string) error { return nil }
+
+func (s stubCore) UnstageFile(context.Context, core.WorktreeID, string) error { return nil }
+
+func (s stubCore) StageAll(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) UnstageAll(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) DiffWorking(context.Context, core.WorktreeID, string, string, bool, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
 func (s stubCore) Refresh(context.Context, core.WorktreeID) error { return nil }
 
 func (s stubCore) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
@@ -101,6 +117,20 @@ func (s stubCore) ListBranches(context.Context, core.RepoPath) ([]core.BranchSum
 func (s stubCore) AddWorktree(context.Context, core.RepoPath, string, string, string, bool) (core.Worktree, error) {
 	return core.Worktree{}, nil
 }
+
+func (s stubCore) Jobs(context.Context, core.WorktreeID) ([]core.JobInfo, error) { return nil, nil }
+
+func (s stubCore) CancelJob(context.Context, core.WorktreeID, string) error { return nil }
+
+func (s stubCore) Fetch(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
+
+func (s stubCore) Pull(context.Context, core.WorktreeID, core.PullMode) (string, error) {
+	return "", nil
+}
+
+func (s stubCore) Push(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
+
+func (s stubCore) ForcePush(context.Context, core.WorktreeID) (string, error) { return "", nil }
 
 type stubRouter struct {
 	local core.API

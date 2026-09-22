@@ -5,6 +5,7 @@ import { formatTimeAgo } from '@vueuse/core'
 import ContextMenu from 'openvue/contextmenu'
 import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
+import { useChangesStore } from '../stores/changes'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import GraphCell from './GraphCell.vue'
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 }>()
 const log = useLogStore()
 const compare = useCompareStore()
+const changes = useChangesStore()
 const { error, runAndClose } = useCoreCall()
 
 onMounted(() => {
@@ -85,6 +87,7 @@ function onRowClick(row: LogCommit | undefined, index: number, event: MouseEvent
     return
   }
   compare.exit()
+  changes.clearSelection() // FR-UX-07: a commit selection wins over a stale changes-panel diff
   if (event.shiftKey) void log.shiftSelectTo(index)
   else log.selectOnly(row, index)
   void log.select(row)

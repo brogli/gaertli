@@ -2,12 +2,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockSummary, mockLoadLog, mockRefs, mockRecentRepos, mockCommandLog } = vi.hoisted(() => ({
+const { mockSummary, mockLoadLog, mockRefs, mockRecentRepos, mockCommandLog, mockStatus } = vi.hoisted(() => ({
   mockSummary: vi.fn(),
   mockLoadLog: vi.fn(),
   mockRefs: vi.fn(),
   mockRecentRepos: vi.fn(),
   mockCommandLog: vi.fn(),
+  mockStatus: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -19,12 +20,16 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     Refs: mockRefs,
     CommandLog: mockCommandLog,
     UncommittedCount: vi.fn(),
+    Jobs: vi.fn().mockResolvedValue([]),
+    CancelJob: vi.fn(),
+    Status: mockStatus,
   },
 }))
 
 import MainView from './MainView.vue'
 import SelectorPanel from '../components/SelectorPanel.vue'
 import WorktreeContent from './WorktreeContent.vue'
+import { changedFilesFixture } from '../testing/fixtures/changes'
 
 describe('MainView', () => {
   beforeEach(() => {
@@ -34,6 +39,7 @@ describe('MainView', () => {
     mockRefs.mockReset().mockResolvedValue({ branches: [], remotes: [], tags: [] })
     mockRecentRepos.mockReset().mockResolvedValue([])
     mockCommandLog.mockReset().mockResolvedValue([])
+    mockStatus.mockReset().mockResolvedValue(changedFilesFixture())
   })
 
   it('FR-WT-13 with no path, renders the panel and the empty state, not WorktreeContent', async () => {

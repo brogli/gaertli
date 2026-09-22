@@ -65,5 +65,19 @@ export const useDiffStore = defineStore('diff', () => {
     return loadInto(`${a}..${b}`, path, force, () => Facade.DiffRange(wt, a, b, path, oldPath, force))
   }
 
-  return { file, loading, load, loadRange }
+  // loadWorking is DiffFile's counterpart for a working-tree change
+  // (FR-CHG-04), keyed on the literal string "working" — there is no
+  // commit/range to key by, and a stage/unstage action reloads the
+  // changes panel anyway, so a coarser cache key costs nothing observable.
+  async function loadWorking(
+    wt: string,
+    path: string,
+    oldPath: string,
+    staged: boolean,
+    force = false,
+  ): Promise<void> {
+    return loadInto('working', path, force, () => Facade.DiffWorking(wt, path, oldPath, staged, force))
+  }
+
+  return { file, loading, load, loadRange, loadWorking }
 })

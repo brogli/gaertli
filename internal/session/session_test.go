@@ -233,6 +233,7 @@ func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close(wt.ID) // stops the poller before PollInterval is restored above
 	drainEvents(events)
 
 	if err := os.WriteFile(filepath.Join(repo.Dir, "seed.txt"), []byte("changed"), 0o644); err != nil {

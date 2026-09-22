@@ -7,4 +7,5 @@
 - FR-UPD case 2 uses the other worktree's queue for `merge --ff-only`.
 - Repo-wide one-offs (`worktree add/remove/prune`, branch delete/rename) use a per-repo queue.
 - Locks held by other tools make git fail; the app shows the error and offers retry.
+- A job (spec 70) is not a bypass: its own `fn` calls `Worktree.Lock`/`Repo.Lock` like any other write path, for whichever class its git call belongs to above. No new queue for jobs.
 

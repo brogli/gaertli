@@ -23,7 +23,7 @@ func TestADR_3_DeployTarget(t *testing.T) {
 
 // localRunner is the fake wslRunner cases 6-8 use: it ignores distro and
 // runs args as a real local command, so ensureDeployed's own "sh -c ..."
-// scripts (Design) run for real against a test-sandboxed $HOME.
+// scripts run for real against a test-sandboxed $HOME.
 func localRunner(ctx context.Context, distro string, args ...string) (*exec.Cmd, error) {
 	return exec.CommandContext(ctx, args[0], args[1:]...), nil
 }

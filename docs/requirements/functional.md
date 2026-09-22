@@ -184,6 +184,6 @@ The app is editor-neutral. the editor is only the default.
 | FR-UX-05 | SHOULD | Keyboard shortcuts for the main actions. |
 | FR-UX-06 | SHOULD | Light and dark theme. |
 | FR-UX-07 | MUST | Everything for the daily flow is in sight at once: selector panel, refs, log, commit details, diff, and the working-tree changes share one window. No switching between views or tabs to reach any of them; panels may be resized or collapsed. |
-| FR-UX-08 | MUST | Layout of the window: the selector panel and refs on the left, the log with its graph in the middle, the selected commit's details and the diff in a column to the right of the log, never below it. |
+| FR-UX-08 | MUST | Layout of the window: the selector panel and refs on the left, the working-tree changes panel between them and the log, the log with its graph in the middle, the selected commit's details and the diff in a column to the right of the log, never below it. |
 
 ---

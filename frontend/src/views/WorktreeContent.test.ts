@@ -15,6 +15,11 @@ const {
   mockSettingsGet,
   mockUpdateWindowTitle,
   mockListBranches,
+  mockJobs,
+  mockStatus,
+  mockDiffFile,
+  mockDiffWorking,
+  mockEventsOn,
 } = vi.hoisted(() => ({
   mockSummary: vi.fn(),
   mockCommandLog: vi.fn(),
@@ -28,6 +33,11 @@ const {
   mockSettingsGet: vi.fn(),
   mockUpdateWindowTitle: vi.fn(),
   mockListBranches: vi.fn(),
+  mockJobs: vi.fn(),
+  mockStatus: vi.fn(),
+  mockDiffFile: vi.fn(),
+  mockDiffWorking: vi.fn(),
+  mockEventsOn: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -43,9 +53,18 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     UncommittedCount: mockUncommittedCount,
     OpenFolder: mockOpenFolder,
     ListBranches: mockListBranches,
+    Jobs: mockJobs,
+    CancelJob: vi.fn(),
+    Status: mockStatus,
+    DiffFile: mockDiffFile,
+    DiffWorking: mockDiffWorking,
   },
   AppService: { UpdateWindowTitle: mockUpdateWindowTitle },
   SettingsService: { Get: mockSettingsGet, Set: vi.fn() },
+}))
+
+vi.mock('@wailsio/runtime', () => ({
+  Events: { On: mockEventsOn },
 }))
 
 import WorktreeContent from './WorktreeContent.vue'
@@ -54,9 +73,14 @@ import ResetDialog from '../components/ResetDialog.vue'
 import LogList from '../components/LogList.vue'
 import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
 import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
+import ChangesPanel from '../components/ChangesPanel.vue'
+import DiffView from '../components/DiffView.vue'
+import SyncControls from '../components/SyncControls.vue'
 import { useLogStore } from '../stores/log'
+import { useChangesStore } from '../stores/changes'
 import { commitRow } from '../testing/fixtures/log-rows'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
+import { changedFilesFixture } from '../testing/fixtures/changes'
 
 function mountView(props: { path: string }) {
   return mount(WorktreeContent, { props })
@@ -144,6 +168,16 @@ describe('WorktreeContent', () => {
     mockUpdateWindowTitle.mockResolvedValue(undefined)
     mockListBranches.mockReset()
     mockListBranches.mockResolvedValue([{ name: 'feature', checkedOutIn: '' }])
+    mockJobs.mockReset()
+    mockJobs.mockResolvedValue([])
+    mockStatus.mockReset()
+    mockStatus.mockResolvedValue(changedFilesFixture())
+    mockDiffFile.mockReset()
+    mockDiffFile.mockResolvedValue({ path: '', binary: false, tooLarge: false })
+    mockDiffWorking.mockReset()
+    mockDiffWorking.mockResolvedValue({ path: '', binary: false, tooLarge: false })
+    mockEventsOn.mockReset()
+    mockEventsOn.mockReturnValue(() => {})
   })
 
   it('FR-UX-08 renders the commit details in a column beside the log, not below it', async () => {
@@ -212,6 +246,13 @@ describe('WorktreeContent', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="ahead-behind"]').exists()).toBe(false)
+  })
+
+  it('FR-SYNC-01, FR-SYNC-02, FR-SYNC-03 renders SyncControls in the summary area', async () => {
+    const wrapper = mountView({ path: '/home/user/project' })
+    await flushPromises()
+
+    expect(wrapper.findComponent(SyncControls).exists()).toBe(true)
   })
 
   it('FR-BR-08 checking out a commit warns, then confirming calls CheckoutCommit once', async () => {
@@ -414,5 +455,91 @@ describe('WorktreeContent', () => {
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
     expect(dialog.exists()).toBe(true)
     expect(dialog.props('start')).toEqual({ newBranch: true, start: 'feature' })
+  })
+
+  // detailsWithFile seeds the log store's selected commit, one changed file.
+  function detailsWithFile(path: string) {
+    return {
+      sha: 'abc123',
+      parents: [],
+      author: '',
+      authorEmail: '',
+      authorAt: 0,
+      committer: '',
+      committerEmail: '',
+      committerAt: 0,
+      body: '',
+      files: [{ path, status: 'M' }],
+    }
+  }
+
+  it('FR-UX-07 a changes-panel selection takes precedence over the commit diff', async () => {
+    const wrapper = mountView({ path: '/home/user/project' })
+    await flushPromises()
+
+    const log = useLogStore()
+    log.details = detailsWithFile('x.txt')
+    log.selectedFile = { path: 'x.txt', status: 'M' }
+    const changes = useChangesStore()
+    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true }
+    await wrapper.vm.$nextTick()
+
+    const diffView = wrapper.findComponent(DiffView)
+    expect(diffView.exists()).toBe(true)
+    expect(diffView.props('working')).toEqual({ path: 'a.txt', oldPath: '', staged: true })
+  })
+
+  it('FR-UX-07 selecting a commit file clears the changes-panel selection and shows the commit diff', async () => {
+    const wrapper = mountView({ path: '/home/user/project' })
+    await flushPromises()
+
+    const changes = useChangesStore()
+    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true }
+    const log = useLogStore()
+    log.details = detailsWithFile('x.txt')
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.commit-details li').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(changes.selectedFile).toBeNull()
+    expect(log.selectedFile).toEqual({ path: 'x.txt', status: 'M' })
+    expect(wrapper.findComponent(DiffView).props('working')).toBeNull()
+  })
+
+  it('FR-UX-07 the changes-column collapse control hides and shows the panel, staying visible itself', async () => {
+    const wrapper = mount(WorktreeContent, { props: { path: '/home/user/project' }, attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.findComponent(ChangesPanel).exists()).toBe(true)
+    expect(wrapper.get('.changes-body').isVisible()).toBe(true)
+
+    const collapseButton = wrapper.get('[data-test="changes-collapse"]')
+    await collapseButton.trigger('click')
+
+    expect(wrapper.get('.changes-body').isVisible()).toBe(false)
+    expect(collapseButton.isVisible()).toBe(true)
+
+    await collapseButton.trigger('click')
+
+    expect(wrapper.get('.changes-body').isVisible()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('FR-CHG-01 a repo:changed index-scope event calls changes.load again', async () => {
+    const changes = useChangesStore()
+    const loadSpy = vi.spyOn(changes, 'load')
+
+    const wrapper = mountView({ path: '/home/user/project' })
+    await flushPromises()
+    expect(loadSpy).toHaveBeenCalledTimes(1)
+
+    const handlers = mockEventsOn.mock.calls.filter((call) => call[0] === 'repo:changed').map((call) => call[1])
+    handlers.forEach((handler) => handler({ data: { scope: 'index' } }))
+    await flushPromises()
+
+    expect(loadSpy).toHaveBeenCalledTimes(2)
+    expect(loadSpy).toHaveBeenLastCalledWith('/home/user/project')
+    wrapper.unmount()
   })
 })

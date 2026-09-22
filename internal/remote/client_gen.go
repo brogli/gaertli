@@ -24,6 +24,15 @@ func (c *Client) AddWorktree(ctx context.Context, path core.RepoPath, target str
 	return result, err
 }
 
+type cancelJobParams struct {
+	Wt core.WorktreeID `json:"wt"`
+	Id string          `json:"id"`
+}
+
+func (c *Client) CancelJob(ctx context.Context, wt core.WorktreeID, id string) error {
+	return c.call(ctx, "CancelJob", cancelJobParams{Wt: wt, Id: id}, nil)
+}
+
 type checkoutParams struct {
 	Wt     core.WorktreeID `json:"wt"`
 	Branch string          `json:"branch"`
@@ -132,6 +141,51 @@ func (c *Client) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b 
 	return result, err
 }
 
+type diffWorkingParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Path    string          `json:"path"`
+	OldPath string          `json:"oldPath"`
+	Staged  bool            `json:"staged"`
+	Force   bool            `json:"force"`
+}
+
+func (c *Client) DiffWorking(ctx context.Context, wt core.WorktreeID, path string, oldPath string, staged bool, force bool) (core.DiffFile, error) {
+	var result core.DiffFile
+	err := c.call(ctx, "DiffWorking", diffWorkingParams{Wt: wt, Path: path, OldPath: oldPath, Staged: staged, Force: force}, &result)
+	return result, err
+}
+
+type fetchParams struct {
+	Wt     core.WorktreeID `json:"wt"`
+	Remote string          `json:"remote"`
+}
+
+func (c *Client) Fetch(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
+	var result string
+	err := c.call(ctx, "Fetch", fetchParams{Wt: wt, Remote: remote}, &result)
+	return result, err
+}
+
+type forcePushParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) ForcePush(ctx context.Context, wt core.WorktreeID) (string, error) {
+	var result string
+	err := c.call(ctx, "ForcePush", forcePushParams{Wt: wt}, &result)
+	return result, err
+}
+
+type jobsParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) Jobs(ctx context.Context, wt core.WorktreeID) ([]core.JobInfo, error) {
+	var result []core.JobInfo
+	err := c.call(ctx, "Jobs", jobsParams{Wt: wt}, &result)
+	return result, err
+}
+
 type listBranchesParams struct {
 	Path core.RepoPath `json:"path"`
 }
@@ -219,6 +273,28 @@ func (c *Client) OpenWorktree(ctx context.Context, path core.RepoPath) (core.Wor
 	return result, err
 }
 
+type pullParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Mode core.PullMode   `json:"mode"`
+}
+
+func (c *Client) Pull(ctx context.Context, wt core.WorktreeID, mode core.PullMode) (string, error) {
+	var result string
+	err := c.call(ctx, "Pull", pullParams{Wt: wt, Mode: mode}, &result)
+	return result, err
+}
+
+type pushParams struct {
+	Wt     core.WorktreeID `json:"wt"`
+	Remote string          `json:"remote"`
+}
+
+func (c *Client) Push(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
+	var result string
+	err := c.call(ctx, "Push", pushParams{Wt: wt, Remote: remote}, &result)
+	return result, err
+}
+
 type refreshParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -292,6 +368,33 @@ func (c *Client) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter co
 	return c.call(ctx, "SetLogFilter", setLogFilterParams{Wt: wt, Filter: filter}, nil)
 }
 
+type stageAllParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) StageAll(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "StageAll", stageAllParams{Wt: wt}, nil)
+}
+
+type stageFileParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Path string          `json:"path"`
+}
+
+func (c *Client) StageFile(ctx context.Context, wt core.WorktreeID, path string) error {
+	return c.call(ctx, "StageFile", stageFileParams{Wt: wt, Path: path}, nil)
+}
+
+type statusParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) Status(ctx context.Context, wt core.WorktreeID) (core.ChangedFiles, error) {
+	var result core.ChangedFiles
+	err := c.call(ctx, "Status", statusParams{Wt: wt}, &result)
+	return result, err
+}
+
 type summaryParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -310,6 +413,23 @@ func (c *Client) UncommittedCount(ctx context.Context, wt core.WorktreeID) (int,
 	var result int
 	err := c.call(ctx, "UncommittedCount", uncommittedCountParams{Wt: wt}, &result)
 	return result, err
+}
+
+type unstageAllParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) UnstageAll(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "UnstageAll", unstageAllParams{Wt: wt}, nil)
+}
+
+type unstageFileParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Path string          `json:"path"`
+}
+
+func (c *Client) UnstageFile(ctx context.Context, wt core.WorktreeID, path string) error {
+	return c.call(ctx, "UnstageFile", unstageFileParams{Wt: wt, Path: path}, nil)
 }
 
 func (c *Client) Version(ctx context.Context) (core.Version, error) {

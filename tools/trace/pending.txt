@@ -1,9 +1,6 @@
 # IDs whose tests are still owed (TR-30, spec 03). The spec that adds an
 # ID's test removes its line in the same commit; task trace fails otherwise.
-FR-CHG-01
-FR-CHG-02
 FR-CHG-03
-FR-CHG-04
 FR-CHG-05
 FR-CHG-06
 FR-CHG-07
@@ -13,14 +10,6 @@ FR-CONF-02
 FR-CONF-03
 FR-CONF-04
 FR-CP-03
-FR-SYNC-01
-FR-SYNC-02
-FR-SYNC-03
-FR-SYNC-04
-FR-SYNC-05
-FR-SYNC-06
-FR-SYNC-07
-FR-SYNC-08
 FR-UPD-01
 FR-UPD-02
 FR-UPD-03
@@ -34,7 +23,3 @@ QA-OSS-04
 QA-PORT-01
 QA-PORT-03
 QA-PORT-04
-QA-RESP-01
-QA-RESP-02
-QA-SAFE-04
-QA-SEC-02

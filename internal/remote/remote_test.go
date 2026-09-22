@@ -50,6 +50,22 @@ func (f *fake) DiffFile(context.Context, core.WorktreeID, string, string, string
 	return core.DiffFile{}, nil
 }
 
+func (f *fake) Status(context.Context, core.WorktreeID) (core.ChangedFiles, error) {
+	return core.ChangedFiles{}, nil
+}
+
+func (f *fake) StageFile(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f *fake) UnstageFile(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f *fake) StageAll(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) UnstageAll(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) DiffWorking(context.Context, core.WorktreeID, string, string, bool, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
 func (f *fake) Refresh(context.Context, core.WorktreeID) error { return nil }
 
 func (f *fake) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
@@ -109,6 +125,20 @@ func (f *fake) ListBranches(context.Context, core.RepoPath) ([]core.BranchSummar
 func (f *fake) AddWorktree(context.Context, core.RepoPath, string, string, string, bool) (core.Worktree, error) {
 	return core.Worktree{}, nil
 }
+
+func (f *fake) Jobs(context.Context, core.WorktreeID) ([]core.JobInfo, error) { return nil, nil }
+
+func (f *fake) CancelJob(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f *fake) Fetch(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
+
+func (f *fake) Pull(context.Context, core.WorktreeID, core.PullMode) (string, error) {
+	return "", nil
+}
+
+func (f *fake) Push(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
+
+func (f *fake) ForcePush(context.Context, core.WorktreeID) (string, error) { return "", nil }
 
 // pipeClient serves f over an in-memory pipe and returns a client on it.
 func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {

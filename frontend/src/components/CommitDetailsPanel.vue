@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useLogStore } from '../stores/log'
+import { useChangesStore } from '../stores/changes'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
@@ -12,7 +13,15 @@ import ErrorBanner from './ErrorBanner.vue'
 // to resolve a file's editor-open call against it.
 const props = defineProps<{ wt: string }>()
 const log = useLogStore()
+const changes = useChangesStore()
 const { error, run } = useCoreCall()
+
+// FR-UX-07: selecting one of this commit's files wins over a stale
+// changes-panel diff, the same rule LogList's own row click applies.
+function selectFile(f: ChangedFile): void {
+  changes.clearSelection()
+  log.selectFile(f)
+}
 
 function openEditor(f: ChangedFile): void {
   void run(() => Facade.OpenFile(props.wt, f.path, 0))
@@ -31,7 +40,7 @@ function openEditor(f: ChangedFile): void {
     <ChangedFileList
       :files="log.details.files ?? []"
       :selected="log.selectedFile"
-      @select="log.selectFile"
+      @select="selectFile"
       @open-editor="openEditor"
     />
   </section>

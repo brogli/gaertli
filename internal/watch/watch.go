@@ -22,7 +22,7 @@ const (
 // before constructing the watcher/poller under test, which reads them once).
 var (
 	DebounceInterval     = 300 * time.Millisecond // git-mapping.md
-	FallbackPollInterval = 5 * time.Second        // insurance only, not the primary path (Design)
+	FallbackPollInterval = 5 * time.Second        // insurance only, not the primary path
 	PollInterval         = 1 * time.Second        // git-mapping.md: "start at 1s"
 	MaxPollInterval      = 10 * time.Second       // backoff cap
 )
