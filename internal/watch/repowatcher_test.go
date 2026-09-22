@@ -70,7 +70,7 @@ func TestQA_PERF_06_FallbackTickerCallsCheckNowAtABoundedRate(t *testing.T) {
 
 func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromOutside(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	commonDir := filepath.Join(repo.Dir, ".git")
 
 	got := make(chan Scope, 10)
@@ -80,7 +80,7 @@ func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromOutside(t *testing.T) {
 	}
 	defer func() { _ = w.Close() }()
 
-	commit(t, repo.Dir, "seed.txt", "y", "second")
+	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
 
 	waitForScope(t, got, Refs)
 }
@@ -105,7 +105,7 @@ func TestFR_REPO_04_RepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
 
 func TestQA_COMP_02_RepoWatcherToleratesConcurrentReadsWhileWriting(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	commonDir := filepath.Join(repo.Dir, ".git")
 
 	got := make(chan Scope, 10)
@@ -159,18 +159,5 @@ func waitForScope(t *testing.T, got chan Scope, want Scope) {
 		case <-deadline:
 			t.Fatalf("onChange(%s) did not fire within 2s", want)
 		}
-	}
-}
-
-func commit(t *testing.T, dir, name, content, msg string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"add", "--", name}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"commit", "-F", "-"}, Stdin: []byte(msg)}); err != nil {
-		t.Fatal(err)
 	}
 }

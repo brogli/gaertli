@@ -16,10 +16,10 @@ func wslPresent() bool {
 	return err == nil
 }
 
-// parseDistroList is the pure parser for `wsl --list --verbose`'s output
-// (Research used: raw may be UTF-16LE when wsl.exe's stdout is piped).
-// Drops the header line by position (not by matching localized column
-// text), and reads each row from the end — last field VERSION (a digit,
+// parseDistroList is the pure parser for `wsl --list --verbose`'s output;
+// raw may be UTF-16LE when wsl.exe's stdout is piped. It drops the header
+// line by position (not by matching localized column text), and reads each
+// row from the end — last field VERSION (a digit,
 // locale-safe), second-last STATE (locale text, kept opaque, not used for
 // any decision), everything before that re-joined as NAME (so a
 // space-containing distro name parses correctly). A leading '*' marks
@@ -66,10 +66,10 @@ func parseDistroRow(row string) (Distro, error) {
 	return Distro{Name: name, Version: version, Default: isDefault}, nil
 }
 
-// decodeWSLText undoes wsl.exe's own UTF-16LE-when-piped behavior (Research
-// used, unverified — testing.md's manual row asks for a real capture to
-// confirm this heuristic): a BOM if present, else the "every other byte is
-// 0x00" pattern, else the bytes are already UTF-8/ASCII.
+// decodeWSLText undoes wsl.exe's own UTF-16LE-when-piped behaviour: a BOM
+// if present, else the "every other byte is 0x00" pattern, else the bytes
+// are already UTF-8/ASCII. The heuristic still awaits a real capture
+// (testing.md's manual row).
 func decodeWSLText(raw []byte) string {
 	if len(raw) >= 2 && raw[0] == 0xFF && raw[1] == 0xFE {
 		return utf16LEToString(raw[2:])
@@ -80,8 +80,8 @@ func decodeWSLText(raw []byte) string {
 	return string(raw)
 }
 
-// looksUTF16LE applies the NUL-byte-pattern heuristic (Research used, Gap):
-// ASCII text encoded as UTF-16LE has a 0x00 byte at every odd index.
+// looksUTF16LE applies the NUL-byte-pattern heuristic: ASCII text encoded
+// as UTF-16LE has a 0x00 byte at every odd index.
 func looksUTF16LE(b []byte) bool {
 	if len(b) < 2 || len(b)%2 != 0 {
 		return false

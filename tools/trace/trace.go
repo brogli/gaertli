@@ -89,8 +89,7 @@ func coverage(cfg Config) (map[string]bool, error) {
 }
 
 // manualCoverage returns the requirement IDs listed in the first cell of a
-// docs/architecture/testing.md table row, split on comma (spec 03,
-// decision 4).
+// docs/architecture/testing.md table row, split on comma.
 func manualCoverage(path string) (map[string]bool, error) {
 	rows, err := tableRows(path)
 	if err != nil {
@@ -136,7 +135,7 @@ func report(out io.Writer, required, covered, pending map[string]bool, pendingPa
 }
 
 // goCoverage returns the requirement IDs named by Go test functions below
-// root (spec 03, decision 3).
+// root.
 func goCoverage(root string) (map[string]bool, error) {
 	return coverageInFiles(root, "_test.go", func(src string, covered map[string]bool) {
 		for _, m := range goTestFunc.FindAllStringSubmatch(src, -1) {
@@ -148,8 +147,7 @@ func goCoverage(root string) (map[string]bool, error) {
 }
 
 // vitestCoverage returns the requirement IDs named by the first string
-// argument of an it(...) or test(...) call in *.test.ts files below root
-// (spec 03, decision 3).
+// argument of an it(...) or test(...) call in *.test.ts files below root.
 func vitestCoverage(root string) (map[string]bool, error) {
 	return coverageInFiles(root, ".test.ts", func(src string, covered map[string]bool) {
 		for _, m := range vitestCall.FindAllStringSubmatch(src, -1) {
@@ -200,7 +198,7 @@ func skipDir(name string) bool {
 }
 
 // requiredIDs returns every MUST FR id from functionalPath and every QA id
-// from qualityPath (spec 03, decision 1).
+// from qualityPath.
 func requiredIDs(functionalPath, qualityPath string) (map[string]bool, error) {
 	required := map[string]bool{}
 

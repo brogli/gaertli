@@ -25,8 +25,7 @@ vi.mock('@wailsio/runtime', () => ({
 
 import App from './App.vue'
 import CompareDiffView from './views/CompareDiffView.vue'
-import WorktreeView from './views/WorktreeView.vue'
-import HomeView from './views/HomeView.vue'
+import MainView from './views/MainView.vue'
 import { defaultSettingsFixture } from './testing/fixtures/settings'
 
 mockSettingsGet.mockResolvedValue(defaultSettingsFixture())
@@ -44,7 +43,7 @@ describe('App', () => {
     expect(mount(App).text()).toContain('nebegit')
   })
 
-  it('FR-CMP-02 routes ?view=compare-diff to CompareDiffView, not WorktreeView/HomeView', async () => {
+  it('FR-CMP-02 routes ?view=compare-diff to CompareDiffView, not MainView', async () => {
     window.history.pushState(
       {},
       '',
@@ -55,7 +54,6 @@ describe('App', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(CompareDiffView).exists()).toBe(true)
-    expect(wrapper.findComponent(WorktreeView).exists()).toBe(false)
-    expect(wrapper.findComponent(HomeView).exists()).toBe(false)
+    expect(wrapper.findComponent(MainView).exists()).toBe(false)
   })
 })

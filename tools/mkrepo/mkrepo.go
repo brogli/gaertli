@@ -1,7 +1,6 @@
 // Package mkrepo builds a deterministic reference git repository via git
-// fast-import, for perf benchmarking (spec 13). Its Build/Config/Params are
-// imported directly by tools/bench (same module); tools/mkrepo/cmd/mkrepo is
-// its CLI entry point.
+// fast-import, for perf benchmarking. tools/bench imports Build/Config/
+// Params directly; tools/mkrepo/cmd/mkrepo is its CLI entry point.
 package mkrepo
 
 import (
@@ -127,9 +126,8 @@ func addWorktrees(ctx context.Context, dir string, cfg Config) error {
 
 // isolateConfig points HOME and git's global config at a fresh temp
 // directory and disables the system config, so Build never reads the
-// developer's own git configuration (gittest.isolateConfig's own approach,
-// spec 02, duplicated rather than shared: gittest.New takes a *testing.T
-// and cannot be called from a non-test main).
+// developer's own git configuration. Same approach as gittest's, which
+// takes a *testing.T and so cannot be called from a plain main.
 func isolateConfig() (restore func(), err error) {
 	home, err := os.MkdirTemp("", "mkrepo-home")
 	if err != nil {

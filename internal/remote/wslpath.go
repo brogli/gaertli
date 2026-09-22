@@ -10,8 +10,8 @@ type Distro struct {
 	Default bool   `json:"default"`
 }
 
-// wslPrefixes are the two UNC forms a WSL path is found under (Research
-// used: neither is documented as deprecated, so both are accepted).
+// wslPrefixes are the two UNC forms a WSL path is found under; neither is
+// documented as deprecated, so both are accepted.
 var wslPrefixes = []string{`\\wsl.localhost\`, `\\wsl$\`}
 
 // ClassifyWSLPath reports whether path names a location inside a WSL
@@ -36,8 +36,8 @@ func ClassifyWSLPath(path string) (distro, linuxPath string, ok bool) {
 
 // BuildWSLPath is ClassifyWSLPath's inverse: the \\wsl.localhost\<distro>\...
 // UNC form of a distro and a POSIX path inside it — the same form
-// AppService.OpenPath already produces and the one spec 04's single-instance
-// launch path already classifies correctly. Pure, no I/O.
+// AppService.OpenPath produces and the single-instance launch path
+// classifies. Pure, no I/O.
 func BuildWSLPath(distro, linuxPath string) string {
 	return `\\wsl.localhost\` + distro + strings.ReplaceAll(linuxPath, "/", `\`)
 }
@@ -53,10 +53,8 @@ func trimWSLPrefix(path string) (string, bool) {
 
 // windowsPathToMount converts an absolute Windows path (os.Executable()'s
 // own form) to its default WSL DrvFs mount form: Windows drives mount under
-// /mnt/<lowercase-letter>/ by default (a customised wsl.conf [automount]
-// root breaks this, the same category of default-config assumption
-// ClassifyWSLPath already makes for the UNC prefix form). ok=false for
-// anything not of the form "<letter>:\...".
+// /mnt/<lowercase-letter>/ unless wsl.conf's [automount] root is
+// customised. ok=false for anything not of the form "<letter>:\...".
 func windowsPathToMount(winPath string) (mountPath string, ok bool) {
 	if len(winPath) < 3 || winPath[1] != ':' || winPath[2] != '\\' {
 		return "", false

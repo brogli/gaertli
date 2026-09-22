@@ -31,4 +31,13 @@ describe('ChangedFileList', () => {
 
     expect(wrapper.emitted('open')?.[0]).toEqual([files[1]])
   })
+
+  it('FR-ED-02 clicking a file row\'s "Open in editor" control emits open-editor with that file, not select', async () => {
+    const wrapper = mount(ChangedFileList, { props: { files } })
+
+    await wrapper.findAll('[data-test="open-editor"]')[1]!.trigger('click')
+
+    expect(wrapper.emitted('open-editor')?.[0]).toEqual([files[1]])
+    expect(wrapper.emitted('select')).toBeUndefined()
+  })
 })

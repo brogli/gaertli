@@ -11,8 +11,8 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// wslRunner is the one seam every wsl.exe-spawning call in this spec goes
-// through: production wires it to the real wsl.exe (Windows-only,
+// wslRunner is the one seam every wsl.exe-spawning call goes through:
+// production wires it to the real wsl.exe (Windows-only,
 // distrocore_windows.go/distrocore_other.go), tests wire it to a fake.
 type wslRunner func(ctx context.Context, distro string, args ...string) (*exec.Cmd, error)
 
@@ -46,9 +46,9 @@ func ensureDeployed(ctx context.Context, run wslRunner, consent Consent, distro,
 	return deployCore(ctx, run, consent, distro, target)
 }
 
-// deployCore asks consent and copies embeddedCore to target unconditionally
-// (Design: DistroCore's version-mismatch retry forces a fresh copy even
-// when the size already matched a stale binary).
+// deployCore asks consent and copies embeddedCore to target
+// unconditionally, so DistroCore's version-mismatch retry replaces a stale
+// binary whose size happened to match.
 func deployCore(ctx context.Context, run wslRunner, consent Consent, distro, target string) error {
 	if !consent.Ask(distro, target) {
 		return core.Errorf(core.DeployRefused, "copying nebegit's helper into %s was declined", distro)
@@ -73,8 +73,8 @@ func remoteSize(ctx context.Context, run wslRunner, distro, target string) (int6
 
 // copyCore pipes payload into target inside distro: wsl.exe -d <distro> --
 // sh -c 'mkdir -p $(dirname <target>) && cat > <target> && chmod +x
-// <target>', stdin = payload — avoids writing through the \\wsl.localhost
-// UNC path at all (Research used: sidesteps its launch friction).
+// <target>', stdin = payload — never writing through the \\wsl.localhost
+// UNC path, which is slow to open.
 func copyCore(ctx context.Context, run wslRunner, distro, target string, payload []byte) error {
 	script := fmt.Sprintf("mkdir -p $(dirname %s) && cat > %s && chmod +x %s", target, target, target)
 	cmd, err := run(ctx, distro, "sh", "-c", script)

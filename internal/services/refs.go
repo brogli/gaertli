@@ -28,19 +28,28 @@ type parsedRef struct {
 	Worktree      string
 }
 
-// parseRefRecords splits on the format's own %00 and strips each record's
-// leading \n (same framing established for git log/for-each-ref), then
-// splits fields on %1f.
+// parseRefRecords splits refsFormat's %00-terminated records and their
+// %1f-separated fields.
 func parseRefRecords(out []byte) []parsedRef {
 	var refs []parsedRef
-	for _, record := range bytes.Split(out, []byte{0}) {
-		record = bytes.TrimPrefix(record, []byte("\n"))
-		if len(record) == 0 {
-			continue
-		}
-		refs = append(refs, parseRefRecord(string(record)))
+	for _, record := range nulRecords(out) {
+		refs = append(refs, parseRefRecord(record))
 	}
 	return refs
+}
+
+// nulRecords splits a %00-terminated git stream into records, stripping the
+// '\n' git appends after each one and dropping empties. Shared by every
+// for-each-ref parser here.
+func nulRecords(out []byte) []string {
+	var records []string
+	for _, record := range bytes.Split(out, []byte{0}) {
+		record = bytes.TrimPrefix(record, []byte("\n"))
+		if len(record) > 0 {
+			records = append(records, string(record))
+		}
+	}
+	return records
 }
 
 func parseRefRecord(record string) parsedRef {
@@ -76,13 +85,10 @@ func parseTrack(s string) (ahead, behind int, gone bool) {
 	return ahead, behind, false
 }
 
-// toRefs implements core.API's Refs. Buckets parsed by refname prefix
-// (for-each-ref's output is sorted globally by refname, not grouped by
-// input pattern order — bucketing, not slicing by position, is
-// required), grouping refs/remotes/<remote>/... by <remote> in
-// first-seen order (each group's own branches, and each bucket as a
-// whole, arrive already alphabetically sorted, so no separate sort step
-// is needed).
+// toRefs buckets parsed refs by refname prefix — for-each-ref sorts its
+// output globally by refname, not by input pattern order — and groups
+// refs/remotes/<remote>/... by <remote> in first-seen order. Everything
+// arrives alphabetically sorted, so no sort step is needed.
 func toRefs(parsed []parsedRef) core.Refs {
 	var refs core.Refs
 	remotes := map[string]*core.Remote{}

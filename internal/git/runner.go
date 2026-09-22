@@ -24,8 +24,7 @@ type Call struct {
 	Continue   bool // adds GIT_EDITOR=true (TR-09): a --continue/--abort/--skip call
 	Background bool // hidden by default in the command log (FR-UX-02)
 
-	// Timeout bounds this call when ctx has no deadline. Zero uses
-	// Runner.DefaultTimeout.
+	// Timeout bounds this call when ctx has no deadline. Zero means 30s.
 	Timeout time.Duration
 }
 
@@ -48,12 +47,15 @@ type Entry struct {
 }
 
 // Runner executes the system git as a subprocess (ADR-1). The zero value
-// runs "git" resolved via PATH with a 30s default timeout and no log.
+// runs "git" resolved via PATH with no log.
 type Runner struct {
-	Git            string        // git executable; "" resolves "git" via exec.LookPath
-	DefaultTimeout time.Duration // 0 means 30 * time.Second
-	Log            func(Entry)   // called once per Run, success or failure; nil is fine
+	Git string      // git executable; "" resolves "git" via exec.LookPath
+	Log func(Entry) // called once per Run, success or failure; nil is fine
 }
+
+// defaultTimeout bounds a call whose ctx has no deadline and whose
+// Call.Timeout is zero.
+const defaultTimeout = 30 * time.Second
 
 // Run executes call and waits for it to finish, ctx to be done, or the
 // effective timeout to expire, whichever comes first.
@@ -85,16 +87,16 @@ func (r Runner) Run(ctx context.Context, call Call) (Result, error) {
 	return result, err
 }
 
-// prepare builds the *exec.Cmd for call, sharing env/SysProcAttr/timeout
-// setup with Run and Stream. cmd is nil and err is the Cancelled error to
-// return immediately if ctx is already done.
+// prepare builds the *exec.Cmd for call, shared by Run and Stream. cmd is
+// nil and err is the Cancelled error to return at once if ctx is already
+// done.
 func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, effectiveCtx context.Context, cancel context.CancelFunc, command string, err error) {
 	command = formatCommand(call.Args, call.Stdin != nil)
 	if ctx.Err() != nil {
 		return nil, ctx, func() {}, command, core.Errorf(core.Cancelled, "%s", ctx.Err())
 	}
 
-	effectiveCtx, cancel = r.withTimeout(ctx, call.Timeout)
+	effectiveCtx, cancel = withTimeout(ctx, call.Timeout)
 
 	git := r.Git
 	if git == "" {
@@ -111,7 +113,6 @@ func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, effectiv
 	return cmd, effectiveCtx, cancel, command, nil
 }
 
-// log reports one Entry to r.Log, if set.
 func (r Runner) log(call Call, command string, result Result, duration time.Duration, err error) {
 	if r.Log == nil {
 		return
@@ -126,18 +127,14 @@ func (r Runner) log(call Call, command string, result Result, duration time.Dura
 	})
 }
 
-// withTimeout bounds ctx with call's or the Runner's timeout when ctx has no
-// deadline of its own.
-func (r Runner) withTimeout(ctx context.Context, callTimeout time.Duration) (context.Context, context.CancelFunc) {
+// withTimeout bounds ctx with the call's timeout when ctx has no deadline
+// of its own.
+func withTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if _, hasDeadline := ctx.Deadline(); hasDeadline {
 		return ctx, func() {}
 	}
-	timeout := callTimeout
 	if timeout == 0 {
-		timeout = r.DefaultTimeout
-	}
-	if timeout == 0 {
-		timeout = 30 * time.Second
+		timeout = defaultTimeout
 	}
 	return context.WithTimeout(ctx, timeout)
 }

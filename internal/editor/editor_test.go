@@ -2,9 +2,7 @@ package editor
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -13,24 +11,12 @@ import (
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// argvWriterBin is a small helper built once (case 15): it writes its own
-// received argv to a file next to itself and exits, standing in for a real
-// editor.
+// argvWriterBin writes its own argv to a file next to itself, standing in
+// for a real editor.
 var argvWriterBin string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "nebegit-editor")
-	if err != nil {
-		panic(err)
-	}
-	argvWriterBin = filepath.Join(dir, "argvwriter")
-	if err := testbin.Build(argvWriterBin, "./testdata/argvwriter"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	code := m.Run()
-	_ = os.RemoveAll(dir)
-	os.Exit(code)
+	testbin.Main(m, testbin.Bin{Path: &argvWriterBin, Pkg: "./testdata/argvwriter"})
 }
 
 func TestFR_ED_05_Default(t *testing.T) {

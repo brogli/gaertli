@@ -11,6 +11,9 @@ import (
 
 func handlers(api core.API) handler.Map {
 	return handler.Map{
+		"AddWorktree": handler.New(func(ctx context.Context, p addWorktreeParams) (core.Worktree, error) {
+			return api.AddWorktree(ctx, p.Path, p.Target, p.Branch, p.Start, p.NewBranch)
+		}),
 		"Checkout": handler.New(func(ctx context.Context, p checkoutParams) error {
 			return api.Checkout(ctx, p.Wt, p.Branch)
 		}),
@@ -41,6 +44,12 @@ func handlers(api core.API) handler.Map {
 		"DiffRange": handler.New(func(ctx context.Context, p diffRangeParams) (core.DiffFile, error) {
 			return api.DiffRange(ctx, p.Wt, p.A, p.B, p.Path, p.OldPath, p.Force)
 		}),
+		"ListBranches": handler.New(func(ctx context.Context, p listBranchesParams) ([]core.BranchSummary, error) {
+			return api.ListBranches(ctx, p.Path)
+		}),
+		"ListWorktrees": handler.New(func(ctx context.Context, p listWorktreesParams) ([]core.Worktree, error) {
+			return api.ListWorktrees(ctx, p.Path)
+		}),
 		"LoadLog": handler.New(func(ctx context.Context, p loadLogParams) error {
 			return api.LoadLog(ctx, p.Wt)
 		}),
@@ -55,6 +64,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"OpenFolder": handler.New(func(ctx context.Context, p openFolderParams) error {
 			return api.OpenFolder(ctx, p.Wt)
+		}),
+		"OpenFolderAt": handler.New(func(ctx context.Context, p openFolderAtParams) error {
+			return api.OpenFolderAt(ctx, p.Path)
 		}),
 		"OpenWorktree": handler.New(func(ctx context.Context, p openWorktreeParams) (core.WorktreeInfo, error) {
 			return api.OpenWorktree(ctx, p.Path)

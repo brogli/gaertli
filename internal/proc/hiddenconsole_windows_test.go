@@ -1,6 +1,6 @@
 //go:build windows
 
-package git
+package proc
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 )
 
 func TestTR_12_SysProcAttrHidesWindow(t *testing.T) {
-	attr := sysProcAttr()
+	attr := HiddenConsole()
 	if attr.CreationFlags&windows.CREATE_NO_WINDOW == 0 {
 		t.Errorf("CreationFlags = %#x, want CREATE_NO_WINDOW set", attr.CreationFlags)
 	}

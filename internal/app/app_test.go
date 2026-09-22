@@ -3,57 +3,30 @@ package app
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/settings"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// fakeAPI is a core.API whose OpenWorktree behaviour a test picks; other
-// calls are recorded or no-op.
+// fakeAPI is a core.API whose OpenWorktree behaviour a test picks; the
+// other methods this package reaches record their calls. The embedded
+// interface is nil, so any method a test does not expect to be called
+// panics instead of quietly answering.
 type fakeAPI struct {
+	core.API
 	openWorktree   func(context.Context, core.RepoPath) (core.WorktreeInfo, error)
 	closed         *[]core.WorktreeID
 	editorProfiles *[]core.EditorProfile // records every SetEditorProfile call, if set
 }
 
-func (f fakeAPI) Version(context.Context) (core.Version, error) { return core.Version{}, nil }
-
 func (f fakeAPI) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 	return f.openWorktree(ctx, path)
 }
-
-func (f fakeAPI) Summary(context.Context, core.WorktreeID) (core.Summary, error) {
-	return core.Summary{}, nil
-}
-
-func (f fakeAPI) Refs(context.Context, core.WorktreeID) (core.Refs, error) {
-	return core.Refs{}, nil
-}
-
-func (f fakeAPI) CommandLog(context.Context, core.WorktreeID) ([]core.CommandLogEntry, error) {
-	return nil, nil
-}
-
-func (f fakeAPI) LoadLog(context.Context, core.WorktreeID) error { return nil }
-
-func (f fakeAPI) LogRows(context.Context, core.WorktreeID, int, int) (core.LogRowsResult, error) {
-	return core.LogRowsResult{}, nil
-}
-
-func (f fakeAPI) CommitDetails(context.Context, core.WorktreeID, string) (core.CommitDetails, error) {
-	return core.CommitDetails{}, nil
-}
-
-func (f fakeAPI) DiffFile(context.Context, core.WorktreeID, string, string, string, bool) (core.DiffFile, error) {
-	return core.DiffFile{}, nil
-}
-
-func (f fakeAPI) Refresh(context.Context, core.WorktreeID) error { return nil }
-
-func (f fakeAPI) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
 
 func (f fakeAPI) CloseWorktree(_ context.Context, id core.WorktreeID) error {
 	if f.closed != nil {
@@ -62,40 +35,6 @@ func (f fakeAPI) CloseWorktree(_ context.Context, id core.WorktreeID) error {
 	return nil
 }
 
-func (f fakeAPI) ReloadLog(context.Context, core.WorktreeID) error { return nil }
-
-func (f fakeAPI) LogIndexOf(context.Context, core.WorktreeID, string) (core.LogIndexResult, error) {
-	return core.LogIndexResult{}, nil
-}
-
-func (f fakeAPI) CompareCommits(context.Context, core.WorktreeID, string, string) ([]core.ChangedFile, error) {
-	return nil, nil
-}
-
-func (f fakeAPI) DiffRange(context.Context, core.WorktreeID, string, string, string, string, bool) (core.DiffFile, error) {
-	return core.DiffFile{}, nil
-}
-
-func (f fakeAPI) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
-
-func (f fakeAPI) CreateBranch(context.Context, core.WorktreeID, string, string, bool) error {
-	return nil
-}
-
-func (f fakeAPI) Checkout(context.Context, core.WorktreeID, string) error { return nil }
-
-func (f fakeAPI) CheckoutCommit(context.Context, core.WorktreeID, string) error { return nil }
-
-func (f fakeAPI) Reset(context.Context, core.WorktreeID, string, core.ResetMode) (core.ResetResult, error) {
-	return core.ResetResult{}, nil
-}
-
-func (f fakeAPI) UncommittedCount(context.Context, core.WorktreeID) (int, error) { return 0, nil }
-
-func (f fakeAPI) CherryPick(context.Context, core.WorktreeID, []string) error { return nil }
-
-func (f fakeAPI) Revert(context.Context, core.WorktreeID, []string) error { return nil }
-
 func (f fakeAPI) SetEditorProfile(_ context.Context, profile core.EditorProfile) error {
 	if f.editorProfiles != nil {
 		*f.editorProfiles = append(*f.editorProfiles, profile)
@@ -103,9 +42,9 @@ func (f fakeAPI) SetEditorProfile(_ context.Context, profile core.EditorProfile)
 	return nil
 }
 
-func (f fakeAPI) OpenFolder(context.Context, core.WorktreeID) error { return nil }
-
-func (f fakeAPI) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
+// SetFocused is reached from a window focus callback's own goroutine, where
+// a panic would take the test binary down with it.
+func (f fakeAPI) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
 
 // fakeNotifier is an errorNotifier that counts its calls.
 type fakeNotifier struct{ calls int }
@@ -171,7 +110,9 @@ func TestADR_9_OptionsRegistersTheFacadeAndSingleInstance(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_02_RestoreOrHomeOpensAWindowForEachRememberedWorktree(t *testing.T) {
+// A window per remembered selection, each with a real, non-empty id —
+// never the empty-selection placeholder.
+func TestFR_REPO_02_RestoreOpensAWindowForEachRememberedSelection(t *testing.T) {
 	reg, opener := newTestRegistry()
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/p1", "/p2"} }); err != nil {
@@ -183,7 +124,7 @@ func TestFR_REPO_02_RestoreOrHomeOpensAWindowForEachRememberedWorktree(t *testin
 		return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path)}, nil
 	}}
 
-	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restoreOrHome(context.Background())
+	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restore(context.Background())
 
 	if len(opener.windows) != 2 {
 		t.Fatalf("windows opened = %d, want 2", len(opener.windows))
@@ -191,9 +132,14 @@ func TestFR_REPO_02_RestoreOrHomeOpensAWindowForEachRememberedWorktree(t *testin
 	if !opened["/p1"] || !opened["/p2"] {
 		t.Errorf("opened = %v, want both /p1 and /p2", opened)
 	}
+	for _, w := range opener.windows {
+		if w.title == "nebegit" {
+			t.Errorf("a window opened with the empty-selection placeholder title, want none (OpenOrFocus never called with \"\")")
+		}
+	}
 }
 
-func TestFR_REPO_02_RestoreOrHomeOpensHomeWhenNothingWasOpen(t *testing.T) {
+func TestFR_REPO_02_RestoreOpensOneEmptySelectionWindowWhenNothingWasOpen(t *testing.T) {
 	reg, opener := newTestRegistry()
 	store := newTestStore(t)
 	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
@@ -201,10 +147,65 @@ func TestFR_REPO_02_RestoreOrHomeOpensHomeWhenNothingWasOpen(t *testing.T) {
 		return core.WorktreeInfo{}, nil
 	}}
 
-	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restoreOrHome(context.Background())
+	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restore(context.Background())
 
 	if len(opener.windows) != 1 {
 		t.Fatalf("windows opened = %d, want 1", len(opener.windows))
+	}
+	if got := opener.windows[0].title; got != "nebegit" {
+		t.Errorf("window title = %q, want %q (OpenOrFocus(\"\", \"\", \"\") called exactly once)", got, "nebegit")
+	}
+}
+
+// fakeCallingWindow is a callingWindow that records what was called on it.
+type fakeCallingWindow struct {
+	id        uint
+	setURLs   []string
+	setTitles []string
+}
+
+func (w *fakeCallingWindow) ID() uint { return w.id }
+
+func (w *fakeCallingWindow) SetURL(s string) application.Window {
+	w.setURLs = append(w.setURLs, s)
+	return nil
+}
+
+func (w *fakeCallingWindow) SetTitle(title string) application.Window {
+	w.setTitles = append(w.setTitles, title)
+	return nil
+}
+
+// switchTo validates path the same way open() does, moves the
+// calling window's own registry selection, and navigates it in place.
+func TestFR_WT_05_FR_WT_08_SwitchToMovesTheWindowsSelection(t *testing.T) {
+	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("A", "/a", "")
+	windowID := opener.windows[0].ID()
+
+	var opened []core.RepoPath
+	api := fakeAPI{openWorktree: func(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+		opened = append(opened, path)
+		return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path), RepoKey: "repo-b"}, nil
+	}}
+	sh := shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
+	fw := &fakeCallingWindow{id: windowID}
+
+	if err := sh.switchTo(context.Background(), fw, "/b"); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := []core.RepoPath{"/b"}; !slices.Equal(opened, want) {
+		t.Errorf("OpenWorktree calls = %v, want %v", opened, want)
+	}
+	if reg.StillSelected("A") {
+		t.Error("the window's own selection still names A, want it moved to the new id")
+	}
+	if _, err := reg.CoreOf("/b"); err != nil {
+		t.Errorf("CoreOf(/b) = %v, want the window's entry to now select it", err)
+	}
+	if want := []string{"/?path=%2Fb"}; !slices.Equal(fw.setURLs, want) {
+		t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
 	}
 }
 
@@ -226,9 +227,8 @@ func TestFR_REPO_05_OpenWorktreePathNotifiesAndOpensNoWindowOnFailure(t *testing
 	}
 }
 
-// case 16's error-message half (spec 30): WSL_NOT_FOUND/DISTRO_NOT_FOUND/
-// DEPLOY_REFUSED need no bespoke handling — openFailedMessage's existing
-// generic *core.Error path (FR-UX-01) already names each situation.
+// The WSL failures need no bespoke handling: openFailedMessage's generic
+// *core.Error path (FR-UX-01) already names each situation.
 func TestOpenFailedMessageNamesWSLFailures(t *testing.T) {
 	cases := []struct {
 		name string

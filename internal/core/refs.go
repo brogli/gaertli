@@ -19,7 +19,7 @@ type Branch struct {
 	// CheckedOutIn is the one worktree with this branch checked out, ""
 	// if none — a single string, not a slice: a branch is checked out in
 	// at most one worktree at a time, unlike a detached commit SHA
-	// (LogCommit.CheckedOutIn, spec 10, plural).
+	// (LogCommit.CheckedOutIn).
 	CheckedOutIn string `json:"checkedOutIn,omitempty"`
 }
 

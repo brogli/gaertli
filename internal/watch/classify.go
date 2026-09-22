@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// baseScopes maps a state file's base name to the Scope it belongs to
-// (Design's table).
+// baseScopes maps a state file's base name to the Scope it belongs to.
 var baseScopes = map[string]Scope{
 	"HEAD":             Refs,
 	"packed-refs":      Refs,
@@ -21,8 +20,8 @@ var baseScopes = map[string]Scope{
 
 // classify maps path, somewhere under commonDir, to the Scope it belongs
 // to. false for a *.lock file (git's lockfile-then-rename pattern; the
-// rename's target already classifies) and for anything not in the Design's
-// table, including objects/, logs/, hooks/, info/.
+// rename's target already classifies) and for anything outside baseScopes,
+// including objects/, logs/, hooks/, info/.
 func classify(commonDir, path string) (Scope, bool) {
 	rel, err := filepath.Rel(commonDir, path)
 	if err != nil {
@@ -49,8 +48,8 @@ func classify(commonDir, path string) (Scope, bool) {
 }
 
 // classifyWorktreeChild classifies a path under worktrees/: the directory
-// itself (Worktrees) or one of its own state files (same base names as the
-// main worktree's, Design).
+// itself (Worktrees) or one of its own state files, whose base names match
+// the main worktree's.
 func classifyWorktreeChild(rel string) (Scope, bool) {
 	parts := strings.Split(rel, "/") // "worktrees", "<name>"[, "<base>"]
 	switch len(parts) {

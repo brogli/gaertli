@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,25 +11,14 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/testbin"
 )
 
 // fakegit is testdata/fakegit, built once for every test in this package.
 var fakegit string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "fakegit")
-	if err != nil {
-		panic(err)
-	}
-	fakegit = filepath.Join(dir, "fakegit")
-	build := exec.Command("go", "build", "-o", fakegit, "./testdata/fakegit")
-	build.Env = append(os.Environ(), "CGO_ENABLED=0")
-	if out, err := build.CombinedOutput(); err != nil {
-		panic(string(out) + err.Error())
-	}
-	code := m.Run()
-	_ = os.RemoveAll(dir)
-	os.Exit(code)
+	testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "./testdata/fakegit"})
 }
 
 func TestTR_09_DefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {

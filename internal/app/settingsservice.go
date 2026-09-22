@@ -25,8 +25,7 @@ func (s *SettingsService) Get(ctx context.Context) (settings.Settings, error) {
 }
 
 // Set replaces the persisted settings with next, then re-pushes each
-// environment's editor profile (TR-13), so an edit takes effect immediately
-// wherever it is already in use.
+// environment's editor profile (TR-13), so an edit takes effect at once.
 func (s *SettingsService) Set(ctx context.Context, next settings.Settings) error {
 	if err := s.store.Update(func(cur *settings.Settings) { *cur = next }); err != nil {
 		return err

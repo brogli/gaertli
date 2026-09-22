@@ -8,6 +8,15 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
+func (f *Facade) AddWorktree(ctx context.Context, path core.RepoPath, target string, branch string, start string, newBranch bool) (core.Worktree, error) {
+	c, err := f.router.CoreFor(path)
+	if err != nil {
+		var zero core.Worktree
+		return zero, err
+	}
+	return c.AddWorktree(ctx, path, target, branch, start, newBranch)
+}
+
 func (f *Facade) Checkout(ctx context.Context, wt core.WorktreeID, branch string) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -93,6 +102,24 @@ func (f *Facade) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b 
 	return c.DiffRange(ctx, wt, a, b, path, oldPath, force)
 }
 
+func (f *Facade) ListBranches(ctx context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
+	c, err := f.router.CoreFor(path)
+	if err != nil {
+		var zero []core.BranchSummary
+		return zero, err
+	}
+	return c.ListBranches(ctx, path)
+}
+
+func (f *Facade) ListWorktrees(ctx context.Context, path core.RepoPath) ([]core.Worktree, error) {
+	c, err := f.router.CoreFor(path)
+	if err != nil {
+		var zero []core.Worktree
+		return zero, err
+	}
+	return c.ListWorktrees(ctx, path)
+}
+
 func (f *Facade) LoadLog(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -133,6 +160,14 @@ func (f *Facade) OpenFolder(ctx context.Context, wt core.WorktreeID) error {
 		return err
 	}
 	return c.OpenFolder(ctx, wt)
+}
+
+func (f *Facade) OpenFolderAt(ctx context.Context, path core.RepoPath) error {
+	c, err := f.router.CoreFor(path)
+	if err != nil {
+		return err
+	}
+	return c.OpenFolderAt(ctx, path)
 }
 
 func (f *Facade) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {

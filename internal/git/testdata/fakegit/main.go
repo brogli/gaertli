@@ -1,21 +1,18 @@
-// Command fakegit stands in for the system git in internal/git's
-// integration tests. Its argv selects a mode; otherwise it is
-// controlled by environment variables (spec 02, task 2):
+// Command fakegit stands in for the system git in tests. Its argv selects a
+// mode; environment variables control the rest:
 //
 //   - argv[0] == "env": dumps its environment, one "KEY=VALUE" per line.
 //   - argv[0] == "argv": echoes the remaining args, one per line.
 //   - argv[0] == "log" and FAKEGIT_STREAM_FILE is set: copies that file's
 //     0x00-terminated records to stdout one at a time, sleeping
-//     FAKEGIT_STREAM_DELAY_MS between each (spec 10, ADR-5), so a test can
-//     redirect Runner.Git at fakegit for a whole session while only the
-//     log call streams.
+//     FAKEGIT_STREAM_DELAY_MS between each, so a test can point Runner.Git
+//     at fakegit for a whole session while only the log call streams.
 //   - otherwise: while sleeping FAKEGIT_SLEEP_MS (if set), touches
 //     FAKEGIT_HEARTBEAT (if set) every 50ms; then writes FAKEGIT_STDOUT to
 //     stdout and FAKEGIT_STDERR to stderr, then exits FAKEGIT_EXIT.
-//     FAKEGIT_SLEEP_ONCE_MS/FAKEGIT_SLEEP_ONCE_FILE (spec 12): sleeps
-//     FAKEGIT_SLEEP_ONCE_MS only for the first call to ever see that file
-//     missing (it creates it), so a test can make one call in a session
-//     slow and the rest fast.
+//     FAKEGIT_SLEEP_ONCE_MS applies only to the first call that finds
+//     FAKEGIT_SLEEP_ONCE_FILE missing, so one call in a session can be slow
+//     and the rest fast.
 package main
 
 import (

@@ -27,16 +27,10 @@ vi.mock('@wailsio/runtime', () => ({
 }))
 
 import { useLogStore } from './log'
+import { commitRow } from '../testing/fixtures/log-rows'
 
 function rowFixture(sha: string) {
-  return {
-    sha,
-    shortSha: sha,
-    author: 'Alice',
-    authorAt: 0,
-    subject: 'x',
-    graph: { lane: 0, colour: 0, edges: [] },
-  }
+  return commitRow({ sha, shortSha: sha, subject: 'x' })
 }
 
 describe('log store', () => {

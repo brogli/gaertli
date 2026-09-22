@@ -95,9 +95,9 @@ func TestFR_LOG_05_HashPatternMatchesHexOnly(t *testing.T) {
 
 func TestFR_LOG_05_SetLogFilterByTextNarrowsAndIsFlat(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "a", "first commit")
-	commit(t, repo.Dir, "b.txt", "b", "urgent fix")
-	commit(t, repo.Dir, "c.txt", "c", "third commit")
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "first commit")
+	gittest.Commit(t, repo.Dir, "b.txt", "b", "urgent fix")
+	gittest.Commit(t, repo.Dir, "c.txt", "c", "third commit")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -151,13 +151,13 @@ func TestFR_LOG_05_SetLogFilterCombinesQueryAndAuthorWithAND(t *testing.T) {
 
 func TestFR_LOG_05_SetLogFilterByHashResolvesAndPopulatesCheckedOutIn(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "base")
-	commit(t, repo.Dir, "seed.txt", "y", "second")
-	sha := headSHA(t, repo.Dir)
-	run(t, repo.Dir, "branch", "feature")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "base")
+	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
+	sha := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "branch", "feature")
 	linked := filepath.Join(t.TempDir(), "linked")
-	run(t, repo.Dir, "worktree", "add", linked, "feature")
-	run(t, repo.Dir, "switch", "--detach", "HEAD~1") // move the main worktree off "second": linked is now the only one there
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
+	gittest.Run(t, repo.Dir, "switch", "--detach", "HEAD~1") // move the main worktree off "second": linked is now the only one there
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -192,12 +192,12 @@ func TestFR_LOG_05_SetLogFilterByHashResolvesAndPopulatesCheckedOutIn(t *testing
 
 func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "root.txt", "r", "root")
-	run(t, repo.Dir, "branch", "feature")
-	commit(t, repo.Dir, "main.txt", "m", "on main")
-	run(t, repo.Dir, "switch", "feature")
-	commit(t, repo.Dir, "feature.txt", "f", "on feature")
-	run(t, repo.Dir, "switch", "master")
+	gittest.Commit(t, repo.Dir, "root.txt", "r", "root")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	gittest.Commit(t, repo.Dir, "main.txt", "m", "on main")
+	gittest.Run(t, repo.Dir, "switch", "feature")
+	gittest.Commit(t, repo.Dir, "feature.txt", "f", "on feature")
+	gittest.Run(t, repo.Dir, "switch", "master")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -227,9 +227,9 @@ func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 
 func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "path.txt", "1", "A touches path")
-	commit(t, repo.Dir, "other.txt", "1", "B touches other")
-	commit(t, repo.Dir, "path.txt", "2", "C touches path")
+	gittest.Commit(t, repo.Dir, "path.txt", "1", "A touches path")
+	gittest.Commit(t, repo.Dir, "other.txt", "1", "B touches other")
+	gittest.Commit(t, repo.Dir, "path.txt", "2", "C touches path")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -259,14 +259,14 @@ func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *test
 
 func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "root.txt", "r", "root") // shared ancestor
-	run(t, repo.Dir, "branch", "feature")
+	gittest.Commit(t, repo.Dir, "root.txt", "r", "root") // shared ancestor
+	gittest.Run(t, repo.Dir, "branch", "feature")
 	commitAs(t, repo.Dir, "target.txt", "1", "on main by alice", "Alice", "alice@example.com") // wrong branch
-	run(t, repo.Dir, "switch", "feature")
+	gittest.Run(t, repo.Dir, "switch", "feature")
 	commitAs(t, repo.Dir, "other.txt", "1", "on feature by alice wrong path", "Alice", "alice@example.com")
 	commitAs(t, repo.Dir, "target.txt", "2", "on feature by bob wrong author", "Bob", "bob@example.com")
 	commitAs(t, repo.Dir, "target.txt", "3", "on feature by alice matches all", "Alice", "alice@example.com")
-	run(t, repo.Dir, "switch", "master")
+	gittest.Run(t, repo.Dir, "switch", "master")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -287,8 +287,8 @@ func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) 
 
 func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "a", "first")
-	commit(t, repo.Dir, "b.txt", "b", "second")
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
+	gittest.Commit(t, repo.Dir, "b.txt", "b", "second")
 
 	c := New(func(core.Event) {})
 	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -384,10 +384,9 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 
 // TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration
 // proves the streaming mechanism QA-PERF-04 depends on: a filtered row is
-// usable long before the whole (delayed) stream finishes, not just after
-// it — the same proof spec 10's QA-PERF-02 case gives for the unfiltered
-// load, here for Core.LogRows serving a window's own active filtered view.
-// The literal ≤2s-at-100k-commits number is tools/bench's own case.
+// usable long before the whole (delayed) stream finishes, here for
+// Core.LogRows serving a window's own active filtered view. The literal
+// ≤2s-at-100k-commits number is tools/bench's own case.
 func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c := New(func(core.Event) {})
@@ -462,7 +461,7 @@ func commitAs(t *testing.T, dir, file, content, msg, authorName, authorEmail str
 	if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	run(t, dir, "add", "--", file)
+	gittest.Run(t, dir, "add", "--", file)
 	author := fmt.Sprintf("%s <%s>", authorName, authorEmail)
 	if _, err := (git.Runner{}).Run(context.Background(), git.Call{
 		Dir: dir, Args: []string{"commit", "--author=" + author, "-F", "-"}, Stdin: []byte(msg),

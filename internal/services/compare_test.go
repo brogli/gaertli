@@ -17,13 +17,13 @@ import (
 // (TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath's own finding).
 func renameWithEdit(t *testing.T, dir, name, newName, ending string) {
 	t.Helper()
-	run(t, dir, "mv", name, newName)
+	gittest.Run(t, dir, "mv", name, newName)
 	base := strings.Repeat("line unchanged\n", 20)
 	if err := os.WriteFile(filepath.Join(dir, newName), []byte(base+ending+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	run(t, dir, "add", newName)
-	run(t, dir, "commit", "-m", "rename "+name+" to "+newName)
+	gittest.Run(t, dir, "add", newName)
+	gittest.Run(t, dir, "commit", "-m", "rename "+name+" to "+newName)
 }
 
 func openCompareRepo(t *testing.T) (*gittest.Repo, *Core, core.WorktreeID) {
@@ -39,14 +39,14 @@ func openCompareRepo(t *testing.T) (*gittest.Repo, *Core, core.WorktreeID) {
 
 func TestFR_CMP_01_CompareCommitsListsModifiedAddedAndDeletedFiles(t *testing.T) {
 	repo, c, id := openCompareRepo(t)
-	commit(t, repo.Dir, "f1", "one", "add f1")
-	commit(t, repo.Dir, "f3", "three", "add f3")
-	a := headSHA(t, repo.Dir)
-	commit(t, repo.Dir, "f1", "one changed", "modify f1")
-	commit(t, repo.Dir, "f2", "two", "add f2")
-	run(t, repo.Dir, "rm", "f3")
-	run(t, repo.Dir, "commit", "-m", "delete f3")
-	b := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
+	gittest.Commit(t, repo.Dir, "f3", "three", "add f3")
+	a := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f1", "one changed", "modify f1")
+	gittest.Commit(t, repo.Dir, "f2", "two", "add f2")
+	gittest.Run(t, repo.Dir, "rm", "f3")
+	gittest.Run(t, repo.Dir, "commit", "-m", "delete f3")
+	b := gittest.HeadSHA(t, repo.Dir)
 
 	files, err := c.CompareCommits(context.Background(), id, a, b)
 	if err != nil {
@@ -66,10 +66,10 @@ func TestFR_CMP_01_CompareCommitsListsModifiedAddedAndDeletedFiles(t *testing.T)
 
 func TestFR_CMP_01_CompareCommitsDetectsARename(t *testing.T) {
 	repo, c, id := openCompareRepo(t)
-	commit(t, repo.Dir, "f1", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f1")
-	a := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f1", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f1")
+	a := gittest.HeadSHA(t, repo.Dir)
 	renameWithEdit(t, repo.Dir, "f1", "f2", "new ending")
-	b := headSHA(t, repo.Dir)
+	b := gittest.HeadSHA(t, repo.Dir)
 
 	files, err := c.CompareCommits(context.Background(), id, a, b)
 	if err != nil {
@@ -83,13 +83,13 @@ func TestFR_CMP_01_CompareCommitsDetectsARename(t *testing.T) {
 
 func TestFR_CMP_03_CompareCommitsSwappedMirrorsEveryStatus(t *testing.T) {
 	repo, c, id := openCompareRepo(t)
-	commit(t, repo.Dir, "f1", "one", "add f1")
-	commit(t, repo.Dir, "f3", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f3")
-	a := headSHA(t, repo.Dir)
-	commit(t, repo.Dir, "f1", "one changed", "modify f1")
-	commit(t, repo.Dir, "f2", "two", "add f2")
+	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
+	gittest.Commit(t, repo.Dir, "f3", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f3")
+	a := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f1", "one changed", "modify f1")
+	gittest.Commit(t, repo.Dir, "f2", "two", "add f2")
 	renameWithEdit(t, repo.Dir, "f3", "f4", "new ending")
-	b := headSHA(t, repo.Dir)
+	b := gittest.HeadSHA(t, repo.Dir)
 
 	forward, err := c.CompareCommits(context.Background(), id, a, b)
 	if err != nil {
@@ -136,8 +136,8 @@ func TestFR_CMP_03_CompareCommitsSwappedMirrorsEveryStatus(t *testing.T) {
 
 func TestFR_CMP_01_CompareCommitsSameCommitIsEmpty(t *testing.T) {
 	repo, c, id := openCompareRepo(t)
-	commit(t, repo.Dir, "f1", "one", "add f1")
-	a := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
+	a := gittest.HeadSHA(t, repo.Dir)
 
 	files, err := c.CompareCommits(context.Background(), id, a, a)
 	if err != nil {
@@ -150,11 +150,11 @@ func TestFR_CMP_01_CompareCommitsSameCommitIsEmpty(t *testing.T) {
 
 func TestFR_CMP_02_DiffRangeReturnsContentAtTwoArbitraryCommits(t *testing.T) {
 	repo, c, id := openCompareRepo(t)
-	commit(t, repo.Dir, "f1", "x", "add f1")
-	a := headSHA(t, repo.Dir)
-	commit(t, repo.Dir, "other", "unrelated", "unrelated commit")
-	commit(t, repo.Dir, "f1", "y", "change f1")
-	b := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f1", "x", "add f1")
+	a := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "other", "unrelated", "unrelated commit")
+	gittest.Commit(t, repo.Dir, "f1", "y", "change f1")
+	b := gittest.HeadSHA(t, repo.Dir)
 
 	diff, err := c.DiffRange(context.Background(), id, a, b, "f1", "", false)
 	if err != nil {
@@ -167,10 +167,10 @@ func TestFR_CMP_02_DiffRangeReturnsContentAtTwoArbitraryCommits(t *testing.T) {
 
 func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 	repo, c, id := openCompareRepo(t)
-	commit(t, repo.Dir, "other", "unrelated", "add other")
-	a := headSHA(t, repo.Dir)
-	commit(t, repo.Dir, "f1", "added later", "add f1")
-	b := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "other", "unrelated", "add other")
+	a := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f1", "added later", "add f1")
+	b := gittest.HeadSHA(t, repo.Dir)
 
 	diff, err := c.DiffRange(context.Background(), id, a, b, "f1", "", false)
 	if err != nil {
@@ -183,10 +183,10 @@ func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 
 func TestFR_CMP_02_DiffRangeOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
 	repo, c, id := openCompareRepo(t)
-	commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
-	a := headSHA(t, repo.Dir)
-	commit(t, repo.Dir, "bin.dat", "xyz\x00def", "change binary file")
-	b := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
+	a := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "bin.dat", "xyz\x00def", "change binary file")
+	b := gittest.HeadSHA(t, repo.Dir)
 
 	diff, err := c.DiffRange(context.Background(), id, a, b, "bin.dat", "", false)
 	if err != nil {

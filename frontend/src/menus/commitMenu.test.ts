@@ -9,11 +9,12 @@ function actions() {
     openReset: vi.fn(),
     cherryPick: vi.fn(),
     revert: vi.fn(),
+    openCreateWorktree: vi.fn(),
   }
 }
 
 describe('buildCommitMenuItems', () => {
-  it('FR-LOG-11 returns copy hash, copy subject, new branch, check out commit, reset, cherry-pick, and revert, in that order', () => {
+  it('FR-LOG-11 returns copy hash, copy subject, new branch, check out commit, reset, cherry-pick, revert, and create worktree, in that order', () => {
     const items = buildCommitMenuItems(row(), actions())
 
     expect(items.map((i) => i.label)).toEqual([
@@ -24,7 +25,18 @@ describe('buildCommitMenuItems', () => {
       'Reset current branch to here…',
       'Cherry-pick',
       'Revert',
+      'Create worktree here…',
     ])
+  })
+
+  it('FR-WT-06, FR-LOG-11 "Create worktree here…" calls openCreateWorktree with the row\'s sha', () => {
+    const a = actions()
+    const items = buildCommitMenuItems(row(), a)
+
+    items.find((i) => i.label === 'Create worktree here…')?.command()
+
+    expect(a.openCreateWorktree).toHaveBeenCalledTimes(1)
+    expect(a.openCreateWorktree).toHaveBeenCalledWith('abc123')
   })
 
   it('FR-BR-01 "New branch from here…" calls openCreateBranch with the row\'s sha', () => {
@@ -90,10 +102,10 @@ describe('buildCommitMenuItems', () => {
     expect(compareWithSelected).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CMP-01 with compareWithSelected omitted, returns exactly the existing 7 items', () => {
+  it('FR-CMP-01 with compareWithSelected omitted, returns exactly the existing 8 items', () => {
     const items = buildCommitMenuItems(row(), actions())
 
-    expect(items).toHaveLength(7)
+    expect(items).toHaveLength(8)
     expect(items.map((i) => i.label)).not.toContain('Compare with selected')
   })
 })

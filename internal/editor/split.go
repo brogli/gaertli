@@ -4,8 +4,8 @@ import "fmt"
 
 // splitCommand splits template into argv using POSIX-style shell word
 // splitting (quotes, backslash escapes) — no shell is invoked (TR-10). Own
-// code (research/dependencies.md: both shlex candidates fail TR-19). Errors
-// on an empty template or an unterminated quote.
+// code: the shlex libraries fail TR-19. Errors on an empty template or an
+// unterminated quote.
 func splitCommand(template string) ([]string, error) {
 	var argv []string
 	var cur []byte

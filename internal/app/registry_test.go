@@ -16,8 +16,7 @@ import (
 )
 
 // emittedEvent is one EmitEvent call recorded by fakeWindow: name and
-// payload, not just a count (spec 23, so a test can assert what
-// "compare:show-file" carried).
+// payload, not just a count, so a test can assert what an event carried.
 type emittedEvent struct {
 	name    string
 	payload any
@@ -26,11 +25,15 @@ type emittedEvent struct {
 // fakeWindow is a shellWindow that records what was called on it, and lets
 // a test simulate the OS closing it.
 type fakeWindow struct {
+	id         uint
+	title      string
 	focusCount int
 	emitCount  int
 	emitted    []emittedEvent
 	closing    func(*application.WindowEvent)
 }
+
+func (w *fakeWindow) ID() uint { return w.id }
 
 func (w *fakeWindow) Focus() { w.focusCount++ }
 
@@ -64,8 +67,8 @@ type fakeOpener struct {
 	windows []*fakeWindow
 }
 
-func (o *fakeOpener) NewWithOptions(application.WebviewWindowOptions) shellWindow {
-	w := &fakeWindow{}
+func (o *fakeOpener) NewWithOptions(opts application.WebviewWindowOptions) shellWindow {
+	w := &fakeWindow{id: uint(len(o.windows)) + 1, title: opts.Title}
 	o.windows = append(o.windows, w)
 	return w
 }
@@ -136,6 +139,26 @@ func TestADR_9_DispatchTargetsTheWindowsAnEventConcerns(t *testing.T) {
 	}
 }
 
+// SetRepo/targets route a repo-scoped event by current selection: only the
+// window whose selection belongs to that repo.
+func TestFR_WT_11_DispatchByRepoReachesOnlyTheWindowSelectingThatRepo(t *testing.T) {
+	r, opener := newTestRegistry()
+
+	r.OpenOrFocus("A", "/a", "")
+	r.OpenOrFocus("B", "/b", "")
+	r.SetRepo("A", "R1")
+	r.SetRepo("B", "R2")
+
+	r.Dispatch(core.Event{Repo: "R1"})
+
+	if opener.windows[0].emitCount != 1 {
+		t.Errorf("window selecting R1's worktree emitCount = %d, want 1", opener.windows[0].emitCount)
+	}
+	if opener.windows[1].emitCount != 0 {
+		t.Errorf("window selecting R2's worktree emitCount = %d, want 0", opener.windows[1].emitCount)
+	}
+}
+
 func TestFR_REPO_02_ClosingAWindowLetsOpenOrFocusCreateANewOne(t *testing.T) {
 	r, opener := newTestRegistry()
 
@@ -151,11 +174,13 @@ func TestFR_REPO_02_ClosingAWindowLetsOpenOrFocusCreateANewOne(t *testing.T) {
 	}
 }
 
-func TestOpenHomeOpensAtMostOneWindow(t *testing.T) {
+// An empty selection ("" = the panel's empty state) is just another
+// selection, deduped by findSelectingLocked the same way a worktree id is.
+func TestADR_9_OpenOrFocusDedupsTheEmptySelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
-	r.OpenHome()
-	r.OpenHome()
+	r.OpenOrFocus("", "", "")
+	r.OpenOrFocus("", "", "")
 
 	if len(opener.windows) != 1 {
 		t.Fatalf("windows created = %d, want 1", len(opener.windows))
@@ -165,12 +190,12 @@ func TestOpenHomeOpensAtMostOneWindow(t *testing.T) {
 	}
 }
 
-func TestOpenHomeReopensAfterItIsClosed(t *testing.T) {
+func TestADR_9_OpenOrFocusReopensTheEmptySelectionAfterItIsClosed(t *testing.T) {
 	r, opener := newTestRegistry()
 
-	r.OpenHome()
+	r.OpenOrFocus("", "", "")
 	opener.windows[0].close()
-	r.OpenHome()
+	r.OpenOrFocus("", "", "")
 
 	if len(opener.windows) != 2 {
 		t.Fatalf("windows created = %d, want 2", len(opener.windows))
@@ -223,8 +248,7 @@ func pipeAPIClient(t *testing.T, api core.API) *remote.Client {
 
 // fakeDistroCore is a distroCorer that always returns client, reporting
 // respawned only on its first Ensure call, and calling onConnect on that
-// same first call (real DistroCore.Ensure's own "on connect" firing,
-// spec 31 case 18's seam).
+// same first call, the way the real DistroCore.Ensure fires it.
 type fakeDistroCore struct {
 	client               *remote.Client
 	calls                int
@@ -248,8 +272,7 @@ func (f *fakeDistroCore) InstallLauncher(_ context.Context, guiExePath string) e
 func (f *fakeDistroCore) OnConnect(fn func(context.Context, *remote.Client)) { f.onConnect = fn }
 
 // LiveClient reports a live connection once Ensure has run at least once
-// (calls > 0), whether that happened for real or was set directly by a test
-// seeding an "already connected" fakeDistroCore (case 19).
+// (calls > 0), whether for real or seeded by a test as "already connected".
 func (f *fakeDistroCore) LiveClient() (*remote.Client, bool) {
 	return f.client, f.calls > 0
 }
@@ -328,6 +351,138 @@ func TestADR_4_CoreOfReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
 	}
 	if wtC.emitCount != 0 {
 		t.Errorf("wtC (different distro) emitCount = %d, want 0", wtC.emitCount)
+	}
+}
+
+// SelectInWindow moves a window's selection and reports the one it
+// replaced; a subsequent CoreOf resolves through the window's new
+// selection, not its old one.
+func TestADR_9_SelectInWindowMovesTheWindowsSelection(t *testing.T) {
+	r, opener := newTestRegistry()
+	distroClient := pipeAPIClient(t, fakeAPI{})
+	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+
+	r.OpenOrFocus("A", "/a", "")
+	windowID := opener.windows[0].ID()
+
+	previous, _, ok := r.SelectInWindow(windowID, "B", "/b", "Ubuntu-22.04")
+	if previous != "A" || !ok {
+		t.Fatalf("SelectInWindow(...) = (%q, %v), want (\"A\", true)", previous, ok)
+	}
+
+	got, err := r.CoreOf("B")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != core.API(distroClient) {
+		t.Error("CoreOf(B) did not resolve through the window's new selection")
+	}
+}
+
+// Releasing the selection a switch leaves behind routes through its own
+// real core (a distro's), not the local one: CoreOf can no longer find it
+// once SelectInWindow has moved the only window that selected it.
+func TestADR_9_SwitchingReleasesThePreviousSelectionThroughItsRealCore(t *testing.T) {
+	r, opener := newTestRegistry()
+	var closed []core.WorktreeID
+	distroClient := pipeAPIClient(t, fakeAPI{closed: &closed})
+	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+
+	r.OpenOrFocus("A", "/a", "Ubuntu-22.04")
+	windowID := opener.windows[0].ID()
+
+	previous, previousDistro, ok := r.SelectInWindow(windowID, "B", "/b", "")
+	if !ok {
+		t.Fatal("SelectInWindow ok = false")
+	}
+	if r.StillSelected(previous) {
+		t.Fatal("StillSelected(A) = true, want false")
+	}
+
+	prevCore, err := r.coreForDistro(previousDistro)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = prevCore.CloseWorktree(context.Background(), previous)
+
+	if len(closed) != 1 || closed[0] != "A" {
+		t.Errorf("CloseWorktree calls = %v, want [\"A\"], routed through the distro core, not r.local", closed)
+	}
+}
+
+// Two windows sharing a selection (ADR-9) both receive a worktree-scoped
+// event.
+func TestADR_9_DispatchReachesEveryWindowSharingASelection(t *testing.T) {
+	r, opener := newTestRegistry()
+
+	r.OpenOrFocus("A", "/a", "")
+	r.OpenOrFocus("other", "/other", "")
+	if _, _, ok := r.SelectInWindow(opener.windows[1].ID(), "A", "/a", ""); !ok {
+		t.Fatal("SelectInWindow ok = false")
+	}
+
+	r.Dispatch(core.Event{Worktree: "A"})
+
+	if opener.windows[0].emitCount != 1 || opener.windows[1].emitCount != 1 {
+		t.Errorf("emitCount = %d, %d, want 1, 1 (sharing, ADR-9)", opener.windows[0].emitCount, opener.windows[1].emitCount)
+	}
+}
+
+// StillSelected is the safety check a switch relies on before
+// releasing a worktree — true here since a second window still selects it.
+func TestADR_9_StillSelectedIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
+	r, opener := newTestRegistry()
+
+	r.OpenOrFocus("A", "/a", "")
+	r.OpenOrFocus("other", "/other", "")
+	r.SelectInWindow(opener.windows[1].ID(), "A", "/a", "")
+
+	previous, _, ok := r.SelectInWindow(opener.windows[0].ID(), "B", "/b", "")
+	if !ok || previous != "A" {
+		t.Fatalf("SelectInWindow(...) = (%q, %v), want (\"A\", true)", previous, ok)
+	}
+
+	if !r.StillSelected(previous) {
+		t.Error("StillSelected(A) = false, want true — another window still selects it (ADR-9)")
+	}
+}
+
+// Closing a window's own OS window (not a switch) releases its selection
+// through the real core too, exercised through a real WindowClosing.
+func TestADR_9_ClosingAWindowClosesItsSelectionThroughTheRealCore(t *testing.T) {
+	r, opener := newTestRegistry()
+	var closed []core.WorktreeID
+	distroClient := pipeAPIClient(t, fakeAPI{closed: &closed})
+	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+
+	r.OpenOrFocus("A", "/a", "Ubuntu-22.04")
+	opener.windows[0].close()
+
+	if len(closed) != 1 || closed[0] != "A" {
+		t.Errorf("CloseWorktree calls = %v, want [\"A\"], routed through the distro core, not r.local", closed)
+	}
+}
+
+// Closing one window sharing a selection does not release it, and
+// leaves the other window's own entry untouched — it still receives events
+// for that selection afterwards.
+func TestADR_9_ClosingAWindowDoesNotCloseASelectionStillHeldElsewhere(t *testing.T) {
+	r, opener := newTestRegistry()
+	var closed []core.WorktreeID
+	r.SetLocal(fakeAPI{closed: &closed})
+
+	r.OpenOrFocus("A", "/a", "")
+	r.OpenOrFocus("other", "/other", "")
+	r.SelectInWindow(opener.windows[1].ID(), "A", "/a", "")
+
+	opener.windows[0].close()
+
+	if len(closed) != 0 {
+		t.Errorf("CloseWorktree calls = %v, want none (window 1 still selects A)", closed)
+	}
+	r.Dispatch(core.Event{Worktree: "A"})
+	if opener.windows[1].emitCount != 1 {
+		t.Errorf("window 1 (still selecting A) emitCount = %d, want 1 — its own entry must be untouched", opener.windows[1].emitCount)
 	}
 }
 

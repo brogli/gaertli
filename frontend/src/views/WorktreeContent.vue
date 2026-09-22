@@ -6,9 +6,9 @@ import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import type { BranchSummary } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from '../components/ErrorBanner.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
-import SettingsPanel from '../components/SettingsPanel.vue'
 import LogList from '../components/LogList.vue'
 import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
 import CompareView from '../components/CompareView.vue'
@@ -18,9 +18,13 @@ import FilterBar from '../components/FilterBar.vue'
 import CreateBranchDialog from '../components/CreateBranchDialog.vue'
 import DetachWarningDialog from '../components/DetachWarningDialog.vue'
 import ResetDialog from '../components/ResetDialog.vue'
+import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
+import type { WorktreeStart } from '../components/worktreeStart'
+import { basename } from '../lib/path'
 
 const props = defineProps<{ path: string }>()
-const name = props.path.split(/[\\/]/).pop() || props.path
+const emit = defineEmits<{ 'open-settings': [] }>()
+const name = basename(props.path)
 const repo = useRepoStore()
 const refs = useRefsStore()
 const log = useLogStore()
@@ -41,14 +45,22 @@ const showDiff = computed(
   () => compareRange.value !== null || (!compare.active && !!log.selectedFile),
 )
 const { error, run } = useCoreCall()
-const showSettings = ref(false)
 
-// The dialogs LogList's context menu opens (spec 40/41, FR-BR-01/FR-BR-02/
-// FR-BR-08): one instance each, owned here rather than by LogList itself —
-// the same reason showSettings lives here instead of inside SettingsPanel.vue.
+// The dialogs LogList's context menu opens (FR-BR-01, FR-BR-02, FR-BR-08):
+// one instance each, owned here rather than by LogList itself.
 const createBranchSha = ref<string | null>(null)
 const checkoutCommitSha = ref<string | null>(null)
 const resetTarget = ref<{ sha: string; subject: string } | null>(null)
+
+// FR-WT-06: "Create worktree here…" from the log's commit menu or the refs
+// sidebar's branch menu, pre-filling CreateWorktreeDialog.
+const createWorktreeStart = ref<WorktreeStart | null>(null)
+const createWorktreeBranches = ref<BranchSummary[]>([])
+
+async function openCreateWorktree(start: WorktreeStart): Promise<void> {
+  createWorktreeBranches.value = (await Facade.ListBranches(props.path)) ?? []
+  createWorktreeStart.value = start
+}
 
 // FR-BR-02: the branch ResetDialog names — "" while detached, shown there
 // as "HEAD" (same as the summary panel just above it).
@@ -73,9 +85,9 @@ function openInEditor(): void {
   void run(() => Facade.OpenFolder(props.path))
 }
 
-// FR-REPO-03: the refs store already carries the current branch's
-// upstream state; nothing to count without an upstream, and a gone
-// upstream has no meaningful ahead/behind either (Design).
+// FR-REPO-03: the refs store already carries the current branch's upstream
+// state; nothing to count without an upstream, and a gone upstream has no
+// meaningful ahead/behind either.
 const tracked = computed(() => {
   const current = refs.refs?.branches?.find((b) => b.current)
   return current?.upstream && !current.upstreamGone ? current : undefined
@@ -92,10 +104,9 @@ function openCreateBranchHere(): void {
 <template>
   <main>
     <h1>{{ name }}</h1>
-    <button type="button" @click="showSettings = !showSettings">Settings</button>
     <button type="button" @click="refresh">Refresh</button>
     <button type="button" @click="openInEditor">{{ editorLabel }}</button>
-    <ErrorBanner v-if="error" :error="error" @open-settings="showSettings = true" />
+    <ErrorBanner v-if="error" :error="error" @open-settings="emit('open-settings')" />
     <p v-else-if="repo.summary">
       {{ repo.summary.detached ? 'detached HEAD' : repo.summary.branch }}
       <template v-if="repo.summary.operation"> ({{ repo.summary.operation }})</template>
@@ -106,9 +117,14 @@ function openCreateBranchHere(): void {
         Create branch here
       </button>
     </p>
-    <SettingsPanel v-if="showSettings" />
     <div class="worktree-body">
-      <RefsSidebar :wt="path" />
+      <RefsSidebar
+        :wt="path"
+        @create-worktree="
+          (name, isRemote) =>
+            openCreateWorktree(isRemote ? { newBranch: true, start: name } : { newBranch: false, branch: name })
+        "
+      />
       <div class="log-column">
         <FilterBar />
         <LogList
@@ -116,11 +132,12 @@ function openCreateBranchHere(): void {
           @create-branch="createBranchSha = $event"
           @checkout-commit="checkoutCommitSha = $event"
           @reset="(sha, subject) => (resetTarget = { sha, subject })"
+          @create-worktree="(sha) => openCreateWorktree({ newBranch: true, start: sha })"
         />
       </div>
       <div class="side-column">
         <CompareView v-if="compare.active" :wt="path" />
-        <CommitDetailsPanel v-else />
+        <CommitDetailsPanel v-else :wt="path" />
         <DiffView v-if="showDiff" :wt="path" :range="compareRange" />
       </div>
     </div>
@@ -147,6 +164,14 @@ function openCreateBranchHere(): void {
       :subject="resetTarget.subject"
       :visible="true"
       @update:visible="resetTarget = null"
+    />
+    <CreateWorktreeDialog
+      v-if="createWorktreeStart"
+      :repo-path="path"
+      :branches="createWorktreeBranches"
+      :start="createWorktreeStart"
+      :visible="true"
+      @update:visible="createWorktreeStart = null"
     />
   </main>
 </template>

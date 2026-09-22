@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,29 +16,15 @@ import (
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// bin is nebegit-core built once, as pure Go, for every test here. guiBin is
-// a fake GUI helper (case 7) standing in for the Windows app launch hands
-// off to.
+// bin is nebegit-core; guiBin is a fake GUI standing in for the Windows app
+// the launch hands off to.
 var bin, guiBin string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "nebegit-core")
-	if err != nil {
-		panic(err)
-	}
-	bin = filepath.Join(dir, "nebegit-core")
-	if err := testbin.Build(bin, "."); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	guiBin = filepath.Join(dir, "fakegui")
-	if err := testbin.Build(guiBin, "./testdata/fakegui"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	code := m.Run()
-	_ = os.RemoveAll(dir)
-	os.Exit(code)
+	testbin.Main(m,
+		testbin.Bin{Path: &bin, Pkg: "."},
+		testbin.Bin{Path: &guiBin, Pkg: "./testdata/fakegui"},
+	)
 }
 
 // envWithout drops every existing entry for key from os.Environ(), so a
@@ -113,8 +98,8 @@ func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
 }
 
 // TestADR_3_UnknownArgumentExits2 uses a flag-shaped bad argument: a bare
-// word is now a legitimate path (launch mode, spec 31), so "bogus" alone no
-// longer exercises usage()'s exit 2.
+// word is a legitimate path (launch mode), so "bogus" alone would not reach
+// usage().
 func TestADR_3_UnknownArgumentExits2(t *testing.T) {
 	err := exec.Command(bin, "--bogus").Run()
 	var exit *exec.ExitError

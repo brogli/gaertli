@@ -94,7 +94,21 @@ func (f *fake) SetEditorProfile(context.Context, core.EditorProfile) error { ret
 
 func (f *fake) OpenFolder(context.Context, core.WorktreeID) error { return nil }
 
+func (f *fake) OpenFolderAt(context.Context, core.RepoPath) error { return nil }
+
 func (f *fake) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
+
+func (f *fake) ListWorktrees(context.Context, core.RepoPath) ([]core.Worktree, error) {
+	return nil, nil
+}
+
+func (f *fake) ListBranches(context.Context, core.RepoPath) ([]core.BranchSummary, error) {
+	return nil, nil
+}
+
+func (f *fake) AddWorktree(context.Context, core.RepoPath, string, string, string, bool) (core.Worktree, error) {
+	return core.Worktree{}, nil
+}
 
 // pipeClient serves f over an in-memory pipe and returns a client on it.
 func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {

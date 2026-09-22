@@ -10,14 +10,11 @@ import (
 )
 
 // TestQA_PERF_04_FirstFilteredLogRowUnder2s proves the literal QA-PERF-04
-// number against the real 100k-commit reference repo (spec 13's
-// tools/mkrepo): a query narrowing to a small, known subset of commits
-// ("merge feature-1", and substring-adjacent branch names like
-// "feature-10".."feature-19" — still a small subset of 100k) still
-// surfaces its first matching row within budget. The mechanism this
-// depends on (a filtered row observable long before its stream finishes)
-// is already proven at synthetic scale by internal/services's own
-// QA-PERF-04 case; this is the literal number.
+// number against the real 100k-commit reference repo: a query narrowing to
+// a small, known subset of commits ("merge feature-1", plus the
+// substring-adjacent "feature-10".."feature-19") still surfaces its first
+// matching row within budget. internal/services proves the mechanism at
+// synthetic scale; this is the literal number.
 func TestQA_PERF_04_FirstFilteredLogRowUnder2s(t *testing.T) {
 	c, id := openReference(t)
 	start := time.Now()

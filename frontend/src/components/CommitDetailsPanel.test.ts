@@ -2,10 +2,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCommitDetails } = vi.hoisted(() => ({ mockCommitDetails: vi.fn() }))
+const { mockCommitDetails, mockOpenFile } = vi.hoisted(() => ({
+  mockCommitDetails: vi.fn(),
+  mockOpenFile: vi.fn(),
+}))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { LoadLog: vi.fn(), LogRows: vi.fn(), CommitDetails: mockCommitDetails },
+  Facade: { LoadLog: vi.fn(), LogRows: vi.fn(), CommitDetails: mockCommitDetails, OpenFile: mockOpenFile },
 }))
 
 vi.mock('@wailsio/runtime', () => ({
@@ -20,10 +23,12 @@ describe('CommitDetailsPanel', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockCommitDetails.mockReset()
+    mockOpenFile.mockReset()
+    mockOpenFile.mockResolvedValue(undefined)
   })
 
   it('FR-LOG-03 renders nothing before a selection', () => {
-    const wrapper = mount(CommitDetailsPanel)
+    const wrapper = mount(CommitDetailsPanel, { props: { wt: '/repo' } })
 
     expect(wrapper.text()).toBe('')
   })
@@ -45,7 +50,7 @@ describe('CommitDetailsPanel', () => {
       ],
     })
 
-    const wrapper = mount(CommitDetailsPanel)
+    const wrapper = mount(CommitDetailsPanel, { props: { wt: '/repo' } })
     const log = useLogStore()
     await log.select(commitRow())
     await flushPromises()
@@ -77,7 +82,7 @@ describe('CommitDetailsPanel', () => {
       ],
     })
 
-    const wrapper = mount(CommitDetailsPanel)
+    const wrapper = mount(CommitDetailsPanel, { props: { wt: '/repo' } })
     const log = useLogStore()
     await log.select(commitRow())
     await flushPromises()
@@ -85,5 +90,30 @@ describe('CommitDetailsPanel', () => {
     await wrapper.get('.files li').trigger('click')
 
     expect(log.selectedFile).toEqual({ path: 'a.txt', status: 'M' })
+  })
+
+  it('FR-ED-02 an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
+    mockCommitDetails.mockResolvedValue({
+      sha: 'abc123',
+      parents: [],
+      author: 'Alice',
+      authorEmail: 'alice@example.com',
+      authorAt: 0,
+      committer: 'Bob',
+      committerEmail: 'bob@example.com',
+      committerAt: 0,
+      body: 'Fix the bug',
+      files: [{ path: 'a.txt', status: 'M' }],
+    })
+
+    const wrapper = mount(CommitDetailsPanel, { props: { wt: '/repo' } })
+    const log = useLogStore()
+    await log.select(commitRow())
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledTimes(1)
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
   })
 })

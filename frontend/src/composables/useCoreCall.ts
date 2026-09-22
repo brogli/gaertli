@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 
 // CoreError is the shape core.Error serialises to, read off a rejected
-// bound-method call's .cause (research/wails/service-pattern-bindings-errors.md).
+// bound-method call's .cause.
 export interface CoreError {
   message: string
   gitStderr?: string
@@ -24,10 +24,9 @@ export function useCoreCall() {
     }
   }
 
-  // runAndClose is run's own "then close on success" shape, shared by every
-  // dialog whose only action on success is to dismiss itself (e.g.
-  // CreateBranchDialog, DetachWarningDialog): onSuccess runs only when call
-  // didn't reject, leaving error set and the dialog open otherwise.
+  // runAndClose is run's "then close on success" shape for a dialog:
+  // onSuccess runs only when call did not reject, so a failure leaves the
+  // error set and the dialog open.
   async function runAndClose<T>(call: () => Promise<T>, onSuccess: () => void): Promise<void> {
     await run(call)
     if (!error.value) onSuccess()

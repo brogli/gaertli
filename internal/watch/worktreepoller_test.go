@@ -2,7 +2,6 @@ package watch
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -11,33 +10,22 @@ import (
 
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// fakegit is internal/git/testdata/fakegit, built once for the test in this
-// file that needs a controllable delay (case 8).
+// fakegit is internal/git/testdata/fakegit, for the test that needs a
+// controllable delay.
 var fakegit string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "fakegit")
-	if err != nil {
-		panic(err)
-	}
-	fakegit = filepath.Join(dir, "fakegit")
-	build := exec.Command("go", "build", "-o", fakegit, "../git/testdata/fakegit")
-	build.Env = append(os.Environ(), "CGO_ENABLED=0")
-	if out, buildErr := build.CombinedOutput(); buildErr != nil {
-		panic(string(out) + buildErr.Error())
-	}
-	code := m.Run()
-	_ = os.RemoveAll(dir)
-	os.Exit(code)
+	testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "../git/testdata/fakegit"})
 }
 
 func TestFR_REPO_04_WorktreePollerObservesAWorkingFileEditDirectly(t *testing.T) {
 	defer setInterval(&PollInterval, 30*time.Millisecond)()
 
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	got := make(chan Scope, 10)
 	p := NewWorktreePoller(git.Runner{}, repo.Dir, func(s Scope) { got <- s })

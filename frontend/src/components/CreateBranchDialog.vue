@@ -9,11 +9,9 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
 // CreateBranchDialog is FR-BR-01's "new branch from here" dialog, opened
-// from the commit-row context menu (spec 22, FR-LOG-11) or the
-// detached-HEAD "Create branch here" action (FR-BR-08). sha is the start
-// point the caller already resolved (a commit's own sha, or the worktree's
-// own HEAD sha while detached) — this component has no branch-listing
-// logic of its own.
+// from the commit-row context menu (FR-LOG-11) or the detached-HEAD
+// "Create branch here" action (FR-BR-08). sha is the start point the caller
+// already resolved: a commit's sha, or HEAD's sha while detached.
 const props = defineProps<{ wt: string; sha: string; visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 

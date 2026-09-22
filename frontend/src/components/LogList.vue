@@ -19,6 +19,7 @@ const emit = defineEmits<{
   'create-branch': [sha: string]
   'checkout-commit': [sha: string]
   reset: [sha: string, subject: string]
+  'create-worktree': [sha: string]
 }>()
 const log = useLogStore()
 const compare = useCompareStore()
@@ -70,12 +71,10 @@ watch(
 
 // Ctrl/Cmd-click adds row to the compare selection (FR-CMP-01) instead of
 // selecting it in the log; the first Ctrl-click of a pair seeds the
-// selection with whatever was plainly selected before it (spec 23: "Ctrl-
-// click a second commit" starts from the ordinarily selected row), so two
-// Ctrl-clicks still work unchanged when the compare selection isn't empty.
-// Shift-click extends/creates a multi-select range (FR-LOG-11, spec 42,
-// spec 21's own reserved gesture); any other plain click leaves compare
-// mode and collapses the multi-select to just this row.
+// selection with whatever was plainly selected before it, so two
+// Ctrl-clicks still work when the compare selection is empty. Shift-click
+// extends a multi-select range (FR-LOG-11); any other plain click leaves
+// compare mode and collapses the multi-select to this row.
 function onRowClick(row: LogCommit | undefined, index: number, event: MouseEvent): void {
   if (!row) return
   if (event.ctrlKey || event.metaKey) {
@@ -95,22 +94,18 @@ function timeAgo(unixSeconds: number): string {
   return formatTimeAgo(new Date(unixSeconds * 1000))
 }
 
-// Right-click context menu (FR-LOG-11 shell, FR-LOG-12 items): right-
-// clicking a row acts on it, same as a left click (log.select), then opens
-// the menu OpenVue's ContextMenu owns (positioning, Escape-to-close,
-// click-outside-to-close). Cherry-pick/revert (spec 42) act on the current
-// multi-select if the right-clicked row is part of it, else collapse to
-// that row alone — RefsSidebar's own stateless-write-action pattern (spec
-// 40): no dialog, this component owns its own useCoreCall/ErrorBanner.
+// Right-click context menu (FR-LOG-11/12): right-clicking a row selects it
+// like a left click, then opens OpenVue's ContextMenu, which owns
+// positioning and dismissal. Cherry-pick and revert act on the current
+// multi-select if the right-clicked row is part of it, else on that row
+// alone; both are stateless writes this component runs itself.
 const menuRef = ref<InstanceType<typeof ContextMenu>>()
 const menuItems = ref<ReturnType<typeof buildCommitMenuItems>>([])
 
 function onContextMenu(event: MouseEvent, row: LogCommit | undefined, index: number): void {
   if (!row) return
-  // "The currently selected commit" compareWithSelected pairs with is
-  // whatever was selected before this right-click (spec 23), captured
-  // ahead of the selection mutations below, which would otherwise have
-  // already made the right-clicked row itself the selection.
+  // compareWithSelected pairs with whatever was selected before this
+  // right-click, captured ahead of the selection changes below.
   const previouslySelected = log.selectedRow
   if (!multiSelected.value.has(row.sha)) log.selectOnly(row, index)
   void log.select(row)
@@ -120,6 +115,7 @@ function onContextMenu(event: MouseEvent, row: LogCommit | undefined, index: num
     openReset: (sha, subject) => emit('reset', sha, subject),
     cherryPick: () => void runAndClose(() => Facade.CherryPick(props.wt, shasOf(log.multiSelect)), log.clearMultiSelect),
     revert: () => void runAndClose(() => Facade.Revert(props.wt, shasOf(log.multiSelect)), log.clearMultiSelect),
+    openCreateWorktree: (sha) => emit('create-worktree', sha),
   }
   if (previouslySelected && previouslySelected.sha !== row.sha) {
     actions.compareWithSelected = () => {
@@ -132,9 +128,6 @@ function onContextMenu(event: MouseEvent, row: LogCommit | undefined, index: num
   menuRef.value?.show(event)
 }
 
-// shasOf is what a cherry-pick/revert menu action runs on: onContextMenu
-// (just above) already collapsed rows to just the right-clicked row unless
-// it was already part of a wider multi-select.
 function shasOf(rows: LogCommit[]): string[] {
   return rows.map((r) => r.sha)
 }

@@ -31,19 +31,19 @@ func (c *Core) CreateBranch(ctx context.Context, id core.WorktreeID, name, start
 
 	args := []string{"branch", "--", name, start}
 	if checkout {
-		args = []string{"switch", "-c", name, "--end-of-options", start} // Research used: atomic, no orphan on failure
+		args = []string{"switch", "-c", name, "--end-of-options", start} // atomic: no orphan branch if the checkout fails
 	}
 	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
 	return remapDirty(err, result)
 }
 
 // validateBranchName rejects an invalid name before any mutating call
-// (FR-BR-01) as Code InvalidName, from check-ref-format's own exit code —
-// not from stderr text (errors-security.md).
+// (FR-BR-01) as Code InvalidName, from check-ref-format's own exit code,
+// never from stderr text (TR-08).
 func validateBranchName(ctx context.Context, r git.Runner, dir, name string) error {
 	_, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
-		Args: []string{"check-ref-format", "--branch", name}, // Research used: safe with no -- of its own
+		Args: []string{"check-ref-format", "--branch", name}, // safe without a -- of its own
 	})
 	var ce *core.Error
 	if errors.As(err, &ce) {
@@ -64,8 +64,7 @@ func (c *Core) CheckoutCommit(ctx context.Context, id core.WorktreeID, sha strin
 }
 
 // switchWorktree runs a git switch call under id's worktree write lock
-// (ADR-6) and applies remapDirty — the shared shape Checkout and
-// CheckoutCommit both need, differing only in their own git args.
+// (ADR-6) and applies remapDirty.
 func (c *Core) switchWorktree(ctx context.Context, id core.WorktreeID, args []string) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -99,7 +98,7 @@ func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha string, mode c
 	if _, err := wt.Runner.Run(ctx, git.Call{
 		Dir: wt.Path, Args: []string{"reset", flag, sha},
 		// no ReadOnly (this writes), no --end-of-options/-- (sha is always
-		// an already-resolved hash, Research used)
+		// an already-resolved hash)
 	}); err != nil {
 		return core.ResetResult{}, err
 	}
@@ -108,8 +107,7 @@ func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha string, mode c
 
 // UncommittedCount implements core.API. --no-renames and
 // --untracked-files=no together guarantee every record is exactly one
-// NUL-terminated field (Research used) — the count is the field count, no
-// record parsing needed.
+// NUL-terminated field, so the count is the field count.
 func (c *Core) UncommittedCount(ctx context.Context, id core.WorktreeID) (int, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -125,9 +123,9 @@ func (c *Core) UncommittedCount(ctx context.Context, id core.WorktreeID) (int, e
 	return bytes.Count(result.Stdout, []byte{0}), nil
 }
 
-// resetFlag maps mode to reset's own flag. mode is a closed UI choice (three
-// radio buttons), never free text, so an unrecognised value is this app's
-// own bug — Code Internal, not git's failure (errors-security.md).
+// resetFlag maps mode to reset's own flag. mode is a closed UI choice,
+// never free text, so an unrecognised value is this app's own bug: Code
+// Internal, not git's failure.
 func resetFlag(mode core.ResetMode) (string, error) {
 	switch mode {
 	case core.ResetSoft:
@@ -141,15 +139,12 @@ func resetFlag(mode core.ResetMode) (string, error) {
 	}
 }
 
-// remapDirty turns a "would be overwritten" checkout refusal into Code
-// DirtyWorktree — exit 1, "error: ...\nAborting" (a tracked file's local
-// change, or an untracked file, in the way of switch/switch -c/switch
-// --detach). Every other failure (exit 128 "fatal:": invalid/nonexistent
-// branch, duplicate name, an ambiguous multi-remote DWIM match, the branch
-// already checked out in another worktree) passes through as plain
-// GitFailed, git's own message intact — FR-BR-05: "if git refuses..., show
-// why", not a code this app invents per case (Research used: the exit-code
-// split is real and reliable, confirmed across every refusal class tested).
+// remapDirty turns a "would be overwritten" checkout refusal (exit 1) into
+// Code DirtyWorktree: a tracked file's local change, or an untracked file,
+// in the way of a switch. Every other failure (exit 128 "fatal:": bad or
+// duplicate branch name, an ambiguous multi-remote DWIM match, the branch
+// already checked out elsewhere) stays plain GitFailed with git's own
+// message, per FR-BR-05.
 func remapDirty(err error, result git.Result) error {
 	var ce *core.Error
 	if errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == 1 {

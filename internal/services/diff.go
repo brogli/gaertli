@@ -1,6 +1,3 @@
-// diff.go implements DiffFile (spec 20, ADR-7): Go fetches, classifies, and
-// caps a file's two-sided content at a commit; CodeMirror computes the
-// visual diff client-side.
 package services
 
 import (
@@ -14,10 +11,9 @@ import (
 	"github.com/brogli/nebegit/internal/git"
 )
 
-// maxDiffFileSize caps DiffFile's auto-loaded content (FR-DIFF-04). Own
-// decision, not a TR/ADR number: 5x QA-PERF-05's 1MB "fast" anchor, giving
-// FR-DIFF-04's "very large" tier real headroom above the budgeted case.
-// force bypasses it; nothing bypasses Binary.
+// maxDiffFileSize caps DiffFile's auto-loaded content (FR-DIFF-04): 5x
+// QA-PERF-05's 1MB "fast" anchor. force bypasses it; nothing bypasses
+// Binary.
 const maxDiffFileSize = 5 * 1024 * 1024
 
 // parseCatFileBatch reads cat-file --batch's own framing: per object,
@@ -66,10 +62,8 @@ func blobSize(line string) (int64, error) {
 // diffIsBinary asks git's own diff machinery whether path is binary
 // (FR-DIFF-03, QA-COMP-01): a NUL-byte sniff of our own would ignore
 // .gitattributes overrides that change git's classification without
-// changing file content (Research used). Both the old-side and new-side
-// path are passed so -M's rename detection still applies when path-
-// restricted (Research used) — only the numstat record's binary marker is
-// read here, not the path/rename fields.
+// changing file content. Both the old-side and new-side path are passed so
+// -M's rename detection still applies when path-restricted.
 func diffIsBinary(ctx context.Context, r git.Runner, dir, sha, oldPath, path string) (bool, error) {
 	return numstatIsBinary(ctx, r, dir, oldPath, path,
 		"show", "--format=", "--numstat", "-z", "-M", "--first-parent", "--end-of-options", sha)
@@ -90,10 +84,7 @@ func numstatIsBinary(ctx context.Context, r git.Runner, dir, oldPath, path strin
 }
 
 // parseBinaryNumstat reads one --numstat -z record ("<added>\t<removed>\t..."
-// or "-\t-\t..." for binary, Research used) and reports whether it marks a
-// binary file. Shared by diffIsBinary (this spec, git show --first-parent)
-// and spec 21's DiffRange equivalent (git diff a b) — same record shape,
-// two different git calls producing it.
+// or "-\t-\t..." for binary) and reports whether it marks a binary file.
 func parseBinaryNumstat(record []byte) bool {
 	record = bytes.TrimSuffix(record, []byte{0})
 	fields := bytes.SplitN(record, []byte{'\t'}, 3)
@@ -123,9 +114,9 @@ func (c *Core) DiffFile(ctx context.Context, id core.WorktreeID, sha, path, oldP
 	return diffSides(ctx, wt.Runner, wt.Path, spec)
 }
 
-// diffSidesSpec drives diffSides: DiffFile (this spec, sha^/sha via git
-// show --first-parent) and spec 21's DiffRange (a/b via git diff) differ
-// only in how oldRev/newRev and isBinary are built.
+// diffSidesSpec drives diffSides: DiffFile (sha^/sha via git show
+// --first-parent) and DiffRange (a/b via git diff) differ only in how
+// oldRev/newRev and isBinary are built.
 type diffSidesSpec struct {
 	oldRev, newRev, path, oldPath string
 	force                         bool
@@ -133,7 +124,8 @@ type diffSidesSpec struct {
 }
 
 // diffSides runs the size cap, the binary check, the content fetch, and the
-// UTF-8 check shared by DiffFile and spec 21's DiffRange.
+// UTF-8 check shared by DiffFile and DiffRange (ADR-7: Go fetches,
+// classifies and caps; CodeMirror computes the visual diff).
 func diffSides(ctx context.Context, r git.Runner, dir string, s diffSidesSpec) (core.DiffFile, error) {
 	sizes, err := diffBlobSizes(ctx, r, dir, s.oldRev, s.newRev)
 	if err != nil {
@@ -158,8 +150,7 @@ func diffSides(ctx context.Context, r git.Runner, dir string, s diffSidesSpec) (
 	if !utf8.Valid(oldContent) || !utf8.Valid(newContent) {
 		// Not binary by git's own classification, but not valid UTF-8 either
 		// (e.g. a Latin-1 file): shown as binary rather than corrupting
-		// through JSON's UTF-8 requirement. No transcoding attempted; out
-		// of scope.
+		// through JSON's UTF-8 requirement.
 		return core.DiffFile{OldPath: s.oldPath, Path: s.path, Binary: true}, nil
 	}
 	return core.DiffFile{OldPath: s.oldPath, Path: s.path, OldContent: string(oldContent), NewContent: string(newContent)}, nil
@@ -180,8 +171,8 @@ func missing(line string) bool {
 
 // diffBlobSizes runs one cat-file --batch-check for both sides (FR-DIFF-04):
 // cheap, no content read, so the size cap is enforced before any content
-// byte is fetched. Object specs go on stdin (Research used: no
-// --end-of-options needed here, unlike the numstat/show call).
+// byte is fetched. Object specs go on stdin, so no --end-of-options is
+// needed here, unlike the numstat/show call.
 func diffBlobSizes(ctx context.Context, r git.Runner, dir, oldRev, newRev string) (blobSizes, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
@@ -207,8 +198,7 @@ func diffBlobSizes(ctx context.Context, r git.Runner, dir, oldRev, newRev string
 }
 
 // diffBlobContent fetches both sides' raw bytes in one cat-file --batch
-// call (ADR-7: "git show <rev>:<path>, cat-file --batch"). A missing side
-// (add/delete, or a root commit's nonexistent parent, Research used)
+// call. A missing side (add/delete, or a root commit's nonexistent parent)
 // yields nil, not an error.
 func diffBlobContent(ctx context.Context, r git.Runner, dir, oldRev, newRev string) (oldContent, newContent []byte, err error) {
 	result, err := r.Run(ctx, git.Call{

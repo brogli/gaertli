@@ -12,6 +12,7 @@ const {
   mockLoadLog,
   mockLogRows,
   mockLogIndexOf,
+  mockOpenFile,
 } = vi.hoisted(() => ({
   mockDiffFile: vi.fn(),
   mockDiffRange: vi.fn(),
@@ -20,6 +21,7 @@ const {
   mockLoadLog: vi.fn(),
   mockLogRows: vi.fn(),
   mockLogIndexOf: vi.fn(),
+  mockOpenFile: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -30,6 +32,7 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     LogRows: mockLogRows,
     CommitDetails: vi.fn(),
     LogIndexOf: mockLogIndexOf,
+    OpenFile: mockOpenFile,
   },
   SettingsService: { Get: mockSettingsGet, Set: mockSettingsSet },
 }))
@@ -75,6 +78,8 @@ describe('DiffView', () => {
     mockSettingsSet.mockReset()
     mockSettingsGet.mockResolvedValue(settings)
     mockSettingsSet.mockResolvedValue(undefined)
+    mockOpenFile.mockReset()
+    mockOpenFile.mockResolvedValue(undefined)
     open('a.txt')
   })
 
@@ -278,5 +283,43 @@ describe('DiffView', () => {
     await wrapper.get('[data-test="prev-file"]').trigger('click')
 
     expect(wrapper.emitted('update:range')).toBeUndefined()
+  })
+
+  it('FR-ED-02 "Open in editor" calls Facade.OpenFile with the commit-mode file, in commit mode', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledTimes(1)
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
+  })
+
+  it('FR-ED-02 "Open in editor" calls Facade.OpenFile with the range-mode file, in range mode', async () => {
+    mockDiffRange.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, range: { from: 'sha-a', to: 'sha-b', path: 'a.txt', oldPath: '' } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledTimes(1)
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
   })
 })

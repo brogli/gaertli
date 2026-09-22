@@ -15,11 +15,10 @@ import (
 )
 
 // candidateFormat resolves everything CherryPick/Revert need about each
-// selected sha in one process (Research used): %ct for FR-CP-02/FR-RV-02's
-// ordering, %P's field count for FR-CP-05/FR-RV-03's merge refusal.
-// --no-walk: a plain lookup of exactly these commits, never a walk of
-// history reachable from them — what makes it safe for cousin/unrelated
-// commits, not just an ancestor chain (Research used).
+// selected sha in one process: %ct for FR-CP-02/FR-RV-02's ordering, %P's
+// field count for FR-CP-05/FR-RV-03's merge refusal. It is used with
+// --no-walk — a plain lookup of exactly these commits, never a walk of the
+// history reachable from them, so cousin and unrelated commits work too.
 const candidateFormat = "%H%x1f%h%x1f%ct%x1f%P"
 
 // pickCandidate is one selected commit's own resolved facts: ordering
@@ -67,8 +66,8 @@ func firstMerge(candidates []pickCandidate) (pickCandidate, bool) {
 // Committer date, not author date: it stays monotonic along a branch after
 // a rebase. Ties (same second) fall back to the given order, which the
 // frontend supplies as log order (newest first): kept for revert, reversed
-// for cherry-pick. Returns the SHAs in the exact order git will apply them
-// (Research used: git applies argument order literally).
+// for cherry-pick. Git applies the argument order literally, so this is
+// the order the commits are applied in.
 func orderedSHAs(candidates []pickCandidate, oldestFirst bool) []string {
 	sorted := append([]pickCandidate(nil), candidates...)
 	if oldestFirst {
@@ -89,8 +88,8 @@ func orderedSHAs(candidates []pickCandidate, oldestFirst bool) []string {
 
 // resolveCandidates resolves everything CherryPick/Revert need to know
 // about shas in one process. Fails the whole call (nothing attempted) if
-// any sha does not resolve (Research used: git log --no-walk on a bad
-// object fails outright, no partial output).
+// any sha does not resolve: git log --no-walk on a bad object fails
+// outright, with no partial output.
 func resolveCandidates(ctx context.Context, r git.Runner, dir string, shas []string) ([]pickCandidate, error) {
 	args := append([]string{"log", "--no-walk", "--format=" + candidateFormat, "--end-of-options"}, shas...)
 	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: args})
@@ -134,8 +133,7 @@ func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []string
 }
 
 // Revert implements core.API. --no-edit: never wait on an interactive
-// editor, regardless of whether this process happens to have a
-// controlling terminal (Research used).
+// editor, whether or not this process has a controlling terminal.
 func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []string) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -145,13 +143,10 @@ func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []string) er
 }
 
 // remapConflicts classifies a failed cherry-pick/revert: a state file left
-// behind means the sequencer genuinely stopped mid-way — left in place for
-// spec 72, Code Conflicts. No state file means the call refused before
-// changing anything beyond what git's own check already rejected (a dirty
-// file in the way, another operation already running): plain GitFailed,
-// git's own message intact (FR-CP-04's "show why"). headFile is checked
-// under wt.GitDir — the same per-worktree directory repo.go's own
-// operation() already reads for Summary.Operation.
+// behind under gitDir means the sequencer stopped mid-way, so Code
+// Conflicts and the state stays for the conflict flow. No state file means
+// git refused before changing anything (a dirty file in the way, another
+// operation running): plain GitFailed with git's own message (FR-CP-04).
 func remapConflicts(err error, gitDir, headFile string) error {
 	if err == nil {
 		return nil

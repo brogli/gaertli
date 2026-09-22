@@ -2,18 +2,26 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCompareCommits, mockDiffRange, mockSettingsGet, mockSettingsSet, mockEventsOn, mockWindowClose } =
-  vi.hoisted(() => ({
-    mockCompareCommits: vi.fn(),
-    mockDiffRange: vi.fn(),
-    mockSettingsGet: vi.fn(),
-    mockSettingsSet: vi.fn(),
-    mockEventsOn: vi.fn(),
-    mockWindowClose: vi.fn(),
-  }))
+const {
+  mockCompareCommits,
+  mockDiffRange,
+  mockSettingsGet,
+  mockSettingsSet,
+  mockEventsOn,
+  mockWindowClose,
+  mockOpenFile,
+} = vi.hoisted(() => ({
+  mockCompareCommits: vi.fn(),
+  mockDiffRange: vi.fn(),
+  mockSettingsGet: vi.fn(),
+  mockSettingsSet: vi.fn(),
+  mockEventsOn: vi.fn(),
+  mockWindowClose: vi.fn(),
+  mockOpenFile: vi.fn(),
+}))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { CompareCommits: mockCompareCommits, DiffRange: mockDiffRange },
+  Facade: { CompareCommits: mockCompareCommits, DiffRange: mockDiffRange, OpenFile: mockOpenFile },
   SettingsService: { Get: mockSettingsGet, Set: mockSettingsSet },
 }))
 
@@ -51,6 +59,8 @@ describe('CompareDiffView', () => {
     mockEventsOn.mockReset()
     mockEventsOn.mockReturnValue(() => {})
     mockWindowClose.mockReset()
+    mockOpenFile.mockReset()
+    mockOpenFile.mockResolvedValue(undefined)
   })
 
   it('FR-CMP-02 loads the comparison and the named file, and renders the file list', async () => {
@@ -111,6 +121,18 @@ describe('CompareDiffView', () => {
     await flushPromises()
 
     expect(mockDiffRange).toHaveBeenCalledWith('/repo', 'sha-a', 'sha-b', 'b.txt', '', false)
+
+    wrapper.unmount()
+  })
+
+  it('FR-ED-02 an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
+    const wrapper = mount(CompareDiffView, { props })
+    await flushPromises()
+
+    await wrapper.findAll('[data-test="open-editor"]')[1]!.trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledTimes(1)
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'b.txt', 0)
 
     wrapper.unmount()
   })

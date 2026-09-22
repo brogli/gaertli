@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/settings"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type fakePicker struct {
@@ -85,8 +87,8 @@ func TestAppService_RecentReposListsStoredEntries(t *testing.T) {
 }
 
 // ListWSLDistros forwards to remote.ListDistros unchanged; on this
-// (non-Windows) platform that is WslNotFound (case 16's first fabricated
-// failure needs no fabrication here — distros_other.go already returns it).
+// (non-Windows) platform that is WslNotFound, so the failure needs no
+// fabricating.
 func TestFR_REPO_07_ListWSLDistrosReturnsWslNotFoundOnThisPlatform(t *testing.T) {
 	s := &AppService{}
 
@@ -130,9 +132,8 @@ func TestFR_REPO_07_PickAndOpenWSLOpensThePickedPath(t *testing.T) {
 	}
 }
 
-// case 16's DistroNotFound path: routing an unknown distro's failure needs
-// no bespoke handling either — open()'s existing generic notify-and-do-
-// nothing-else covers it (FR-REPO-05).
+// An unknown distro needs no bespoke handling either: open()'s generic
+// notify-and-do-nothing-else covers it (FR-REPO-05).
 func TestFR_REPO_07_PickAndOpenWSLNotifiesOnDistroNotFound(t *testing.T) {
 	reg, opener := newTestRegistry()
 	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
@@ -182,10 +183,6 @@ func TestFR_CMP_01_FR_CMP_02_OpenCompareDiffOpensAWindow(t *testing.T) {
 	}
 }
 
-// TestFR_REPO_06_InstallWSLLauncherInstallsTheRunningBinaryIntoTheDistro is
-// case 9's Go half: the frontend "Install nebegit command" click (task 8/9,
-// component-tested there) is exercised as a direct unit call here in the
-// meantime.
 func TestFR_REPO_06_InstallWSLLauncherInstallsTheRunningBinaryIntoTheDistro(t *testing.T) {
 	reg, _ := newTestRegistry()
 	fdc := &fakeDistroCore{}
@@ -202,5 +199,47 @@ func TestFR_REPO_06_InstallWSLLauncherInstallsTheRunningBinaryIntoTheDistro(t *t
 	}
 	if len(fdc.installLauncherCalls) != 1 || fdc.installLauncherCalls[0] != self {
 		t.Errorf("InstallLauncher calls = %v, want one call with %q", fdc.installLauncherCalls, self)
+	}
+}
+
+// The window comes from ctx; a windowless/background call is a no-op, not
+// an error.
+func TestFR_WT_09_UpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
+	fw := &fakeCallingWindow{}
+	ctx := context.WithValue(context.Background(), application.WindowKey, fw)
+	s := &AppService{}
+
+	if err := s.UpdateWindowTitle(ctx, "project", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"project [main]"}; !slices.Equal(fw.setTitles, want) {
+		t.Errorf("SetTitle calls = %v, want %v", fw.setTitles, want)
+	}
+
+	if err := s.UpdateWindowTitle(context.Background(), "project", "main"); err != nil {
+		t.Errorf("UpdateWindowTitle with no window in ctx = %v, want nil", err)
+	}
+	if len(fw.setTitles) != 1 {
+		t.Errorf("SetTitle calls = %d, want still 1 (no window in ctx)", len(fw.setTitles))
+	}
+}
+
+// A windowless/background call fails without ever touching OpenWorktree.
+func TestFR_WT_05_SelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
+	called := false
+	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
+		called = true
+		return core.WorktreeInfo{}, nil
+	}}
+	s := &AppService{shell: shell{api: api}}
+
+	err := s.SelectWorktree(context.Background(), "/x")
+
+	var ce *core.Error
+	if !errors.As(err, &ce) || ce.Code != core.Internal {
+		t.Fatalf("SelectWorktree(no window in ctx) err = %v, want Code Internal", err)
+	}
+	if called {
+		t.Error("OpenWorktree should not be called")
 	}
 }

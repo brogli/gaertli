@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,26 +13,24 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// fakegit is testdata/fakegit (internal/git), built once for the tests in
-// this file that inject a delayed stream (case 7, 12).
+// fakegit is internal/git/testdata/fakegit, for the tests that inject a
+// delayed stream.
 var fakegit string
 
+// argvWriterBin is internal/editor/testdata/argvwriter (spec 31), reused by
+// editor_test.go (spec 51): a stand-in editor that writes its received argv
+// to a file next to itself and exits. Built here, the package's one
+// TestMain, alongside fakegit.
+var argvWriterBin string
+
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "fakegit")
-	if err != nil {
-		panic(err)
-	}
-	fakegit = filepath.Join(dir, "fakegit")
-	build := exec.Command("go", "build", "-o", fakegit, "../git/testdata/fakegit")
-	build.Env = append(os.Environ(), "CGO_ENABLED=0")
-	if out, buildErr := build.CombinedOutput(); buildErr != nil {
-		panic(string(out) + buildErr.Error())
-	}
-	code := m.Run()
-	_ = os.RemoveAll(dir)
-	os.Exit(code)
+	testbin.Main(m,
+		testbin.Bin{Path: &fakegit, Pkg: "../git/testdata/fakegit"},
+		testbin.Bin{Path: &argvWriterBin, Pkg: "../editor/testdata/argvwriter"},
+	)
 }
 
 func TestFR_LOG_01_ParseLogRecordParsesFieldsAndRefs(t *testing.T) {
@@ -94,7 +91,7 @@ func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo.Dir, "c.txt"), []byte("dirty"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	run(t, repo.Dir, "stash")
+	gittest.Run(t, repo.Dir, "stash")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -172,12 +169,12 @@ func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T
 
 func TestADR_5_LogRowsGraphIsPopulatedFromLoad(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "a", "base")
-	run(t, repo.Dir, "branch", "side")
-	commit(t, repo.Dir, "a.txt", "b", "on main")
-	run(t, repo.Dir, "switch", "side")
-	commit(t, repo.Dir, "b.txt", "c", "on side")
-	run(t, repo.Dir, "switch", "master")
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "base")
+	gittest.Run(t, repo.Dir, "branch", "side")
+	gittest.Commit(t, repo.Dir, "a.txt", "b", "on main")
+	gittest.Run(t, repo.Dir, "switch", "side")
+	gittest.Commit(t, repo.Dir, "b.txt", "c", "on side")
+	gittest.Run(t, repo.Dir, "switch", "master")
 	_, _ = (git.Runner{}).Run(context.Background(), git.Call{Dir: repo.Dir, Args: []string{"merge", "--no-ff", "-m", "merge side", "side"}})
 
 	c := New(func(core.Event) {})
@@ -210,13 +207,13 @@ func TestADR_5_LogRowsGraphIsPopulatedFromLoad(t *testing.T) {
 
 func TestFR_LOG_10_LoadLogMarksCheckedOutWorktrees(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "base")
-	older := headSHA(t, repo.Dir)
-	commit(t, repo.Dir, "seed.txt", "y", "second")
-	run(t, repo.Dir, "branch", "feature")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "base")
+	older := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
+	gittest.Run(t, repo.Dir, "branch", "feature")
 	linked := filepath.Join(t.TempDir(), "linked")
-	run(t, repo.Dir, "worktree", "add", linked, "feature")
-	run(t, repo.Dir, "switch", "--detach", older)
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
+	gittest.Run(t, repo.Dir, "switch", "--detach", older)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -242,7 +239,7 @@ func TestFR_LOG_10_LoadLogMarksCheckedOutWorktrees(t *testing.T) {
 
 func TestFR_REPO_04_ReloadLogNoOpsWhenTipsUnchanged(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	c := New(func(core.Event) {})
 	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -270,7 +267,7 @@ func TestFR_REPO_04_ReloadLogNoOpsWhenTipsUnchanged(t *testing.T) {
 
 func TestFR_REPO_04_ReloadLogRestartsWhenARefMoved(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	c := New(func(core.Event) {})
 	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -283,7 +280,7 @@ func TestFR_REPO_04_ReloadLogRestartsWhenARefMoved(t *testing.T) {
 	waitForLog(t, c, info.ID)
 	beforeGen := logGeneration(t, c, info.ID)
 
-	run(t, repo.Dir, "branch", "feature")
+	gittest.Run(t, repo.Dir, "branch", "feature")
 
 	if err := c.ReloadLog(context.Background(), info.ID); err != nil {
 		t.Fatal(err)
@@ -300,8 +297,8 @@ func TestFR_REPO_04_ReloadLogRestartsWhenARefMoved(t *testing.T) {
 
 func TestFR_REPO_04_ReloadLogRestartsWhenOnlyHEADsTargetChanged(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	run(t, repo.Dir, "branch", "feature")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "branch", "feature")
 
 	c := New(func(core.Event) {})
 	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -314,7 +311,7 @@ func TestFR_REPO_04_ReloadLogRestartsWhenOnlyHEADsTargetChanged(t *testing.T) {
 	waitForLog(t, c, info.ID)
 	beforeGen := logGeneration(t, c, info.ID)
 
-	run(t, repo.Dir, "switch", "feature") // no new commit: only HEAD's target ref changes
+	gittest.Run(t, repo.Dir, "switch", "feature") // no new commit: only HEAD's target ref changes
 
 	if err := c.ReloadLog(context.Background(), info.ID); err != nil {
 		t.Fatal(err)
@@ -328,9 +325,9 @@ func TestFR_REPO_04_ReloadLogRestartsWhenOnlyHEADsTargetChanged(t *testing.T) {
 
 func TestFR_LOG_01_LogIndexOfFindsRowBySHA(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "a", "first")
-	commit(t, repo.Dir, "b.txt", "b", "second")
-	commit(t, repo.Dir, "c.txt", "c", "third")
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
+	gittest.Commit(t, repo.Dir, "b.txt", "b", "second")
+	gittest.Commit(t, repo.Dir, "c.txt", "c", "third")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -370,14 +367,14 @@ func TestQA_PERF_02_LargeLoadWritesCommitGraphOnce(t *testing.T) {
 	t.Cleanup(func() { largeRepoRows = prev })
 
 	large := gittest.New(t)
-	commit(t, large.Dir, "a.txt", "1", "one")
-	commit(t, large.Dir, "a.txt", "2", "two")
-	commit(t, large.Dir, "a.txt", "3", "three")
-	commit(t, large.Dir, "a.txt", "4", "four")
+	gittest.Commit(t, large.Dir, "a.txt", "1", "one")
+	gittest.Commit(t, large.Dir, "a.txt", "2", "two")
+	gittest.Commit(t, large.Dir, "a.txt", "3", "three")
+	gittest.Commit(t, large.Dir, "a.txt", "4", "four")
 
 	small := gittest.New(t)
-	commit(t, small.Dir, "a.txt", "1", "one")
-	commit(t, small.Dir, "a.txt", "2", "two")
+	gittest.Commit(t, small.Dir, "a.txt", "1", "one")
+	gittest.Commit(t, small.Dir, "a.txt", "2", "two")
 
 	c := New(func(core.Event) {})
 
@@ -496,40 +493,13 @@ func waitForLog(t *testing.T, c *Core, id core.WorktreeID) []core.LogCommit {
 
 func commitOrphan(t *testing.T, dir, branch, file, msg string) {
 	t.Helper()
-	run(t, dir, "checkout", "--orphan", branch)
+	gittest.Run(t, dir, "checkout", "--orphan", branch)
 	_, _ = (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"rm", "-rf", "--cached", "."}})
 	if err := os.WriteFile(filepath.Join(dir, file), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	run(t, dir, "add", "--", file)
+	gittest.Run(t, dir, "add", "--", file)
 	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"commit", "-F", "-"}, Stdin: []byte(msg)}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func commit(t *testing.T, dir, name, content, msg string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	run(t, dir, "add", "--", name)
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"commit", "-F", "-"}, Stdin: []byte(msg)}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func headSHA(t *testing.T, dir string) string {
-	t.Helper()
-	result, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, ReadOnly: true, Args: []string{"rev-parse", "HEAD"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(result.Stdout[:len(result.Stdout)-1])
-}
-
-func run(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: args}); err != nil {
 		t.Fatal(err)
 	}
 }

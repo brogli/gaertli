@@ -69,9 +69,7 @@ type ChangedFile struct {
 // LogFilter is FR-LOG-05..08's combined filter. Every non-empty field
 // narrows the result set together (FR-LOG-08's "combined" is AND, not OR —
 // git's own default combination of different predicate types). Query, if it
-// parses as an existing commit's hash, short-circuits every other field
-// (services.streamFilteredLog) — pasting a hash is a more specific request
-// than any fuzzy filter.
+// parses as an existing commit's hash, short-circuits every other field.
 type LogFilter struct {
 	Query    string   `json:"query,omitempty"`    // FR-LOG-05: message text (subject+body), or a commit hash
 	Author   string   `json:"author,omitempty"`   // FR-LOG-05: author name or email
@@ -85,10 +83,9 @@ func (f LogFilter) Empty() bool {
 	return f.Query == "" && f.Author == "" && len(f.Branches) == 0 && f.Path == ""
 }
 
-// LogProgress is "log:progress"'s payload, shared by the unfiltered log
-// (spec 10) and a window's own filtered view (spec 22): Filtered tells the
-// two apart, since one window can have both streams running at once (its
-// base log still streaming in, its own search already active).
+// LogProgress is "log:progress"'s payload. Filtered tells the repo-wide
+// unfiltered log apart from a window's own filtered view: one window can
+// have both streams running at once.
 type LogProgress struct {
 	Loaded   int  `json:"loaded"`
 	Done     bool `json:"done"`

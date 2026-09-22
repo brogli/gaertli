@@ -31,9 +31,8 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 		Dir: wt.Path, ReadOnly: true, Background: true,
 		Args: []string{"symbolic-ref", "--short", "-q", "HEAD"},
 	})
-	// exit 1 with empty stdout = detached HEAD (git-symbolic-ref: "-q ...
-	// exit with non-zero status"); any other failure is returned as-is
-	// (QA-REL-02: show it; no more specific code exists yet).
+	// exit 1 with empty stdout = detached HEAD (symbolic-ref -q); any other
+	// failure is returned as-is (QA-REL-02).
 	detached := quietFailure(err, result)
 	if err != nil && !detached {
 		return core.Summary{}, err
@@ -52,11 +51,8 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 }
 
 // resolveHeadSHA resolves HEAD's own commit (QA-REL-02): "" for an unborn
-// HEAD, never an error — same exit-1/empty-stdout shape as the detached
-// check just above it (quietFailure). Named apart from the test suite's own
-// headSHA(t, dir) helper (log_test.go), already established across this
-// package's tests (Design note: the spec's own draft named this the same as
-// that helper — adapted to the code found, not the spec's exact name).
+// HEAD, never an error — the same exit-1/empty-stdout shape quietFailure
+// covers.
 func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
@@ -69,11 +65,9 @@ func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, erro
 }
 
 // quietFailure reports whether err is git's own "-q ... nothing to report"
-// shape — a Code GitFailed, exit-1 result with empty stdout — rather than a
-// real failure: an unattached HEAD's symbolic-ref, or an unborn HEAD's
-// rev-parse, both used above. Shared so this exit-code/empty-stdout idiom
-// (errors-security.md: classified from exit code, not stderr text) is
-// checked identically in both places instead of copy-pasted.
+// shape — Code GitFailed, exit 1, empty stdout — rather than a real
+// failure: an unattached HEAD's symbolic-ref, an unborn HEAD's rev-parse.
+// Classified from the exit code, never stderr text (TR-08).
 func quietFailure(err error, result git.Result) bool {
 	var ce *core.Error
 	return errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == 1 && len(result.Stdout) == 0

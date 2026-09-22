@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"net/url"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -46,7 +47,7 @@ func (n wailsNotifier) Show(title, msg string) {
 // shell is what every "open this worktree" trigger shares: CLI launch,
 // second-instance relay, folder picker, recent-repo click.
 type shell struct {
-	api    core.API // the Facade: OpenWorktree routes through Router.CoreFor, where spec 30 hooks WSL in
+	api    core.API // the Facade: routing happens in Router.CoreFor
 	reg    *Registry
 	store  *settings.Store
 	notify errorNotifier
@@ -69,12 +70,13 @@ func (sh shell) open(ctx context.Context, path string) {
 	})
 }
 
-// restoreOrHome is the no-path launch (FR-REPO-02): a window per worktree
-// open at last quit, or the home window if there were none.
-func (sh shell) restoreOrHome(ctx context.Context) {
+// restore is the no-path launch (FR-REPO-02): a window per worktree
+// selected at last quit, or one fresh empty-selection window if there were
+// none (ADR-9).
+func (sh shell) restore(ctx context.Context) {
 	open := sh.store.Get().OpenWorktrees
 	if len(open) == 0 {
-		sh.reg.OpenHome()
+		sh.reg.OpenOrFocus("", "", "")
 		return
 	}
 	for _, p := range open {
@@ -85,10 +87,52 @@ func (sh shell) restoreOrHome(ctx context.Context) {
 // launch handles a launch's resolved path argument, first or relayed.
 func (sh shell) launch(ctx context.Context, path string) {
 	if path == "" {
-		sh.restoreOrHome(ctx)
+		sh.restore(ctx)
 		return
 	}
 	sh.open(ctx, path)
+}
+
+// callingWindow is the part of the ctx-carried calling window
+// (application.WindowKey) this package needs; satisfied by
+// application.Window, a fake in tests. Deliberately smaller than
+// application.Window, which declares unexported methods no type outside
+// package application can implement — asserting against it directly would
+// make SelectWorktree/UpdateWindowTitle untestable.
+type callingWindow interface {
+	ID() uint
+	SetURL(s string) application.Window
+	SetTitle(title string) application.Window
+}
+
+// switchTo implements FR-WT-05/FR-WT-08's panel-triggered switch: validates
+// path through the same CoreFor routing as open, moves this window's own
+// selection, navigates it (SetURL reloads the window), records settings,
+// and — if no other window still selects the worktree just left — closes
+// its session. Unlike open(), which runs before any window exists, a switch
+// failure is returned rather than shown: the panel that asked for it has an
+// ErrorBanner (FR-UX-01).
+func (sh shell) switchTo(ctx context.Context, w callingWindow, path string) error {
+	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
+	if err != nil {
+		return err
+	}
+	distro, _, _ := remote.ClassifyWSLPath(path)
+	previous, previousDistro, _ := sh.reg.SelectInWindow(w.ID(), wt.ID, wt.Path, distro)
+	sh.reg.SetRepo(wt.ID, wt.RepoKey)
+	w.SetURL(selectionURL(wt.Path))
+	sh.reg.Release(previous, previousDistro)
+	_ = sh.store.Update(func(s *settings.Settings) { s.SetOpenWorktrees(sh.reg.OpenWorktreePaths()) })
+	return nil
+}
+
+// selectionURL builds a worktree window's URL; "" (the empty selection)
+// gets the placeholder "/".
+func selectionURL(path string) string {
+	if path == "" {
+		return "/"
+	}
+	return "/?path=" + url.QueryEscape(path)
 }
 
 // openFailedMessage is FR-REPO-05's user-facing text for a validation

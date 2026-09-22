@@ -6,9 +6,9 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
 // DetachWarningDialog is FR-BR-08's own one-off confirmation, opened from
-// the commit-row context menu's "Check out commit" (spec 22, FR-LOG-11).
-// Not FR-UX-03's shared confirmation-rule component: that is spec 41's own
-// build, and FR-BR-08's wording is not in FR-UX-03's fixed list anyway.
+// the commit-row context menu's "Check out commit" (FR-LOG-11). Its wording
+// is not in FR-UX-03's fixed list, so it does not use the shared
+// confirmation rule.
 const props = defineProps<{ wt: string; sha: string; visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 

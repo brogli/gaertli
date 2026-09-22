@@ -43,7 +43,7 @@ func TestADR_7_BlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
 func TestFR_DIFF_03_DiffIsBinaryClassifiesNumstatRecords(t *testing.T) {
 	// A fake git.Runner's stdout goes through an OS environment variable
 	// (FAKEGIT_STDOUT), which cannot carry an embedded NUL byte — so the
-	// rename fixture (whose real -z record embeds one, Research used) is
+	// rename fixture (whose real -z record embeds one) is
 	// exercised directly against parseBinaryNumstat below instead.
 	tests := []struct {
 		name       string
@@ -79,9 +79,9 @@ func TestFR_DIFF_03_ParseBinaryNumstatIgnoresARenameRecordsThirdField(t *testing
 
 func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "first\n", "first")
-	commit(t, repo.Dir, "a.txt", "second\n", "second")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "a.txt", "first\n", "first")
+	gittest.Commit(t, repo.Dir, "a.txt", "second\n", "second")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -100,8 +100,8 @@ func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
 
 func TestFR_LOG_04_DiffFileOnAddedFileHasNoOldContent(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "added text\n", "add a.txt")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "a.txt", "added text\n", "add a.txt")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -120,10 +120,10 @@ func TestFR_LOG_04_DiffFileOnAddedFileHasNoOldContent(t *testing.T) {
 
 func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "still here\n", "add a.txt")
-	run(t, repo.Dir, "rm", "a.txt")
-	run(t, repo.Dir, "commit", "-m", "remove a.txt")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "a.txt", "still here\n", "add a.txt")
+	gittest.Run(t, repo.Dir, "rm", "a.txt")
+	gittest.Run(t, repo.Dir, "commit", "-m", "remove a.txt")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -143,9 +143,9 @@ func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 func TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath(t *testing.T) {
 	repo := gittest.New(t)
 	base := strings.Repeat("line unchanged\n", 20)
-	commit(t, repo.Dir, "a.txt", base+"old ending\n", "add a.txt")
+	gittest.Commit(t, repo.Dir, "a.txt", base+"old ending\n", "add a.txt")
 	renameWithEdit(t, repo.Dir, "a.txt", "b.txt", "new ending") // compare_test.go
-	sha := headSHA(t, repo.Dir)
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -167,8 +167,8 @@ func TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath(t *testing.T) {
 
 func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -187,9 +187,9 @@ func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T)
 
 func TestFR_DIFF_03_DiffFileTreatsGitattributesDiffOverrideAsBinary(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, ".gitattributes", "a.txt -diff\n", "add gitattributes")
-	commit(t, repo.Dir, "a.txt", "plain text, no nul bytes\n", "add a.txt")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, ".gitattributes", "a.txt -diff\n", "add gitattributes")
+	gittest.Commit(t, repo.Dir, "a.txt", "plain text, no nul bytes\n", "add a.txt")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -209,8 +209,8 @@ func TestFR_DIFF_03_DiffFileTreatsGitattributesDiffOverrideAsBinary(t *testing.T
 func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 	repo := gittest.New(t)
 	big := strings.Repeat("a", maxDiffFileSize+1)
-	commit(t, repo.Dir, "big.txt", big, "add big file")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "big.txt", big, "add big file")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -238,8 +238,8 @@ func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 func TestQA_PERF_05_DiffFileUnder1MBCompletesWithinBudget(t *testing.T) {
 	repo := gittest.New(t)
 	content := strings.Repeat("a line of committed text\n", 700*1024/25) // ~700KB, under maxDiffFileSize
-	commit(t, repo.Dir, "file.txt", content, "add a ~700KB file")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "file.txt", content, "add a ~700KB file")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -263,8 +263,8 @@ func TestQA_PERF_05_DiffFileUnder1MBCompletesWithinBudget(t *testing.T) {
 
 func TestADR_7_DiffFileOnRootCommitHasNoOldContent(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "root content\n", "root commit")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "a.txt", "root content\n", "root commit")
+	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))

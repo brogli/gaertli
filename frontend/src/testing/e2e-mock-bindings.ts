@@ -23,8 +23,7 @@ function delay<T>(value: T): Promise<T> {
 // HomeView.vue/SettingsPanel.vue even when neither is ever mounted in the
 // scenario this harness drives. Facade itself implements only the subset
 // WorktreeView.vue's mounted lifecycle calls, backed by LOG_ROWS_FIXTURE
-// instead of a real core (TR-31, spec 13 Design); AppService/SettingsService
-// are unused here and stay empty.
+// instead of a real core (TR-31); AppService/SettingsService stay empty.
 
 declare global {
   interface Window {

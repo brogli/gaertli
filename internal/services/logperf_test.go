@@ -66,8 +66,8 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 
 // TestQA_PERF_07_LogMemoryStaysBoundedPerRow proves the per-row memory
 // shape QA-PERF-07 depends on, at a scale a unit test can run fast and
-// deterministically. The literal 500MB-at-100k-commits target is spec 13's
-// benchmark.
+// deterministically. The literal 500MB-at-100k-commits target is the
+// benchmark's job, not this test's.
 func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	const rows = 20000
 	repo := gittest.New(t)

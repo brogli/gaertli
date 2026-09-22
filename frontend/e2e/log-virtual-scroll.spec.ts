@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
 
-// FR-LOG-09, TR-31 (moved from spec 10): a component test runs in happy-dom,
-// which has no real layout/scroll, so it cannot exercise the virtual list's
-// actual behavior. This drives the real, rendered app instead: only the
+// FR-LOG-09, TR-31: a component test runs in happy-dom, which has no real
+// layout or scrolling, so it cannot exercise the virtual list's actual
+// behaviour. This drives the real, rendered app instead: only the
 // visible window loads up front, and scrolling past it pulls in further,
 // higher-index rows (window.__e2eLogRowsCalls, set by
 // src/testing/e2e-mock-bindings.ts).

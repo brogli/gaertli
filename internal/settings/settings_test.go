@@ -191,10 +191,9 @@ func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
 	}
 }
 
-// TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey is case 10's other
-// half: an old settings file's bare "editor" key (spec 05's old shape) is
-// silently ignored by encoding/json's default unknown-field handling — no
-// migration to write, since nebegit has shipped no release yet (Design).
+// TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey: an older settings
+// file's bare "editor" key is ignored by encoding/json's unknown-field
+// handling, with no migration to write.
 func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	if err := os.WriteFile(path, []byte(`{"editor": "editor"}`), 0o644); err != nil {

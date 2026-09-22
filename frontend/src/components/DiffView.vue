@@ -7,20 +7,20 @@ import { useDiffStore } from '../stores/diff'
 import { useSettingsStore } from '../stores/settings'
 import { useLogStore } from '../stores/log'
 import { useCoreCall } from '../composables/useCoreCall'
+import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// DiffView renders a file's two-sided content, either the log store's
+// DiffView renders a file's two-sided content: either the log store's
 // selected file at its selected commit (FR-LOG-04, ADR-7) or, when range is
-// given, a compare's file between two arbitrary commits (spec 21,
-// FR-CMP-02). CodeMirror computes the diff client-side from the store's
-// fetched old/new content. Read-only; unified/side-by-side is
-// Settings.DiffMode (FR-DIFF-01).
+// given, a compare's file between two arbitrary commits (FR-CMP-02).
+// CodeMirror computes the diff client-side from the store's fetched
+// old/new content. Read-only; unified/side-by-side is Settings.DiffMode
+// (FR-DIFF-01).
 //
-// files is the compare diff window's own ordered file list (spec 23,
-// FR-CMP-02); meaningful only together with range. DiffView doesn't own
-// range, so stepping through files emits update:range for the parent to
-// apply, rather than mutating the prop.
+// files is the compare diff window's own ordered file list, meaningful only
+// together with range. DiffView doesn't own range, so stepping through
+// files emits update:range instead of mutating the prop.
 type DiffRange = { from: string; to: string; path: string; oldPath: string }
 
 const props = defineProps<{
@@ -60,6 +60,14 @@ function load(force = false): void {
 }
 
 watch(target, () => load(), { immediate: true })
+
+// FR-ED-02: open the file currently shown, commit or range mode alike —
+// both Target kinds carry the same path. Line is always 0 (FR-ED-09's "at
+// the line shown" is a SHOULD, still open).
+function openEditor(): void {
+  const t = target.value
+  if (t) void run(() => Facade.OpenFile(props.wt, t.path, 0))
+}
 
 const mode = computed(() => settings.settings?.diffMode ?? 'unified')
 if (!settings.settings) void settings.load()
@@ -124,13 +132,9 @@ function prevChange(): void {
   if (target) goToPreviousChunk(target)
 }
 
-// Next/previous file (FR-DIFF-02) step the log store's already-loaded file
-// list; the target watcher reloads. No auto-chaining into change
-// navigation (own decision, two independent controls).
-
-// stepRangeFile is files' own next/previous-file (spec 23, FR-CMP-02): a
-// no-op past either end (mirrors log.nextFile/prevFile's own boundary
-// behaviour).
+// stepRangeFile is files' own next/previous-file (FR-CMP-02), a no-op past
+// either end like the log store's nextFile/prevFile. File and change
+// navigation stay two independent controls.
 function stepRangeFile(step: 1 | -1): void {
   if (!props.range || !props.files) return
   const i = props.files.findIndex(
@@ -168,6 +172,7 @@ function stepRangeFile(step: 1 | -1): void {
         <button type="button" data-test="prev-file" @click="log.prevFile()">Previous file</button>
         <button type="button" data-test="next-file" @click="log.nextFile()">Next file</button>
       </template>
+      <button type="button" data-test="open-editor" @click="openEditor">Open in editor</button>
       <div ref="container" class="cm-container"></div>
     </template>
   </section>

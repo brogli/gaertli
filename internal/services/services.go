@@ -1,6 +1,5 @@
 // Package services implements core.API in-process: it validates input, runs
-// git, and returns DTOs. One service per feature area; this is the stub
-// every spec adds to.
+// git, and returns DTOs. One service per feature area.
 package services
 
 import (
@@ -9,6 +8,7 @@ import (
 
 	"github.com/brogli/nebegit/internal/buildinfo"
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/session"
 )
 
@@ -16,6 +16,7 @@ import (
 type Core struct {
 	sink     core.EventSink
 	sessions *session.Manager
+	discover git.Runner // no Log, no session: ListWorktrees/ListBranches's stateless reads
 
 	// editorProfile is the profile pushed by SetEditorProfile (TR-13); an
 	// atomic.Value since it is set from a different goroutine than the one

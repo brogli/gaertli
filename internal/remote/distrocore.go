@@ -48,11 +48,9 @@ func NewDistroCore(distro, version string, run wslRunner, consent Consent, sink 
 
 // Ensure returns a live client, (re)spawning the core process if none is
 // running or the last one exited. respawned is true only when a spawn just
-// happened (ADR-4: the caller — Registry, internal/app — then re-opens
-// every worktree it had open against this distro, since a fresh core has no
-// sessions). Concurrent callers during a spawn share the one attempt (mu
-// held for its duration — a spawn is rare and fast, spike: ~50ms plus
-// ensureDeployed's cheap size check, not a hot path).
+// happened; the caller then re-opens every worktree it had open against
+// this distro, since a fresh core has no sessions (ADR-4). Concurrent
+// callers during a spawn share the one attempt.
 func (d *DistroCore) Ensure(ctx context.Context) (*Client, bool, error) {
 	client, respawned, onConnect, err := d.ensure(ctx)
 	if err != nil {
@@ -80,9 +78,9 @@ func (d *DistroCore) ensure(ctx context.Context) (client *Client, respawned bool
 	}
 	if !d.versionOK(ctx, client) {
 		discard(client, cmd)
-		// A stale binary despite a matching size (Research used: a
-		// same-version dev rebuild whose bytes changed): force one fresh
-		// copy, skipping the size check, and retry once.
+		// A stale binary despite a matching size (a same-version dev
+		// rebuild): force one fresh copy, skipping the size check, and
+		// retry once.
 		if err := deployCore(ctx, d.run, d.consent, d.distro, deployTarget(d.version)); err != nil {
 			return nil, false, nil, err
 		}
@@ -162,12 +160,10 @@ func closed(ch <-chan struct{}) bool {
 	}
 }
 
-// openingWSLWorktree adapts a live DistroCore client to core.API for the one
-// call that needs path translation (only OpenWorktree takes a RepoPath;
-// every other core.API method takes the WorktreeID the distro's own core
-// already minted, opaque and already in its own — Linux — form, so no
-// translation is needed for them). Struct embedding promotes every other
-// core.API method straight through to *Client, unmodified.
+// openingWSLWorktree adapts a live DistroCore client to core.API for the
+// one call that needs path translation: only OpenWorktree takes a RepoPath,
+// every other method takes a WorktreeID the distro's own core minted.
+// Embedding promotes the rest straight through to *Client.
 type openingWSLWorktree struct {
 	*Client
 	distro string

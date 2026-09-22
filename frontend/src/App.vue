@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import ConfirmDialog from 'openvue/confirmdialog'
-import WorktreeView from './views/WorktreeView.vue'
-import HomeView from './views/HomeView.vue'
+import MainView from './views/MainView.vue'
 import CompareDiffView from './views/CompareDiffView.vue'
 
 // A window's query string is fixed for its lifetime: parsed once here, it
-// decides which root view this window is (spec 04's ?path=, spec 23's
-// ?view=compare-diff — an explicit discriminator, checked first, so the two
-// window kinds never compete for the same branch).
+// decides which root view this window is. ?view=compare-diff is an explicit
+// discriminator, checked first, so the two window kinds never compete for
+// the same branch.
 const query = new URLSearchParams(window.location.search)
 const path = query.get('path')
 
@@ -24,6 +23,5 @@ const compareDiffProps = (() => {
 <template>
   <ConfirmDialog />
   <CompareDiffView v-if="compareDiffProps" v-bind="compareDiffProps" />
-  <WorktreeView v-else-if="path" :path="path" />
-  <HomeView v-else />
+  <MainView v-else :path="path ?? ''" />
 </template>

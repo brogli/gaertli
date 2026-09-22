@@ -10,6 +10,20 @@ import (
 
 var _ core.API = (*Client)(nil)
 
+type addWorktreeParams struct {
+	Path      core.RepoPath `json:"path"`
+	Target    string        `json:"target"`
+	Branch    string        `json:"branch"`
+	Start     string        `json:"start"`
+	NewBranch bool          `json:"newBranch"`
+}
+
+func (c *Client) AddWorktree(ctx context.Context, path core.RepoPath, target string, branch string, start string, newBranch bool) (core.Worktree, error) {
+	var result core.Worktree
+	err := c.call(ctx, "AddWorktree", addWorktreeParams{Path: path, Target: target, Branch: branch, Start: start, NewBranch: newBranch}, &result)
+	return result, err
+}
+
 type checkoutParams struct {
 	Wt     core.WorktreeID `json:"wt"`
 	Branch string          `json:"branch"`
@@ -118,6 +132,26 @@ func (c *Client) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b 
 	return result, err
 }
 
+type listBranchesParams struct {
+	Path core.RepoPath `json:"path"`
+}
+
+func (c *Client) ListBranches(ctx context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
+	var result []core.BranchSummary
+	err := c.call(ctx, "ListBranches", listBranchesParams{Path: path}, &result)
+	return result, err
+}
+
+type listWorktreesParams struct {
+	Path core.RepoPath `json:"path"`
+}
+
+func (c *Client) ListWorktrees(ctx context.Context, path core.RepoPath) ([]core.Worktree, error) {
+	var result []core.Worktree
+	err := c.call(ctx, "ListWorktrees", listWorktreesParams{Path: path}, &result)
+	return result, err
+}
+
 type loadLogParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -165,6 +199,14 @@ type openFolderParams struct {
 
 func (c *Client) OpenFolder(ctx context.Context, wt core.WorktreeID) error {
 	return c.call(ctx, "OpenFolder", openFolderParams{Wt: wt}, nil)
+}
+
+type openFolderAtParams struct {
+	Path core.RepoPath `json:"path"`
+}
+
+func (c *Client) OpenFolderAt(ctx context.Context, path core.RepoPath) error {
+	return c.call(ctx, "OpenFolderAt", openFolderAtParams{Path: path}, nil)
 }
 
 type openWorktreeParams struct {

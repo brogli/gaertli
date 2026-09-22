@@ -1,16 +1,13 @@
 //go:build bench
 
 // Package bench proves the literal QA-PERF-02/06/07 numbers against the
-// real reference repo (spec 13), through the real in-process services.Core
-// — the same call path app.Run's shell uses, no mock.
+// real reference repo, through the in-process services.Core — the same call
+// path the shell uses, no mock.
 //
-// This file is invisible to plain `go test ./...` (task test): the build
-// tag keeps a 100k-commit, multi-second-to-generate fixture out of the
-// fast/offline default loop (QA-MNT-03's spirit). tools/trace's own ID
-// scanner reads source text, not compiled output, so these Test names still
-// count as coverage regardless of the tag — QA-PERF-02/06/07 are
-// "automated" for TR-30/QA-MNT-02 purposes even though the tag keeps them
-// out of the everyday run. Run via `task bench` = `go test -tags=bench ...`.
+// The build tag keeps a 100k-commit fixture out of the fast, offline
+// default run (QA-MNT-03). tools/trace scans source text, not compiled
+// output, so these test names still count as coverage (TR-30). Run via
+// `task bench` = `go test -tags=bench ...`.
 package bench
 
 import (

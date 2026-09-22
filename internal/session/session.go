@@ -33,9 +33,8 @@ type worktreePoller interface {
 	Close()
 }
 
-// Worktree is a per-window session (ADR-9). Thin here: only identity and a
-// git.Runner scoped to it. Later specs (60+, 70) add status/index/conflict
-// state, a write queue, a message draft.
+// Worktree is a per-window session (ADR-9): identity, a git.Runner scoped
+// to it, and the per-window log state below.
 type Worktree struct {
 	ID     core.WorktreeID
 	Path   string
@@ -43,23 +42,21 @@ type Worktree struct {
 	Repo   *Repo
 	Runner git.Runner // Log emits a "command" event scoped to ID and appends to log
 
-	poller worktreePoller // FR-REPO-04's working-file half, focused while the window is (spec 12)
+	poller worktreePoller // FR-REPO-04's working-file half, focused while the window is
 
 	// writeMu serialises everything that writes this worktree's index or
 	// files (ADR-6: "one at a time per worktree" — stage, commit, reset,
-	// checkout, cherry-pick, revert, merge/rebase steps, discard). First use:
-	// Checkout, CheckoutCommit, and CreateBranch when it also checks out
-	// (spec 40). A distinct mutex from mu below, which guards the unrelated
-	// command-log ring buffer and filter state.
+	// checkout, cherry-pick, revert, merge/rebase steps, discard). A distinct
+	// mutex from mu below, which guards the unrelated command-log ring buffer
+	// and filter state.
 	writeMu sync.Mutex
 
 	mu  sync.Mutex
 	log []core.CommandLogEntry // ring buffer, capped at logCap
 
-	// Per-window filtered log view (spec 22, "Per-window, not per-repo"):
-	// shaped like Repo's own log cache but scoped to this window alone, so
-	// one window's search never overwrites what another window of the same
-	// repo is browsing.
+	// Per-window filtered log view, not per-repo: shaped like Repo's own log
+	// cache but scoped to this window alone, so one window's search never
+	// overwrites what another window of the same repo is browsing.
 	filterMu     sync.Mutex
 	filterActive bool
 	filterFlat   bool
@@ -94,18 +91,18 @@ func (w *Worktree) append(e core.CommandLogEntry) {
 	}
 }
 
-// Repo is a per-repo session (ADR-9), shared by every Worktree with the same
-// Key. Later specs (70) add the repo-level write queue.
+// Repo is a per-repo session (ADR-9), shared by every Worktree with the
+// same Key.
 type Repo struct {
 	Key string
 
-	watcher repoWatcher // FR-REPO-04's git-state half (spec 12)
+	watcher repoWatcher // FR-REPO-04's git-state half
 
 	// writeMu serialises this repo's write one-offs (ADR-6: "worktree
-	// add/remove/prune, branch delete/rename" — first use here is branch
-	// create without checkout, spec 40: a plain ref create touches no
-	// worktree's index/files, so it belongs on this queue, not a
-	// worktree's). Distinct from mu below (log cache/refcount state).
+	// add/remove/prune, branch delete/rename", plus branch create without
+	// checkout — a plain ref create touches no worktree's index or files, so
+	// it belongs here, not on a worktree's queue). Distinct from mu below
+	// (log cache/refcount state).
 	writeMu sync.Mutex
 
 	mu       sync.Mutex
@@ -113,9 +110,9 @@ type Repo struct {
 	logDone  bool
 	logErr   *core.Error
 	loading  bool
-	tips     map[string]string // ref-tip snapshot recorded when the log last finished (spec 12)
-	gen      int               // bumped by LogBeginLoad/LogBeginReload (spec 12)
-	refcount int               // open worktrees sharing this repo (spec 12)
+	tips     map[string]string // ref-tip snapshot recorded when the log last finished
+	gen      int               // bumped by LogBeginLoad/LogBeginReload
+	refcount int               // open worktrees sharing this repo
 }
 
 // Watcher is the repo's git-dir watcher (internal/services.Refresh).
@@ -218,9 +215,9 @@ func (r *Repo) LogReady() bool {
 }
 
 // LogView is one snapshot of a log's rows: Repo's own shared cache
-// (Repo.LogSnapshot) or a window's filtered view (Worktree.FilterSnapshot,
-// spec 22). Generation bumps whenever that view restarts from row 0 (a
-// reload, a new filter); Flat is true only for a text/author search.
+// (Repo.LogSnapshot) or a window's filtered view (Worktree.FilterSnapshot).
+// Generation bumps whenever that view restarts from row 0 (a reload, a new
+// filter); Flat is true only for a text/author search.
 type LogView struct {
 	Rows       []core.LogCommit
 	Loaded     int
@@ -270,14 +267,12 @@ func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
 }
 
 // FilterBegin starts a new filtered load, cancelling and superseding
-// whatever filtered load (if any) is already running (git-mapping.md, "Log
-// loading and graph" §7: "a new filter kills the running git log and starts
-// a new one"). The returned generation stamps every FilterAppend/
-// FilterFinish call for this load; a stale call from the load just
-// cancelled is dropped even before the cancel takes effect (gen-guarded the
-// same way LogBeginReload guards ReloadLog's superseded streams — belt and
-// suspenders: the cancel stops wasted work, the gen-guard is what actually
-// prevents corruption).
+// whatever filtered load is already running: a new filter kills the running
+// git log and starts a new one (git-mapping.md, "Log loading and graph"
+// §7). The returned generation stamps every FilterAppend/FilterFinish call
+// for this load, so a stale call from the load just cancelled is dropped
+// even before the cancel takes effect — the cancel only stops wasted work,
+// the gen-guard is what prevents corruption.
 func (w *Worktree) FilterBegin(flat bool, cancel context.CancelFunc) (gen int) {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
@@ -392,15 +387,18 @@ func NewManager(sink core.EventSink) *Manager {
 	}
 }
 
-// Open validates path and returns its worktree session, minting one on
-// first use. Errors are *core.Error:
+// Resolve validates path and returns its worktree's identity (toplevel, git
+// dir, repo key) without minting or reusing any session: Open's stateless
+// half, so listing a repo's worktrees or branches never starts a poller or
+// watcher for a repo the panel has only expanded, not selected. Errors are
+// exactly Open's own:
 //   - Code GitTooOld: from Runner.CheckVersion (git absent, unparsable, or
-//     older than MinVersion — spec 02)
+//     older than MinVersion)
 //   - Code NotARepo: rev-parse failed (bad Dir, or not inside a work tree)
 //     or --is-inside-work-tree printed anything but "true"
-func (m *Manager) Open(ctx context.Context, path core.RepoPath) (*Worktree, error) {
+func (m *Manager) Resolve(ctx context.Context, path core.RepoPath) (toplevel, gitDir, repoKey string, err error) {
 	if _, err := m.discover.CheckVersion(ctx); err != nil {
-		return nil, err
+		return "", "", "", err
 	}
 
 	result, err := m.discover.Run(ctx, git.Call{
@@ -409,18 +407,27 @@ func (m *Manager) Open(ctx context.Context, path core.RepoPath) (*Worktree, erro
 		Args:     []string{"rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir", "--is-inside-work-tree"},
 	})
 	if err != nil {
-		return nil, remapNotARepo(err, path)
+		return "", "", "", remapNotARepo(err, path)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(result.Stdout)), "\n")
 	if len(lines) != 4 || lines[3] != "true" {
-		return nil, notARepo(path)
+		return "", "", "", notARepo(path)
 	}
-	return m.session(lines[0], lines[1], lines[2]), nil
+	return lines[0], lines[1], lines[2], nil
+}
+
+// Open resolves path, then mints or reuses its session.
+func (m *Manager) Open(ctx context.Context, path core.RepoPath) (*Worktree, error) {
+	toplevel, gitDir, repoKey, err := m.Resolve(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return m.session(toplevel, gitDir, repoKey), nil
 }
 
 // Get returns an already-open session. core.Errorf(core.Internal, ...) for
-// an unknown id — same convention as app.Router.CoreOf (spec 01).
+// an unknown id — same convention as app.Router.CoreOf.
 func (m *Manager) Get(wt core.WorktreeID) (*Worktree, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -467,9 +474,9 @@ func (m *Manager) newRepo(key string) *Repo {
 	return repo
 }
 
-// newWorktree mints wt's session and focuses its status poller immediately
-// — simpler and more robust than waiting for a first WindowFocus event
-// whose timing on window creation isn't verified (Design).
+// newWorktree mints wt's session and focuses its status poller immediately:
+// simpler and more robust than waiting for a first WindowFocus event, whose
+// timing on window creation is not guaranteed.
 func (m *Manager) newWorktree(id core.WorktreeID, toplevel, gitDir string, repo *Repo) *Worktree {
 	wt := &Worktree{ID: id, Path: toplevel, GitDir: gitDir, Repo: repo}
 	wt.Runner = git.Runner{Log: func(e git.Entry) {

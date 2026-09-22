@@ -102,12 +102,12 @@ func buildForEachRefFixture(records []ref) []byte {
 
 func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	sha := headSHA(t, repo.Dir)
-	run(t, repo.Dir, "branch", "feature")
-	run(t, repo.Dir, "update-ref", "refs/remotes/origin/master", sha)
-	run(t, repo.Dir, "update-ref", "refs/remotes/origin/feature", sha)
-	run(t, repo.Dir, "tag", "v1")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	sha := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/origin/master", sha)
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/origin/feature", sha)
+	gittest.Run(t, repo.Dir, "tag", "v1")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -142,10 +142,10 @@ func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
 
 func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	run(t, repo.Dir, "branch", "feature")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "branch", "feature")
 	linked := filepath.Join(t.TempDir(), "linked")
-	run(t, repo.Dir, "worktree", "add", linked, "feature")
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -186,14 +186,14 @@ func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
 
 func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	run(t, repo.Dir, "switch", "-c", "feature")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
 	bare := initBare(t)
-	run(t, repo.Dir, "remote", "add", "origin", bare)
-	run(t, repo.Dir, "push", "-u", "origin", "feature")
-	commit(t, repo.Dir, "local.txt", "local", "local-only")
+	gittest.Run(t, repo.Dir, "remote", "add", "origin", bare)
+	gittest.Run(t, repo.Dir, "push", "-u", "origin", "feature")
+	gittest.Commit(t, repo.Dir, "local.txt", "local", "local-only")
 	clonePush(t, bare, "feature", "remote.txt", "remote", "remote-only")
-	run(t, repo.Dir, "fetch", "origin")
+	gittest.Run(t, repo.Dir, "fetch", "origin")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -216,12 +216,12 @@ func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
 
 func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	bare := initBare(t)
-	run(t, repo.Dir, "remote", "add", "origin", bare)
-	run(t, repo.Dir, "push", "-u", "origin", "master")
-	run(t, bare, "update-ref", "-d", "refs/heads/master")
-	run(t, repo.Dir, "fetch", "--prune", "origin")
+	gittest.Run(t, repo.Dir, "remote", "add", "origin", bare)
+	gittest.Run(t, repo.Dir, "push", "-u", "origin", "master")
+	gittest.Run(t, bare, "update-ref", "-d", "refs/heads/master")
+	gittest.Run(t, repo.Dir, "fetch", "--prune", "origin")
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -258,8 +258,8 @@ func clonePush(t *testing.T, bareDir, branch, file, content, msg string) {
 	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Args: []string{"clone", "--branch", branch, bareDir, clone}}); err != nil {
 		t.Fatal(err)
 	}
-	commit(t, clone, file, content, msg)
-	run(t, clone, "push", "origin", branch)
+	gittest.Commit(t, clone, file, content, msg)
+	gittest.Run(t, clone, "push", "origin", branch)
 }
 
 func findBranch(branches []core.Branch, name string) *core.Branch {

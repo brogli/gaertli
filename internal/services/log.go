@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -19,14 +18,14 @@ import (
 )
 
 // largeRepoRows is the loaded-row threshold above which streamLog writes
-// git's own commit-graph file once (Design, spec 13, QA-PERF-02, ADR-4
-// exception). A package var, not a const, so tests can lower it.
+// git's own commit-graph file once (QA-PERF-02). A package var, not a
+// const, so tests can lower it.
 var largeRepoRows = 20_000
 
 const progressInterval = 100 * time.Millisecond
 
-// logTimeout bounds the log stream (reviewed: Runner's 30s default is too
-// short for a large repo; the real duration is spec 13's benchmark).
+// logTimeout bounds the log stream: the runner's 30s default is too short
+// for a large repo.
 const logTimeout = 10 * time.Minute
 
 // LogFormat is the git log record layout LoadLog streams; exported so
@@ -153,14 +152,11 @@ func streamCommits(ctx context.Context, wt *session.Worktree, args []string, fla
 	return loaded, err
 }
 
-// writeCommitGraphIfLarge runs `git commit-graph write --reachable` once the
-// load's done signal is out, the first time a load reaches largeRepoRows rows: it cuts
-// git log's time-to-first-record and peak memory at real scale (spec 13's
-// own measurement), at no cost on repos small enough for anyone to notice
-// the write. Skipped once the file exists — later opens just find it. Its
-// failure is logged (background calls still go through wt.Runner's normal
-// command log) but never surfaced: the file is an optimisation, not app
-// state (ADR-4's git-own-cache exception).
+// writeCommitGraphIfLarge runs `git commit-graph write --reachable` after
+// the load's done signal, the first time a load reaches largeRepoRows rows:
+// it cuts git log's time-to-first-record and peak memory at real scale.
+// Skipped once the file exists. A failure is never surfaced — the file is
+// an optimisation, not app state (ADR-4's git-own-cache exception).
 func writeCommitGraphIfLarge(wt *session.Worktree, loaded int) {
 	if loaded < largeRepoRows {
 		return
@@ -190,8 +186,7 @@ func refTips(ctx context.Context, r git.Runner, dir string) (map[string]string, 
 	tips := parseRefTips(result.Stdout)
 
 	branch, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Background: true, Args: []string{"symbolic-ref", "--short", "-q", "HEAD"}})
-	var ce *core.Error
-	detached := errors.As(err, &ce) && ce.Code == core.GitFailed && branch.ExitCode == 1
+	detached := quietFailure(err, branch)
 	if err != nil && !detached {
 		return nil, err
 	}
@@ -200,26 +195,21 @@ func refTips(ctx context.Context, r git.Runner, dir string) (map[string]string, 
 		return tips, nil
 	}
 
-	sha, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Background: true, Args: []string{"rev-parse", "-q", "--verify", "HEAD"}})
+	sha, err := resolveHeadSHA(ctx, r, dir) // an unresolvable HEAD reads as ""; the next log load reports it
 	if err != nil {
 		return nil, err
 	}
-	tips["HEAD"] = strings.TrimSpace(string(sha.Stdout))
+	tips["HEAD"] = sha
 	return tips, nil
 }
 
 // parseRefTips parses for-each-ref's "%(refname)%1f%(objectname)%00"
-// stream: for-each-ref's own %1f/%00 escape syntax (not %x1f/%x00, unlike
-// git log), and the same split-on-NUL-strip-leading-newline record framing
-// as git log's own records (log-format-and-decorations.md).
+// stream — for-each-ref's own %1f/%00 escape syntax, not git log's
+// %x1f/%x00.
 func parseRefTips(out []byte) map[string]string {
 	tips := map[string]string{}
-	for _, record := range bytes.Split(out, []byte{0}) {
-		record = bytes.TrimPrefix(record, []byte("\n"))
-		if len(record) == 0 {
-			continue
-		}
-		if name, sha, ok := strings.Cut(string(record), "\x1f"); ok {
+	for _, record := range nulRecords(out) {
+		if name, sha, ok := strings.Cut(record, "\x1f"); ok {
 			tips[name] = sha
 		}
 	}
@@ -253,8 +243,7 @@ func parseLogRecord(record []byte) (commit core.LogCommit, parents []string, err
 	return commit, strings.Fields(fields[2]), nil
 }
 
-// parseRefs classifies --decorate=full's %D decoration string into labels
-// (Research used: log-format-and-decorations.md).
+// parseRefs classifies --decorate=full's %D decoration string into labels.
 func parseRefs(decoration string) []core.RefLabel {
 	if decoration == "" {
 		return nil
@@ -289,8 +278,8 @@ func refFromPath(path string) core.RefLabel {
 	return core.RefLabel{Name: path}
 }
 
-// toGraphRow converts graph's leaf type to core's JSON DTO (spec 05's
-// precedent: the leaf package never imports core).
+// toGraphRow converts graph's leaf type to core's JSON DTO; the leaf
+// package never imports core.
 func toGraphRow(row graph.Row) core.GraphRow {
 	edges := make([]core.GraphEdge, len(row.Edges))
 	for i, e := range row.Edges {
@@ -312,27 +301,10 @@ func worktreeCheckouts(r git.Runner, dir string, background bool) (map[string][]
 	}
 
 	checkouts := map[string][]string{}
-	for _, block := range bytes.Split(result.Stdout, []byte{0, 0}) {
-		if len(block) == 0 {
-			continue
-		}
-		path, sha := parseWorktreeBlock(block)
-		if path != "" && sha != "" {
-			checkouts[sha] = append(checkouts[sha], path)
+	for _, wt := range parseWorktreeRecords(result.Stdout) {
+		if wt.Path != "" && wt.SHA != "" {
+			checkouts[wt.SHA] = append(checkouts[wt.SHA], wt.Path)
 		}
 	}
 	return checkouts, nil
-}
-
-func parseWorktreeBlock(block []byte) (path, sha string) {
-	for _, line := range bytes.Split(block, []byte{0}) {
-		key, value, _ := strings.Cut(string(line), " ")
-		switch key {
-		case "worktree":
-			path = value
-		case "HEAD":
-			sha = value
-		}
-	}
-	return path, sha
 }

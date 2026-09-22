@@ -10,7 +10,7 @@ import (
 // windowTitle formats a window's title (FR-WT-09): the worktree's display
 // name (its last path segment) and, once known, the branch. branch is ""
 // until a later spec supplies one; path is "" for the no-argument
-// placeholder window, kept as plain "nebegit" (spec 00's existing title).
+// placeholder window, kept as plain "nebegit".
 func windowTitle(path, branch string) string {
 	if path == "" {
 		return "nebegit"
@@ -38,8 +38,7 @@ func shortSHA(sha string) string {
 	return sha
 }
 
-// compareDiffURL builds the compare diff window's URL (Design, "How the
-// window is addressed", spec 23).
+// compareDiffURL builds the compare diff window's URL.
 func compareDiffURL(wt core.WorktreeID, a, b, path, oldPath string) string {
 	q := url.Values{"view": {"compare-diff"}, "wt": {string(wt)}, "from": {a}, "to": {b}, "file": {path}}
 	if oldPath != "" {

@@ -17,6 +17,7 @@ const DEFAULT_PROFILE: EditorProfile = {
   fileAtLineCmd: 'zed {path}:{line}',
 }
 
+const emit = defineEmits<{ close: [] }>()
 const store = useSettingsStore()
 const { error, run } = useCoreCall()
 
@@ -48,9 +49,7 @@ function addDistroProfile(name: string): void {
   editorProfiles[name] = { ...DEFAULT_PROFILE }
 }
 
-// installLauncher is FR-REPO-06's "one-click" install action, per distro
-// (case 9's other half — the Go side, AppService.InstallWSLLauncher, spec
-// 31 task 5).
+// installLauncher is FR-REPO-06's "one-click" install action, per distro.
 function installLauncher(distro: string): void {
   void run(() => AppService.InstallWSLLauncher(distro))
 }
@@ -90,6 +89,7 @@ async function submit(): Promise<void> {
 
 <template>
   <form class="settings-panel" @submit.prevent="submit">
+    <button type="button" data-test="close-settings" @click="emit('close')">Close</button>
     <ErrorBanner v-if="error" :error="error" />
 
     <fieldset v-for="(profile, name) in editorProfiles" :key="name">

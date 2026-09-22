@@ -10,7 +10,7 @@ import { ResetMode } from '../../bindings/github.com/brogli/nebegit/internal/cor
 import ErrorBanner from './ErrorBanner.vue'
 
 // ResetDialog is FR-BR-02's mode picker (soft/mixed/hard), opened from the
-// commit-row context menu (spec 22, FR-LOG-11). Soft/mixed run immediately;
+// commit-row context menu (FR-LOG-11). Soft/mixed run immediately;
 // hard goes through useConfirmAction's shared confirmation (FR-BR-03,
 // FR-UX-03, QA-SAFE-01), naming how many uncommitted changes would be lost.
 // After a successful reset the dialog stays open and shows the previous

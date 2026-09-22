@@ -29,8 +29,7 @@ function select(distro: Distro): void {
 }
 
 // uncPath builds \\wsl.localhost\<distro>\<typed>, flipping the typed
-// folder's forward slashes to the backslashes wsl.exe/Windows expect
-// (Design: built client-side, no server-side path-joining).
+// folder's forward slashes to the backslashes wsl.exe/Windows expect.
 function uncPath(distro: string, typed: string): string {
   return `\\\\wsl.localhost\\${distro}\\${typed.replaceAll('/', '\\')}`
 }

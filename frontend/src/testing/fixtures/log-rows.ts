@@ -3,9 +3,7 @@ import type { LogCommit } from '../../../bindings/github.com/brogli/nebegit/inte
 const ROW_COUNT = 300
 
 // LOG_ROWS_FIXTURE: canned commit rows, more than a screenful, for the
-// virtual-scroll e2e case (frontend/e2e/log-virtual-scroll.spec.ts) and
-// reusable by future Vitest component tests wanting the same canned log
-// (spec 13 Design).
+// virtual-scroll e2e case (frontend/e2e/log-virtual-scroll.spec.ts).
 export const LOG_ROWS_FIXTURE: LogCommit[] = Array.from({ length: ROW_COUNT }, (_, i) => {
   const sha = i.toString(16).padStart(40, '0')
   return {
@@ -18,9 +16,8 @@ export const LOG_ROWS_FIXTURE: LogCommit[] = Array.from({ length: ROW_COUNT }, (
   }
 })
 
-// commitRow: the single canned LogCommit shared by LogList/WorktreeView/
-// commitMenu/CommitDetailsPanel component tests (spec 40), overridable via
-// partial for the rare test that needs a different field.
+// commitRow: the canned LogCommit shared by the component tests,
+// overridable field by field.
 export function commitRow(overrides: Partial<LogCommit> = {}): LogCommit {
   return {
     sha: 'abc123',

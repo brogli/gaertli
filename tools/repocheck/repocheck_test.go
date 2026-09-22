@@ -233,8 +233,7 @@ func readFrontendPackageJSON(t *testing.T, root string) packageJSON {
 // frontendToolchainAvailable reports whether the real pnpm/oxlint/vue-tsc
 // toolchain can be shelled out to. It's absent on a bare `go test ./...`
 // checkout (no network, no `frontend/node_modules`); `task ci` installs the
-// frontend deps first, so cases 2, 5 and 6 run for real there (spec 07
-// review amendment).
+// frontend deps first, so those checks run for real there.
 func frontendToolchainAvailable(root string) bool {
 	if _, err := exec.LookPath("pnpm"); err != nil {
 		return false

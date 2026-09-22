@@ -27,8 +27,8 @@ export const useCompareStore = defineStore('compare', () => {
     files.value = []
   }
 
-  // load throwing is deliberate: CompareView.vue owns the useCoreCall/
-  // ErrorBanner wrapping (DiffView.vue's own pattern), not the store.
+  // load throws on purpose: CompareView.vue owns the useCoreCall/
+  // ErrorBanner wrapping, not the store.
   async function load(wt: string): Promise<void> {
     if (!from.value || !to.value) return
     files.value = (await Facade.CompareCommits(wt, from.value.sha, to.value.sha)) ?? []

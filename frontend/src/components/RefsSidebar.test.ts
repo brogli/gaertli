@@ -85,7 +85,7 @@ describe('RefsSidebar', () => {
 
     const body = new DOMWrapper(document.body)
     const labels = body.findAll('.p-contextmenu-item-label').map((n) => n.text())
-    expect(labels).toEqual(['Checkout'])
+    expect(labels).toEqual(['Checkout', 'Create worktree here…'])
 
     await body.get('.p-contextmenu-item-content').trigger('click')
     await flushPromises()
@@ -122,6 +122,37 @@ describe('RefsSidebar', () => {
 
     expect(mockCheckout).toHaveBeenCalledTimes(1)
     expect(mockCheckout).toHaveBeenCalledWith('/repo', 'feature')
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-06 "Create worktree here…" on a local branch emits create-worktree with isRemote false', async () => {
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    await openContextMenu(wrapper, 'feature')
+    const body = new DOMWrapper(document.body)
+
+    const items = body.findAll('.p-contextmenu-item-content')
+    await items[1]!.trigger('click')
+
+    expect(wrapper.emitted('create-worktree')).toEqual([['feature', false]])
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-06 "Create worktree here…" on a remote branch emits create-worktree with isRemote true', async () => {
+    mockRefs.mockReturnValue({
+      branches: [],
+      remotes: [{ name: 'origin', branches: [{ name: 'feature', sha: 'sha-feature' }] }],
+      tags: [],
+    })
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    await openContextMenu(wrapper, 'feature')
+    const body = new DOMWrapper(document.body)
+
+    const items = body.findAll('.p-contextmenu-item-content')
+    await items[1]!.trigger('click')
+
+    expect(wrapper.emitted('create-worktree')).toEqual([['feature', true]])
 
     wrapper.unmount()
   })

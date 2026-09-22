@@ -3,7 +3,9 @@ package gittest
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/brogli/nebegit/internal/git"
@@ -25,10 +27,9 @@ func New(t *testing.T) *Repo {
 	isolateConfig(t)
 
 	dir := t.TempDir()
-	r := git.Runner{}
-	run(t, r, dir, "init")
-	run(t, r, dir, "config", "--global", "user.name", "nebegit test")
-	run(t, r, dir, "config", "--global", "user.email", "test@nebegit.invalid")
+	Run(t, dir, "init")
+	Run(t, dir, "config", "--global", "user.name", "nebegit test")
+	Run(t, dir, "config", "--global", "user.email", "test@nebegit.invalid")
 
 	return &Repo{Dir: dir}
 }
@@ -44,9 +45,47 @@ func isolateConfig(t *testing.T) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 }
 
-func run(t *testing.T, r git.Runner, dir string, args ...string) {
+// Run runs git with args in dir, failing the test if it does not exit 0.
+func Run(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	if _, err := r.Run(context.Background(), git.Call{Dir: dir, Args: args}); err != nil {
+	Out(t, dir, args...)
+}
+
+// Out runs git with args in dir and returns its stdout, trimmed.
+func Out(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	result, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: args})
+	if err != nil {
+		t.Fatalf("git %s: %v", strings.Join(args, " "), err)
+	}
+	return strings.TrimSpace(string(result.Stdout))
+}
+
+// Commit writes content to name in dir, stages it and commits msg.
+func Commit(t *testing.T, dir, name, content, msg string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	Run(t, dir, "add", "--", name)
+	CommitAll(t, dir, msg)
+}
+
+// CommitAll commits whatever is staged in dir with msg.
+func CommitAll(t *testing.T, dir, msg string) {
+	t.Helper()
+	result, err := (git.Runner{}).Run(context.Background(), git.Call{
+		Dir:   dir,
+		Args:  []string{"commit", "-F", "-"},
+		Stdin: []byte(msg),
+	})
+	if err != nil {
+		t.Fatalf("git commit: %v\n%s", err, result.Stderr)
+	}
+}
+
+// HeadSHA is dir's HEAD commit.
+func HeadSHA(t *testing.T, dir string) string {
+	t.Helper()
+	return Out(t, dir, "rev-parse", "HEAD")
 }

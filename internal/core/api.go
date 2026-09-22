@@ -26,14 +26,14 @@ type API interface {
 	// worktree returns the same ID.
 	OpenWorktree(ctx context.Context, path RepoPath) (WorktreeInfo, error)
 
-	// Summary is FR-REPO-03's "always show" panel minus ahead/behind (spec
-	// 11) and the refs lists (10/11). Cheap and repeatable — spec 12's
-	// watcher calls it again on change.
+	// Summary is FR-REPO-03's "always show" panel minus ahead/behind and the
+	// refs lists. Cheap and repeatable — the watcher calls it again on every
+	// change.
 	Summary(ctx context.Context, wt WorktreeID) (Summary, error)
 
 	// Refs lists every local branch, every remote's tracking branches, and
-	// every tag (FR-LOG-01's sidebar half; spec 10 delivers the per-commit
-	// row-label half). Not streamed, not cached in session.Repo — unlike
+	// every tag (FR-LOG-01's sidebar half; the per-commit row labels come
+	// with the log rows). Not streamed, not cached in session.Repo — unlike
 	// LoadLog/LogRows: one for-each-ref call costs the same single process
 	// spawn no matter how many branches exist, so recomputing on every
 	// call is as cheap as a cache would be.
@@ -104,25 +104,25 @@ type API interface {
 	// CompareCommits lists the files that differ between a and b (FR-CMP-01):
 	// a direct two-revision diff (a..b), never a merge-base diff (a...b) —
 	// only the two-revision form makes swapping a and b mirror every file's
-	// status exactly (FR-CMP-03). Same ChangedFile shape as CommitDetails
-	// (spec 10) — a consumer already knows how to render it.
+	// status exactly (FR-CMP-03). Same ChangedFile shape as CommitDetails, so
+	// a consumer already knows how to render it.
 	CompareCommits(ctx context.Context, wt WorktreeID, a, b string) ([]ChangedFile, error)
 
 	// DiffRange returns path's content at two arbitrary revisions a and b
-	// (FR-CMP-02): DiffFile's (spec 20) counterpart for two independently
-	// chosen commits instead of one commit vs its first parent. Same result
-	// DTO, same binary/size-cap rules — force bypasses the size cap only, a
-	// binary result never carries content regardless of force.
+	// (FR-CMP-02): DiffFile's counterpart for two independently chosen
+	// commits instead of one commit vs its first parent. Same result DTO,
+	// same binary/size-cap rules — force bypasses the size cap only, a binary
+	// result never carries content regardless of force.
 	DiffRange(ctx context.Context, wt WorktreeID, a, b, path, oldPath string, force bool) (DiffFile, error)
 
 	// SetLogFilter starts (filter non-empty) or clears (filter.Empty()) wt's
 	// own filtered view of the log (FR-LOG-05..08). A filtered view is this
 	// window's private state, independent of wt's repo's shared unfiltered
-	// cache (spec 10/12). A new non-empty filter supersedes whatever
-	// filtered view was already active or loading, killing its stream.
-	// Returns once the view has started changing, not once it finishes;
-	// rows arrive incrementally, readable via LogRows and announced by
-	// "log:progress" events exactly like LoadLog.
+	// cache. A new non-empty filter supersedes whatever filtered view was
+	// already active or loading, killing its stream. Returns once the view
+	// has started changing, not once it finishes; rows arrive incrementally,
+	// readable via LogRows and announced by "log:progress" events exactly
+	// like LoadLog.
 	SetLogFilter(ctx context.Context, wt WorktreeID, filter LogFilter) error
 
 	// CreateBranch creates a new branch named name at start — a commit, an
@@ -168,9 +168,9 @@ type API interface {
 	// --soft's own "cannot do a soft reset in the middle of a merge"
 	// during any unresolved conflict — both are exit 128 with no other
 	// machine-readable signal to split them by, unlike Checkout's
-	// exit-1-vs-128 split (spec 40). --mixed/--hard are never refused for
-	// a dirty tree or a conflict in progress, mid-merge included — git's
-	// own behaviour, not pre-blocked (same stance as spec 40).
+	// exit-1-vs-128 split. --mixed/--hard are never refused for a dirty
+	// tree or a conflict in progress, mid-merge included — git's own
+	// behaviour, not pre-blocked, the same stance Checkout takes.
 	Reset(ctx context.Context, wt WorktreeID, sha string, mode ResetMode) (ResetResult, error)
 
 	// UncommittedCount is FR-BR-03's confirmation-dialog number: how many
@@ -190,15 +190,15 @@ type API interface {
 	// deliver "nothing changed" for a batch, so this app-level check is
 	// what does. A stop with git's own CHERRY_PICK_HEAD state file left
 	// behind (a real content conflict, or an already-applied/empty result)
-	// comes back as Code Conflicts, left in place for spec 72's own
+	// comes back as Code Conflicts, left in place for a later
 	// abort/continue/skip flow. Any other refusal (a dirty file in the
 	// way, another operation already running, a nonexistent sha) is git's
 	// own, passed through as plain GitFailed (FR-CP-04's "show why").
 	CherryPick(ctx context.Context, wt WorktreeID, shas []string) error
 
 	// Revert is CherryPick's undo counterpart (FR-RV-01): applies shas
-	// newest-first (FR-RV-02, proven load-bearing the same way as
-	// FR-CP-02's ordering); every other rule — the merge pre-check,
+	// newest-first (FR-RV-02, load-bearing the same way as FR-CP-02's
+	// ordering); every other rule — the merge pre-check,
 	// refusal classification, Code Conflicts on a stop — is identical
 	// (FR-RV-03: "handled as for cherry-pick").
 	Revert(ctx context.Context, wt WorktreeID, shas []string) error
@@ -217,9 +217,40 @@ type API interface {
 	OpenFolder(ctx context.Context, wt WorktreeID) error
 
 	// OpenFile starts wt's configured editor on path, at line if line > 0
-	// (FR-ED-04). No caller in this spec's own UI — the changes list / diff
-	// / conflict list call sites are FR-ED-02 (spec 51, per ROADMAP).
+	// (FR-ED-04). path is worktree-relative, resolved against wt's own
+	// toplevel (FR-ED-02): the commit-details, compare, and compare-diff
+	// file lists, and the diff pane's toolbar.
 	OpenFile(ctx context.Context, wt WorktreeID, path string, line int) error
+
+	// OpenFolderAt starts the configured editor on path (FR-WT-04) with no
+	// worktree session: a panel row nobody has selected has no WorktreeID
+	// to route by, so it takes a path like ListWorktrees and AddWorktree.
+	OpenFolderAt(ctx context.Context, path RepoPath) error
+
+	// ListWorktrees lists every worktree of path's repo (FR-WT-01): path,
+	// branch or detached commit, clean/dirty, main/locked/missing. Stateless
+	// (session.Manager.Resolve) — resolves path, then runs git directly; no
+	// session.Worktree is minted, so expanding a repo's panel node starts no
+	// poller. Cheap and repeatable, same "no cache" precedent as Refs and
+	// Summary: a repo's worktree count is small, unlike its commit count.
+	ListWorktrees(ctx context.Context, path RepoPath) ([]Worktree, error)
+
+	// ListBranches lists path's repo's local branches and which worktree, if
+	// any, has each checked out (FR-WT-13's "and their branches", for a repo
+	// with no worktree open anywhere yet — Refs needs an already-open
+	// WorktreeID and carries upstream/ahead-behind data no panel action needs).
+	// Stateless, same reasoning as ListWorktrees.
+	ListBranches(ctx context.Context, path RepoPath) ([]BranchSummary, error)
+
+	// AddWorktree creates a worktree at target, from an existing local branch
+	// (newBranch false, start ignored) or a new one (newBranch true: branch
+	// names the branch to create, start is the branch/commit to start it from
+	// — mirrors CreateBranch's own name/start shape). target must not exist,
+	// or must be empty (FR-WT-03): git's own refusal, not pre-checked.
+	// newBranch's name is validated (Code InvalidName) before any mutating
+	// call — required here, unlike CreateBranch's switch -c, because
+	// worktree add -b's own argument is not protected by --.
+	AddWorktree(ctx context.Context, path RepoPath, target, branch, start string, newBranch bool) (Worktree, error)
 }
 
 // Version of a core. App is "dev" until a release build stamps it.
@@ -271,7 +302,7 @@ type ResetResult struct {
 }
 
 // ResetMode is FR-BR-02's three choices, one explanatory line each in the
-// dialog. The fourth mode, --keep, is spec 91's (FR-BR-07).
+// dialog. The fourth mode, --keep (FR-BR-07), is not offered yet.
 type ResetMode string
 
 const (

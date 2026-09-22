@@ -13,6 +13,8 @@ const {
   mockUncommittedCount,
   mockOpenFolder,
   mockSettingsGet,
+  mockUpdateWindowTitle,
+  mockListBranches,
 } = vi.hoisted(() => ({
   mockSummary: vi.fn(),
   mockCommandLog: vi.fn(),
@@ -24,6 +26,8 @@ const {
   mockUncommittedCount: vi.fn(),
   mockOpenFolder: vi.fn(),
   mockSettingsGet: vi.fn(),
+  mockUpdateWindowTitle: vi.fn(),
+  mockListBranches: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -38,22 +42,24 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     CheckoutCommit: mockCheckoutCommit,
     UncommittedCount: mockUncommittedCount,
     OpenFolder: mockOpenFolder,
+    ListBranches: mockListBranches,
   },
+  AppService: { UpdateWindowTitle: mockUpdateWindowTitle },
   SettingsService: { Get: mockSettingsGet, Set: vi.fn() },
 }))
 
-import WorktreeView from './WorktreeView.vue'
+import WorktreeContent from './WorktreeContent.vue'
 import CreateBranchDialog from '../components/CreateBranchDialog.vue'
 import ResetDialog from '../components/ResetDialog.vue'
 import LogList from '../components/LogList.vue'
 import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
-import SettingsPanel from '../components/SettingsPanel.vue'
+import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
 import { useLogStore } from '../stores/log'
 import { commitRow } from '../testing/fixtures/log-rows'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
 
 function mountView(props: { path: string }) {
-  return mount(WorktreeView, { props })
+  return mount(WorktreeContent, { props })
 }
 
 function branch(fields: Record<string, unknown>) {
@@ -72,12 +78,11 @@ function branch(fields: Record<string, unknown>) {
 
 const sampleRow = commitRow()
 
-// mountWithCheckoutCommitDialogOpen mounts WorktreeView with one log row,
+// mountWithCheckoutCommitDialogOpen mounts WorktreeContent with one log row,
 // right-clicks it, and opens "Check out commit" from the resulting menu —
-// the shared setup cases 21/22 (FR-BR-08) both need before diverging on
-// confirm vs cancel.
+// the setup FR-BR-08's confirm and cancel cases share.
 async function mountWithCheckoutCommitDialogOpen() {
-  const wrapper = mount(WorktreeView, {
+  const wrapper = mount(WorktreeContent, {
     props: { path: '/home/user/project' },
     attachTo: document.body,
   })
@@ -97,7 +102,17 @@ async function mountWithCheckoutCommitDialogOpen() {
   return { wrapper, body }
 }
 
-describe('WorktreeView', () => {
+// clickMenuItemByLabel finds a context-menu item by its label text and
+// clicks it — robust to a menu's own item order/length (mirrors
+// LogList.test.ts's own helper).
+async function clickMenuItemByLabel(body: DOMWrapper<Element>, label: string): Promise<void> {
+  const labels = body.findAll('.p-contextmenu-item-label')
+  const index = labels.findIndex((l) => l.text() === label)
+  const items = body.findAll('.p-contextmenu-item-content')
+  await items[index]!.trigger('click')
+}
+
+describe('WorktreeContent', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockSummary.mockReset()
@@ -125,6 +140,10 @@ describe('WorktreeView', () => {
     mockOpenFolder.mockResolvedValue(undefined)
     mockSettingsGet.mockReset()
     mockSettingsGet.mockResolvedValue(defaultSettingsFixture())
+    mockUpdateWindowTitle.mockReset()
+    mockUpdateWindowTitle.mockResolvedValue(undefined)
+    mockListBranches.mockReset()
+    mockListBranches.mockResolvedValue([{ name: 'feature', checkedOutIn: '' }])
   })
 
   it('FR-UX-08 renders the commit details in a column beside the log, not below it', async () => {
@@ -258,7 +277,7 @@ describe('WorktreeView', () => {
   })
 
   it('FR-BR-02, FR-LOG-11 "Reset current branch to here…" opens ResetDialog with the row\'s sha and subject', async () => {
-    const wrapper = mount(WorktreeView, {
+    const wrapper = mount(WorktreeContent, {
       props: { path: '/home/user/project' },
       attachTo: document.body,
     })
@@ -303,7 +322,7 @@ describe('WorktreeView', () => {
     expect(mockOpenFolder).toHaveBeenCalledWith('/home/user/project')
   })
 
-  it('FR-ED-06 an EDITOR_NOT_FOUND error opens the settings panel via ErrorBanner\'s link', async () => {
+  it('FR-ED-06 an EDITOR_NOT_FOUND error emits open-settings via ErrorBanner\'s link', async () => {
     mockSummary.mockResolvedValue({
       path: '/home/user/project',
       branch: 'main',
@@ -327,8 +346,73 @@ describe('WorktreeView', () => {
     expect(settingsLink).toBeTruthy()
 
     await settingsLink!.trigger('click')
+
+    expect(wrapper.emitted('open-settings')).toHaveLength(1)
+  })
+
+  it('FR-WT-06, FR-LOG-11 "Create worktree here…" from the log opens the dialog pre-filled at that commit', async () => {
+    const wrapper = mount(WorktreeContent, {
+      props: { path: '/home/user/project' },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const log = useLogStore()
+    log.rowCache.set(0, sampleRow)
+    log.loaded = 1
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findComponent(SettingsPanel).exists()).toBe(true)
+    await wrapper.get('.row').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    const body = new DOMWrapper(document.body)
+    await clickMenuItemByLabel(body, 'Create worktree here…')
+    await flushPromises()
+
+    const dialog = wrapper.findComponent(CreateWorktreeDialog)
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.props('start')).toEqual({ newBranch: true, start: 'abc123' })
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-06 "Create worktree here…" on a local branch in the refs sidebar opens the dialog on that branch', async () => {
+    mockRefs.mockResolvedValue({
+      branches: [branch({ name: 'feature', current: false })],
+      remotes: [],
+      tags: [],
+    })
+    const wrapper = mountView({ path: '/home/user/project' })
+    await flushPromises()
+
+    const item = wrapper.findAll('[role="treeitem"]').find((n) => n.attributes('aria-label') === 'feature')
+    await item?.find('.ref-node').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    const body = new DOMWrapper(document.body)
+    await clickMenuItemByLabel(body, 'Create worktree here…')
+    await flushPromises()
+
+    const dialog = wrapper.findComponent(CreateWorktreeDialog)
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.props('start')).toEqual({ newBranch: false, branch: 'feature' })
+  })
+
+  it('FR-WT-06 "Create worktree here…" on a remote branch in the refs sidebar starts a new branch at its name', async () => {
+    mockRefs.mockResolvedValue({
+      branches: [],
+      remotes: [{ name: 'origin', branches: [{ name: 'feature', sha: 'sha-feature' }] }],
+      tags: [],
+    })
+    const wrapper = mountView({ path: '/home/user/project' })
+    await flushPromises()
+
+    const item = wrapper.findAll('[role="treeitem"]').find((n) => n.attributes('aria-label') === 'feature')
+    await item?.find('.ref-node').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+    const body = new DOMWrapper(document.body)
+    await clickMenuItemByLabel(body, 'Create worktree here…')
+    await flushPromises()
+
+    const dialog = wrapper.findComponent(CreateWorktreeDialog)
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.props('start')).toEqual({ newBranch: true, start: 'feature' })
   })
 })

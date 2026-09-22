@@ -16,10 +16,8 @@ func Default() core.EditorProfile {
 }
 
 // OrDefault returns profile if it names a folder command, else Default()
-// (FR-ED-05). A zero-value profile (unconfigured environment, or nothing
-// ever pushed at all) has an empty FolderCmd, so this doubles as both
-// internal/app's "unconfigured environment" fallback and
-// internal/services's "never pushed" safety net.
+// (FR-ED-05). A zero-value profile — an unconfigured environment, or none
+// ever pushed — has an empty FolderCmd.
 func OrDefault(profile core.EditorProfile) core.EditorProfile {
 	if profile.FolderCmd != "" {
 		return profile

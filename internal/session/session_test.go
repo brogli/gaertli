@@ -39,7 +39,7 @@ func TestManagerOpenReusesSessionForSameToplevel(t *testing.T) {
 func TestManagerOpenSharesRepoAcrossLinkedWorktrees(t *testing.T) {
 	repo := gittest.New(t)
 	linked := filepath.Join(t.TempDir(), "linked")
-	run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
+	gittest.Run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
 	m := NewManager(func(core.Event) {})
 
 	main, err := m.Open(context.Background(), core.RepoPath(repo.Dir))
@@ -96,7 +96,7 @@ func TestWorktreeRunnerAppendsToCommandLogAndEmitsSink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	drainEvents(events) // the poller's own baseline status check (spec 12)
+	drainEvents(events) // the poller's own baseline status check
 
 	if _, err := wt.Runner.Run(context.Background(), git.Call{Dir: wt.Path, ReadOnly: true, Args: []string{"status"}}); err != nil {
 		t.Fatal(err)
@@ -193,7 +193,7 @@ func TestFR_REPO_04_LogBeginReloadFailsWhileALoadIsInFlight(t *testing.T) {
 
 func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	events := make(chan core.Event, 16)
 	m := NewManager(func(e core.Event) { events <- e })
@@ -203,7 +203,7 @@ func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
 	}
 	drainEvents(events)
 
-	commit(t, repo.Dir, "seed.txt", "y", "second")
+	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
 
 	deadline := time.After(2 * time.Second)
 	for {
@@ -225,7 +225,7 @@ func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
 	defer func() { watch.PollInterval = orig }()
 
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	events := make(chan core.Event, 16)
 	m := NewManager(func(e core.Event) { events <- e })
@@ -256,8 +256,8 @@ func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
 	}
 }
 
-// fakeRepoWatcher and fakeWorktreePoller stand in for the real watch types
-// (case 18): counting Close() without touching fsnotify or git.
+// fakeRepoWatcher and fakeWorktreePoller stand in for the real watch types,
+// counting Close() without touching fsnotify or git.
 type fakeRepoWatcher struct{ closeCount int }
 
 func (f *fakeRepoWatcher) CheckNow()    {}
@@ -273,7 +273,7 @@ func (f *fakeWorktreePoller) Close()    { f.closeCount++ }
 func TestQA_PERF_06_ManagerCloseTearsDownThePollerAndTheLastWorktreesWatcher(t *testing.T) {
 	repo := gittest.New(t)
 	linked := filepath.Join(t.TempDir(), "linked")
-	run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
+	gittest.Run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
 
 	repoWatcherFake := &fakeRepoWatcher{}
 	var pollers []*fakeWorktreePoller
@@ -308,24 +308,6 @@ func TestQA_PERF_06_ManagerCloseTearsDownThePollerAndTheLastWorktreesWatcher(t *
 	}
 	if pollers[1].closeCount != 1 {
 		t.Errorf("second worktree's poller Close() called %d times, want 1", pollers[1].closeCount)
-	}
-}
-
-func commit(t *testing.T, dir, name, content, msg string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	run(t, dir, "add", "--", name)
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"commit", "-F", "-"}, Stdin: []byte(msg)}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func run(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: args}); err != nil {
-		t.Fatal(err)
 	}
 }
 

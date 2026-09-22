@@ -1,13 +1,15 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockSummary, mockEventsOn } = vi.hoisted(() => ({
+const { mockSummary, mockEventsOn, mockUpdateWindowTitle } = vi.hoisted(() => ({
   mockSummary: vi.fn(),
   mockEventsOn: vi.fn(),
+  mockUpdateWindowTitle: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade: { Summary: mockSummary },
+  AppService: { UpdateWindowTitle: mockUpdateWindowTitle },
 }))
 
 vi.mock('@wailsio/runtime', () => ({
@@ -28,6 +30,16 @@ describe('repo store', () => {
     })
     mockEventsOn.mockReset()
     mockEventsOn.mockReturnValue(() => {})
+    mockUpdateWindowTitle.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('FR-WT-09 calls UpdateWindowTitle with the worktree\'s display name and branch after loading Summary', async () => {
+    const repo = useRepoStore()
+
+    await repo.loadSummary('/home/user/project')
+
+    expect(mockUpdateWindowTitle).toHaveBeenCalledTimes(1)
+    expect(mockUpdateWindowTitle).toHaveBeenCalledWith('project', 'main')
   })
 
   it('FR-REPO-04 reloads Summary on a state or refs repo:changed event, not on index', async () => {

@@ -1,10 +1,8 @@
 import { useConfirm } from 'openvue/useconfirm'
 
-// useConfirmAction is QA-SAFE-01/FR-UX-03's one shared confirmation rule,
-// first used by ResetDialog's hard reset (spec 41), reused unchanged by
-// specs 71 (force push), 72 (discard), 91/92 (remove worktree, delete
-// unmerged branch): one Confirm/Cancel button pair, one danger-styled
-// confirm button. Callers supply only their own header and message text.
+// useConfirmAction is QA-SAFE-01/FR-UX-03's one shared confirmation rule
+// for every hard action: one Confirm/Cancel pair, a danger-styled confirm
+// button. Callers supply only their own header and message text.
 export function useConfirmAction() {
   const confirm = useConfirm()
 

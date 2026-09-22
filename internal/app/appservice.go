@@ -35,9 +35,8 @@ func (p wailsPicker) Pick(dir string) (path string, ok bool) {
 
 // wailsConsent bridges DialogManager's callback-based Question dialog to
 // Consent's blocking bool (QA-PORT-02): the shell asks before the core is
-// copied into a distro, naming exactly where. Not unit-tested (needs a
-// real Wails window; folded into case 30's manual check), same as
-// wailsNotifier/wailsPicker above.
+// copied into a distro, naming exactly where. Not unit-tested (needs a real
+// Wails window), same as wailsNotifier/wailsPicker above.
 type wailsConsent struct{ app *application.App }
 
 func (c wailsConsent) Ask(distro, targetPath string) bool {
@@ -64,11 +63,49 @@ type AppService struct {
 // platform default); cancelling returns nil, not an error. Shared by
 // PickAndOpen (FR-REPO-01) and PickAndOpenWSL (FR-REPO-07's "browse").
 func (s *AppService) pickAndOpen(ctx context.Context, dir string) error {
-	path, ok := s.picker.Pick(dir)
+	path, ok := s.PickFolder(ctx, dir)
 	if !ok {
 		return nil
 	}
 	s.open(ctx, path)
+	return nil
+}
+
+// PickFolder shows the native folder picker seeded at dir, with no "open it
+// as a repo" side effect: CreateWorktreeDialog's target field must not be
+// validated as an existing repo.
+func (s *AppService) PickFolder(ctx context.Context, dir string) (path string, ok bool) {
+	return s.picker.Pick(dir)
+}
+
+// callingWindowFrom extracts ctx's calling window
+// (application.WindowKey), or false for a windowless/background call.
+func callingWindowFrom(ctx context.Context) (callingWindow, bool) {
+	w, ok := ctx.Value(application.WindowKey).(callingWindow)
+	return w, ok
+}
+
+// SelectWorktree switches the calling window's own selection (FR-WT-05,
+// FR-WT-08). "This window" comes from ctx — no window handle is ever passed
+// from the frontend.
+func (s *AppService) SelectWorktree(ctx context.Context, path string) error {
+	w, ok := callingWindowFrom(ctx)
+	if !ok {
+		return core.Errorf(core.Internal, "no calling window for this call")
+	}
+	return s.switchTo(ctx, w, path)
+}
+
+// UpdateWindowTitle sets the calling window's own OS title (FR-WT-09). The
+// frontend's repo store calls it on every Summary change, not only at
+// open/switch time, so the title tracks a branch change within the same
+// selection without this package knowing which actions change a branch.
+func (s *AppService) UpdateWindowTitle(ctx context.Context, name, branch string) error {
+	w, ok := callingWindowFrom(ctx)
+	if !ok {
+		return nil // a windowless/background call: nothing to title, not an error
+	}
+	w.SetTitle(windowTitle(name, branch))
 	return nil
 }
 
@@ -78,8 +115,7 @@ func (s *AppService) PickAndOpen(ctx context.Context) error {
 	return s.pickAndOpen(ctx, "")
 }
 
-// OpenRecent re-opens an already-remembered path (FR-REPO-02) through the
-// same openWorktreePath flow.
+// OpenRecent re-opens an already-remembered path (FR-REPO-02).
 func (s *AppService) OpenRecent(ctx context.Context, path string) error {
 	s.open(ctx, path)
 	return nil
@@ -98,15 +134,15 @@ func (s *AppService) ListWSLDistros(ctx context.Context) ([]remote.Distro, error
 }
 
 // PickAndOpenWSL shows the native folder picker seeded at distro's UNC root
-// (FR-REPO-07's "browse", Research used: OpenFileDialogOptions.Directory);
-// cancelling returns nil, not an error, same as PickAndOpen.
+// (FR-REPO-07's "browse"); cancelling returns nil, not an error, same as
+// PickAndOpen.
 func (s *AppService) PickAndOpenWSL(ctx context.Context, distro string) error {
 	return s.pickAndOpen(ctx, `\\wsl.localhost\`+distro)
 }
 
-// OpenPath opens path the same way PickAndOpen/OpenRecent do. The one new
-// caller is "Open WSL folder"'s typed-path field, which builds the
-// \\wsl.localhost\<distro>\<typed> string client-side before calling this.
+// OpenPath opens path the same way PickAndOpen/OpenRecent do. Its caller is
+// "Open WSL folder"'s typed-path field, which builds the
+// \\wsl.localhost\<distro>\<typed> string client-side.
 func (s *AppService) OpenPath(ctx context.Context, path string) error {
 	s.open(ctx, path)
 	return nil
@@ -121,8 +157,8 @@ func (s *AppService) OpenCompareDiff(ctx context.Context, wt core.WorktreeID, a,
 }
 
 // InstallWSLLauncher makes `nebegit <path>` work inside distro's own shell
-// (FR-REPO-06's WSL half). This running process's own path is exactly what
-// the installed launcher will hand off to.
+// (FR-REPO-06's WSL half); the launcher hands off to this running process's
+// own path.
 func (s *AppService) InstallWSLLauncher(ctx context.Context, distro string) error {
 	guiExe, err := os.Executable()
 	if err != nil {

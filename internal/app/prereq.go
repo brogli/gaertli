@@ -7,7 +7,7 @@ import (
 
 // gitPresent reports whether a git executable is on PATH (QA-INST-01).
 // Not a version check: TR-04's ≥ 2.40 minimum is enforced when a repo is
-// opened (spec 02); this is presence only.
+// opened.
 func gitPresent() bool {
 	_, err := exec.LookPath("git")
 	return err == nil

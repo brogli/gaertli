@@ -11,22 +11,17 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// Stream runs call like Run, but instead of buffering all of stdout, calls
-// onRecord once per record as the process's output arrives (ADR-5,
-// QA-PERF-02/03: rows are usable before the process exits). call.Args must
-// build a --format that ends each record with a literal NUL; Stream does
-// not special-case any subcommand, it only frames on 0x00.
+// Stream runs call like Run, but calls onRecord once per record as output
+// arrives instead of buffering stdout (ADR-5). call.Args must build a
+// --format that ends each record with a literal NUL; Stream only frames on
+// 0x00.
 //
 // onRecord's slice aliases an internal buffer and is only valid until
-// onRecord returns; copy anything kept past that. Returning a non-nil error
-// from onRecord stops reading and kills the process; Stream then returns
-// that error (wrapped as *core.Error{Code: Internal} if it is not already
-// one).
+// onRecord returns; copy anything kept past that. A non-nil error from
+// onRecord stops reading, kills the process, and is what Stream returns
+// (wrapped as *core.Error{Code: Internal} if it is not already one).
 //
-// Everything else — env, Windows flags, context cancel and timeout,
-// Runner.Log, and *core.Error classification on the process's own exit —
-// matches Run. Result.Stdout is left empty (never buffered); Result.Stderr
-// is still captured in full.
+// Result.Stdout is left empty; everything else matches Run.
 func (r Runner) Stream(ctx context.Context, call Call, onRecord func([]byte) error) (Result, error) {
 	cmd, effectiveCtx, cancel, command, err := r.prepare(ctx, call)
 	if err != nil {
@@ -82,8 +77,7 @@ func scanRecords(r io.Reader, onRecord func([]byte) error) error {
 }
 
 // splitNUL is a bufio.SplitFunc that frames on 0x00, stripping the single
-// leading '\n' git appends after every record's own terminator (Research
-// used: log-format-and-decorations.md).
+// leading '\n' git appends after every record's own terminator.
 func splitNUL(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if i := bytes.IndexByte(data, 0); i >= 0 {
 		return i + 1, bytes.TrimPrefix(data[:i], []byte{'\n'}), nil

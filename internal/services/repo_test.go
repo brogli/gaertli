@@ -38,9 +38,9 @@ func TestFR_REPO_01_OpenWorktreeReusesSessionForSameToplevel(t *testing.T) {
 
 func TestFR_REPO_01_OpenWorktreeGivesLinkedWorktreesDistinctIDsSameRepoKey(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	linked := filepath.Join(t.TempDir(), "linked")
-	run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
+	gittest.Run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
 	c := services.New(func(core.Event) {})
 
 	main, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -78,8 +78,8 @@ func TestFR_REPO_05_OpenWorktreeRejectsMissingPath(t *testing.T) {
 
 func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	run(t, repo.Dir, "switch", "-c", "feature")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
 	c := services.New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
 	if err != nil {
@@ -98,9 +98,9 @@ func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
 
 func TestFR_REPO_03_SummaryReportsDetachedHEAD(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	sha := headSHA(t, repo.Dir)
-	run(t, repo.Dir, "switch", "--detach", sha)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	sha := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "switch", "--detach", sha)
 	c := services.New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
 	if err != nil {
@@ -119,7 +119,7 @@ func TestFR_REPO_03_SummaryReportsDetachedHEAD(t *testing.T) {
 
 func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	c := services.New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
 	if err != nil {
@@ -149,13 +149,13 @@ func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 
 func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "file.txt", "base\n", "base")
-	run(t, repo.Dir, "branch", "other")
-	commit(t, repo.Dir, "file.txt", "main change\n", "on main")
+	gittest.Commit(t, repo.Dir, "file.txt", "base\n", "base")
+	gittest.Run(t, repo.Dir, "branch", "other")
+	gittest.Commit(t, repo.Dir, "file.txt", "main change\n", "on main")
 
 	linked := filepath.Join(t.TempDir(), "linked")
-	run(t, repo.Dir, "worktree", "add", linked, "other")
-	commit(t, linked, "file.txt", "other change\n", "on other")
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "other")
+	gittest.Commit(t, linked, "file.txt", "other change\n", "on other")
 	_, _ = (git.Runner{}).Run(context.Background(), git.Call{Dir: linked, Args: []string{"merge", "master"}})
 	if _, err := os.Stat(filepath.Join(linked, "file.txt")); err != nil {
 		t.Fatal(err)
@@ -178,7 +178,7 @@ func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
 
 func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	if err := os.Mkdir(filepath.Join(repo.Dir, ".git", "rebase-merge"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -199,9 +199,9 @@ func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
 
 func TestQA_REL_02_SummaryReportsHeadSHA(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	commit(t, repo.Dir, "seed.txt", "y", "second")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
+	sha := gittest.HeadSHA(t, repo.Dir)
 	c := services.New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
 	if err != nil {
@@ -238,8 +238,8 @@ func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
 
 func TestQA_REL_02_SummaryReportsSHAWhenDetached(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
-	sha := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	sha := gittest.HeadSHA(t, repo.Dir)
 	c := services.New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
 	if err != nil {
@@ -264,7 +264,7 @@ func TestQA_REL_02_SummaryReportsSHAWhenDetached(t *testing.T) {
 
 func TestFR_REPO_04_SetFocusedTrueRunsAnImmediatePollerCheck(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	c := services.New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
 	if err != nil {
@@ -293,7 +293,7 @@ func TestFR_REPO_04_SetFocusedTrueRunsAnImmediatePollerCheck(t *testing.T) {
 
 func TestFR_REPO_04_RefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	events := make(chan core.Event, 16)
 	c := services.New(func(e core.Event) { events <- e })
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -305,7 +305,7 @@ func TestFR_REPO_04_RefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
 	// an external commit just before Refresh: the watcher's baseline
 	// predates it, so only a fresh CheckNow notices it without waiting for
 	// the fallback ticker's own interval.
-	commit(t, repo.Dir, "seed.txt", "y", "second")
+	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
 	before, err := c.CommandLog(context.Background(), wt.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -337,33 +337,6 @@ func TestFR_REPO_04_RefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
 		case <-deadline:
 			t.Fatal("no repo:changed(refs) event after Refresh (the watcher's CheckNow)")
 		}
-	}
-}
-
-func commit(t *testing.T, dir, name, content, msg string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	run(t, dir, "add", "--", name)
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: []string{"commit", "-F", "-"}, Stdin: []byte(msg)}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func headSHA(t *testing.T, dir string) string {
-	t.Helper()
-	result, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, ReadOnly: true, Args: []string{"rev-parse", "HEAD"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(result.Stdout[:len(result.Stdout)-1])
-}
-
-func run(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: args}); err != nil {
-		t.Fatal(err)
 	}
 }
 

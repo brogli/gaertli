@@ -19,7 +19,7 @@ func TestFR_UX_02_CommandLogReturnsBufferedEntryAndSinkReceivesMatchingEvent(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	drainEvents(events) // the poller's own baseline status check (spec 12)
+	drainEvents(events) // the poller's own baseline status check
 
 	if _, err := c.Summary(context.Background(), wt.ID); err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestFR_UX_02_CommandLogReturnsBufferedEntryAndSinkReceivesMatchingEvent(t *
 	}
 	want := got[len(got)-1]
 
-	// Summary can run more than one git call (spec 11: ahead/behind);
+	// Summary can run more than one git call (ahead/behind);
 	// drain every "command" event the sink received and check the last
 	// one, not just the first.
 	var payload core.CommandLogEntry

@@ -2,6 +2,13 @@ import { defineStore } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 import { Events } from '@wailsio/runtime'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import type {
+  ChangedFile,
+  CommitDetails,
+  LogCommit,
+  LogFilter,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
+
 type RowView = {
   cache: Map<number, LogCommit>
   generation: number
@@ -29,20 +36,11 @@ function cachedWindow(view: RowView, from: number, to: number): LogCommit[] | nu
   return rows
 }
 
-import type {
-  ChangedFile,
-  CommitDetails,
-  LogCommit,
-  LogFilter,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
-
 // log holds one repo session's commit log (FR-LOG-01/09): loaded once per
 // LoadLog, row windows cached by index, one commit's details cached by sha.
-// It also holds this window's own filtered view (FR-LOG-05..08, spec 22):
-// a filter never replaces the base log/loaded/done pair (Design, "Per-
-// window, not per-repo") — filterLoaded/filterDone track the filtered
-// stream separately, and activeLoaded/activeDone pick whichever pair is
-// current.
+// It also holds this window's own filtered view (FR-LOG-05..08): a filter
+// never replaces the base loaded/done pair — filterLoaded/filterDone track
+// the filtered stream, and activeLoaded/activeDone pick the current pair.
 export const useLogStore = defineStore('log', () => {
   const loaded = ref(0)
   const done = ref(false)
@@ -54,10 +52,9 @@ export const useLogStore = defineStore('log', () => {
   const selectedFile = ref<ChangedFile | null>(null)
   const pendingScrollTo = ref<number | null>(null)
 
-  // multiSelect is a Shift-click contiguous range (FR-LOG-11, spec 42):
-  // independent of selectedRow (single-row details) and of the compare
-  // store's own 2-max pair (spec 21) — spec 21 explicitly reserved
-  // Shift-click for this exact use.
+  // multiSelect is a Shift-click contiguous range (FR-LOG-11), independent
+  // of selectedRow (single-row details) and of the compare store's
+  // Ctrl-click pair.
   const multiSelect = ref<LogCommit[]>([])
   let anchorIndex: number | null = null
 
@@ -67,7 +64,7 @@ export const useLogStore = defineStore('log', () => {
   let unlistenChanged: (() => void) | undefined
   let unlistenReconnected: (() => void) | undefined
 
-  // filterActive mirrors core.LogFilter.Empty() (Go): whether filter narrows
+  // filterActive mirrors core.LogFilter.Empty(): whether filter narrows
   // anything at all. activeLoaded/activeDone read the filtered pair while
   // active, the base pair otherwise — what LogList's virtualizer counts on.
   const filterActive = computed(() => {
@@ -94,8 +91,8 @@ export const useLogStore = defineStore('log', () => {
   const rowCache = computed(() => activeView.value.cache)
 
   // knownAuthors is a best-effort suggestion list for the author filter's
-  // AutoComplete (Design: not FR-backed, a plain nicety) — every author seen
-  // among rows fetched so far, not a complete list of the repo's authors.
+  // AutoComplete: every author seen among the rows fetched so far, not a
+  // complete list of the repo's authors.
   const authors = reactive(new Set<string>())
   const knownAuthors = computed(() => [...authors].sort())
 
@@ -133,8 +130,8 @@ export const useLogStore = defineStore('log', () => {
     })
 
     // core:reconnected (ADR-4): a fresh core's session/generation numbers
-    // have no relationship to the old ones, so this starts the log over,
-    // same as its own mount load (Design: not folded into ReloadLog above).
+    // have no relationship to the old ones, so the log starts over rather
+    // than reloading.
     unlistenReconnected?.()
     unlistenReconnected = Events.On('core:reconnected', () => void Facade.LoadLog(wt))
 
@@ -179,7 +176,7 @@ export const useLogStore = defineStore('log', () => {
     const result = await Facade.LogRows(wt, from, to)
     if (result.generation !== view.generation) {
       view.generation = result.generation
-      view.cache.clear() // the view restarted from row 0 (spec 12 Design)
+      view.cache.clear() // the view restarted from row 0
     }
     const fetched = result.rows ?? []
     fetched.forEach((row, i) => {
@@ -224,8 +221,8 @@ export const useLogStore = defineStore('log', () => {
   }
 
   // jumpTo selects sha's row and asks LogList to scroll to it (FR-LOG-01,
-  // a sidebar ref click). Not found (not yet streamed, or absent) is a
-  // deliberate no-op (Design), not a retry loop or an error.
+  // a sidebar ref click). A sha not found — not yet streamed, or absent —
+  // is a deliberate no-op.
   async function jumpTo(sha: string): Promise<void> {
     const { index, found } = await Facade.LogIndexOf(wt, sha)
     if (!found) return
@@ -234,18 +231,17 @@ export const useLogStore = defineStore('log', () => {
     pendingScrollTo.value = index
   }
 
-  // selectOnly collapses the multi-select to just row (a plain click, or a
-  // right-click on a row outside the current range — Design, LogList.vue).
+  // selectOnly collapses the multi-select to just row: a plain click, or a
+  // right-click on a row outside the current range.
   function selectOnly(row: LogCommit, index: number): void {
     multiSelect.value = [row]
     anchorIndex = index
   }
 
   // shiftSelectTo extends/creates a range from the last plain-clicked row
-  // to toIndex (FR-LOG-11, spec 42). Reuses rows() (not rowCache
-  // directly): a fast fling-scroll can shift-click far past rows that were
-  // never rendered in between, so the whole [lo, hi] window may need a
-  // fresh LogRows call, not just what happens to be cached (Design).
+  // to toIndex (FR-LOG-11). It goes through rows(), not rowCache: a fast
+  // fling-scroll can shift-click far past rows that were never rendered, so
+  // the whole [lo, hi] window may need a fresh LogRows call.
   async function shiftSelectTo(toIndex: number): Promise<void> {
     if (anchorIndex === null) anchorIndex = toIndex
     const [lo, hi] = anchorIndex <= toIndex ? [anchorIndex, toIndex] : [toIndex, anchorIndex]

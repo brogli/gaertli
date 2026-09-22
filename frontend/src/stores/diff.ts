@@ -14,10 +14,8 @@ export const useDiffStore = defineStore('diff', () => {
   const cache = new Map<string, DiffFile>()
   let cachedSha = ''
 
-  // loadInto shares DiffFile's and DiffRange's cache logic (spec 21): sha
-  // is the commit being viewed for cache-invalidation purposes — either a
-  // single sha, or a range's "a..b" (a range is "the commit being viewed"
-  // for cache purposes).
+  // loadInto shares load's and loadRange's cache logic. sha is what the
+  // cache is keyed on: a single commit, or a range's "a..b".
   async function loadInto(
     sha: string,
     path: string,

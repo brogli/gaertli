@@ -30,9 +30,8 @@ func TestSettingsService_SetThenGetRoundTrips(t *testing.T) {
 	}
 }
 
-// TestTR_13_SettingsServiceSetPushesTheNewProfileToTheLocalCore: an edit
-// takes effect immediately wherever it is already in use (Design,
-// PushEditorProfiles), not just on the next connect.
+// An edit takes effect immediately wherever the profile is already in use,
+// not just on the next connect.
 func TestTR_13_SettingsServiceSetPushesTheNewProfileToTheLocalCore(t *testing.T) {
 	reg, _ := newTestRegistry()
 	var pushed []core.EditorProfile

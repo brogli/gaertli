@@ -1,8 +1,8 @@
 // buildRefTree turns a flat list of namespaced refs (e.g. "feature/a",
 // "feature/b", "main") into OpenVue's TreeNode[] shape, folding shared
-// `/`-separated prefixes into folder nodes — the standard git-GUI
-// convention for namespaced branches (FR-LOG-01, Design). No library
-// performs this exact transform (TR-17).
+// `/`-separated prefixes into folder nodes — the usual git-GUI convention
+// for namespaced branches (FR-LOG-01). No library does this transform
+// (TR-17).
 
 export interface RefTreeLeaf {
   name: string

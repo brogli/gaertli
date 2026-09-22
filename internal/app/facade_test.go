@@ -86,7 +86,21 @@ func (s stubCore) SetEditorProfile(context.Context, core.EditorProfile) error { 
 
 func (s stubCore) OpenFolder(context.Context, core.WorktreeID) error { return nil }
 
+func (s stubCore) OpenFolderAt(context.Context, core.RepoPath) error { return nil }
+
 func (s stubCore) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
+
+func (s stubCore) ListWorktrees(context.Context, core.RepoPath) ([]core.Worktree, error) {
+	return nil, nil
+}
+
+func (s stubCore) ListBranches(context.Context, core.RepoPath) ([]core.BranchSummary, error) {
+	return nil, nil
+}
+
+func (s stubCore) AddWorktree(context.Context, core.RepoPath, string, string, string, bool) (core.Worktree, error) {
+	return core.Worktree{}, nil
+}
 
 type stubRouter struct {
 	local core.API

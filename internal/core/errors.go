@@ -2,7 +2,7 @@ package core
 
 import "fmt"
 
-// Code is the machine-readable failure class (errors-security.md).
+// Code is the machine-readable failure class.
 type Code string
 
 const (
@@ -16,19 +16,22 @@ const (
 	Locked         Code = "LOCKED"
 	InvalidName    Code = "INVALID_NAME"
 	EditorNotFound Code = "EDITOR_NOT_FOUND"
-	Cancelled      Code = "CANCELLED"
-	GitFailed      Code = "GIT_FAILED"
+	// FileNotFound: OpenFile's path no longer exists in the worktree (a
+	// deleted or since-renamed file shown from a historical diff, FR-ED-02).
+	FileNotFound Code = "FILE_NOT_FOUND"
+	Cancelled    Code = "CANCELLED"
+	GitFailed    Code = "GIT_FAILED"
 	// Internal marks a failure that is not git's: a panic, a bad request, a
 	// broken transport.
 	Internal Code = "INTERNAL"
 	// WslNotFound: wsl.exe not on PATH (Windows), or any WSL call attempted
-	// on a non-Windows shell (spec 30).
+	// on a non-Windows shell.
 	WslNotFound Code = "WSL_NOT_FOUND"
 	// DistroNotFound: the named distro is not among ListDistros's result, or
-	// wsl.exe -d <name> itself refuses it (spec 30).
+	// wsl.exe -d <name> itself refuses it.
 	DistroNotFound Code = "DISTRO_NOT_FOUND"
 	// DeployRefused: the consent dialog to copy the core into a distro was
-	// declined (spec 30, QA-PORT-02).
+	// declined (QA-PORT-02).
 	DeployRefused Code = "DEPLOY_REFUSED"
 )
 

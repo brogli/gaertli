@@ -20,11 +20,8 @@ type Settings struct {
 	OpenWorktrees []string     `json:"openWorktrees"` // FR-REPO-02: windows open at last quit
 
 	// EditorProfiles is keyed by environment: "" for local (Windows/Linux/
-	// macOS native), else a WSL distro name (FR-ED-11) — same "" = local
-	// convention as RecentRepo.Distro. Replaces spec 05's flat "editor"
-	// string; an old settings file's bare "editor" key is silently ignored
-	// by encoding/json (unknown field), not migrated — nebegit has shipped
-	// no release yet, so there is no real user settings file to preserve.
+	// macOS native), else a WSL distro name (FR-ED-11) — the same "" = local
+	// convention as RecentRepo.Distro.
 	EditorProfiles map[string]core.EditorProfile `json:"editorProfiles,omitempty"`
 
 	ProtectedBranches        []string `json:"protectedBranches"`        // FR-UX-04

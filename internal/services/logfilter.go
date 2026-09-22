@@ -14,21 +14,17 @@ import (
 )
 
 // hashPattern is what resolveHash checks a query against before spending a
-// git process on it (spec 22, FR-LOG-05): 4-40 lowercase hex characters —
-// git itself accepts a 4-char unambiguous prefix, and lowercase-only avoids
-// wasting a rev-parse call on an ordinary text query that happens to look
-// hex-ish in the wrong case.
+// git process on it (FR-LOG-05): 4-40 lowercase hex characters — git itself
+// accepts a 4-char unambiguous prefix, and lowercase-only keeps ordinary
+// text queries from costing a rev-parse.
 var hashPattern = regexp.MustCompile(`^[0-9a-f]{4,40}$`)
 
 // LogArgs builds the git log call for filter (FR-LOG-05..08); the empty
-// filter is the unfiltered load (spec 10), also what tools/bench times. Query
-// and Author are user text, but each lands only as the value half of one
-// '='-joined argv token (--grep=<q>, --author=<a>) — never its own token —
-// so it can never be mistaken for a new option regardless of content
-// (TR-10: a flag's value is only ever read as a value). Branches and Path
-// are separate tokens carrying user-influenced text, so --end-of-options
-// (before the branches) and -- (before the path) protect them exactly like
-// spec 20's DiffFile call protects <sha>/<path>.
+// filter is the unfiltered load, also what tools/bench times. Query and
+// Author land only as the value half of one '='-joined token (--grep=<q>,
+// --author=<a>), so no content can turn them into an option. Branches and
+// Path are separate tokens, so --end-of-options (before the branches) and
+// -- (before the path) protect them (TR-10).
 func LogArgs(f core.LogFilter) []string {
 	args := []string{"log", "--topo-order", "--parents", "--decorate=full"}
 	if f.Query != "" {
@@ -71,11 +67,11 @@ func (c *Core) SetLogFilter(ctx context.Context, id core.WorktreeID, filter core
 	return nil
 }
 
-// streamFilteredLog runs in its own goroutine, mirroring streamLog (spec 10)
-// but writing into wt's own filtered view and emitting a Worktree-targeted
-// "log:progress" instead of the repo-wide one spec 10 uses. A query that
-// resolves as a commit hash short-circuits every other field (Design: a
-// more specific request than any fuzzy filter).
+// streamFilteredLog runs in its own goroutine, mirroring streamLog but
+// writing into wt's own filtered view and emitting a Worktree-targeted
+// "log:progress" instead of the repo-wide one. A query that resolves as a
+// commit hash short-circuits every other field: a pasted hash is a more
+// specific request than any fuzzy filter.
 func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filter core.LogFilter, gen int, flat bool) {
 	if sha, ok := resolveHash(ctx, wt.Runner, wt.Path, filter.Query); ok {
 		c.streamFilteredHashHit(wt, sha, gen)
@@ -89,7 +85,7 @@ func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filt
 }
 
 // streamFilteredHashHit finishes a filtered load whose Query resolved to an
-// existing commit (Design: a single-record result, not a walk).
+// existing commit: a single-record result, not a walk.
 func (c *Core) streamFilteredHashHit(wt *session.Worktree, sha string, gen int) {
 	commit, err := loadSingleCommit(context.Background(), wt.Runner, wt.Path, sha)
 	var logErr *core.Error
@@ -129,12 +125,10 @@ func resolveHash(ctx context.Context, r git.Runner, dir, q string) (sha string, 
 	return strings.TrimSpace(string(result.Stdout)), true
 }
 
-// loadSingleCommit fetches one LogCommit by sha, reusing LogFormat/
-// parseLogRecord (spec 10) via a single-commit git log call instead of a
-// second parser. -1 must come before --end-of-options: git's own option
-// parser rejects a "-"-prefixed option appearing after --end-of-options as
-// a bad revision ("must come before non-option arguments") — confirmed
-// empirically; the spec's own draft had the two the other way round.
+// loadSingleCommit fetches one LogCommit by sha, reusing LogFormat and
+// parseLogRecord instead of a second parser. -1 must come before
+// --end-of-options: git rejects a "-"-prefixed option after it as a bad
+// revision.
 func loadSingleCommit(ctx context.Context, r git.Runner, dir, sha string) (core.LogCommit, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
@@ -143,7 +137,7 @@ func loadSingleCommit(ctx context.Context, r git.Runner, dir, sha string) (core.
 	if err != nil {
 		return core.LogCommit{}, err
 	}
-	record := bytes.TrimSuffix(result.Stdout, []byte{0, '\n'}) // spec 10's own per-record NUL+newline framing
+	record := bytes.TrimSuffix(result.Stdout, []byte{0, '\n'}) // per-record NUL+newline framing
 	commit, _, err := parseLogRecord(record)
 	return commit, err
 }

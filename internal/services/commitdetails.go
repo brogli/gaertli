@@ -32,8 +32,8 @@ func (c *Core) CommitDetails(ctx context.Context, id core.WorktreeID, sha string
 // parseCommitDetails parses detailsFormat's header (9 fields, %x1f-
 // separated, %x00-terminated) followed by --name-status -z -M records. Two
 // bytes separate them: -z turns the usual header/diff blank line into a
-// second 0x00, then git appends its own '\n' (as it does after every
-// custom --format, Research used).
+// second 0x00, then git appends its own '\n', as it does after every
+// custom --format.
 func parseCommitDetails(stdout []byte) (core.CommitDetails, error) {
 	i := bytes.IndexByte(stdout, 0)
 	if i < 0 {
@@ -66,8 +66,7 @@ func parseCommitDetails(stdout []byte) (core.CommitDetails, error) {
 }
 
 // parseNameStatus parses --name-status -z -M records: "<status>\0<path>\0"
-// or, for a rename/copy, "<status><similarity>\0<old>\0<new>\0" (Research
-// used).
+// or, for a rename/copy, "<status><similarity>\0<old>\0<new>\0".
 func parseNameStatus(data []byte) ([]core.ChangedFile, error) {
 	tokens := bytes.Split(bytes.TrimSuffix(data, []byte{0}), []byte{0})
 	var files []core.ChangedFile

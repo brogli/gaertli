@@ -12,13 +12,13 @@ import (
 
 func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "a.txt", "x", "base")
-	base := headSHA(t, repo.Dir)
-	commit(t, repo.Dir, "a.txt", "y", "second\n\nmore detail\nsecond line")
-	multiSHA := headSHA(t, repo.Dir)
-	run(t, repo.Dir, "mv", "a.txt", "b.txt")
-	run(t, repo.Dir, "commit", "-m", "rename")
-	renameSHA := headSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "a.txt", "x", "base")
+	base := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "a.txt", "y", "second\n\nmore detail\nsecond line")
+	multiSHA := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "mv", "a.txt", "b.txt")
+	gittest.Run(t, repo.Dir, "commit", "-m", "rename")
+	renameSHA := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
@@ -51,17 +51,17 @@ func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 
 func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T) {
 	repo := gittest.New(t)
-	commit(t, repo.Dir, "shared.txt", "base", "base")
-	run(t, repo.Dir, "branch", "side")
-	commit(t, repo.Dir, "main.txt", "m", "on main")
-	run(t, repo.Dir, "switch", "side")
-	commit(t, repo.Dir, "side.txt", "s", "on side")
-	run(t, repo.Dir, "switch", "master")
+	gittest.Commit(t, repo.Dir, "shared.txt", "base", "base")
+	gittest.Run(t, repo.Dir, "branch", "side")
+	gittest.Commit(t, repo.Dir, "main.txt", "m", "on main")
+	gittest.Run(t, repo.Dir, "switch", "side")
+	gittest.Commit(t, repo.Dir, "side.txt", "s", "on side")
+	gittest.Run(t, repo.Dir, "switch", "master")
 	_, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: repo.Dir, Args: []string{"merge", "--no-ff", "-m", "merge side", "side"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	mergeSHA := headSHA(t, repo.Dir)
+	mergeSHA := gittest.HeadSHA(t, repo.Dir)
 
 	c := New(func(core.Event) {})
 	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))

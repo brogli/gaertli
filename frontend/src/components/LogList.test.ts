@@ -37,9 +37,9 @@ function row(sha: string): LogCommit {
 const sampleRow = commitRow()
 
 // mountWithRows renders LogList with shas.length rows already cached, ready
-// to click/shift-click (spec 42's multi-select cases). clientHeight, not
-// just offsetHeight, is what @tanstack/vue-virtual needs to size enough
-// rows for a shift-click range to render under happy-dom.
+// to click/shift-click. clientHeight, not just offsetHeight, is what
+// @tanstack/vue-virtual needs to size enough rows for a shift-click range
+// to render under happy-dom.
 async function mountWithRows(shas: string[]): Promise<{ wrapper: VueWrapper; rowEls: DOMWrapper<Element>[] }> {
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 500 })
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 500 })
@@ -83,8 +83,7 @@ describe('LogList', () => {
   })
 
   // clickMenuItem finds the context-menu item content by its label text and
-  // clicks it — robust to the item list's own order/length (spec 42 appends
-  // two items after the ones spec 22/40 already added).
+  // clicks it, so it survives changes to the menu's order and length.
   async function clickMenuItem(body: DOMWrapper<Element>, label: string): Promise<void> {
     const labels = body.findAll('.p-contextmenu-item-label')
     const index = labels.findIndex((l) => l.text() === label)
@@ -113,7 +112,26 @@ describe('LogList', () => {
       'Reset current branch to here…',
       'Cherry-pick',
       'Revert',
+      'Create worktree here…',
     ])
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-06 clicking "Create worktree here…" emits create-worktree with the row\'s sha', async () => {
+    const wrapper = mount(LogList, { props: { wt: '/repo' }, attachTo: document.body })
+    await flushPromises()
+    const log = useLogStore()
+    log.rowCache.set(0, sampleRow)
+    log.loaded = 1
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.row').trigger('contextmenu')
+    await wrapper.vm.$nextTick()
+
+    await clickMenuItem(new DOMWrapper(document.body), 'Create worktree here…')
+
+    expect(wrapper.emitted('create-worktree')).toEqual([['abc123']])
 
     wrapper.unmount()
   })

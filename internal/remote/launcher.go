@@ -9,13 +9,9 @@ import (
 )
 
 // InstallLauncher makes `nebegit <path>` work inside d's own distro shell
-// (ADR-3: "links ~/.local/bin/nebegit to the deployed core"): ensures the
-// core binary is deployed (one consent ask, reused from ensureDeployed),
-// records guiExePath's WSL-mount form next to the deployed core (so a
-// future launch knows which Windows binary to hand off to, without
-// depending on this distro's own $PATH containing a portable,
-// no-installer .exe), then symlinks ~/.local/bin/nebegit to the deployed
-// core.
+// (ADR-3): it deploys the core binary if needed, records guiExePath's
+// WSL-mount form next to it so a later launch knows which Windows binary to
+// hand off to, then symlinks ~/.local/bin/nebegit to the deployed core.
 func (d *DistroCore) InstallLauncher(ctx context.Context, guiExePath string) error {
 	if err := ensureDeployed(ctx, d.run, d.consent, d.distro, d.version); err != nil {
 		return err

@@ -19,6 +19,12 @@ import { defaultSettingsFixture } from '../testing/fixtures/settings'
 
 const filled = defaultSettingsFixture({ protectedBranches: ['main'] })
 
+async function mountPanel() {
+  const wrapper = mount(SettingsPanel)
+  await flushPromises()
+  return wrapper
+}
+
 describe('SettingsPanel', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -33,8 +39,7 @@ describe('SettingsPanel', () => {
   })
 
   it('FR-UX-04 loads settings and submits the edited form', async () => {
-    const wrapper = mount(SettingsPanel)
-    await flushPromises()
+    const wrapper = await mountPanel()
 
     await wrapper.find('input[type=number]').setValue(5)
     await wrapper.find('form').trigger('submit')
@@ -44,11 +49,18 @@ describe('SettingsPanel', () => {
     expect(mockSet.mock.calls[0]?.[0]).toMatchObject({ ...filled, autoFetchIntervalMinutes: 5 })
   })
 
+  it('FR-UX-04 clicking Close emits close', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-test="close-settings"]').trigger('click')
+
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
   it('FR-REPO-06 clicking "Install nebegit command" calls InstallWSLLauncher with the distro name', async () => {
     mockListWSLDistros.mockResolvedValue([{ name: 'Ubuntu-22.04', version: 2, default: true }])
 
-    const wrapper = mount(SettingsPanel)
-    await flushPromises()
+    const wrapper = await mountPanel()
 
     const button = wrapper.findAll('button').find((b) => b.text() === 'Install nebegit command')
     expect(button).toBeTruthy()
@@ -68,8 +80,7 @@ describe('SettingsPanel', () => {
       }),
     )
 
-    const wrapper = mount(SettingsPanel)
-    await flushPromises()
+    const wrapper = await mountPanel()
 
     const fieldsets = wrapper.findAll('fieldset')
     expect(fieldsets).toHaveLength(2)
@@ -91,8 +102,7 @@ describe('SettingsPanel', () => {
   it('FR-ED-11 adding a distro profile seeds it with the built-in default, unsaved until submit', async () => {
     mockListWSLDistros.mockResolvedValue([{ name: 'Ubuntu-22.04', version: 2, default: true }])
 
-    const wrapper = mount(SettingsPanel)
-    await flushPromises()
+    const wrapper = await mountPanel()
 
     expect(wrapper.findAll('fieldset')).toHaveLength(1) // Local only, so far
 

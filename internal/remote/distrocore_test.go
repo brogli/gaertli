@@ -3,10 +3,7 @@ package remote_test
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,29 +13,14 @@ import (
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// coreBin and badBin are built once for every test in this file: the real
-// nebegit-core (spec 01 case 8 pattern) and a fixture reporting a wrong
-// protocol version (case 10).
+// coreBin is the real nebegit-core; badBin reports a wrong protocol version.
 var coreBin, badBin string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "nebegit-distrocore")
-	if err != nil {
-		panic(err)
-	}
-	coreBin = filepath.Join(dir, "nebegit-core")
-	badBin = filepath.Join(dir, "badcore")
-	if err := testbin.Build(coreBin, "../../cmd/nebegit-core"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if err := testbin.Build(badBin, "./testdata/badcore"); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	code := m.Run()
-	_ = os.RemoveAll(dir)
-	os.Exit(code)
+	testbin.Main(m,
+		testbin.Bin{Path: &coreBin, Pkg: "../../cmd/nebegit-core"},
+		testbin.Bin{Path: &badBin, Pkg: "./testdata/badcore"},
+	)
 }
 
 // acceptConsent always accepts (cases 9-12 don't assert consent behaviour;
@@ -48,12 +30,11 @@ type acceptConsent struct{}
 func (acceptConsent) Ask(string, string) bool { return true }
 
 // fakeWSLRunner intercepts the "sh -c '<target> --stdio'" spawn call to run
-// bin locally instead of a real wsl.exe child (spec 01 case 8 pattern);
-// every other call (deploy's stat/cat dance) runs the given shell command
-// for real against a test-sandboxed $HOME (t.Setenv), same technique as
-// deploy_test.go. Every call, spawn or not, increments *calls. Each spawn
-// cmd is appended to *spawns, letting a test find the live process to kill
-// without DistroCore exposing it.
+// bin locally instead of a real wsl.exe child; every other call (deploy's
+// stat/cat dance) runs the given shell command for real against a
+// test-sandboxed $HOME. Every call increments *calls, and each spawn cmd is
+// appended to *spawns so a test can kill the live process without
+// DistroCore exposing it.
 func fakeWSLRunner(bin string, calls *int, spawns *[]*exec.Cmd) func(context.Context, string, ...string) (*exec.Cmd, error) {
 	return func(ctx context.Context, distro string, args ...string) (*exec.Cmd, error) {
 		*calls++

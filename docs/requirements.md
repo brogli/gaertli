@@ -1,6 +1,5 @@
 # Requirements — nebegit
 
-
 This doc says **what** the app must do. It says nothing about **how**. See `architecture.md` for that.
 
 Priorities: **MUST** = needed for v1. **SHOULD** = wanted, can slip.

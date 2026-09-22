@@ -3,15 +3,15 @@ import { watch } from 'vue'
 import { useCompareStore } from '../stores/compare'
 import { onKeyStroke } from '@vueuse/core'
 import { useCoreCall } from '../composables/useCoreCall'
-import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ChangedFileList from './ChangedFileList.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // CompareView shows the compare store's two selected commits (FR-CMP-01),
 // their direction and a swap action (FR-CMP-03), and their changed files
-// (FR-CMP-02). Escape leaves compare mode. A double-click on a file opens
-// its own diff window (spec 23, FR-CMP-02).
+// (FR-CMP-02). Escape leaves compare mode; a double-click on a file opens
+// its own diff window.
 const props = defineProps<{ wt: string }>()
 const compare = useCompareStore()
 const { error, run } = useCoreCall()
@@ -19,6 +19,11 @@ const { error, run } = useCoreCall()
 function openDiffWindow(f: ChangedFile): void {
   if (!compare.from || !compare.to) return
   void AppService.OpenCompareDiff(props.wt, compare.from.sha, compare.to.sha, f.path, f.oldPath ?? '')
+}
+
+// FR-ED-02: open a compared file in the editor.
+function openEditor(f: ChangedFile): void {
+  void run(() => Facade.OpenFile(props.wt, f.path, 0))
 }
 
 watch(
@@ -47,6 +52,7 @@ onKeyStroke('Escape', () => compare.exit())
       :selected="compare.selectedFile"
       @select="compare.selectFile"
       @open="openDiffWindow"
+      @open-editor="openEditor"
     />
   </section>
 </template>

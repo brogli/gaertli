@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { Events } from '@wailsio/runtime'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { Summary } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { basename } from '../lib/path'
 
 // scopes that mean the summary panel might now be stale (FR-REPO-04,
 // git-mapping.md's "Noticing outside changes").
@@ -18,6 +19,11 @@ export const useRepoStore = defineStore('repo', () => {
 
   async function refresh(): Promise<void> {
     summary.value = await Facade.Summary(wt)
+    // FR-WT-09: the window title tracks the branch from mount onward, not
+    // only at open/switch time, so a later checkout updates it too, riding
+    // this same Summary refresh.
+    const name = basename(wt)
+    void AppService.UpdateWindowTitle(name, summary.value.detached ? '' : summary.value.branch)
   }
 
   async function loadSummary(id: string): Promise<void> {

@@ -80,7 +80,7 @@ func (w *RepoWatcher) addWatches() error {
 }
 
 // addTree adds root and every directory beneath it: fsnotify has no
-// recursive watch (Research used).
+// recursive watch.
 func (w *RepoWatcher) addTree(root string) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || !d.IsDir() {
@@ -157,7 +157,7 @@ func (w *RepoWatcher) fallbackLoop() {
 }
 
 // CheckNow runs one immediate fallback-walk pass, independent of its own
-// timer. Used by the fallback ticker itself and by Refresh (services.go).
+// timer. Used by the fallback ticker and by Refresh.
 func (w *RepoWatcher) CheckNow() {
 	next := w.walk()
 

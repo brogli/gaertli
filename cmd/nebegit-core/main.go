@@ -44,13 +44,11 @@ func usage() int {
 	return 2
 }
 
-// launch is nebegit-core's "given a path instead of --stdio" mode
-// (ADR-3): resolves path to an absolute one, reads $WSL_DISTRO_NAME and the
-// gui-path marker InstallLauncher wrote next to this binary's own real
-// (symlink-resolved) location, builds the UNC path (remote.BuildWSLPath),
-// and hands off to the single Windows instance exactly like a native
-// `nebegit.exe <path>` launch would (spec 04's existing single-instance
-// mechanism, unchanged).
+// launch is nebegit-core's "given a path instead of --stdio" mode (ADR-3):
+// it resolves path, reads $WSL_DISTRO_NAME and the gui-path marker
+// InstallLauncher wrote next to this binary's own symlink-resolved
+// location, and hands the UNC path to the single Windows instance exactly
+// like a native `nebegit.exe <path>` launch.
 func launch(path string) int {
 	abs, err := filepath.Abs(path)
 	if err != nil {

@@ -10,10 +10,9 @@ import { useRefsStore } from '../stores/refs'
 import type { LogFilter } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // FilterBar is FR-LOG-05..08's filter UI: free-text query/author/path
-// (debounced 300ms, git-mapping.md's own repo-watcher debounce number,
-// reused rather than inventing a second constant), branches (a discrete
-// MultiSelect choice, applied immediately), active-filter chips, and one
-// clear action (button or Escape).
+// (debounced 300ms, the repo watcher's own debounce number), branches (a
+// discrete MultiSelect choice, applied immediately), active-filter chips,
+// and one clear action (button or Escape).
 const log = useLogStore()
 const refs = useRefsStore()
 
@@ -24,7 +23,7 @@ const branches = ref<string[]>(log.filter.branches ?? [])
 const authorSuggestions = ref<string[]>([])
 
 // Branch options: local branch names, plus "<remote>/<name>" for each
-// remote branch (spec 22 Design), fed from spec 11's refs store.
+// remote branch.
 const branchOptions = computed(() => {
   const local = (refs.refs?.branches ?? []).map((b) => b.name)
   const remote = (refs.refs?.remotes ?? []).flatMap((r) =>
@@ -56,7 +55,7 @@ function currentFilter(): LogFilter {
 const applyDebounced = useDebounceFn(() => void log.applyFilter(currentFilter()), 300)
 
 // Branches is a discrete choice, not a keystroke stream: applied
-// immediately, no debounce (spec 22 Design).
+// immediately, no debounce.
 function onBranchesChange(): void {
   void log.applyFilter(currentFilter())
 }

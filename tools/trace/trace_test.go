@@ -1,6 +1,6 @@
 // Package main implements tools/trace, the requirement-traceability check
 // (TR-30). Tests build synthetic fixtures in t.TempDir(); none reads the
-// real repo (spec 03, decision 7).
+// real repo.
 package main
 
 import (
