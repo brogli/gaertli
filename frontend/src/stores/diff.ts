@@ -11,12 +11,13 @@ export const useDiffStore = defineStore('diff', () => {
 
   const cache = new Map<string, DiffFile>()
   let cachedSha = ''
+  let lastFetch: (() => Promise<DiffFile>) | null = null
+  let lastKey = ''
 
-  // loadInto shares load's and loadRange's cache logic. sha is what the
-  // cache clears on: a single commit, or a range's "a..b". key is the
-  // cache slot within that sha; load/loadRange key on path alone,
-  // loadWorking also keys on staged since the same path has a staged and
-  // an unstaged diff at once.
+  // loadInto loads file through fetch, cached by key. The cache clears
+  // when sha changes: a commit, a range's "a..b", or "working". key is the
+  // path, plus staged for a working-tree diff, since one path can have a
+  // staged and an unstaged diff at once.
   async function loadInto(
     sha: string,
     key: string,
@@ -34,14 +35,36 @@ export const useDiffStore = defineStore('diff', () => {
         return
       }
     }
+    lastFetch = fetch
+    lastKey = key
     loading.value = true
     try {
-      const result = await fetch()
-      cache.set(key, result)
-      file.value = result
+      show(key, await fetch())
     } finally {
       loading.value = false
     }
+  }
+
+  // show caches result and displays it, keeping the displayed object when
+  // the content is unchanged so the view isn't rebuilt for nothing.
+  function show(key: string, result: DiffFile): void {
+    cache.set(key, result)
+    const f = file.value
+    const same =
+      f &&
+      f.path === result.path &&
+      f.oldPath === result.oldPath &&
+      f.binary === result.binary &&
+      f.tooLarge === result.tooLarge &&
+      f.oldContent === result.oldContent &&
+      f.newContent === result.newContent
+    if (!same) file.value = result
+  }
+
+  // refetch re-runs the last load past the cache, with the same arguments
+  // (incl. an explicit "load anyway"): the working tree changed under it.
+  async function refetch(): Promise<void> {
+    if (lastFetch) show(lastKey, await lastFetch())
   }
 
   async function load(
@@ -66,8 +89,7 @@ export const useDiffStore = defineStore('diff', () => {
     return loadInto(`${a}..${b}`, path, force, () => Facade.DiffRange(wt, a, b, path, oldPath, force))
   }
 
-  // loadWorking is load's counterpart for a working-tree change, keyed on
-  // the literal "working": there is no commit or range to key by.
+  // loadWorking is load's counterpart for a working-tree change.
   async function loadWorking(
     wt: string,
     path: string,
@@ -80,5 +102,19 @@ export const useDiffStore = defineStore('diff', () => {
     )
   }
 
-  return { file, loading, load, loadRange, loadWorking }
+  // loadAgainstWorking is load's counterpart for a commit compared against
+  // the current working tree (compare.workingCommit).
+  async function loadAgainstWorking(
+    wt: string,
+    sha: string,
+    path: string,
+    oldPath: string,
+    force = false,
+  ): Promise<void> {
+    return loadInto(`${sha}..working`, path, force, () =>
+      Facade.DiffAgainstWorking(wt, sha, path, oldPath, force),
+    )
+  }
+
+  return { file, loading, load, loadRange, loadWorking, loadAgainstWorking, refetch }
 })

@@ -114,6 +114,36 @@ func TestADR_9_OptionsRegistersTheFacadeAndSingleInstance(t *testing.T) {
 	}
 }
 
+func TestFR_REPO_06_ASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testing.T) {
+	launchDir, elsewhere := t.TempDir(), t.TempDir()
+	cases := []struct{ arg, want string }{
+		{".", launchDir},
+		{"sub/repo", filepath.Join(launchDir, "sub", "repo")},
+		{elsewhere, elsewhere},
+	}
+	for _, c := range cases {
+		var got string
+		opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path })
+
+		opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"nebegit", c.arg}, WorkingDir: launchDir})
+
+		if got != c.want {
+			t.Errorf("relayed path for %q = %q, want %q", c.arg, got, c.want)
+		}
+	}
+}
+
+func TestFR_REPO_02_ASecondInstanceWithoutAPathRelaysNone(t *testing.T) {
+	got := "unset"
+	opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path })
+
+	opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"nebegit"}, WorkingDir: t.TempDir()})
+
+	if got != "" {
+		t.Errorf("relayed path = %q, want \"\" (restore)", got)
+	}
+}
+
 // A window per remembered selection, each with a real, non-empty id —
 // never the empty-selection placeholder.
 func TestFR_REPO_02_RestoreOpensAWindowForEachRememberedSelection(t *testing.T) {
@@ -158,6 +188,46 @@ func TestFR_REPO_02_RestoreOpensOneEmptySelectionWindowWhenNothingWasOpen(t *tes
 	}
 	if got := opener.windows[0].title; got != "nebegit" {
 		t.Errorf("window title = %q, want %q (OpenOrFocus(\"\", \"\", \"\") called exactly once)", got, "nebegit")
+	}
+}
+
+func TestFR_REPO_02_RestoreFallsBackToTheEmptySelectionWindowWhenNoRememberedWorktreeOpens(t *testing.T) {
+	reg, opener := newTestRegistry()
+	store := newTestStore(t)
+	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/gone1", "/gone2"} }); err != nil {
+		t.Fatal(err)
+	}
+	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
+		return core.WorktreeInfo{}, &core.Error{Code: core.NotARepo, Message: "not a git repository"}
+	}}
+	notify := &fakeNotifier{}
+
+	shell{api: api, reg: reg, store: store, notify: notify}.restore(context.Background())
+
+	if notify.calls != 2 {
+		t.Errorf("notify.Show calls = %d, want 2", notify.calls)
+	}
+	if len(opener.windows) != 1 || opener.windows[0].title != "nebegit" {
+		t.Fatalf("windows = %d, want the one empty-selection window", len(opener.windows))
+	}
+}
+
+func TestFR_REPO_05_OpenReportsWhetherTheWindowOpened(t *testing.T) {
+	reg, _ := newTestRegistry()
+	store := newTestStore(t)
+	api := fakeAPI{openWorktree: func(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+		if path == "/bad" {
+			return core.WorktreeInfo{}, &core.Error{Code: core.NotARepo, Message: "not a git repository"}
+		}
+		return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path)}, nil
+	}}
+	sh := shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}
+
+	if sh.open(context.Background(), "/bad") {
+		t.Error("open(/bad) = true, want false")
+	}
+	if !sh.open(context.Background(), "/good") {
+		t.Error("open(/good) = false, want true")
 	}
 }
 
@@ -210,6 +280,41 @@ func TestFR_WT_05_FR_WT_08_SwitchToMovesTheWindowsSelection(t *testing.T) {
 	}
 	if want := []string{"/?path=%2Fb"}; !slices.Equal(fw.setURLs, want) {
 		t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
+	}
+}
+
+// A WSL window's URL carries the distro the path arrived from, so a later
+// MainView/WorktreeContent load knows which core to route through.
+func TestFR_REPO_02_SwitchToCarriesTheDistroInTheURL(t *testing.T) {
+	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("A", "/a", "")
+	windowID := opener.windows[0].ID()
+
+	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
+		return core.WorktreeInfo{ID: "B", Path: "/home/u/r", RepoKey: "repo-b"}, nil
+	}}
+	sh := shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
+	fw := &fakeCallingWindow{id: windowID}
+
+	if err := sh.switchTo(context.Background(), fw, `\\wsl.localhost\Ubuntu\home\u\r`); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := []string{"/?path=%2Fhome%2Fu%2Fr&distro=Ubuntu"}; !slices.Equal(fw.setURLs, want) {
+		t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
+	}
+}
+
+func TestFR_REPO_02_SelectionURLCarriesTheDistro(t *testing.T) {
+	cases := []struct{ path, distro, want string }{
+		{"", "", "/"},
+		{"/home/u/r", "", "/?path=%2Fhome%2Fu%2Fr"},
+		{"/home/u/r", "Ubuntu", "/?path=%2Fhome%2Fu%2Fr&distro=Ubuntu"},
+	}
+	for _, c := range cases {
+		if got := selectionURL(c.path, c.distro); got != c.want {
+			t.Errorf("selectionURL(%q, %q) = %q, want %q", c.path, c.distro, got, c.want)
+		}
 	}
 }
 

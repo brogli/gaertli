@@ -16,12 +16,8 @@ import (
 // is usable long before the whole (delayed) stream finishes.
 func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
-	c := New(func(core.Event) {})
-	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wt, err := c.sessions.Get(info.ID)
+	c, id := openWorktree(t, repo.Dir)
+	wt, err := c.sessions.Get(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,14 +31,14 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 	wt.Runner.Git = fakegit
 
 	start := time.Now()
-	if err := c.LoadLog(context.Background(), info.ID); err != nil {
+	if err := c.LoadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
 
 	var elapsed time.Duration
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		res, err := c.LogRows(context.Background(), info.ID, 0, 1)
+		res, err := c.LogRows(context.Background(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,7 +56,7 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 		t.Errorf("first row observable after %s, want well under 1s (the full 2.5s unstreamed load)", elapsed)
 	}
 
-	waitForLogDone(t, c, info.ID) // drain the background stream so it doesn't leak noise into later tests
+	waitForLogDone(t, c, id) // drain the background stream so it doesn't leak noise into later tests
 }
 
 // TestQA_PERF_07_LogMemoryStaysBoundedPerRow checks per-row memory at a
@@ -69,12 +65,8 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	const rows = 20000
 	repo := gittest.New(t)
-	c := New(func(core.Event) {})
-	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wt, err := c.sessions.Get(info.ID)
+	c, id := openWorktree(t, repo.Dir)
+	wt, err := c.sessions.Get(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,10 +82,10 @@ func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	runtime.GC()
 	runtime.ReadMemStats(&before)
 
-	if err := c.LoadLog(context.Background(), info.ID); err != nil {
+	if err := c.LoadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	loaded := waitForLogDone(t, c, info.ID)
+	loaded := waitForLogDone(t, c, id)
 	if loaded != rows {
 		t.Fatalf("loaded = %d, want %d", loaded, rows)
 	}

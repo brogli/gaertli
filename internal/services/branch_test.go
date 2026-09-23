@@ -62,19 +62,165 @@ func TestFR_BR_02_ResetFlagMapsModeToGitFlag(t *testing.T) {
 	coretest.AssertCode(t, err, core.Internal)
 }
 
+func TestFR_BR_06_RenameBranchRenamesANonCurrentBranch(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	featureTip := branchTip(t, repo.Dir, "feature")
+	mainTip := branchTip(t, repo.Dir, "master")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.RenameBranch(context.Background(), wt, "feature", "renamed"); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := branchTip(t, repo.Dir, "renamed"); got != featureTip {
+		t.Errorf("renamed = %s, want %s", got, featureTip)
+	}
+	if branchExists(t, repo.Dir, "feature") {
+		t.Error("feature still exists, want renamed away")
+	}
+	if got := branchTip(t, repo.Dir, "master"); got != mainTip {
+		t.Errorf("master = %s, want unchanged %s", got, mainTip)
+	}
+}
+
+func TestFR_BR_06_RenameBranchRejectsAnInvalidNewNameBeforeTouchingGit(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	featureTip := branchTip(t, repo.Dir, "feature")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	err := c.RenameBranch(context.Background(), wt, "feature", "-badname")
+
+	coretest.AssertCode(t, err, core.InvalidName)
+	if got := branchTip(t, repo.Dir, "feature"); got != featureTip {
+		t.Errorf("feature = %s, want unchanged %s (unrenamed)", got, featureTip)
+	}
+}
+
+func TestFR_BR_06_RenameBranchRejectsADuplicateNewNameAsGitFailed(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	gittest.Run(t, repo.Dir, "branch", "taken")
+	featureTip := branchTip(t, repo.Dir, "feature")
+	takenTip := branchTip(t, repo.Dir, "taken")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	err := c.RenameBranch(context.Background(), wt, "feature", "taken")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if !strings.Contains(ce.GitStderr, "already exists") {
+		t.Errorf("GitStderr = %q, want it to say the branch already exists", ce.GitStderr)
+	}
+	if got := branchTip(t, repo.Dir, "feature"); got != featureTip {
+		t.Errorf("feature = %s, want unchanged %s", got, featureTip)
+	}
+	if got := branchTip(t, repo.Dir, "taken"); got != takenTip {
+		t.Errorf("taken = %s, want unchanged %s", got, takenTip)
+	}
+}
+
+func TestFR_BR_06_DeleteBranchDeletesAFullyMergedBranch(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "merged")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.DeleteBranch(context.Background(), wt, "merged", false); err != nil {
+		t.Fatal(err)
+	}
+
+	if branchExists(t, repo.Dir, "merged") {
+		t.Error("merged still exists, want deleted")
+	}
+}
+
+func TestFR_BR_06_DeleteBranchRefusesAnUnmergedBranchAsCodeUnmerged(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "topic")
+	gittest.Run(t, repo.Dir, "checkout", "topic")
+	gittest.Commit(t, repo.Dir, "seed.txt", "b", "second")
+	gittest.Run(t, repo.Dir, "checkout", "master")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	err := c.DeleteBranch(context.Background(), wt, "topic", false)
+
+	coretest.AssertCode(t, err, core.Unmerged)
+	if !branchExists(t, repo.Dir, "topic") {
+		t.Error("topic gone, want still present (unforced delete refuses)")
+	}
+}
+
+func TestFR_BR_06_DeleteBranchForcedDeletesAnUnmergedBranch(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "topic")
+	gittest.Run(t, repo.Dir, "checkout", "topic")
+	gittest.Commit(t, repo.Dir, "seed.txt", "b", "second")
+	gittest.Run(t, repo.Dir, "checkout", "master")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.DeleteBranch(context.Background(), wt, "topic", true); err != nil {
+		t.Fatal(err)
+	}
+
+	if branchExists(t, repo.Dir, "topic") {
+		t.Error("topic still exists, want deleted")
+	}
+}
+
+func TestFR_BR_06_DeleteBranchRefusesABranchCheckedOutInAnotherWorktreeAsGitFailedNotUnmerged(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "other")
+	linked := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "other")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	err := c.DeleteBranch(context.Background(), wt, "other", false)
+	coretest.AssertCode(t, err, core.GitFailed)
+
+	err = c.DeleteBranch(context.Background(), wt, "other", true)
+	coretest.AssertCode(t, err, core.GitFailed)
+
+	if !branchExists(t, repo.Dir, "other") {
+		t.Error("other gone, want still present")
+	}
+	if got := currentBranch(t, linked); got != "other" {
+		t.Errorf("linked worktree's branch = %s, want still other", got)
+	}
+}
+
+func TestFR_BR_07_ResetFlagMapsKeepToGitFlag(t *testing.T) {
+	got, err := resetFlag(core.ResetKeep)
+	if err != nil {
+		t.Fatalf("resetFlag(keep) error = %v, want nil", err)
+	}
+	if got != "--keep" {
+		t.Errorf("resetFlag(keep) = %q, want \"--keep\"", got)
+	}
+}
+
 func TestFR_BR_01_CreateBranchWithoutCheckoutLeavesCurrentBranchAlone(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	firstSHA := gittest.HeadSHA(t, repo.Dir)
 	gittest.Commit(t, repo.Dir, "seed.txt", "b", "second")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CreateBranch(context.Background(), wt.ID, "feature", firstSHA, false); err != nil {
+	if err := c.CreateBranch(context.Background(), wt, "feature", firstSHA, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -92,13 +238,9 @@ func TestFR_BR_01_CreateBranchWithCheckoutSwitchesToIt(t *testing.T) {
 	firstSHA := gittest.HeadSHA(t, repo.Dir)
 	gittest.Commit(t, repo.Dir, "seed.txt", "b", "second")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CreateBranch(context.Background(), wt.ID, "feature", firstSHA, true); err != nil {
+	if err := c.CreateBranch(context.Background(), wt, "feature", firstSHA, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -117,13 +259,9 @@ func TestFR_BR_01_CreateBranchRejectsADuplicateNameAsGitFailed(t *testing.T) {
 	originalTip := branchTip(t, repo.Dir, "feature")
 	sha := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	err = c.CreateBranch(context.Background(), wt.ID, "feature", sha, false)
+	err := c.CreateBranch(context.Background(), wt, "feature", sha, false)
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "already exists") {
@@ -139,13 +277,9 @@ func TestFR_BR_01_CreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	sha := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	err = c.CreateBranch(context.Background(), wt.ID, "-bad", sha, false)
+	err := c.CreateBranch(context.Background(), wt, "-bad", sha, false)
 
 	coretest.AssertCode(t, err, core.InvalidName)
 	if branchExists(t, repo.Dir, "-bad") {
@@ -158,13 +292,9 @@ func TestFR_BR_01_CreateBranchWithCheckoutIsAtomicOnADirtyConflict(t *testing.T)
 	olderSHA := conflictingCheckoutFixture(t, repo.Dir)
 	before := currentBranch(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	err = c.CreateBranch(context.Background(), wt.ID, "old", olderSHA, true)
+	err := c.CreateBranch(context.Background(), wt, "old", olderSHA, true)
 
 	coretest.AssertCode(t, err, core.DirtyWorktree)
 	if branchExists(t, repo.Dir, "old") {
@@ -183,13 +313,9 @@ func TestFR_BR_05_CheckoutSwitchesToAnExistingLocalBranch(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.Checkout(context.Background(), wt.ID, "feature"); err != nil {
+	if err := c.Checkout(context.Background(), wt, "feature"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -210,13 +336,9 @@ func TestFR_BR_05_CheckoutDWIMsARemoteTrackingBranchIntoALocalOne(t *testing.T) 
 	gittest.Run(t, repo.Dir, "push", "origin", "master:shared")
 	gittest.Run(t, repo.Dir, "fetch", "origin")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.Checkout(context.Background(), wt.ID, "shared"); err != nil {
+	if err := c.Checkout(context.Background(), wt, "shared"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -234,13 +356,9 @@ func TestFR_BR_05_CheckoutRefusesADirtyConflictAsDirtyWorktree(t *testing.T) {
 	gittest.Run(t, repo.Dir, "branch", "feature", olderSHA) // a plain ref create, unaffected by the dirty working tree
 	before := currentBranch(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	err = c.Checkout(context.Background(), wt.ID, "feature")
+	err := c.Checkout(context.Background(), wt, "feature")
 
 	coretest.AssertCode(t, err, core.DirtyWorktree)
 	if got := currentBranch(t, repo.Dir); got != before {
@@ -256,13 +374,9 @@ func TestFR_BR_05_CheckoutNamesTheOtherWorktreeWhenABranchIsAlreadyCheckedOutThe
 	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
 	before := currentBranch(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	err = c.Checkout(context.Background(), wt.ID, "feature")
+	err := c.Checkout(context.Background(), wt, "feature")
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, linked) {
@@ -279,13 +393,9 @@ func TestFR_BR_08_CheckoutCommitDetachesHEADAtTheGivenSHA(t *testing.T) {
 	firstSHA := gittest.HeadSHA(t, repo.Dir)
 	gittest.Commit(t, repo.Dir, "seed.txt", "b", "second")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CheckoutCommit(context.Background(), wt.ID, firstSHA); err != nil {
+	if err := c.CheckoutCommit(context.Background(), wt, firstSHA); err != nil {
 		t.Fatal(err)
 	}
 
@@ -302,13 +412,9 @@ func TestFR_BR_08_CheckoutCommitRefusesADirtyConflictAsDirtyWorktree(t *testing.
 	olderSHA := conflictingCheckoutFixture(t, repo.Dir)
 	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	err = c.CheckoutCommit(context.Background(), wt.ID, olderSHA)
+	err := c.CheckoutCommit(context.Background(), wt, olderSHA)
 
 	coretest.AssertCode(t, err, core.DirtyWorktree)
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
@@ -323,13 +429,9 @@ func TestFR_BR_08_CheckoutCommitSucceedsEvenWhenAlreadyDetachedInAnotherWorktree
 	linked := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", linked, sha)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CheckoutCommit(context.Background(), wt.ID, sha); err != nil {
+	if err := c.CheckoutCommit(context.Background(), wt, sha); err != nil {
 		t.Errorf("CheckoutCommit = %v, want success (a detached commit may be shared across worktrees)", err)
 	}
 }
@@ -337,25 +439,21 @@ func TestFR_BR_08_CheckoutCommitSucceedsEvenWhenAlreadyDetachedInAnotherWorktree
 func TestQA_REL_02_BranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
 	repo := gittest.New(t) // no commit: an unborn HEAD
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CreateBranch(context.Background(), wt.ID, "feature", "HEAD", false); err == nil {
+	if err := c.CreateBranch(context.Background(), wt, "feature", "HEAD", false); err == nil {
 		t.Error("CreateBranch on an empty repo = nil, want an error")
 	} else {
 		coretest.AssertCode(t, err, core.GitFailed)
 	}
 
-	if err := c.Checkout(context.Background(), wt.ID, "anything"); err == nil {
+	if err := c.Checkout(context.Background(), wt, "anything"); err == nil {
 		t.Error("Checkout on an empty repo = nil, want an error")
 	} else {
 		coretest.AssertCode(t, err, core.GitFailed)
 	}
 
-	if err := c.CheckoutCommit(context.Background(), wt.ID, "HEAD"); err == nil {
+	if err := c.CheckoutCommit(context.Background(), wt, "HEAD"); err == nil {
 		t.Error("CheckoutCommit on an empty repo = nil, want an error")
 	} else {
 		coretest.AssertCode(t, err, core.GitFailed)
@@ -368,13 +466,9 @@ func TestFR_BR_02_ResetSoftMovesBranchLeavesIndexAndWorkingTreeUntouched(t *test
 	beforeWorking := readFile(t, repo.Dir, "seed.txt")
 	beforeIndex := indexBlob(t, repo.Dir, "seed.txt")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Reset(context.Background(), wt.ID, firstSHA, core.ResetSoft); err != nil {
+	if _, err := c.Reset(context.Background(), wt, firstSHA, core.ResetSoft); err != nil {
 		t.Fatal(err)
 	}
 
@@ -394,13 +488,9 @@ func TestFR_BR_02_ResetMixedLeavesWorkingTreeUntracksPathsAbsentFromTarget(t *te
 	firstSHA := resetFixture(t, repo.Dir)
 	beforeWorking := readFile(t, repo.Dir, "seed.txt")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Reset(context.Background(), wt.ID, firstSHA, core.ResetMixed); err != nil {
+	if _, err := c.Reset(context.Background(), wt, firstSHA, core.ResetMixed); err != nil {
 		t.Fatal(err)
 	}
 
@@ -425,13 +515,9 @@ func TestFR_BR_02_ResetHardMatchesTargetExactlyLeavesUntrackedFileAlone(t *testi
 		t.Fatal(err)
 	}
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Reset(context.Background(), wt.ID, firstSHA, core.ResetHard); err != nil {
+	if _, err := c.Reset(context.Background(), wt, firstSHA, core.ResetHard); err != nil {
 		t.Fatal(err)
 	}
 
@@ -456,16 +542,12 @@ func TestFR_BR_02_ResetWhileDetachedMovesHEADNotTheCheckedOutBranch(t *testing.T
 	gittest.Commit(t, repo.Dir, "seed.txt", "b", "second")
 	thirdSHA := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := c.CheckoutCommit(context.Background(), wt.ID, thirdSHA); err != nil {
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.CheckoutCommit(context.Background(), wt, thirdSHA); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := c.Reset(context.Background(), wt.ID, firstSHA, core.ResetHard); err != nil {
+	if _, err := c.Reset(context.Background(), wt, firstSHA, core.ResetHard); err != nil {
 		t.Fatal(err)
 	}
 
@@ -508,13 +590,9 @@ func TestFR_BR_03_UncommittedCountCountsTrackedChangesNotUntrackedFiles(t *testi
 		t.Fatal(err)
 	}
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	got, err := c.UncommittedCount(context.Background(), wt.ID)
+	got, err := c.UncommittedCount(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,13 +605,9 @@ func TestFR_BR_03_UncommittedCountIsZeroOnACleanWorkingTree(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	got, err := c.UncommittedCount(context.Background(), wt.ID)
+	got, err := c.UncommittedCount(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,13 +624,9 @@ func TestFR_BR_04_ResetReturnsThePreviousHEAD(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "seed.txt", "c", "third")
 	thirdSHA := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	result, err := c.Reset(context.Background(), wt.ID, firstSHA, core.ResetHard)
+	result, err := c.Reset(context.Background(), wt, firstSHA, core.ResetHard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,13 +644,9 @@ func TestFR_BR_02_ResetSoftRefusesDuringAnUnresolvedConflict(t *testing.T) {
 	baseSHA := mergeConflictFixture(t, repo.Dir)
 	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	_, err = c.Reset(context.Background(), wt.ID, baseSHA, core.ResetSoft)
+	_, err := c.Reset(context.Background(), wt, baseSHA, core.ResetSoft)
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if !mergeInProgress(repo.Dir) {
@@ -595,13 +661,9 @@ func TestFR_BR_02_ResetHardSucceedsDuringAnUnresolvedConflictEndingIt(t *testing
 	repo := gittest.New(t)
 	baseSHA := mergeConflictFixture(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Reset(context.Background(), wt.ID, baseSHA, core.ResetHard); err != nil {
+	if _, err := c.Reset(context.Background(), wt, baseSHA, core.ResetHard); err != nil {
 		t.Fatal(err)
 	}
 
@@ -616,17 +678,78 @@ func TestFR_BR_02_ResetHardSucceedsDuringAnUnresolvedConflictEndingIt(t *testing
 	}
 }
 
+func TestFR_BR_07_ResetKeepMatchesTargetExactlyOnACleanTree(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	firstSHA := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "extra.txt", "x", "second")
+	gittest.Commit(t, repo.Dir, "seed.txt", "c", "third")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if _, err := c.Reset(context.Background(), wt, firstSHA, core.ResetKeep); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := branchTip(t, repo.Dir, "master"); got != firstSHA {
+		t.Errorf("master = %s, want %s", got, firstSHA)
+	}
+	if got := readFile(t, repo.Dir, "seed.txt"); got != "a" {
+		t.Errorf("seed.txt = %q, want firstSHA's own content %q", got, "a")
+	}
+	if _, err := os.Stat(filepath.Join(repo.Dir, "extra.txt")); !os.IsNotExist(err) {
+		t.Errorf("extra.txt = %v, want removed (absent from firstSHA's own tree)", err)
+	}
+}
+
+func TestFR_BR_07_ResetKeepRefusesALocalChangeLeavingHEADIndexAndWorkingTreeUntouched(t *testing.T) {
+	repo := gittest.New(t)
+	firstSHA := resetFixture(t, repo.Dir)
+	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
+	beforeWorking := readFile(t, repo.Dir, "seed.txt")
+	beforeIndex := indexBlob(t, repo.Dir, "seed.txt")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, err := c.Reset(context.Background(), wt, firstSHA, core.ResetKeep)
+
+	coretest.AssertCode(t, err, core.GitFailed)
+	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
+		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
+	}
+	if got := readFile(t, repo.Dir, "seed.txt"); got != beforeWorking {
+		t.Errorf("working tree seed.txt = %q, want unchanged %q", got, beforeWorking)
+	}
+	if got := indexBlob(t, repo.Dir, "seed.txt"); got != beforeIndex {
+		t.Errorf("index seed.txt = %q, want unchanged %q", got, beforeIndex)
+	}
+}
+
+func TestFR_BR_07_ResetKeepRefusesDuringAnUnresolvedConflict(t *testing.T) {
+	repo := gittest.New(t)
+	baseSHA := mergeConflictFixture(t, repo.Dir)
+	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, err := c.Reset(context.Background(), wt, baseSHA, core.ResetKeep)
+
+	coretest.AssertCode(t, err, core.GitFailed)
+	if !mergeInProgress(repo.Dir) {
+		t.Error("MERGE_HEAD gone, want still present (--keep refuses mid-merge)")
+	}
+	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
+		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
+	}
+}
+
 func TestFR_BR_02_ResetRefusesANonexistentSHAAsGitFailed(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	_, err = c.Reset(context.Background(), wt.ID, "0000000000000000000000000000000000000000", core.ResetHard)
+	_, err := c.Reset(context.Background(), wt, "0000000000000000000000000000000000000000", core.ResetHard)
 
 	coretest.AssertCode(t, err, core.GitFailed)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,44 @@ func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if got := mtime(t, heartbeat); !got.Equal(stopped) {
 		t.Errorf("heartbeat mtime advanced after cancel: %v -> %v (process not killed)", stopped, got)
+	}
+}
+
+// A grandchild that inherited git's stderr, e.g. a stalled ssh transport,
+// keeps the pipe open after git itself is killed.
+func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsStderr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+
+	start := time.Now()
+	_, err := (Runner{Git: "sh"}).StreamErr(ctx, Call{Args: []string{"-c", "sleep 6 & wait"}}, func([]byte) error { return nil })
+	elapsed := time.Since(start)
+
+	coretest.AssertCode(t, err, core.Cancelled)
+	if elapsed > 4*time.Second {
+		t.Errorf("StreamErr() took %s after cancel, want it back within the 2s wait delay", elapsed)
+	}
+}
+
+// The shape of a delayed transport: the grandchild holds git's stderr but
+// not its stdout, so stdout ends as soon as git is killed.
+func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsOnlyStderr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+
+	start := time.Now()
+	_, err := (Runner{Git: "sh"}).StreamErr(ctx, Call{Args: []string{"-c", "sleep 6 >/dev/null & wait"}}, func([]byte) error { return nil })
+	elapsed := time.Since(start)
+
+	coretest.AssertCode(t, err, core.Cancelled)
+	if elapsed > 4*time.Second {
+		t.Errorf("StreamErr() took %s after cancel, want it back within the 2s wait delay", elapsed)
 	}
 }
 

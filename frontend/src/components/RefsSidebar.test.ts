@@ -1,12 +1,17 @@
-import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { mountInBody } from '../testing/mountInBody'
 
-const { mockJumpTo, mockCheckout, mockUpdateBranch } = vi.hoisted(() => ({
-  mockJumpTo: vi.fn(),
-  mockCheckout: vi.fn(),
-  mockUpdateBranch: vi.fn(),
-}))
+const { mockJumpTo, mockCheckout, mockUpdateBranch, mockRenameBranch, mockDeleteBranch, mockRequire } =
+  vi.hoisted(() => ({
+    mockJumpTo: vi.fn(),
+    mockCheckout: vi.fn(),
+    mockUpdateBranch: vi.fn(),
+    mockRenameBranch: vi.fn(),
+    mockDeleteBranch: vi.fn(),
+    mockRequire: vi.fn(),
+  }))
 
 const mockRefs = vi.fn()
 
@@ -19,11 +24,21 @@ vi.mock('../stores/log', () => ({
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { Checkout: mockCheckout, UpdateBranch: mockUpdateBranch },
+  Facade: {
+    Checkout: mockCheckout,
+    UpdateBranch: mockUpdateBranch,
+    RenameBranch: mockRenameBranch,
+    DeleteBranch: mockDeleteBranch,
+  },
+}))
+
+vi.mock('openvue/useconfirm', () => ({
+  useConfirm: () => ({ require: mockRequire, close: vi.fn() }),
 }))
 
 import RefsSidebar from './RefsSidebar.vue'
 import ErrorBanner from './ErrorBanner.vue'
+import RenameBranchDialog from './RenameBranchDialog.vue'
 import { useJobsStore } from '../stores/jobs'
 import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { branchFixture } from '../testing/fixtures/branch'
@@ -32,7 +47,8 @@ import { clickMenuItem } from '../testing/contextMenu'
 function updateJob(fields: Partial<JobInfo>): JobInfo {
   return {
     id: '1',
-    kind: 'update-branch:feature',
+    kind: 'update-branch',
+    branch: 'feature',
     state: 'running',
     progress: -1,
     message: '',
@@ -60,6 +76,11 @@ describe('RefsSidebar', () => {
     mockCheckout.mockResolvedValue(undefined)
     mockUpdateBranch.mockReset()
     mockUpdateBranch.mockResolvedValue(undefined)
+    mockRenameBranch.mockReset()
+    mockRenameBranch.mockResolvedValue(undefined)
+    mockDeleteBranch.mockReset()
+    mockDeleteBranch.mockResolvedValue(undefined)
+    mockRequire.mockReset()
     setActivePinia(createPinia())
     mockRefs.mockReset()
     mockRefs.mockReturnValue({
@@ -95,12 +116,11 @@ describe('RefsSidebar', () => {
   })
 
   it('FR-BR-05 right-clicking a non-current branch offers Checkout, calling Facade.Checkout with its name', async () => {
-    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
     await openContextMenu(wrapper, 'feature')
 
-    const body = new DOMWrapper(document.body)
     const labels = body.findAll('.p-contextmenu-item-label').map((n) => n.text())
-    expect(labels).toEqual(['Checkout', 'Create worktree here…'])
+    expect(labels).toEqual(['Checkout', 'Create worktree here…', 'Rename…', 'Delete'])
 
     await clickMenuItem(body, 'Checkout')
     await flushPromises()
@@ -112,10 +132,9 @@ describe('RefsSidebar', () => {
   })
 
   it("FR-BR-05 the current branch's own menu has no Checkout item", async () => {
-    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
     await openContextMenu(wrapper, 'main')
 
-    const body = new DOMWrapper(document.body)
     expect(body.findAll('.p-contextmenu-item-label')).toHaveLength(0)
     expect(mockCheckout).not.toHaveBeenCalled()
 
@@ -128,10 +147,9 @@ describe('RefsSidebar', () => {
       remotes: [{ name: 'origin', branches: [{ name: 'feature', sha: 'sha-feature' }] }],
       tags: [],
     })
-    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
     await openContextMenu(wrapper, 'feature')
 
-    const body = new DOMWrapper(document.body)
     await clickMenuItem(body, 'Checkout')
     await flushPromises()
 
@@ -141,10 +159,84 @@ describe('RefsSidebar', () => {
     wrapper.unmount()
   })
 
-  it('FR-WT-06 "Create worktree here…" on a local branch emits create-worktree with isRemote false', async () => {
-    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+  it('FR-BR-06 "Rename…" opens RenameBranchDialog prefilled with the branch\'s name', async () => {
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
     await openContextMenu(wrapper, 'feature')
-    const body = new DOMWrapper(document.body)
+
+    await clickMenuItem(body, 'Rename…')
+    await flushPromises()
+
+    expect(wrapper.findComponent(RenameBranchDialog).props()).toMatchObject({
+      wt: '/repo',
+      name: 'feature',
+    })
+
+    wrapper.unmount()
+  })
+
+  it('FR-BR-06 "Delete" on a mergeable branch calls Facade.DeleteBranch(wt, name, false) with no confirmation', async () => {
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
+    await openContextMenu(wrapper, 'feature')
+
+    await clickMenuItem(body, 'Delete')
+    await flushPromises()
+
+    expect(mockDeleteBranch).toHaveBeenCalledTimes(1)
+    expect(mockDeleteBranch).toHaveBeenCalledWith('/repo', 'feature', false)
+    expect(mockRequire).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('FR-BR-06, FR-UX-03, QA-SAFE-01 "Delete" on an unmerged branch confirms, naming the reason, then retries forced', async () => {
+    mockDeleteBranch.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), {
+        cause: { code: 'UNMERGED_BRANCH', message: 'not fully merged' },
+      }),
+    )
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
+    await openContextMenu(wrapper, 'feature')
+
+    await clickMenuItem(body, 'Delete')
+    await flushPromises()
+
+    expect(mockDeleteBranch).toHaveBeenCalledTimes(1)
+    expect(mockDeleteBranch).toHaveBeenCalledWith('/repo', 'feature', false)
+    expect(mockRequire).toHaveBeenCalledTimes(1)
+    const options = mockRequire.mock.calls[0]![0] as { message: string; accept: () => void }
+    expect(options.message).toContain('not fully merged')
+    expect(wrapper.findComponent(ErrorBanner).exists()).toBe(false)
+
+    options.accept()
+    await flushPromises()
+
+    expect(mockDeleteBranch).toHaveBeenCalledTimes(2)
+    expect(mockDeleteBranch).toHaveBeenLastCalledWith('/repo', 'feature', true)
+
+    wrapper.unmount()
+  })
+
+  it('FR-BR-06 "Delete" refused for another reason shows ErrorBanner, no confirmation', async () => {
+    mockDeleteBranch.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { code: 'GIT_FAILED', message: 'used by worktree' } }),
+    )
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
+    await openContextMenu(wrapper, 'feature')
+
+    await clickMenuItem(body, 'Delete')
+    await flushPromises()
+
+    const error = wrapper.findComponent(ErrorBanner)
+    expect(error.exists()).toBe(true)
+    expect(error.props('error')).toEqual({ code: 'GIT_FAILED', message: 'used by worktree' })
+    expect(mockRequire).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-06 "Create worktree here…" on a local branch emits create-worktree with isRemote false', async () => {
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
+    await openContextMenu(wrapper, 'feature')
 
     await clickMenuItem(body, 'Create worktree here…')
 
@@ -159,9 +251,8 @@ describe('RefsSidebar', () => {
       remotes: [{ name: 'origin', branches: [{ name: 'feature', sha: 'sha-feature' }] }],
       tags: [],
     })
-    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
     await openContextMenu(wrapper, 'feature')
-    const body = new DOMWrapper(document.body)
 
     await clickMenuItem(body, 'Create worktree here…')
 
@@ -179,12 +270,17 @@ describe('RefsSidebar', () => {
       remotes: [],
       tags: [],
     })
-    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
     await openContextMenu(wrapper, 'feature')
 
-    const body = new DOMWrapper(document.body)
     const labels = body.findAll('.p-contextmenu-item-label').map((n) => n.text())
-    expect(labels).toEqual(['Checkout', 'Create worktree here…', 'Update from upstream'])
+    expect(labels).toEqual([
+      'Checkout',
+      'Create worktree here…',
+      'Update from upstream',
+      'Rename…',
+      'Delete',
+    ])
 
     await clickMenuItem(body, 'Update from upstream')
     await flushPromises()
@@ -235,9 +331,8 @@ describe('RefsSidebar', () => {
     mockUpdateBranch.mockRejectedValueOnce(
       Object.assign(new Error('boom'), { cause: { message: 'no upstream configured', code: 'NO_UPSTREAM' } }),
     )
-    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' }, attachTo: document.body })
+    const { wrapper, body } = await mountInBody(RefsSidebar, { props: { wt: '/repo' } })
     await openContextMenu(wrapper, 'feature')
-    const body = new DOMWrapper(document.body)
 
     await clickMenuItem(body, 'Update from upstream')
     await flushPromises()
@@ -247,5 +342,62 @@ describe('RefsSidebar', () => {
     expect(error.props('error')).toEqual({ message: 'no upstream configured', code: 'NO_UPSTREAM' })
 
     wrapper.unmount()
+  })
+
+  it('FR-UPD-06 checking two eligible branches then clicking "Update 2 branches" calls Facade.UpdateBranch once per branch', async () => {
+    mockRefs.mockReturnValue({
+      branches: [
+        branchFixture(),
+        branchFixture({ name: 'feature', sha: 'sha-feature', current: false, upstream: 'origin/feature' }),
+        branchFixture({ name: 'other', sha: 'sha-other', current: false, upstream: 'origin/other' }),
+      ],
+      remotes: [],
+      tags: [],
+    })
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' } })
+
+    const checkboxes = wrapper.findAll('[data-test="update-select"]')
+    expect(checkboxes).toHaveLength(2) // "main" is current, excluded; "feature" and "other" are eligible
+    await checkboxes[0]!.setValue(true)
+    await checkboxes[1]!.setValue(true)
+
+    const updateButton = wrapper.findAll('button').find((b) => b.text() === 'Update 2 branches')
+    expect(updateButton).toBeTruthy()
+    await updateButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockUpdateBranch).toHaveBeenCalledTimes(2)
+    expect(mockUpdateBranch).toHaveBeenCalledWith('/repo', 'feature')
+    expect(mockUpdateBranch).toHaveBeenCalledWith('/repo', 'other')
+  })
+
+  it('FR-UPD-06 the current branch and a branch with no upstream offer no selection checkbox', () => {
+    mockRefs.mockReturnValue({
+      branches: [
+        branchFixture(), // current, no upstream
+        branchFixture({ name: 'feature', sha: 'sha-feature', current: false, upstream: '' }),
+      ],
+      remotes: [],
+      tags: [],
+    })
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' } })
+
+    expect(wrapper.findAll('[data-test="update-select"]')).toHaveLength(0)
+  })
+
+  it('FR-UX-09 an eligible branch\'s update checkbox has a title and aria-label naming it', () => {
+    mockRefs.mockReturnValue({
+      branches: [
+        branchFixture(),
+        branchFixture({ name: 'feature', sha: 'sha-feature', current: false, upstream: 'origin/feature' }),
+      ],
+      remotes: [],
+      tags: [],
+    })
+    const wrapper = mount(RefsSidebar, { props: { wt: '/repo' } })
+
+    const checkbox = wrapper.get('[data-test="update-select"]')
+    expect(checkbox.attributes('title')).toBe('Select feature to update')
+    expect(checkbox.attributes('aria-label')).toBe('Select feature to update')
   })
 })

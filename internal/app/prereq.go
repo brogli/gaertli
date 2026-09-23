@@ -13,9 +13,7 @@ func gitPresent() bool {
 }
 
 // missingGitMessage is shown when gitPresent is false.
-func missingGitMessage() string {
-	return "nebegit needs git. Install git and make sure it is on your PATH, then start nebegit again."
-}
+const missingGitMessage = "nebegit needs git. Install git and make sure it is on your PATH, then start nebegit again."
 
 // startupFailedMessage is shown when a.Run() fails after git was already
 // confirmed present: the webview prerequisite.

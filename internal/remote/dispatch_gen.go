@@ -29,6 +29,9 @@ func handlers(api core.API) handler.Map {
 		"CherryPick": handler.New(func(ctx context.Context, p cherryPickParams) error {
 			return api.CherryPick(ctx, p.Wt, p.Shas)
 		}),
+		"CherryPickWith": handler.New(func(ctx context.Context, p cherryPickWithParams) error {
+			return api.CherryPickWith(ctx, p.Wt, p.Shas, p.Opts)
+		}),
 		"CloseWorktree": handler.New(func(ctx context.Context, p closeWorktreeParams) error {
 			return api.CloseWorktree(ctx, p.Wt)
 		}),
@@ -44,11 +47,20 @@ func handlers(api core.API) handler.Map {
 		"CompareCommits": handler.New(func(ctx context.Context, p compareCommitsParams) ([]core.ChangedFile, error) {
 			return api.CompareCommits(ctx, p.Wt, p.A, p.B)
 		}),
+		"CompareWithWorking": handler.New(func(ctx context.Context, p compareWithWorkingParams) ([]core.ChangedFile, error) {
+			return api.CompareWithWorking(ctx, p.Wt, p.Sha)
+		}),
 		"ContinueOperation": handler.New(func(ctx context.Context, p continueOperationParams) error {
 			return api.ContinueOperation(ctx, p.Wt)
 		}),
 		"CreateBranch": handler.New(func(ctx context.Context, p createBranchParams) error {
 			return api.CreateBranch(ctx, p.Wt, p.Name, p.Start, p.Checkout)
+		}),
+		"DeleteBranch": handler.New(func(ctx context.Context, p deleteBranchParams) error {
+			return api.DeleteBranch(ctx, p.Wt, p.Name, p.Force)
+		}),
+		"DiffAgainstWorking": handler.New(func(ctx context.Context, p diffAgainstWorkingParams) (core.DiffFile, error) {
+			return api.DiffAgainstWorking(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Force)
 		}),
 		"DiffFile": handler.New(func(ctx context.Context, p diffFileParams) (core.DiffFile, error) {
 			return api.DiffFile(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Force)
@@ -58,6 +70,15 @@ func handlers(api core.API) handler.Map {
 		}),
 		"DiffWorking": handler.New(func(ctx context.Context, p diffWorkingParams) (core.DiffFile, error) {
 			return api.DiffWorking(ctx, p.Wt, p.Path, p.OldPath, p.Staged, p.Force)
+		}),
+		"DiscardFile": handler.New(func(ctx context.Context, p discardFileParams) error {
+			return api.DiscardFile(ctx, p.Wt, p.Path, p.Untracked)
+		}),
+		"DiscardLines": handler.New(func(ctx context.Context, p discardLinesParams) error {
+			return api.DiscardLines(ctx, p.Wt, p.Path, p.Sel)
+		}),
+		"DropStash": handler.New(func(ctx context.Context, p dropStashParams) error {
+			return api.DropStash(ctx, p.Wt, p.Sha)
 		}),
 		"Fetch": handler.New(func(ctx context.Context, p fetchParams) (string, error) {
 			return api.Fetch(ctx, p.Wt, p.Remote)
@@ -86,17 +107,32 @@ func handlers(api core.API) handler.Map {
 		"OpenFile": handler.New(func(ctx context.Context, p openFileParams) error {
 			return api.OpenFile(ctx, p.Wt, p.Path, p.Line)
 		}),
+		"OpenFileFallback": handler.New(func(ctx context.Context, p openFileFallbackParams) error {
+			return api.OpenFileFallback(ctx, p.Wt, p.Path, p.Line, p.Kind)
+		}),
 		"OpenFolder": handler.New(func(ctx context.Context, p openFolderParams) error {
 			return api.OpenFolder(ctx, p.Wt)
 		}),
 		"OpenFolderAt": handler.New(func(ctx context.Context, p openFolderAtParams) error {
 			return api.OpenFolderAt(ctx, p.Path)
 		}),
+		"OpenFolderFallback": handler.New(func(ctx context.Context, p openFolderFallbackParams) error {
+			return api.OpenFolderFallback(ctx, p.Wt, p.Kind)
+		}),
 		"OpenWorktree": handler.New(func(ctx context.Context, p openWorktreeParams) (core.WorktreeInfo, error) {
 			return api.OpenWorktree(ctx, p.Path)
 		}),
+		"PopStash": handler.New(func(ctx context.Context, p popStashParams) error {
+			return api.PopStash(ctx, p.Wt, p.Sha)
+		}),
+		"PruneWorktrees": handler.New(func(ctx context.Context, p pruneWorktreesParams) error {
+			return api.PruneWorktrees(ctx, p.Path)
+		}),
 		"Pull": handler.New(func(ctx context.Context, p pullParams) (string, error) {
 			return api.Pull(ctx, p.Wt, p.Mode)
+		}),
+		"PullWithStash": handler.New(func(ctx context.Context, p pullWithStashParams) (string, error) {
+			return api.PullWithStash(ctx, p.Wt, p.Mode)
 		}),
 		"Push": handler.New(func(ctx context.Context, p pushParams) (string, error) {
 			return api.Push(ctx, p.Wt, p.Remote)
@@ -110,11 +146,20 @@ func handlers(api core.API) handler.Map {
 		"ReloadLog": handler.New(func(ctx context.Context, p reloadLogParams) error {
 			return api.ReloadLog(ctx, p.Wt)
 		}),
+		"RemoveWorktree": handler.New(func(ctx context.Context, p removeWorktreeParams) error {
+			return api.RemoveWorktree(ctx, p.Path, p.Target, p.Force)
+		}),
+		"RenameBranch": handler.New(func(ctx context.Context, p renameBranchParams) error {
+			return api.RenameBranch(ctx, p.Wt, p.Name, p.NewName)
+		}),
 		"Reset": handler.New(func(ctx context.Context, p resetParams) (core.ResetResult, error) {
 			return api.Reset(ctx, p.Wt, p.Sha, p.Mode)
 		}),
 		"Revert": handler.New(func(ctx context.Context, p revertParams) error {
 			return api.Revert(ctx, p.Wt, p.Shas)
+		}),
+		"RevertWith": handler.New(func(ctx context.Context, p revertWithParams) error {
+			return api.RevertWith(ctx, p.Wt, p.Shas, p.Opts)
 		}),
 		"SetEditorProfile": handler.New(func(ctx context.Context, p setEditorProfileParams) error {
 			return api.SetEditorProfile(ctx, p.Profile)
@@ -127,6 +172,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"SetMessageDraft": handler.New(func(ctx context.Context, p setMessageDraftParams) error {
 			return api.SetMessageDraft(ctx, p.Wt, p.Message)
+		}),
+		"SkipOperation": handler.New(func(ctx context.Context, p skipOperationParams) error {
+			return api.SkipOperation(ctx, p.Wt)
 		}),
 		"StageAll": handler.New(func(ctx context.Context, p stageAllParams) error {
 			return api.StageAll(ctx, p.Wt)
@@ -142,6 +190,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"Summary": handler.New(func(ctx context.Context, p summaryParams) (core.Summary, error) {
 			return api.Summary(ctx, p.Wt)
+		}),
+		"TestEditorProfile": handler.New(func(ctx context.Context, p testEditorProfileParams) error {
+			return api.TestEditorProfile(ctx, p.Profile)
 		}),
 		"UncommittedCount": handler.New(func(ctx context.Context, p uncommittedCountParams) (int, error) {
 			return api.UncommittedCount(ctx, p.Wt)

@@ -3,6 +3,7 @@ package jobs
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -31,11 +32,11 @@ type Progress func(percent int, message string)
 // ID identifies one job, unique for its Manager's lifetime.
 type ID string
 
-// Job is one job's current state, JSON-serialisable at the core.API
-// boundary via core.JobInfo (internal/session converts).
+// Job is one job's current state; Info converts it to core.JobInfo.
 type Job struct {
 	ID        ID
 	Kind      string
+	Branch    string // the branch a per-branch job acts on; "" for a repo-wide one
 	State     State
 	Percent   int
 	Message   string
@@ -45,8 +46,7 @@ type Job struct {
 	Result    any       // set from fn's first return value when State ends Done; nil otherwise
 }
 
-// progressInterval throttles progress emission (same value and reasoning as
-// internal/services's own log:progress throttle).
+// progressInterval throttles progress emission.
 const progressInterval = 100 * time.Millisecond
 
 // historyCap bounds finished jobs kept for the UI; a queued or running job
@@ -91,8 +91,14 @@ func NewManager(onUpdate func(Job)) *Manager {
 // fetches of one repo at once only race git's ref locks, so a second one is
 // redundant).
 func (m *Manager) Start(kind string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
+	return m.StartForBranch(kind, "", fn)
+}
+
+// StartForBranch is Start for a job of kind acting on one branch: one such
+// job per branch runs at a time.
+func (m *Manager) StartForBranch(kind, branch string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
 	m.mu.Lock()
-	if id, ok := m.activeKindLocked(kind); ok {
+	if id, ok := m.activeLocked(kind, branch); ok {
 		m.mu.Unlock()
 		return id
 	}
@@ -101,7 +107,7 @@ func (m *Manager) Start(kind string, fn func(ctx context.Context, progress Progr
 	id := ID(strconv.Itoa(m.next))
 	ctx, cancel := context.WithCancel(context.Background())
 	m.jobs[id] = &entry{
-		job:    Job{ID: id, Kind: kind, State: Queued, Percent: -1, StartedAt: time.Now()},
+		job:    Job{ID: id, Kind: kind, Branch: branch, State: Queued, Percent: -1, StartedAt: time.Now()},
 		cancel: cancel,
 	}
 	m.order = append(m.order, id)
@@ -111,11 +117,11 @@ func (m *Manager) Start(kind string, fn func(ctx context.Context, progress Progr
 	return id
 }
 
-// activeKindLocked returns the id of a queued or running job of kind, if
-// any. m.mu must be held.
-func (m *Manager) activeKindLocked(kind string) (ID, bool) {
+// activeLocked returns the id of a queued or running job of kind on
+// branch, if any. m.mu must be held.
+func (m *Manager) activeLocked(kind, branch string) (ID, bool) {
 	for _, id := range m.order {
-		if e := m.jobs[id]; e.job.Kind == kind && !isTerminal(e.job.State) {
+		if e := m.jobs[id]; e.job.Kind == kind && e.job.Branch == branch && !isTerminal(e.job.State) {
 			return id, true
 		}
 	}
@@ -189,14 +195,13 @@ func (m *Manager) trimHistoryLocked() {
 		finished++
 		if finished > historyCap {
 			delete(m.jobs, id)
-			m.order = append(m.order[:i], m.order[i+1:]...)
+			m.order = slices.Delete(m.order, i, i+1)
 		}
 	}
 }
 
 // update applies mutate to id's entry under m.mu and returns its job
-// snapshot; ok is always true in practice — every caller here runs on a
-// job's own goroutine after Start already registered its entry.
+// snapshot; ok is false for an unknown id.
 func (m *Manager) update(id ID, mutate func(*entry)) (Job, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

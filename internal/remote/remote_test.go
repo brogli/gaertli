@@ -16,11 +16,24 @@ import (
 type fake struct {
 	version func() (core.Version, error)
 	sink    core.EventSink
+
+	// paths records the string a RepoPath-taking method last received,
+	// keyed by method name; AddWorktree and RemoveWorktree additionally
+	// record their target under "<method>:target".
+	paths map[string]string
+}
+
+func (f *fake) recordPath(method, path string) {
+	if f.paths == nil {
+		f.paths = map[string]string{}
+	}
+	f.paths[method] = path
 }
 
 func (f *fake) Version(context.Context) (core.Version, error) { return f.version() }
 
-func (f *fake) OpenWorktree(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
+func (f *fake) OpenWorktree(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+	f.recordPath("OpenWorktree", string(path))
 	return core.WorktreeInfo{}, nil
 }
 
@@ -66,6 +79,12 @@ func (f *fake) StageLines(context.Context, core.WorktreeID, string, core.LineSel
 	return nil
 }
 
+func (f *fake) DiscardFile(context.Context, core.WorktreeID, string, bool) error { return nil }
+
+func (f *fake) DiscardLines(context.Context, core.WorktreeID, string, core.LineSelection) error {
+	return nil
+}
+
 func (f *fake) Commit(context.Context, core.WorktreeID, string, bool) error { return nil }
 
 func (f *fake) SetMessageDraft(context.Context, core.WorktreeID, string) error { return nil }
@@ -94,6 +113,14 @@ func (f *fake) DiffRange(context.Context, core.WorktreeID, string, string, strin
 	return core.DiffFile{}, nil
 }
 
+func (f *fake) DiffAgainstWorking(context.Context, core.WorktreeID, string, string, string, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
+func (f *fake) CompareWithWorking(context.Context, core.WorktreeID, string) ([]core.ChangedFile, error) {
+	return nil, nil
+}
+
 func (f *fake) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
 
 func (f *fake) CreateBranch(context.Context, core.WorktreeID, string, string, bool) error {
@@ -112,25 +139,50 @@ func (f *fake) UncommittedCount(context.Context, core.WorktreeID) (int, error) {
 
 func (f *fake) CherryPick(context.Context, core.WorktreeID, []string) error { return nil }
 
+func (f *fake) CherryPickWith(context.Context, core.WorktreeID, []string, core.PickOptions) error {
+	return nil
+}
+
 func (f *fake) Revert(context.Context, core.WorktreeID, []string) error { return nil }
+
+func (f *fake) RevertWith(context.Context, core.WorktreeID, []string, core.PickOptions) error {
+	return nil
+}
 
 func (f *fake) SetEditorProfile(context.Context, core.EditorProfile) error { return nil }
 
+func (f *fake) TestEditorProfile(context.Context, core.EditorProfile) error { return nil }
+
 func (f *fake) OpenFolder(context.Context, core.WorktreeID) error { return nil }
 
-func (f *fake) OpenFolderAt(context.Context, core.RepoPath) error { return nil }
+func (f *fake) OpenFolderAt(_ context.Context, path core.RepoPath) error {
+	f.recordPath("OpenFolderAt", string(path))
+	return nil
+}
 
 func (f *fake) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
 
-func (f *fake) ListWorktrees(context.Context, core.RepoPath) ([]core.Worktree, error) {
+func (f *fake) OpenFolderFallback(context.Context, core.WorktreeID, core.EditorFallbackKind) error {
+	return nil
+}
+
+func (f *fake) OpenFileFallback(context.Context, core.WorktreeID, string, int, core.EditorFallbackKind) error {
+	return nil
+}
+
+func (f *fake) ListWorktrees(_ context.Context, path core.RepoPath) ([]core.Worktree, error) {
+	f.recordPath("ListWorktrees", string(path))
 	return nil, nil
 }
 
-func (f *fake) ListBranches(context.Context, core.RepoPath) ([]core.BranchSummary, error) {
+func (f *fake) ListBranches(_ context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
+	f.recordPath("ListBranches", string(path))
 	return nil, nil
 }
 
-func (f *fake) AddWorktree(context.Context, core.RepoPath, string, string, string, bool) (core.Worktree, error) {
+func (f *fake) AddWorktree(_ context.Context, path core.RepoPath, target, _, _ string, _ bool) (core.Worktree, error) {
+	f.recordPath("AddWorktree", string(path))
+	f.recordPath("AddWorktree:target", target)
 	return core.Worktree{}, nil
 }
 
@@ -144,6 +196,14 @@ func (f *fake) Pull(context.Context, core.WorktreeID, core.PullMode) (string, er
 	return "", nil
 }
 
+func (f *fake) PullWithStash(context.Context, core.WorktreeID, core.PullMode) (string, error) {
+	return "", nil
+}
+
+func (f *fake) PopStash(context.Context, core.WorktreeID, string) error { return nil }
+
+func (f *fake) DropStash(context.Context, core.WorktreeID, string) error { return nil }
+
 func (f *fake) Push(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
 
 func (f *fake) ForcePush(context.Context, core.WorktreeID) (string, error) { return "", nil }
@@ -154,6 +214,23 @@ func (f *fake) UpdateBranch(context.Context, core.WorktreeID, string) (string, e
 func (f *fake) ContinueOperation(context.Context, core.WorktreeID) error { return nil }
 
 func (f *fake) AbortOperation(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) SkipOperation(context.Context, core.WorktreeID) error { return nil }
+
+func (f *fake) RenameBranch(context.Context, core.WorktreeID, string, string) error { return nil }
+
+func (f *fake) DeleteBranch(context.Context, core.WorktreeID, string, bool) error { return nil }
+
+func (f *fake) RemoveWorktree(_ context.Context, path core.RepoPath, target string, _ bool) error {
+	f.recordPath("RemoveWorktree", string(path))
+	f.recordPath("RemoveWorktree:target", target)
+	return nil
+}
+
+func (f *fake) PruneWorktrees(_ context.Context, path core.RepoPath) error {
+	f.recordPath("PruneWorktrees", string(path))
+	return nil
+}
 
 // pipeClient serves f over an in-memory pipe and returns a client on it.
 func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {

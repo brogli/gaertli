@@ -17,8 +17,8 @@ func AssertCode(t testing.TB, err error, want core.Code) {
 // AsError is AssertCode that also returns the *core.Error.
 func AsError(t testing.TB, err error, want core.Code) *core.Error {
 	t.Helper()
-	var ce *core.Error
-	if !errors.As(err, &ce) || ce.Code != want {
+	ce, ok := errors.AsType[*core.Error](err)
+	if !ok || ce.Code != want {
 		t.Fatalf("err = %v, want *core.Error{Code: %s}", err, want)
 	}
 	return ce

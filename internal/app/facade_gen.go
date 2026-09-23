@@ -57,6 +57,14 @@ func (f *Facade) CherryPick(ctx context.Context, wt core.WorktreeID, shas []stri
 	return c.CherryPick(ctx, wt, shas)
 }
 
+func (f *Facade) CherryPickWith(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.CherryPickWith(ctx, wt, shas, opts)
+}
+
 func (f *Facade) CloseWorktree(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -100,6 +108,15 @@ func (f *Facade) CompareCommits(ctx context.Context, wt core.WorktreeID, a strin
 	return c.CompareCommits(ctx, wt, a, b)
 }
 
+func (f *Facade) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha string) ([]core.ChangedFile, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero []core.ChangedFile
+		return zero, err
+	}
+	return c.CompareWithWorking(ctx, wt, sha)
+}
+
 func (f *Facade) ContinueOperation(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -114,6 +131,23 @@ func (f *Facade) CreateBranch(ctx context.Context, wt core.WorktreeID, name stri
 		return err
 	}
 	return c.CreateBranch(ctx, wt, name, start, checkout)
+}
+
+func (f *Facade) DeleteBranch(ctx context.Context, wt core.WorktreeID, name string, force bool) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.DeleteBranch(ctx, wt, name, force)
+}
+
+func (f *Facade) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, force bool) (core.DiffFile, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
+	return c.DiffAgainstWorking(ctx, wt, sha, path, oldPath, force)
 }
 
 func (f *Facade) DiffFile(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, force bool) (core.DiffFile, error) {
@@ -141,6 +175,30 @@ func (f *Facade) DiffWorking(ctx context.Context, wt core.WorktreeID, path strin
 		return zero, err
 	}
 	return c.DiffWorking(ctx, wt, path, oldPath, staged, force)
+}
+
+func (f *Facade) DiscardFile(ctx context.Context, wt core.WorktreeID, path string, untracked bool) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.DiscardFile(ctx, wt, path, untracked)
+}
+
+func (f *Facade) DiscardLines(ctx context.Context, wt core.WorktreeID, path string, sel core.LineSelection) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.DiscardLines(ctx, wt, path, sel)
+}
+
+func (f *Facade) DropStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.DropStash(ctx, wt, sha)
 }
 
 func (f *Facade) Fetch(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
@@ -222,6 +280,14 @@ func (f *Facade) OpenFile(ctx context.Context, wt core.WorktreeID, path string, 
 	return c.OpenFile(ctx, wt, path, line)
 }
 
+func (f *Facade) OpenFileFallback(ctx context.Context, wt core.WorktreeID, path string, line int, kind core.EditorFallbackKind) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.OpenFileFallback(ctx, wt, path, line, kind)
+}
+
 func (f *Facade) OpenFolder(ctx context.Context, wt core.WorktreeID) error {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -238,6 +304,14 @@ func (f *Facade) OpenFolderAt(ctx context.Context, path core.RepoPath) error {
 	return c.OpenFolderAt(ctx, path)
 }
 
+func (f *Facade) OpenFolderFallback(ctx context.Context, wt core.WorktreeID, kind core.EditorFallbackKind) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.OpenFolderFallback(ctx, wt, kind)
+}
+
 func (f *Facade) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 	c, err := f.router.CoreFor(path)
 	if err != nil {
@@ -247,6 +321,22 @@ func (f *Facade) OpenWorktree(ctx context.Context, path core.RepoPath) (core.Wor
 	return c.OpenWorktree(ctx, path)
 }
 
+func (f *Facade) PopStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.PopStash(ctx, wt, sha)
+}
+
+func (f *Facade) PruneWorktrees(ctx context.Context, path core.RepoPath) error {
+	c, err := f.router.CoreFor(path)
+	if err != nil {
+		return err
+	}
+	return c.PruneWorktrees(ctx, path)
+}
+
 func (f *Facade) Pull(ctx context.Context, wt core.WorktreeID, mode core.PullMode) (string, error) {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -254,6 +344,15 @@ func (f *Facade) Pull(ctx context.Context, wt core.WorktreeID, mode core.PullMod
 		return zero, err
 	}
 	return c.Pull(ctx, wt, mode)
+}
+
+func (f *Facade) PullWithStash(ctx context.Context, wt core.WorktreeID, mode core.PullMode) (string, error) {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		var zero string
+		return zero, err
+	}
+	return c.PullWithStash(ctx, wt, mode)
 }
 
 func (f *Facade) Push(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
@@ -290,6 +389,22 @@ func (f *Facade) ReloadLog(ctx context.Context, wt core.WorktreeID) error {
 	return c.ReloadLog(ctx, wt)
 }
 
+func (f *Facade) RemoveWorktree(ctx context.Context, path core.RepoPath, target string, force bool) error {
+	c, err := f.router.CoreFor(path)
+	if err != nil {
+		return err
+	}
+	return c.RemoveWorktree(ctx, path, target, force)
+}
+
+func (f *Facade) RenameBranch(ctx context.Context, wt core.WorktreeID, name string, newName string) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.RenameBranch(ctx, wt, name, newName)
+}
+
 func (f *Facade) Reset(ctx context.Context, wt core.WorktreeID, sha string, mode core.ResetMode) (core.ResetResult, error) {
 	c, err := f.router.CoreOf(wt)
 	if err != nil {
@@ -305,6 +420,14 @@ func (f *Facade) Revert(ctx context.Context, wt core.WorktreeID, shas []string) 
 		return err
 	}
 	return c.Revert(ctx, wt, shas)
+}
+
+func (f *Facade) RevertWith(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.RevertWith(ctx, wt, shas, opts)
 }
 
 func (f *Facade) SetEditorProfile(ctx context.Context, profile core.EditorProfile) error {
@@ -333,6 +456,14 @@ func (f *Facade) SetMessageDraft(ctx context.Context, wt core.WorktreeID, messag
 		return err
 	}
 	return c.SetMessageDraft(ctx, wt, message)
+}
+
+func (f *Facade) SkipOperation(ctx context.Context, wt core.WorktreeID) error {
+	c, err := f.router.CoreOf(wt)
+	if err != nil {
+		return err
+	}
+	return c.SkipOperation(ctx, wt)
 }
 
 func (f *Facade) StageAll(ctx context.Context, wt core.WorktreeID) error {
@@ -375,6 +506,10 @@ func (f *Facade) Summary(ctx context.Context, wt core.WorktreeID) (core.Summary,
 		return zero, err
 	}
 	return c.Summary(ctx, wt)
+}
+
+func (f *Facade) TestEditorProfile(ctx context.Context, profile core.EditorProfile) error {
+	return f.router.Local().TestEditorProfile(ctx, profile)
 }
 
 func (f *Facade) UncommittedCount(ctx context.Context, wt core.WorktreeID) (int, error) {

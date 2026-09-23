@@ -108,13 +108,9 @@ func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
 	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/origin/feature", sha)
 	gittest.Run(t, repo.Dir, "tag", "v1")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt.ID)
+	refs, err := c.Refs(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,13 +142,9 @@ func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
 	linked := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt.ID)
+	refs, err := c.Refs(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,13 +159,9 @@ func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
 
 func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
 	repo := gittest.New(t)
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt.ID)
+	refs, err := c.Refs(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,13 +181,9 @@ func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
 	remoteAppendCommitOnBranch(t, bare, "feature", "remote.txt", "remote", "remote-only")
 	gittest.Run(t, repo.Dir, "fetch", "origin")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt.ID)
+	refs, err := c.Refs(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,13 +204,9 @@ func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
 	gittest.Run(t, bare, "update-ref", "-d", "refs/heads/master")
 	gittest.Run(t, repo.Dir, "fetch", "--prune", "origin")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt.ID)
+	refs, err := c.Refs(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}

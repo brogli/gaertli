@@ -39,6 +39,34 @@ func TestFR_REPO_04_WorktreePollerObservesAWorkingFileEditDirectly(t *testing.T)
 	waitForScope(t, got, Index)
 }
 
+// A second edit to a file already listed as changed leaves git status's
+// output identical; the poll still reports it, so an open diff catches up.
+func TestFR_REPO_04_WorktreePollerSeesAFurtherEditToAnAlreadyChangedFile(t *testing.T) {
+	for _, file := range []string{"seed.txt", "untracked.txt"} {
+		t.Run(file, func(t *testing.T) {
+			repo := gittest.New(t)
+			gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+			path := filepath.Join(repo.Dir, file)
+			if err := os.WriteFile(path, []byte("first edit"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var changes atomic.Int32
+			p := NewWorktreePoller(git.Runner{}, repo.Dir, func(Scope) { changes.Add(1) })
+			defer p.Close()
+			p.CheckNow() // baseline: the file already changed
+
+			if err := os.WriteFile(path, []byte("second, longer edit"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			p.CheckNow()
+
+			if changes.Load() != 1 {
+				t.Errorf("changes reported = %d, want 1", changes.Load())
+			}
+		})
+	}
+}
+
 func TestFR_REPO_04_WorktreePollerBacksOffAfterASlowPollThenResets(t *testing.T) {
 	defer setInterval(&PollInterval, 40*time.Millisecond)()
 

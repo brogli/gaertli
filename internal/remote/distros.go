@@ -9,21 +9,17 @@ import (
 	"unicode/utf16"
 )
 
-// wslPresent reports whether wsl.exe is on PATH (mirrors
-// internal/app/prereq.go's gitPresent()). Gates every WSL action.
+// wslPresent reports whether wsl.exe is on PATH. Gates every WSL action.
 func wslPresent() bool {
 	_, err := exec.LookPath("wsl.exe")
 	return err == nil
 }
 
-// parseDistroList is the pure parser for `wsl --list --verbose`'s output;
-// raw may be UTF-16LE when wsl.exe's stdout is piped. It drops the header
-// line by position (not by matching localized column text), and reads each
-// row from the end — last field VERSION (a digit,
-// locale-safe), second-last STATE (locale text, kept opaque, not used for
-// any decision), everything before that re-joined as NAME (so a
-// space-containing distro name parses correctly). A leading '*' marks
-// Default.
+// parseDistroList parses `wsl --list --verbose`'s output, UTF-16LE when
+// piped. It skips the header line by position, not by its localized text,
+// and reads each row from the end: VERSION last, STATE (localized, unused)
+// second-last, the rest re-joined as NAME, so a name with spaces parses. A
+// leading '*' marks Default.
 func parseDistroList(raw []byte) ([]Distro, error) {
 	lines := strings.Split(decodeWSLText(raw), "\n")
 	var rows []string

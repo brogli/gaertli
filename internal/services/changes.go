@@ -3,10 +3,11 @@ package services
 import (
 	"cmp"
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
@@ -176,9 +177,7 @@ func appendUnmerged(out *core.ChangedFiles, rec string) {
 	out.Conflicted = append(out.Conflicted, core.ChangedFile{Status: f[0], Path: f[9]})
 }
 
-// DiffWorking implements core.API. The staged case is a thin wrapper over
-// DiffFile's own diffSides: HEAD and the index are both git objects, so
-// only the two revision strings differ from DiffFile's sha^/sha pair.
+// DiffWorking implements core.API.
 func (c *Core) DiffWorking(ctx context.Context, id core.WorktreeID, path, oldPath string, staged, force bool) (core.DiffFile, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -186,7 +185,7 @@ func (c *Core) DiffWorking(ctx context.Context, id core.WorktreeID, path, oldPat
 	}
 	old := cmp.Or(oldPath, path)
 	if !staged {
-		return diffWorkingTree(ctx, wt.Runner, wt.Path, path, old, force)
+		return diffWorkingTree(ctx, wt.Runner, wt.Path, path, oldSide{path: old}, force)
 	}
 
 	spec := diffSidesSpec{
@@ -199,28 +198,36 @@ func (c *Core) DiffWorking(ctx context.Context, id core.WorktreeID, path, oldPat
 	return diffSides(ctx, wt.Runner, wt.Path, spec)
 }
 
-// diffWorkingTree handles DiffWorking's !staged path: the index (or
-// nothing, for an untracked file) against the literal working-tree file,
-// which is not a git object until staged, so it is read straight off disk
-// rather than via cat-file — the one place in this codebase where a diff
-// side isn't a git object. Mirrors diffSides' size-cap -> binary-check ->
-// content-fetch -> UTF-8-check shape.
-func diffWorkingTree(ctx context.Context, r git.Runner, dir, path, indexPath string, force bool) (core.DiffFile, error) {
-	oldSize, oldMissing, err := indexBlobSize(ctx, r, dir, indexPath)
+// oldSide is a working-tree diff's old side: the index (sha "") or a commit.
+type oldSide struct {
+	sha, path string
+}
+
+// rev is the old side's git revision: ":<path>" for the index,
+// "<sha>:<path>" for a commit.
+func (o oldSide) rev() string {
+	return o.sha + ":" + o.path
+}
+
+// diffWorkingTree is diffSides for a diff whose new side is the working-tree
+// file, read off disk: it is not a git object until staged.
+func diffWorkingTree(ctx context.Context, r git.Runner, dir, path string, old oldSide, force bool) (core.DiffFile, error) {
+	sizes, err := objectSizes(ctx, r, dir, old.rev())
 	if err != nil {
 		return core.DiffFile{}, err
 	}
+	oldMissing := sizes[0].missing
 	full := filepath.Join(dir, path)
-	info, err := os.Stat(full)
+	newSize, err := workingFileSize(full)
 	if err != nil {
 		return core.DiffFile{}, core.Errorf(core.Internal, "stat %s: %v", path, err)
 	}
 
-	if !force && (oldSize > maxDiffFileSize || info.Size() > maxDiffFileSize) {
+	if !force && (sizes[0].size > maxDiffFileSize || newSize > maxDiffFileSize) {
 		return core.DiffFile{Path: path, TooLarge: true}, nil
 	}
 
-	binary, err := diffWorkingIsBinary(ctx, r, dir, path, oldMissing)
+	binary, err := diffWorkingIsBinary(ctx, r, dir, path, oldMissing, old)
 	if err != nil {
 		return core.DiffFile{}, err
 	}
@@ -229,65 +236,46 @@ func diffWorkingTree(ctx context.Context, r git.Runner, dir, path, indexPath str
 	}
 
 	newContent, err := os.ReadFile(full)
-	if err != nil {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return core.DiffFile{}, core.Errorf(core.Internal, "read %s: %v", path, err)
 	}
 	var oldContent []byte
 	if !oldMissing {
-		if oldContent, err = indexBlobContent(ctx, r, dir, indexPath); err != nil {
+		blobs, err := objectContents(ctx, r, dir, old.rev())
+		if err != nil {
 			return core.DiffFile{}, err
 		}
+		oldContent = blobs[0]
 	}
-	if !utf8.Valid(oldContent) || !utf8.Valid(newContent) {
-		return core.DiffFile{Path: path, Binary: true}, nil
-	}
-	return core.DiffFile{Path: path, OldContent: string(oldContent), NewContent: string(newContent)}, nil
+	return contentDiff("", path, oldContent, newContent), nil
 }
 
-// indexBlobSize is diffBlobSizes' single-object counterpart, for the index
-// side of a working-tree diff alone.
-func indexBlobSize(ctx context.Context, r git.Runner, dir, path string) (size int64, missingEntirely bool, err error) {
-	result, err := r.Run(ctx, git.Call{
-		Dir: dir, ReadOnly: true,
-		Args: []string{"cat-file", "--batch-check=%(objectsize)"}, Stdin: []byte(":" + path + "\n"),
-	})
+// workingFileSize is the size of the working-tree file at full; 0 for a
+// deleted file, whose new side is empty.
+func workingFileSize(full string) (int64, error) {
+	info, err := os.Stat(full)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
 	if err != nil {
-		return 0, false, err
+		return 0, err
 	}
-	line := strings.TrimRight(string(result.Stdout), "\n")
-	if missing(line) {
-		return 0, true, nil
-	}
-	size, err = blobSize(line)
-	return size, false, err
+	return info.Size(), nil
 }
 
-// indexBlobContent is diffBlobContent's single-object counterpart, for the
-// index side of a working-tree diff alone.
-func indexBlobContent(ctx context.Context, r git.Runner, dir, path string) ([]byte, error) {
-	result, err := r.Run(ctx, git.Call{
-		Dir: dir, ReadOnly: true,
-		Args: []string{"cat-file", "--batch"}, Stdin: []byte(":" + path + "\n"),
-	})
-	if err != nil {
-		return nil, err
-	}
-	blobs, err := parseCatFileBatch(result.Stdout, 1)
-	if err != nil {
-		return nil, err
-	}
-	return blobs[0], nil
-}
-
-// diffWorkingIsBinary classifies path the way git itself would: an
-// index-tracked path compares index to worktree exactly like diffIsBinary's
-// own git diff shape (always exits 0); an untracked path has no index side
-// to compare against, so it diffs against /dev/null via --no-index — the
-// one call in this codebase that exits 1 on a real difference, tolerated
-// the same way resolveHeadSHA (repo.go) tolerates an expected exit 1.
-func diffWorkingIsBinary(ctx context.Context, r git.Runner, dir, path string, untracked bool) (bool, error) {
-	if !untracked {
-		return numstatIsBinary(ctx, r, dir, "", path, "diff", "--numstat", "-z", "-M")
+// diffWorkingIsBinary asks git whether path is binary: against the index
+// (old.sha "") or a commit, both vs. the working tree. The pathspec names
+// old.path too, so -M still pairs a rename; without it, a binary old side
+// renamed to a text file would read as a text add. A path missing from the
+// old side (untracked, or added since sha) diffs against /dev/null with
+// --no-index, which exits 1 on any difference.
+func diffWorkingIsBinary(ctx context.Context, r git.Runner, dir, path string, oldMissing bool, old oldSide) (bool, error) {
+	if !oldMissing {
+		args := []string{"diff", "--numstat", "-z", "-M"}
+		if old.sha != "" {
+			args = append(args, "--end-of-options", old.sha)
+		}
+		return numstatIsBinary(ctx, r, dir, old.path, path, args...)
 	}
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,

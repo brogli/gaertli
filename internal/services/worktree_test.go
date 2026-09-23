@@ -227,6 +227,41 @@ func TestFR_WT_02_AddWorktreeCreatesANewBranchFromAGivenStart(t *testing.T) {
 	}
 }
 
+func TestFR_WT_02_AddWorktreeWithANewBranchAndNoStartBranchesFromHEAD(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	head := gittest.HeadSHA(t, repo.Dir)
+	target := filepath.Join(t.TempDir(), "wt")
+
+	c := New(func(core.Event) {})
+	if _, err := c.AddWorktree(context.Background(), core.RepoPath(repo.Dir), target, "fresh", "", true); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := gittest.HeadSHA(t, target); got != head {
+		t.Errorf("new worktree HEAD = %s, want the repo's HEAD %s", got, head)
+	}
+}
+
+func TestFR_WT_02_AddWorktreeIntoAFolderWithFilesCreatesNoBranch(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	target := t.TempDir()
+	if err := os.WriteFile(filepath.Join(target, "existing.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(func(core.Event) {})
+	_, err := c.AddWorktree(context.Background(), core.RepoPath(repo.Dir), target, "stray", "", true)
+
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("AddWorktree err = %v, want an \"already exists\" refusal", err)
+	}
+	if out := gittest.Out(t, repo.Dir, "branch", "--list", "stray"); out != "" {
+		t.Errorf("branch list = %q, want no stray branch", out)
+	}
+}
+
 func TestFR_WT_02_AddWorktreeRejectsAnInvalidNewBranchNameBeforeTouchingGit(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -307,6 +342,148 @@ func TestFR_WT_03_AddWorktreeCreatesTheTargetsMissingParentDirectory(t *testing.
 	if _, statErr := os.Stat(target); statErr != nil {
 		t.Errorf("target %s missing: %v (git should have created its own parent directory)", target, statErr)
 	}
+}
+
+func TestFR_WT_07_RemoveWorktreeRemovesACleanLinkedWorktree(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	target := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
+
+	c := New(func(core.Event) {})
+	if err := c.RemoveWorktree(context.Background(), core.RepoPath(repo.Dir), target, false); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := c.ListWorktrees(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, wt := range got {
+		if wt.Path == target {
+			t.Errorf("worktrees = %+v, want %s gone", got, target)
+		}
+	}
+}
+
+func TestFR_WT_07_RemoveWorktreeRefusesADirtyWorktreeAsCodeDirtyWorktree(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	target := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
+	if err := os.WriteFile(filepath.Join(target, "seed.txt"), []byte("changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(func(core.Event) {})
+	err := c.RemoveWorktree(context.Background(), core.RepoPath(repo.Dir), target, false)
+
+	ce := coretest.AsError(t, err, core.DirtyWorktree)
+	if !strings.Contains(ce.GitStderr, "contains modified or untracked files") {
+		t.Errorf("GitStderr = %q, want git's own dirty-worktree message", ce.GitStderr)
+	}
+	if _, statErr := os.Stat(target); statErr != nil {
+		t.Errorf("worktree %s missing: %v, want still present", target, statErr)
+	}
+	if got := readFile(t, target, "seed.txt"); got != "changed" {
+		t.Errorf("seed.txt = %q, want unchanged %q", got, "changed")
+	}
+}
+
+func TestFR_WT_07_RemoveWorktreeForcedRemovesADirtyWorktree(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	target := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
+	if err := os.WriteFile(filepath.Join(target, "seed.txt"), []byte("changed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(func(core.Event) {})
+	if err := c.RemoveWorktree(context.Background(), core.RepoPath(repo.Dir), target, true); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
+		t.Errorf("worktree %s = %v, want removed", target, statErr)
+	}
+}
+
+func TestFR_WT_07_RemoveWorktreeRefusesALockedWorktreeEvenForced(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	target := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
+	gittest.Run(t, repo.Dir, "worktree", "lock", target)
+
+	c := New(func(core.Event) {})
+	err := c.RemoveWorktree(context.Background(), core.RepoPath(repo.Dir), target, true)
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if !strings.Contains(ce.GitStderr, "cannot remove a locked working tree") {
+		t.Errorf("GitStderr = %q, want git's own locked-worktree message", ce.GitStderr)
+	}
+	if _, statErr := os.Stat(target); statErr != nil {
+		t.Errorf("worktree %s missing: %v, want still present", target, statErr)
+	}
+}
+
+func TestFR_WT_07_RemoveWorktreeRemovesAMissingWorktreeWithNoForce(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	target := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", target, gittest.HeadSHA(t, repo.Dir))
+	if err := os.RemoveAll(target); err != nil {
+		t.Fatal(err)
+	}
+
+	c := New(func(core.Event) {})
+	if err := c.RemoveWorktree(context.Background(), core.RepoPath(repo.Dir), target, false); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := c.ListWorktrees(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, wt := range got {
+		if wt.Path == target {
+			t.Errorf("worktrees = %+v, want %s gone", got, target)
+		}
+	}
+}
+
+func TestFR_WT_07_PruneWorktreesRemovesOnlyMissingEntries(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	sha := gittest.HeadSHA(t, repo.Dir)
+	missing := filepath.Join(t.TempDir(), "missing")
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", missing, sha)
+	if err := os.RemoveAll(missing); err != nil {
+		t.Fatal(err)
+	}
+	clean := filepath.Join(t.TempDir(), "clean")
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", clean, sha)
+
+	c := New(func(core.Event) {})
+	if err := c.PruneWorktrees(context.Background(), core.RepoPath(repo.Dir)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := c.ListWorktrees(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, wt := range got {
+		if wt.Path == missing {
+			t.Errorf("worktrees = %+v, want %s pruned away", got, missing)
+		}
+	}
+	findWorktree(t, got, clean) // still present, fails the test if not
 }
 
 // findBranchSummary returns the entry of branches named name, failing t if

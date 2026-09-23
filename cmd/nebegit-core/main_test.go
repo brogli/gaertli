@@ -97,6 +97,26 @@ func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
 	}
 }
 
+// TestQA_INST_03_LdflagsStampAppVersion proves the release build's version
+// stamping mechanism: -ldflags -X into buildinfo.App, surfaced by --version.
+func TestQA_INST_03_LdflagsStampAppVersion(t *testing.T) {
+	stamped := filepath.Join(t.TempDir(), "nebegit-core-stamped")
+	build := exec.Command("go", "build",
+		"-ldflags", "-X github.com/brogli/nebegit/internal/buildinfo.App=v9.9.9",
+		"-o", stamped, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, output)
+	}
+
+	out, err := exec.Command(stamped, "--version").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out, []byte("v9.9.9\n")) {
+		t.Errorf("--version printed %q, want %q", out, "v9.9.9\n")
+	}
+}
+
 // TestADR_3_UnknownArgumentExits2 uses a flag-shaped bad argument: a bare
 // word is a legitimate path (launch mode), so "bogus" alone would not reach
 // usage().

@@ -44,8 +44,7 @@ func validateBranchName(ctx context.Context, r git.Runner, dir, name string) err
 		Dir: dir, ReadOnly: true,
 		Args: []string{"check-ref-format", "--branch", name}, // safe without a -- of its own
 	})
-	var ce *core.Error
-	if errors.As(err, &ce) {
+	if ce, ok := errors.AsType[*core.Error](err); ok {
 		ce.Code = core.InvalidName
 		ce.Message = fmt.Sprintf("%q is not a valid branch name", name)
 	}
@@ -90,7 +89,7 @@ func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha string, mode c
 	wt.Lock() // reset writes this worktree's index/files
 	defer wt.Unlock()
 
-	previous, err := resolveHeadSHA(ctx, wt.Runner, wt.Path) // "" only for an unborn HEAD
+	previous, err := verifyRev(ctx, wt.Runner, wt.Path, "HEAD") // "" only for an unborn HEAD
 	if err != nil {
 		return core.ResetResult{}, err
 	}
@@ -119,9 +118,8 @@ func (c *Core) UncommittedCount(ctx context.Context, id core.WorktreeID) (int, e
 	return bytes.Count(result.Stdout, []byte{0}), nil
 }
 
-// resetFlag maps mode to reset's own flag. mode is a closed UI choice,
-// never free text, so an unrecognised value is this app's own bug: Code
-// Internal, not git's failure.
+// resetFlag maps mode to reset's flag. An unknown mode is a caller bug: Code
+// Internal.
 func resetFlag(mode core.ResetMode) (string, error) {
 	switch mode {
 	case core.ResetSoft:
@@ -130,6 +128,8 @@ func resetFlag(mode core.ResetMode) (string, error) {
 		return "--mixed", nil
 	case core.ResetHard:
 		return "--hard", nil
+	case core.ResetKeep:
+		return "--keep", nil
 	default:
 		return "", core.Errorf(core.Internal, "unknown reset mode %q", mode)
 	}
@@ -142,10 +142,54 @@ func resetFlag(mode core.ResetMode) (string, error) {
 // already checked out elsewhere) stays plain GitFailed with git's own
 // message.
 func remapDirty(err error, result git.Result) error {
-	if gitExited(err, result, 1) {
-		var ce *core.Error
-		errors.As(err, &ce)
+	if ce := gitFailure(err); ce != nil && result.ExitCode == 1 {
 		ce.Code = core.DirtyWorktree
+	}
+	return err
+}
+
+// RenameBranch implements core.API.
+func (c *Core) RenameBranch(ctx context.Context, id core.WorktreeID, name, newName string) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := validateBranchName(ctx, wt.Runner, wt.Path, newName); err != nil {
+		return err
+	}
+
+	wt.Repo.Lock() // branch rename is a repo-wide one-off
+	defer wt.Repo.Unlock()
+
+	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"branch", "-m", "--", name, newName}})
+	return err
+}
+
+// DeleteBranch implements core.API.
+func (c *Core) DeleteBranch(ctx context.Context, id core.WorktreeID, name string, force bool) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	flag := "-d"
+	if force {
+		flag = "-D"
+	}
+
+	wt.Repo.Lock() // branch delete is a repo-wide one-off
+	defer wt.Repo.Unlock()
+
+	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"branch", flag, "--", name}})
+	return remapUnmerged(err, result)
+}
+
+// remapUnmerged reclassifies -d's "not fully merged" refusal as Code
+// Unmerged, so the caller can offer a forced retry. Every other exit-1
+// refusal ("used by worktree") stays plain GitFailed: forcing does not fix
+// that one.
+func remapUnmerged(err error, result git.Result) error {
+	if ce := gitFailure(err); ce != nil && result.ExitCode == 1 && bytes.Contains(result.Stderr, []byte("is not fully merged")) {
+		ce.Code = core.Unmerged
 	}
 	return err
 }

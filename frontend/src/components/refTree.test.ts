@@ -21,4 +21,21 @@ describe('buildRefTree', () => {
     expect(main?.children).toBeUndefined()
     expect(main?.data?.sha).toBe('sha-main')
   })
+
+  it('FR-UX-06 marks a childless node as a leaf', () => {
+    const tree = buildRefTree([{ name: 'main', sha: 'sha-main' }])
+
+    expect(tree[0]?.leaf).toBe(true)
+  })
+
+  it('FR-UX-06 leaves a folder node unmarked, marking only its leaf children', () => {
+    const tree = buildRefTree([
+      { name: 'feature/a', sha: 'sha-a' },
+      { name: 'feature/b', sha: 'sha-b' },
+    ])
+
+    const feature = tree[0]!
+    expect(feature.leaf).toBeFalsy()
+    expect(feature.children?.every((child) => child.leaf)).toBe(true)
+  })
 })

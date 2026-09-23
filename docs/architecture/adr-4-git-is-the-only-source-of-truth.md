@@ -1,7 +1,22 @@
 # ADR-4: Git is the only source of truth
 
-- No index, database, or on-disk cache of repo data. The core binary copied into a WSL distro is program code, not repo data.
-- In memory: commit list, graph rows, ref map, last status. All droppable and rebuildable.
-- On disk: settings only (recent repos, preferences, last pull mode).
+Status: accepted
 
-- Exception (2026-09-21, owner decision): git's own rebuildable maintenance files are not app state. nebegit may run `git commit-graph write --reachable` on the first open of a large repo; the file lives in `.git/objects/info/`, git maintains and rebuilds it itself, and its absence changes nothing but speed (measured: first log row 280 ms → 63 ms, peak RSS −35 % on a 100k-commit repo).
+## Context
+
+nebegit runs beside a terminal and an editor that change the repo at any time. Any state the app keeps about a repo can go stale, and a stale view in a git tool leads to wrong actions (G4).
+
+## Decision
+
+- No index, database or on-disk cache of repo data.
+- In memory only: the commit list, graph rows, ref map and last status. All of it can be dropped and rebuilt.
+- On disk, only settings: recent repos, preferences, the last pull mode.
+- The core binary copied into a WSL distro is program code, not repo data.
+
+One exception: git's own rebuildable maintenance files do not count as app state. On the first open of a large repo, nebegit may run `git commit-graph write --reachable`. The file lives in `.git/objects/info/`, git maintains it itself, and its absence changes nothing but speed. On a 100k-commit repo it cut time to the first log row from 280 ms to 63 ms and peak memory by 35 %.
+
+## Consequences
+
+- After any outside change, a reload from git is always correct. Change detection (`git-mapping.md`) only has to decide *when* to reload.
+- A crashed or restarted core, such as a WSL core after `wsl --shutdown`, loses nothing.
+- Every view pays for its first load. The log is streamed so the first rows show at once (ADR-5).

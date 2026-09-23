@@ -3,10 +3,12 @@ package services
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -81,6 +83,27 @@ func TestFR_LOG_01_ParseLogRecordParsesFieldsAndRefs(t *testing.T) {
 	}
 }
 
+func TestFR_CP_08_ParseLogRecordMarksAMultiParentCommitAsMerge(t *testing.T) {
+	oneParent := "2222222222222222222222222222222222222222\x1f2222222\x1f1111111111111111111111111111111111111111\x1fBob\x1f1700000100\x1f\x1fFeature work"
+	twoParents := "3333333333333333333333333333333333333333\x1f3333333\x1f1111111111111111111111111111111111111111 2222222222222222222222222222222222222222\x1fBob\x1f1700000200\x1f\x1fMerge branch"
+
+	commit, _, err := parseLogRecord([]byte(oneParent))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commit.Merge {
+		t.Error("Merge = true for a one-parent commit, want false")
+	}
+
+	commit, _, err = parseLogRecord([]byte(twoParents))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !commit.Merge {
+		t.Error("Merge = false for a two-parent commit, want true")
+	}
+}
+
 func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 	repo := gittest.New(t)
 	commitOrphan(t, repo.Dir, "main", "a.txt", "a")
@@ -91,15 +114,11 @@ func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 	}
 	gittest.Run(t, repo.Dir, "stash")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.LoadLog(context.Background(), wt); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
-		t.Fatal(err)
-	}
-	rows := waitForLog(t, c, wt.ID)
+	rows := waitForLog(t, c, wt)
 
 	subjects := map[string]bool{}
 	for _, r := range rows {
@@ -117,12 +136,8 @@ func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 
 func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T) {
 	repo := gittest.New(t)
-	c := New(func(core.Event) {})
-	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wt, err := c.sessions.Get(info.ID)
+	c, id := openWorktree(t, repo.Dir)
+	wt, err := c.sessions.Get(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,14 +150,14 @@ func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T
 	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500")
 	wt.Runner.Git = fakegit
 
-	if err := c.LoadLog(context.Background(), info.ID); err != nil {
+	if err := c.LoadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
 
 	var res core.LogRowsResult
 	deadline := time.Now().Add(400 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		res, err = c.LogRows(context.Background(), info.ID, 0, 1)
+		res, err = c.LogRows(context.Background(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -162,7 +177,7 @@ func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T
 		t.Fatalf("Rows = %d, want exactly 1", len(res.Rows))
 	}
 
-	waitForLog(t, c, info.ID) // drain the background stream so it doesn't leak noise into later tests
+	waitForLog(t, c, id) // drain the background stream so it doesn't leak noise into later tests
 }
 
 func TestADR_5_LogRowsGraphIsPopulatedFromLoad(t *testing.T) {
@@ -175,15 +190,11 @@ func TestADR_5_LogRowsGraphIsPopulatedFromLoad(t *testing.T) {
 	gittest.Run(t, repo.Dir, "switch", "master")
 	_, _ = (git.Runner{}).Run(context.Background(), git.Call{Dir: repo.Dir, Args: []string{"merge", "--no-ff", "-m", "merge side", "side"}})
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.LoadLog(context.Background(), wt); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
-		t.Fatal(err)
-	}
-	rows := waitForLog(t, c, wt.ID)
+	rows := waitForLog(t, c, wt)
 
 	if len(rows) != 4 {
 		t.Fatalf("rows = %d, want 4 (base, on main, on side, merge side)", len(rows))
@@ -213,15 +224,11 @@ func TestFR_LOG_10_LoadLogMarksCheckedOutWorktrees(t *testing.T) {
 	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
 	gittest.Run(t, repo.Dir, "switch", "--detach", older)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.LoadLog(context.Background(), wt); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
-		t.Fatal(err)
-	}
-	rows := waitForLog(t, c, wt.ID)
+	rows := waitForLog(t, c, wt)
 
 	byMsg := map[string]core.LogCommit{}
 	for _, r := range rows {
@@ -239,26 +246,22 @@ func TestFR_REPO_04_ReloadLogNoOpsWhenTipsUnchanged(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
-	c := New(func(core.Event) {})
-	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, id := openWorktree(t, repo.Dir)
+	if err := c.LoadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.LoadLog(context.Background(), info.ID); err != nil {
-		t.Fatal(err)
-	}
-	waitForLog(t, c, info.ID)
-	beforeCalls := countCommands(t, c, info.ID, "git log ")
-	beforeGen := logGeneration(t, c, info.ID)
+	waitForLog(t, c, id)
+	beforeCalls := countCommands(t, c, id, "git log ")
+	beforeGen := logGeneration(t, c, id)
 
-	if err := c.ReloadLog(context.Background(), info.ID); err != nil {
+	if err := c.ReloadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := countCommands(t, c, info.ID, "git log "); got != beforeCalls {
+	if got := countCommands(t, c, id, "git log "); got != beforeCalls {
 		t.Errorf("git log calls = %d, want unchanged from %d", got, beforeCalls)
 	}
-	if got := logGeneration(t, c, info.ID); got != beforeGen {
+	if got := logGeneration(t, c, id); got != beforeGen {
 		t.Errorf("Generation = %d, want unchanged (%d)", got, beforeGen)
 	}
 }
@@ -267,25 +270,21 @@ func TestFR_REPO_04_ReloadLogRestartsWhenARefMoved(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
-	c := New(func(core.Event) {})
-	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, id := openWorktree(t, repo.Dir)
+	if err := c.LoadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.LoadLog(context.Background(), info.ID); err != nil {
-		t.Fatal(err)
-	}
-	waitForLog(t, c, info.ID)
-	beforeGen := logGeneration(t, c, info.ID)
+	waitForLog(t, c, id)
+	beforeGen := logGeneration(t, c, id)
 
 	gittest.Run(t, repo.Dir, "branch", "feature")
 
-	if err := c.ReloadLog(context.Background(), info.ID); err != nil {
+	if err := c.ReloadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	rows := waitForLog(t, c, info.ID)
+	rows := waitForLog(t, c, id)
 
-	if got := logGeneration(t, c, info.ID); got == beforeGen {
+	if got := logGeneration(t, c, id); got == beforeGen {
 		t.Errorf("Generation = %d, want incremented from %d", got, beforeGen)
 	}
 	if !hasRefLabel(rows, "feature") {
@@ -298,26 +297,74 @@ func TestFR_REPO_04_ReloadLogRestartsWhenOnlyHEADsTargetChanged(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Run(t, repo.Dir, "branch", "feature")
 
-	c := New(func(core.Event) {})
-	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, id := openWorktree(t, repo.Dir)
+	if err := c.LoadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.LoadLog(context.Background(), info.ID); err != nil {
-		t.Fatal(err)
-	}
-	waitForLog(t, c, info.ID)
-	beforeGen := logGeneration(t, c, info.ID)
+	waitForLog(t, c, id)
+	beforeGen := logGeneration(t, c, id)
 
 	gittest.Run(t, repo.Dir, "switch", "feature") // no new commit: only HEAD's target ref changes
 
-	if err := c.ReloadLog(context.Background(), info.ID); err != nil {
+	if err := c.ReloadLog(context.Background(), id); err != nil {
 		t.Fatal(err)
 	}
-	waitForLog(t, c, info.ID)
+	waitForLog(t, c, id)
 
-	if got := logGeneration(t, c, info.ID); got == beforeGen {
+	if got := logGeneration(t, c, id); got == beforeGen {
 		t.Errorf("Generation = %d, want incremented from %d", got, beforeGen)
+	}
+}
+
+// A reload that keeps the commit set (a tag added on HEAD) still replaces
+// the rows: its log:progress names the new generation, so a window knows
+// to drop the rows it cached.
+func TestFR_REPO_04_ReloadLogProgressNamesTheNewGeneration(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	progress := make(chan core.LogProgress, 100)
+	c := New(func(ev core.Event) {
+		var p core.LogProgress
+		if ev.Name == "log:progress" && json.Unmarshal(ev.Payload, &p) == nil {
+			progress <- p
+		}
+	})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+	loaded := nextDone(t, progress)
+
+	gittest.Run(t, repo.Dir, "tag", "v1")
+	if err := c.ReloadLog(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+	reloaded := nextDone(t, progress)
+
+	if reloaded.Generation == loaded.Generation {
+		t.Errorf("reload's Generation = %d, want it to differ from the first load's", reloaded.Generation)
+	}
+	if got := logGeneration(t, c, wt.ID); reloaded.Generation != got {
+		t.Errorf("reload's Generation = %d, want LogRows' %d", reloaded.Generation, got)
+	}
+}
+
+// nextDone reads progress until a done event arrives.
+func nextDone(t *testing.T, progress <-chan core.LogProgress) core.LogProgress {
+	t.Helper()
+	timeout := time.After(5 * time.Second)
+	for {
+		select {
+		case p := <-progress:
+			if p.Done {
+				return p
+			}
+		case <-timeout:
+			t.Fatal("no done log:progress in time")
+		}
 	}
 }
 
@@ -327,22 +374,18 @@ func TestFR_LOG_01_LogIndexOfFindsRowBySHA(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "second")
 	gittest.Commit(t, repo.Dir, "c.txt", "c", "third")
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.LoadLog(context.Background(), wt); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
-		t.Fatal(err)
-	}
-	rows := waitForLog(t, c, wt.ID)
+	rows := waitForLog(t, c, wt)
 
 	byMsg := map[string]core.LogCommit{}
 	for _, r := range rows {
 		byMsg[r.Subject] = r
 	}
 
-	got, err := c.LogIndexOf(context.Background(), wt.ID, byMsg["second"].SHA)
+	got, err := c.LogIndexOf(context.Background(), wt, byMsg["second"].SHA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +393,7 @@ func TestFR_LOG_01_LogIndexOfFindsRowBySHA(t *testing.T) {
 		t.Errorf("LogIndexOf(second) = %+v, want {Index:1, Found:true}", got)
 	}
 
-	missing, err := c.LogIndexOf(context.Background(), wt.ID, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+	missing, err := c.LogIndexOf(context.Background(), wt, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,6 +512,93 @@ func buildLogFixture(n int) []byte {
 	return buf.Bytes()
 }
 
+// A window opened on a repo whose log another window already loaded
+// learns the row count from log:progress like the first one did.
+func TestFR_LOG_01_LoadLogOnALoadedRepoReemitsItsProgress(t *testing.T) {
+	repo := gittest.New(t)
+	commitOrphan(t, repo.Dir, "main", "a.txt", "a")
+	commitOrphan(t, repo.Dir, "feature", "b.txt", "b")
+	var mu sync.Mutex
+	var progress []core.LogProgress
+	c := New(func(ev core.Event) {
+		if ev.Name != "log:progress" {
+			return
+		}
+		var p core.LogProgress
+		_ = json.Unmarshal(ev.Payload, &p)
+		mu.Lock()
+		progress = append(progress, p)
+		mu.Unlock()
+	})
+	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitForLog(t, c, wt.ID)
+	mu.Lock()
+	progress = nil
+	mu.Unlock()
+
+	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if want := (core.LogProgress{Loaded: 2, Done: true}); len(progress) != 1 || progress[0] != want {
+		t.Errorf("progress after the second LoadLog = %+v, want [%+v]", progress, want)
+	}
+}
+
+// The log is loaded once per repo; HEAD is per worktree, so each window's
+// rows carry the HEAD label on its own worktree's HEAD commit.
+func TestFR_LOG_01_LogRowsPlaceHEADOnTheAskingWorktreesHead(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "a")
+	gittest.Run(t, repo.Dir, "branch", "side")
+	gittest.Commit(t, repo.Dir, "a.txt", "a2", "a2")
+	linked := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "side")
+
+	c := New(func(core.Event) {})
+	mainWt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedWt, err := c.OpenWorktree(context.Background(), core.RepoPath(linked))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.LoadLog(context.Background(), mainWt.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitForLog(t, c, mainWt.ID)
+
+	for _, tc := range []struct {
+		id   core.WorktreeID
+		want string
+	}{{mainWt.ID, "a2"}, {linkedWt.ID, "a"}} {
+		res, err := c.LogRows(context.Background(), tc.id, 0, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var heads []string
+		for _, row := range res.Rows {
+			for _, ref := range row.Refs {
+				if ref.Kind == "head" {
+					heads = append(heads, row.Subject)
+				}
+			}
+		}
+		if len(heads) != 1 || heads[0] != tc.want {
+			t.Errorf("worktree %s: HEAD labels on %v, want only on %q", tc.id, heads, tc.want)
+		}
+	}
+}
+
 func waitForLog(t *testing.T, c *Core, id core.WorktreeID) []core.LogCommit {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -502,24 +632,20 @@ func commitOrphan(t *testing.T, dir, branch, file, msg string) {
 
 func TestFR_UX_02_AppDrivenReadsAreBackgroundCommands(t *testing.T) {
 	repo := gittest.New(t)
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.LoadLog(context.Background(), wt); err != nil {
+		t.Fatal(err)
+	}
+	waitForLog(t, c, wt)
+	if _, err := c.Summary(context.Background(), wt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Refs(context.Background(), wt); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := c.LoadLog(context.Background(), wt.ID); err != nil {
-		t.Fatal(err)
-	}
-	waitForLog(t, c, wt.ID)
-	if _, err := c.Summary(context.Background(), wt.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := c.Refs(context.Background(), wt.ID); err != nil {
-		t.Fatal(err)
-	}
-
-	entries, err := c.CommandLog(context.Background(), wt.ID)
+	entries, err := c.CommandLog(context.Background(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}

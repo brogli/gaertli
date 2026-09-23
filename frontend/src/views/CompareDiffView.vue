@@ -4,6 +4,7 @@ import { Events, Window } from '@wailsio/runtime'
 import { onKeyStroke } from '@vueuse/core'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { useCoreCall } from '../composables/useCoreCall'
+import { useOpenInEditor } from '../composables/useOpenInEditor'
 import ErrorBanner from '../components/ErrorBanner.vue'
 import ChangedFileList from '../components/ChangedFileList.vue'
 import DiffView from '../components/DiffView.vue'
@@ -17,6 +18,7 @@ const props = defineProps<{ wt: string; from: string; to: string; path: string; 
 const files = ref<ChangedFile[]>([])
 const current = ref({ path: props.path, oldPath: props.oldPath })
 const { error, run } = useCoreCall()
+const { openEditor, openEditorFallback } = useOpenInEditor(() => props.wt, run)
 
 onMounted(() => {
   void run(async () => {
@@ -32,10 +34,6 @@ function selectFile(f: ChangedFile): void {
 }
 function onUpdateRange(r: { path: string; oldPath: string }): void {
   current.value = { path: r.path, oldPath: r.oldPath }
-}
-
-function openEditor(f: ChangedFile): void {
-  void run(() => Facade.OpenFile(props.wt, f.path, 0))
 }
 
 // "compare:show-file" retargets this window to a newly double-clicked file
@@ -55,7 +53,7 @@ onKeyStroke('Escape', () => void Window.Close())
 
 <template>
   <div class="compare-diff-window">
-    <ErrorBanner v-if="error" :error="error" />
+    <ErrorBanner v-if="error" :error="error" @fallback="openEditorFallback" />
     <aside class="file-list">
       <ChangedFileList :files="files" :selected="currentFile" @select="selectFile" @open-editor="openEditor" />
     </aside>
@@ -73,5 +71,12 @@ onKeyStroke('Escape', () => void Window.Close())
 .file-list {
   overflow: auto;
   flex: 0 0 auto;
+  max-width: 35%;
+}
+/* The diff takes the rest of the window, not just its content's width. */
+.diff-view {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: auto;
 }
 </style>

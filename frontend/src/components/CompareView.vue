@@ -3,7 +3,8 @@ import { watch } from 'vue'
 import { useCompareStore } from '../stores/compare'
 import { onKeyStroke } from '@vueuse/core'
 import { useCoreCall } from '../composables/useCoreCall'
-import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { useOpenInEditor } from '../composables/useOpenInEditor'
+import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ChangedFileList from './ChangedFileList.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
@@ -14,14 +15,11 @@ import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/inter
 const props = defineProps<{ wt: string }>()
 const compare = useCompareStore()
 const { error, run } = useCoreCall()
+const { openEditor, openEditorFallback } = useOpenInEditor(() => props.wt, run)
 
 function openDiffWindow(f: ChangedFile): void {
   if (!compare.from || !compare.to) return
   void AppService.OpenCompareDiff(props.wt, compare.from.sha, compare.to.sha, f.path, f.oldPath ?? '')
-}
-
-function openEditor(f: ChangedFile): void {
-  void run(() => Facade.OpenFile(props.wt, f.path, 0))
 }
 
 watch(
@@ -44,7 +42,7 @@ onKeyStroke('Escape', () => compare.exit())
       <button type="button" data-test="swap" @click="compare.swap">Swap</button>
       <button type="button" data-test="exit" @click="compare.exit">&times;</button>
     </header>
-    <ErrorBanner v-if="error" :error="error" />
+    <ErrorBanner v-if="error" :error="error" @fallback="openEditorFallback" />
     <ChangedFileList
       :files="compare.files"
       :selected="compare.selectedFile"

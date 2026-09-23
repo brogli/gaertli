@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -32,9 +33,9 @@ func (c *Core) ListWorktrees(ctx context.Context, path core.RepoPath) ([]core.Wo
 	return worktrees, nil
 }
 
-// isDirty runs the same status call the poller uses. A run error counts as
-// clean: this is display data, and the error surfaces when the worktree is
-// opened.
+// isDirty reports whether dir has any change, untracked files included. A
+// run error counts as clean: this is display data, and the error surfaces
+// when the worktree is opened.
 func (c *Core) isDirty(ctx context.Context, dir string) bool {
 	result, err := c.discover.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Args: []string{"status", "--porcelain=v2", "-z", "--untracked-files=all"},
@@ -72,7 +73,15 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 		if err := validateBranchName(ctx, wt.Runner, wt.Path, branch); err != nil { // worktree add -b's name argument is not protected by --
 			return core.Worktree{}, err
 		}
-		args = []string{"worktree", "add", "-b", branch, "--", target, start}
+		// git creates -b's branch before it finds target taken, and leaves
+		// the branch behind; refuse first, in git's own words.
+		if entries, err := os.ReadDir(target); err == nil && len(entries) > 0 {
+			return core.Worktree{}, core.Errorf(core.GitFailed, "'%s' already exists", target)
+		}
+		args = []string{"worktree", "add", "-b", branch, "--", target}
+		if start != "" { // none: git branches from HEAD
+			args = append(args, start)
+		}
 	}
 	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args}); err != nil {
 		return core.Worktree{}, err
@@ -94,6 +103,48 @@ func (c *Core) describeWorktree(ctx context.Context, wt *session.Worktree, targe
 		}
 	}
 	return core.Worktree{}, core.Errorf(core.Internal, "worktree %q not found after creation", target)
+}
+
+// RemoveWorktree implements core.API.
+func (c *Core) RemoveWorktree(ctx context.Context, path core.RepoPath, target string, force bool) error {
+	wt, err := c.sessions.Open(ctx, path) // path is an existing worktree of the repo
+	if err != nil {
+		return err
+	}
+	wt.Repo.Lock() // worktree remove is a repo-wide one-off
+	defer wt.Repo.Unlock()
+
+	args := []string{"worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	args = append(args, "--", target)
+	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
+	return remapDirtyWorktree(err, result)
+}
+
+// remapDirtyWorktree reclassifies remove's "contains modified or untracked
+// files" refusal (exit 128) as Code DirtyWorktree, so the caller can confirm
+// the loss and retry forced. A locked worktree's refusal stays GitFailed:
+// force does not fix it.
+func remapDirtyWorktree(err error, result git.Result) error {
+	if ce := gitFailure(err); ce != nil && result.ExitCode == 128 && bytes.Contains(result.Stderr, []byte("contains modified or untracked files")) {
+		ce.Code = core.DirtyWorktree
+	}
+	return err
+}
+
+// PruneWorktrees implements core.API.
+func (c *Core) PruneWorktrees(ctx context.Context, path core.RepoPath) error {
+	wt, err := c.sessions.Open(ctx, path)
+	if err != nil {
+		return err
+	}
+	wt.Repo.Lock() // worktree prune is a repo-wide one-off
+	defer wt.Repo.Unlock()
+
+	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"worktree", "prune"}})
+	return err
 }
 
 // parseWorktreeRecords parses "git worktree list --porcelain -z" output

@@ -19,13 +19,9 @@ func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 	gittest.Run(t, repo.Dir, "commit", "-m", "rename")
 	renameSHA := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	multi, err := c.CommitDetails(context.Background(), wt.ID, multiSHA)
+	multi, err := c.CommitDetails(context.Background(), wt, multiSHA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +35,7 @@ func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 		t.Errorf("Files = %+v, want one Modified file", multi.Files)
 	}
 
-	rename, err := c.CommitDetails(context.Background(), wt.ID, renameSHA)
+	rename, err := c.CommitDetails(context.Background(), wt, renameSHA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,13 +55,9 @@ func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T)
 	gittest.Run(t, repo.Dir, "merge", "--no-ff", "-m", "merge side", "side")
 	mergeSHA := gittest.HeadSHA(t, repo.Dir)
 
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	c, wt := openWorktree(t, repo.Dir)
 
-	details, err := c.CommitDetails(context.Background(), wt.ID, mergeSHA)
+	details, err := c.CommitDetails(context.Background(), wt, mergeSHA)
 	if err != nil {
 		t.Fatal(err)
 	}

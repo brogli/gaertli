@@ -58,6 +58,12 @@ func (s stubCore) StageLines(context.Context, core.WorktreeID, string, core.Line
 	return nil
 }
 
+func (s stubCore) DiscardFile(context.Context, core.WorktreeID, string, bool) error { return nil }
+
+func (s stubCore) DiscardLines(context.Context, core.WorktreeID, string, core.LineSelection) error {
+	return nil
+}
+
 func (s stubCore) Commit(context.Context, core.WorktreeID, string, bool) error { return nil }
 
 func (s stubCore) SetMessageDraft(context.Context, core.WorktreeID, string) error { return nil }
@@ -86,6 +92,14 @@ func (s stubCore) DiffRange(context.Context, core.WorktreeID, string, string, st
 	return core.DiffFile{}, nil
 }
 
+func (s stubCore) DiffAgainstWorking(context.Context, core.WorktreeID, string, string, string, bool) (core.DiffFile, error) {
+	return core.DiffFile{}, nil
+}
+
+func (s stubCore) CompareWithWorking(context.Context, core.WorktreeID, string) ([]core.ChangedFile, error) {
+	return nil, nil
+}
+
 func (s stubCore) SetLogFilter(context.Context, core.WorktreeID, core.LogFilter) error { return nil }
 
 func (s stubCore) CreateBranch(context.Context, core.WorktreeID, string, string, bool) error {
@@ -104,15 +118,33 @@ func (s stubCore) UncommittedCount(context.Context, core.WorktreeID) (int, error
 
 func (s stubCore) CherryPick(context.Context, core.WorktreeID, []string) error { return nil }
 
+func (s stubCore) CherryPickWith(context.Context, core.WorktreeID, []string, core.PickOptions) error {
+	return nil
+}
+
 func (s stubCore) Revert(context.Context, core.WorktreeID, []string) error { return nil }
 
+func (s stubCore) RevertWith(context.Context, core.WorktreeID, []string, core.PickOptions) error {
+	return nil
+}
+
 func (s stubCore) SetEditorProfile(context.Context, core.EditorProfile) error { return nil }
+
+func (s stubCore) TestEditorProfile(context.Context, core.EditorProfile) error { return nil }
 
 func (s stubCore) OpenFolder(context.Context, core.WorktreeID) error { return nil }
 
 func (s stubCore) OpenFolderAt(context.Context, core.RepoPath) error { return nil }
 
 func (s stubCore) OpenFile(context.Context, core.WorktreeID, string, int) error { return nil }
+
+func (s stubCore) OpenFolderFallback(context.Context, core.WorktreeID, core.EditorFallbackKind) error {
+	return nil
+}
+
+func (s stubCore) OpenFileFallback(context.Context, core.WorktreeID, string, int, core.EditorFallbackKind) error {
+	return nil
+}
 
 func (s stubCore) ListWorktrees(context.Context, core.RepoPath) ([]core.Worktree, error) {
 	return nil, nil
@@ -136,6 +168,14 @@ func (s stubCore) Pull(context.Context, core.WorktreeID, core.PullMode) (string,
 	return "", nil
 }
 
+func (s stubCore) PullWithStash(context.Context, core.WorktreeID, core.PullMode) (string, error) {
+	return "", nil
+}
+
+func (s stubCore) PopStash(context.Context, core.WorktreeID, string) error { return nil }
+
+func (s stubCore) DropStash(context.Context, core.WorktreeID, string) error { return nil }
+
 func (s stubCore) Push(context.Context, core.WorktreeID, string) (string, error) { return "", nil }
 
 func (s stubCore) ForcePush(context.Context, core.WorktreeID) (string, error) { return "", nil }
@@ -146,6 +186,16 @@ func (s stubCore) UpdateBranch(context.Context, core.WorktreeID, string) (string
 func (s stubCore) ContinueOperation(context.Context, core.WorktreeID) error { return nil }
 
 func (s stubCore) AbortOperation(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) SkipOperation(context.Context, core.WorktreeID) error { return nil }
+
+func (s stubCore) RenameBranch(context.Context, core.WorktreeID, string, string) error { return nil }
+
+func (s stubCore) DeleteBranch(context.Context, core.WorktreeID, string, bool) error { return nil }
+
+func (s stubCore) RemoveWorktree(context.Context, core.RepoPath, string, bool) error { return nil }
+
+func (s stubCore) PruneWorktrees(context.Context, core.RepoPath) error { return nil }
 
 type stubRouter struct {
 	local core.API

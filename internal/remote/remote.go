@@ -57,8 +57,7 @@ func toCoreError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var rpcErr *jrpc2.Error
-	if errors.As(err, &rpcErr) && rpcErr.Code == coreErrorCode {
+	if rpcErr, ok := errors.AsType[*jrpc2.Error](err); ok && rpcErr.Code == coreErrorCode {
 		var ce core.Error
 		if json.Unmarshal(rpcErr.Data, &ce) == nil && ce.Code != "" {
 			return &ce
@@ -114,10 +113,7 @@ func guard(h jrpc2.Handler) jrpc2.Handler {
 }
 
 func toRPCError(err error) *jrpc2.Error {
-	var ce *core.Error
-	if !errors.As(err, &ce) {
-		ce = core.Errorf(core.Internal, "%v", err)
-	}
+	ce := core.ErrorOf(err)
 	return jrpc2.Errorf(coreErrorCode, "%s", ce.Error()).WithData(ce)
 }
 

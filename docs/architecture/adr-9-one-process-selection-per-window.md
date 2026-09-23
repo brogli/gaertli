@@ -1,18 +1,26 @@
 # ADR-9: One process, one selection per window
 
-Requirements: FR-WT-05, FR-WT-08 to FR-WT-11, FR-WT-13. Revised 2026-09-22 (owner decision): a window shows one *selected* worktree and can switch, instead of being bound to one worktree for its lifetime.
+Status: accepted
 
-- One shell process, many windows. Each window has one selection: a worktree id. The selector panel (FR-WT-13) changes it; the whole window then reloads for the new worktree.
-- Two session levels, unchanged:
-  - Repo session, one per repo, shared by every window whose selection is one of its worktrees: commit list, graph rows, refs map, worktree list, repo-level queue, git-dir watcher, remote jobs.
-  - Worktree session, one per worktree in use (not per window): status, index state, conflict state, worktree write queue, status poller, message draft. Two windows selecting the same worktree share it.
-- One process so the log of a 100k-commit repo is loaded once (QA-PERF-07), queues are shared, and FR-WT-10 holds by construction.
-- Every service call carries a worktree id; the core resolves it to a session and runs git with `-C <worktree path>`. The UI never sends raw paths for worktree actions. Switching the selection is a shell concern: the window swaps the id its stores use and reloads; the core sees an `OpenWorktree` for the new selection and a `CloseWorktree` for the old one once no window shows it.
-- Events go to the windows they concern: repo-level to every window currently selecting one of the repo's worktrees, worktree-level to the windows currently selecting that worktree. The shell keeps the routing table (`Registry`) keyed by the current selection, not by window identity.
-- Single instance: a second launch hands its path to the running process, which focuses a window already showing that worktree or, if none, opens a new window on it (FR-REPO-06, FR-WT-08). Wails provides the single-instance callback, per-window events (`window.EmitEvent`), and broadcast events (`app.Event.Emit`).
+## Context
+
+Users work with several worktrees of the same repo at once (FR-WT-05, FR-WT-08 to FR-WT-11), and move between them from a selector panel (FR-WT-13). Loading the log of a 100k-commit repo once per window would break the memory budget (QA-PERF-07). Two windows writing the same worktree must not race (FR-WT-10).
+
+## Decision
+
+- One shell process, many windows. Each window has one selection, a worktree id. The selector panel changes it and the whole window then reloads for the new worktree.
+- Sessions live in the core, at two levels:
+  - A **repo session**, one per repo, shared by every window that selects one of its worktrees: commit list, graph rows, ref map, worktree list, the repo-level write queue, the git-dir watcher, remote jobs.
+  - A **worktree session**, one per worktree in use (not per window): status, conflict state, the worktree write queue, the status poller, the commit message draft. Two windows selecting the same worktree share it.
+- Every core call carries a worktree id. The core resolves it to a session and runs git with `-C <worktree path>`. The UI never sends raw paths for worktree actions.
+- Switching the selection is a shell concern. The window swaps the id its stores use and reloads. The core sees an open for the new worktree, and a close for the old one once no window shows it.
+- Events go only to the windows they concern: repo-level events to every window selecting one of the repo's worktrees, worktree-level events to the windows selecting that worktree.
+- Single instance: a second launch hands its path to the running process, which focuses a window already showing that worktree or opens a new one (FR-REPO-06, FR-WT-08).
 - A repo session is dropped when no window selects any of its worktrees. Closing the last window quits.
-- The panel's own data (recent repos, each repo's worktrees and branches) comes from the settings file (recents) and the repo sessions of the repos it shows; a repo not yet opened in this process gets a session on first expansion.
+- The selector panel reads recent repos from settings and each repo's worktrees and branches from its repo session. A repo not yet open in this process gets a session when the panel first expands it.
 
-Consequences: the home window becomes the empty state of the panel, not a separate view. `Registry` maps selections to windows rather than windows to fixed paths. Nothing changes in `core.API`.
+## Consequences
 
----
+- A repo's log is loaded once, however many windows show it.
+- FR-WT-10 holds by construction: all windows share one write queue per worktree.
+- There is no separate home window; the empty state of the selector panel takes its place.

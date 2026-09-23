@@ -104,6 +104,16 @@ func (c *Core) DiffFile(ctx context.Context, id core.WorktreeID, sha, path, oldP
 	return diffSides(ctx, wt.Runner, wt.Path, spec)
 }
 
+// DiffAgainstWorking implements core.API.
+func (c *Core) DiffAgainstWorking(ctx context.Context, id core.WorktreeID, sha, path, oldPath string, force bool) (core.DiffFile, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return core.DiffFile{}, err
+	}
+	old := cmp.Or(oldPath, path)
+	return diffWorkingTree(ctx, wt.Runner, wt.Path, path, oldSide{sha: sha, path: old}, force)
+}
+
 // diffSidesSpec drives diffSides: DiffFile (sha^/sha via git show
 // --first-parent) and DiffRange (a/b via git diff) differ only in how
 // oldRev/newRev and isBinary are built.
@@ -117,11 +127,11 @@ type diffSidesSpec struct {
 // UTF-8 check shared by DiffFile and DiffRange. The frontend computes the
 // visual diff.
 func diffSides(ctx context.Context, r git.Runner, dir string, s diffSidesSpec) (core.DiffFile, error) {
-	sizes, err := diffBlobSizes(ctx, r, dir, s.oldRev, s.newRev)
+	sizes, err := objectSizes(ctx, r, dir, s.oldRev, s.newRev)
 	if err != nil {
 		return core.DiffFile{}, err
 	}
-	if !s.force && (sizes.oldSize > maxDiffFileSize || sizes.newSize > maxDiffFileSize) {
+	if !s.force && (sizes[0].size > maxDiffFileSize || sizes[1].size > maxDiffFileSize) {
 		return core.DiffFile{OldPath: s.oldPath, Path: s.path, TooLarge: true}, nil
 	}
 
@@ -133,24 +143,20 @@ func diffSides(ctx context.Context, r git.Runner, dir string, s diffSidesSpec) (
 		return core.DiffFile{OldPath: s.oldPath, Path: s.path, Binary: true}, nil
 	}
 
-	oldContent, newContent, err := diffBlobContent(ctx, r, dir, s.oldRev, s.newRev)
+	blobs, err := objectContents(ctx, r, dir, s.oldRev, s.newRev)
 	if err != nil {
 		return core.DiffFile{}, err
 	}
-	if !utf8.Valid(oldContent) || !utf8.Valid(newContent) {
-		// Not binary by git's own classification, but not valid UTF-8 either
-		// (e.g. a Latin-1 file): shown as binary rather than corrupting
-		// through JSON's UTF-8 requirement.
-		return core.DiffFile{OldPath: s.oldPath, Path: s.path, Binary: true}, nil
-	}
-	return core.DiffFile{OldPath: s.oldPath, Path: s.path, OldContent: string(oldContent), NewContent: string(newContent)}, nil
+	return contentDiff(s.oldPath, s.path, blobs[0], blobs[1]), nil
 }
 
-type blobSizes struct{ oldSize, newSize int64 }
-
-// batchStdin is cat-file --batch/--batch-check's input: one object spec per line.
-func batchStdin(oldRev, newRev string) []byte {
-	return []byte(oldRev + "\n" + newRev + "\n")
+// contentDiff carries both sides' content, or reports Binary if either side
+// is not valid UTF-8 (e.g. a Latin-1 file), which JSON would corrupt.
+func contentDiff(oldPath, path string, oldContent, newContent []byte) core.DiffFile {
+	if !utf8.Valid(oldContent) || !utf8.Valid(newContent) {
+		return core.DiffFile{OldPath: oldPath, Path: path, Binary: true}
+	}
+	return core.DiffFile{OldPath: oldPath, Path: path, OldContent: string(oldContent), NewContent: string(newContent)}
 }
 
 // missing reports cat-file's "<request> missing" line for an absent object
@@ -159,48 +165,54 @@ func missing(line string) bool {
 	return strings.HasSuffix(line, " missing")
 }
 
-// diffBlobSizes runs one cat-file --batch-check for both sides, so the size
-// cap is enforced before any content byte is fetched. Object specs go on
-// stdin, so no --end-of-options is needed.
-func diffBlobSizes(ctx context.Context, r git.Runner, dir, oldRev, newRev string) (blobSizes, error) {
+// objectSize is one object's size; 0 if missing.
+type objectSize struct {
+	size    int64
+	missing bool
+}
+
+// objectSizes runs one cat-file --batch-check for revs, so a size cap is
+// enforced before any content byte is fetched. Object specs go on stdin, so
+// no --end-of-options is needed.
+func objectSizes(ctx context.Context, r git.Runner, dir string, revs ...string) ([]objectSize, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
 		Args:  []string{"cat-file", "--batch-check=%(objectsize)"},
-		Stdin: batchStdin(oldRev, newRev),
+		Stdin: batchStdin(revs),
 	})
 	if err != nil {
-		return blobSizes{}, err
+		return nil, err
 	}
 	lines := strings.Split(strings.TrimRight(string(result.Stdout), "\n"), "\n")
-	if len(lines) != 2 {
-		return blobSizes{}, core.Errorf(core.Internal, "cat-file --batch-check: %d lines, want 2", len(lines))
+	if len(lines) != len(revs) {
+		return nil, core.Errorf(core.Internal, "cat-file --batch-check: %d lines, want %d", len(lines), len(revs))
 	}
-	oldSize, err := blobSize(lines[0])
-	if err != nil {
-		return blobSizes{}, err
+	sizes := make([]objectSize, len(lines))
+	for i, line := range lines {
+		size, err := blobSize(line)
+		if err != nil {
+			return nil, err
+		}
+		sizes[i] = objectSize{size: size, missing: missing(line)}
 	}
-	newSize, err := blobSize(lines[1])
-	if err != nil {
-		return blobSizes{}, err
-	}
-	return blobSizes{oldSize: oldSize, newSize: newSize}, nil
+	return sizes, nil
 }
 
-// diffBlobContent fetches both sides' raw bytes in one cat-file --batch
-// call. A missing side (add/delete, or a root commit's nonexistent parent)
-// yields nil, not an error.
-func diffBlobContent(ctx context.Context, r git.Runner, dir, oldRev, newRev string) (oldContent, newContent []byte, err error) {
+// objectContents fetches revs' raw bytes in one cat-file --batch call. A
+// missing object yields nil, not an error.
+func objectContents(ctx context.Context, r git.Runner, dir string, revs ...string) ([][]byte, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
 		Args:  []string{"cat-file", "--batch"},
-		Stdin: batchStdin(oldRev, newRev),
+		Stdin: batchStdin(revs),
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	blobs, err := parseCatFileBatch(result.Stdout, 2)
-	if err != nil {
-		return nil, nil, err
-	}
-	return blobs[0], blobs[1], nil
+	return parseCatFileBatch(result.Stdout, len(revs))
+}
+
+// batchStdin is cat-file --batch/--batch-check's input: one object spec per line.
+func batchStdin(revs []string) []byte {
+	return []byte(strings.Join(revs, "\n") + "\n")
 }

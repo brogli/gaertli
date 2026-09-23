@@ -13,3 +13,5 @@ build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 build/linux/nebegit.desktop
 .claude/worktrees/
+/THIRD-PARTY-NOTICES.txt
+/dist/

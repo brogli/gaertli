@@ -28,12 +28,8 @@ func renameWithEdit(t *testing.T, dir, name, newName, ending string) {
 func openCompareRepo(t *testing.T) (*gittest.Repo, *Core, core.WorktreeID) {
 	t.Helper()
 	repo := gittest.New(t)
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return repo, c, wt.ID
+	c, wt := openWorktree(t, repo.Dir)
+	return repo, c, wt
 }
 
 func TestFR_CMP_01_CompareCommitsListsModifiedAddedAndDeletedFiles(t *testing.T) {
@@ -177,6 +173,68 @@ func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 	}
 	if diff.OldContent != "" || diff.NewContent != "added later" {
 		t.Errorf("DiffRange = %+v, want OldContent \"\" NewContent %q (not limited to parent/child commits)", diff, "added later")
+	}
+}
+
+func TestFR_CMP_04_DiffAgainstWorkingComparesHeadContentToTheLiteralOnDiskFile(t *testing.T) {
+	repo, c, id := openCompareRepo(t)
+	gittest.Commit(t, repo.Dir, "f1", "head content\n", "add f1")
+	head := gittest.HeadSHA(t, repo.Dir)
+	writeFile(t, repo.Dir, "f1", "unstaged edit\n")
+
+	diff, err := c.DiffAgainstWorking(context.Background(), id, head, "f1", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff.OldContent != "head content\n" || diff.NewContent != "unstaged edit\n" {
+		t.Errorf("DiffAgainstWorking = %+v, want OldContent %q NewContent %q", diff, "head content\n", "unstaged edit\n")
+	}
+}
+
+// TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTheNewOne
+// pins a real rename: a git-detected rename (-M, matching CompareWithWorking's
+// own detection) where the old content is binary and the new content is not.
+// The binary check must diff old.dat -> new.dat (a paired rename, binary
+// under git's own "either side binary" rule), not new.dat against itself
+// (an unpaired add, which reads as plain text).
+func TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTheNewOne(t *testing.T) {
+	repo, c, id := openCompareRepo(t)
+	base := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 50)[:2000]
+	oldContent := base[:1000] + "\x00" + base[1001:]
+	gittest.Commit(t, repo.Dir, "old.dat", oldContent, "add old.dat")
+	head := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "mv", "old.dat", "new.dat")
+	writeFile(t, repo.Dir, "new.dat", base)
+
+	diff, err := c.DiffAgainstWorking(context.Background(), id, head, "new.dat", "old.dat", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !diff.Binary {
+		t.Errorf("DiffAgainstWorking on a binary-old/text-new rename = %+v, want Binary true", diff)
+	}
+}
+
+func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesTogether(t *testing.T) {
+	repo, c, id := openCompareRepo(t)
+	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
+	c1 := gittest.HeadSHA(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f2", "two", "add f2")
+	writeFile(t, repo.Dir, "f1", "one, edited unstaged\n")
+
+	files, err := c.CompareWithWorking(context.Background(), id, c1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{"f1": "M", "f2": "A"}
+	if len(files) != len(want) {
+		t.Fatalf("CompareWithWorking = %+v, want %d files", files, len(want))
+	}
+	for _, f := range files {
+		if want[f.Path] != f.Status {
+			t.Errorf("file %q status = %q, want %q", f.Path, f.Status, want[f.Path])
+		}
 	}
 }
 

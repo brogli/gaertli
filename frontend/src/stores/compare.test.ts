@@ -1,10 +1,13 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCompareCommits } = vi.hoisted(() => ({ mockCompareCommits: vi.fn() }))
+const { mockCompareCommits, mockCompareWithWorking } = vi.hoisted(() => ({
+  mockCompareCommits: vi.fn(),
+  mockCompareWithWorking: vi.fn(),
+}))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { CompareCommits: mockCompareCommits },
+  Facade: { CompareCommits: mockCompareCommits, CompareWithWorking: mockCompareWithWorking },
 }))
 
 import { useCompareStore } from './compare'
@@ -16,6 +19,7 @@ describe('compare store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockCompareCommits.mockReset()
+    mockCompareWithWorking.mockReset()
   })
 
   it('FR-CMP-01 toggleSelect keeps the two most recently picked rows (FIFO)', () => {
@@ -41,5 +45,37 @@ describe('compare store', () => {
     compare.toggleSelect(rowX)
 
     expect(compare.selection).toEqual([])
+  })
+
+  it('FR-CMP-04 startAgainstWorking sets workingCommit and clears any two-commit selection', () => {
+    const compare = useCompareStore()
+    compare.toggleSelect(row('x'))
+    compare.toggleSelect(row('y'))
+
+    const rowZ = row('z')
+    compare.startAgainstWorking(rowZ)
+
+    expect(compare.workingCommit).toEqual(rowZ)
+    expect(compare.selection).toEqual([])
+  })
+
+  it('FR-CMP-04 toggleSelect clears workingCommit', () => {
+    const compare = useCompareStore()
+    compare.startAgainstWorking(row('z'))
+
+    compare.toggleSelect(row('x'))
+
+    expect(compare.workingCommit).toBeNull()
+  })
+
+  it('FR-CMP-04 loadAgainstWorking populates files from Facade.CompareWithWorking', async () => {
+    const compare = useCompareStore()
+    const files = [{ status: 'M', path: 'a.txt' }]
+    mockCompareWithWorking.mockResolvedValue(files)
+
+    await compare.loadAgainstWorking('/repo', 'sha1')
+
+    expect(mockCompareWithWorking).toHaveBeenCalledWith('/repo', 'sha1')
+    expect(compare.files).toEqual(files)
   })
 })

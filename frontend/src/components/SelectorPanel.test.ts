@@ -1,6 +1,7 @@
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mountInBody } from '../testing/mountInBody'
 
 const {
   mockPickAndOpen,
@@ -14,6 +15,9 @@ const {
   mockListBranches,
   mockCheckout,
   mockOpenFolderAt,
+  mockRemoveWorktree,
+  mockPruneWorktrees,
+  mockRequire,
 } = vi.hoisted(() => ({
   mockPickAndOpen: vi.fn(),
   mockRecentRepos: vi.fn(),
@@ -26,6 +30,9 @@ const {
   mockListBranches: vi.fn(),
   mockCheckout: vi.fn(),
   mockOpenFolderAt: vi.fn(),
+  mockRemoveWorktree: vi.fn(),
+  mockPruneWorktrees: vi.fn(),
+  mockRequire: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -43,7 +50,13 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     ListBranches: mockListBranches,
     Checkout: mockCheckout,
     OpenFolderAt: mockOpenFolderAt,
+    RemoveWorktree: mockRemoveWorktree,
+    PruneWorktrees: mockPruneWorktrees,
   },
+}))
+
+vi.mock('openvue/useconfirm', () => ({
+  useConfirm: () => ({ require: mockRequire, close: vi.fn() }),
 }))
 
 const { mockEventsOn } = vi.hoisted(() => ({ mockEventsOn: vi.fn() }))
@@ -53,6 +66,7 @@ import SelectorPanel from './SelectorPanel.vue'
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import { worktreeFixture } from '../testing/fixtures/worktree'
+import { registeredHandler } from '../testing/events'
 
 // repoTreeItem returns the top-level treeitem labelled with path.
 function repoTreeItem(wrapper: ReturnType<typeof mount>, path: string) {
@@ -81,6 +95,9 @@ describe('SelectorPanel', () => {
     mockListBranches.mockReset().mockResolvedValue([])
     mockCheckout.mockReset().mockResolvedValue(undefined)
     mockOpenFolderAt.mockReset().mockResolvedValue(undefined)
+    mockRemoveWorktree.mockReset().mockResolvedValue(undefined)
+    mockPruneWorktrees.mockReset().mockResolvedValue(undefined)
+    mockRequire.mockReset()
     mockEventsOn.mockReset().mockReturnValue(() => {})
   })
 
@@ -92,11 +109,12 @@ describe('SelectorPanel', () => {
   // openWSLDialog mounts SelectorPanel, clicks "Open WSL folder…", and
   // hands back a DOMWrapper on the dialog's teleported content; wslWrapper
   // is unmounted in afterEach.
-  async function openWSLDialog(): Promise<DOMWrapper<HTMLElement>> {
-    wslWrapper = mount(SelectorPanel, { props: { selectedPath: '' }, attachTo: document.body })
-    await wslWrapper.get('[data-test="open-wsl-folder"]').trigger('click')
+  async function openWSLDialog(): Promise<DOMWrapper<Element>> {
+    const { wrapper, body } = await mountInBody(SelectorPanel, { props: { selectedPath: '' } })
+    wslWrapper = wrapper
+    await wrapper.get('[data-test="open-wsl-folder"]').trigger('click')
     await flushPromises()
-    return new DOMWrapper(document.body)
+    return body
   }
 
   it('FR-REPO-01 opens the folder picker on click', async () => {
@@ -117,13 +135,25 @@ describe('SelectorPanel', () => {
     const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('/a')
-    expect(wrapper.text()).toContain('/b')
+    const rows = wrapper.findAll('.repo-node')
+    expect(rows.map((r) => r.attributes('title'))).toEqual(['/a', '/b'])
 
     await wrapper.get('.p-tree-node-content').trigger('click')
 
     expect(mockSelectWorktree).toHaveBeenCalledTimes(1)
     expect(mockSelectWorktree).toHaveBeenCalledWith('/a')
+  })
+
+  it('FR-UX-09 a repo row shows the folder name, the muted parent path, and the full path in title', async () => {
+    mockRecentRepos.mockResolvedValue([{ path: '/a/b/repo', lastOpened: '2026-01-01T00:00:00Z' }])
+
+    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
+    await flushPromises()
+
+    const row = wrapper.get('.repo-node')
+    expect(row.attributes('title')).toBe('/a/b/repo')
+    expect(row.get('.repo-name').text()).toBe('repo')
+    expect(row.get('.repo-parent').text()).toBe('/a/b')
   })
 
   it('FR-REPO-07 shows the WSL distro of a WSL recent repo, not of a local one', async () => {
@@ -207,6 +237,21 @@ describe('SelectorPanel', () => {
     expect(wrapper.text()).toContain('feature')
   })
 
+  it('FR-WT-01 a worktree row shows its folder name after the branch, the full path in title', async () => {
+    mockRecentRepos.mockResolvedValue([{ path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' }])
+    mockListWorktrees.mockResolvedValue([worktreeFixture({ path: '/repoA/wt-feature', branch: 'feature' })])
+
+    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
+    await flushPromises()
+    await expandRepo(wrapper, '/repoA')
+
+    const row = wrapper.get('[data-test="worktree-row"]')
+    const folder = row.get('[data-test="worktree-folder"]')
+    expect(folder.text()).toBe('wt-feature')
+    expect(folder.attributes('title')).toBe('/repoA/wt-feature')
+    expect(row.text().indexOf('feature')).toBeLessThan(row.text().indexOf('wt-feature'))
+  })
+
   it('FR-WT-05 clicking a worktree row calls SelectWorktree with its path', async () => {
     mockRecentRepos.mockResolvedValue([{ path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' }])
     mockListWorktrees.mockResolvedValue([worktreeFixture()])
@@ -267,6 +312,117 @@ describe('SelectorPanel', () => {
     expect(mockOpenFolderAt).toHaveBeenCalledWith('/repoA/wt')
   })
 
+  it('FR-WT-07 "Remove" is hidden for the shown worktree, confirms with the loss named only for the dirty row', async () => {
+    mockRecentRepos.mockResolvedValue([{ path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' }])
+    mockListWorktrees.mockResolvedValue([
+      worktreeFixture({ path: '/repoA/wt-shown' }),
+      worktreeFixture({ path: '/repoA/wt-clean' }),
+      worktreeFixture({ path: '/repoA/wt-dirty', dirty: true }),
+    ])
+
+    const { wrapper } = await mountInBody(SelectorPanel, { props: { selectedPath: '/repoA/wt-shown' } })
+    await expandRepo(wrapper, '/repoA')
+
+    const rows = wrapper.findAll('[data-test="worktree-row"]')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]!.find('[data-test="remove-worktree"]').exists()).toBe(false)
+    expect(rows[1]!.find('[data-test="remove-worktree"]').exists()).toBe(true)
+    expect(rows[2]!.find('[data-test="remove-worktree"]').exists()).toBe(true)
+
+    await rows[1]!.get('[data-test="remove-worktree"]').trigger('click')
+    expect(mockRequire).toHaveBeenCalledTimes(1)
+    expect((mockRequire.mock.calls[0]![0] as { message: string }).message).not.toContain('uncommitted changes')
+
+    await rows[2]!.get('[data-test="remove-worktree"]').trigger('click')
+    expect(mockRequire).toHaveBeenCalledTimes(2)
+    expect((mockRequire.mock.calls[1]![0] as { message: string }).message).toContain('uncommitted changes')
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-07 a dirty row removes forced on confirm; a clean row retries forced only after a DIRTY_WORKTREE refusal', async () => {
+    mockRecentRepos.mockResolvedValue([{ path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' }])
+    mockListWorktrees.mockResolvedValue([
+      worktreeFixture({ path: '/repoA/wt-clean' }),
+      worktreeFixture({ path: '/repoA/wt-dirty', dirty: true }),
+    ])
+    mockRemoveWorktree.mockImplementation((_repo: string, target: string) => {
+      if (target === '/repoA/wt-clean') {
+        return Promise.reject(Object.assign(new Error('boom'), { cause: { code: 'DIRTY_WORKTREE', message: 'dirty' } }))
+      }
+      return Promise.resolve(undefined)
+    })
+
+    const { wrapper } = await mountInBody(SelectorPanel, { props: { selectedPath: '' } })
+    await expandRepo(wrapper, '/repoA')
+    const rows = wrapper.findAll('[data-test="worktree-row"]')
+
+    await rows[0]!.get('[data-test="remove-worktree"]').trigger('click')
+    const cleanAccept = mockRequire.mock.calls[0]![0] as { accept: () => void }
+    cleanAccept.accept()
+    await flushPromises()
+
+    expect(mockRemoveWorktree).toHaveBeenCalledTimes(1)
+    expect(mockRemoveWorktree).toHaveBeenCalledWith('/repoA', '/repoA/wt-clean', false)
+    expect(wrapper.findComponent(ErrorBanner).exists()).toBe(false)
+    expect(mockRequire).toHaveBeenCalledTimes(2)
+    const retryAccept = mockRequire.mock.calls[1]![0] as { message: string; accept: () => void }
+    expect(retryAccept.message).toContain('uncommitted changes')
+    retryAccept.accept()
+    await flushPromises()
+    expect(mockRemoveWorktree).toHaveBeenCalledTimes(2)
+    expect(mockRemoveWorktree).toHaveBeenLastCalledWith('/repoA', '/repoA/wt-clean', true)
+
+    await rows[1]!.get('[data-test="remove-worktree"]').trigger('click')
+    const dirtyAccept = mockRequire.mock.calls[2]![0] as { accept: () => void }
+    dirtyAccept.accept()
+    await flushPromises()
+
+    expect(mockRemoveWorktree).toHaveBeenCalledTimes(3)
+    expect(mockRemoveWorktree).toHaveBeenLastCalledWith('/repoA', '/repoA/wt-dirty', true)
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-07 "Clean up stale entries" is shown only for a repo node with a missing worktree', async () => {
+    mockRecentRepos.mockResolvedValue([
+      { path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' },
+      { path: '/repoB', lastOpened: '2026-01-02T00:00:00Z' },
+    ])
+    mockListWorktrees.mockImplementation((path: string) =>
+      Promise.resolve([
+        worktreeFixture({ path: `${path}/wt` }),
+        ...(path === '/repoA' ? [worktreeFixture({ path: `${path}/wt-missing`, missing: true })] : []),
+      ]),
+    )
+
+    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
+    await flushPromises()
+    await expandRepo(wrapper, '/repoA')
+    await expandRepo(wrapper, '/repoB')
+
+    expect(wrapper.findAll('[data-test="prune-worktrees"]')).toHaveLength(1)
+  })
+
+  it('FR-WT-07 "Clean up stale entries" calls Facade.PruneWorktrees with the repo\'s path, no confirmation', async () => {
+    mockRecentRepos.mockResolvedValue([{ path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' }])
+    mockListWorktrees.mockResolvedValue([
+      worktreeFixture({ path: '/repoA/wt' }),
+      worktreeFixture({ path: '/repoA/wt-missing', missing: true }),
+    ])
+
+    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
+    await flushPromises()
+    await expandRepo(wrapper, '/repoA')
+
+    await wrapper.get('[data-test="prune-worktrees"]').trigger('click')
+    await flushPromises()
+
+    expect(mockPruneWorktrees).toHaveBeenCalledTimes(1)
+    expect(mockPruneWorktrees).toHaveBeenCalledWith('/repoA')
+    expect(mockRequire).not.toHaveBeenCalled()
+  })
+
   it('FR-BR-01, FR-BR-05 "New branch…" and per-branch "Checkout" render only under the selected repo\'s node', async () => {
     mockRecentRepos.mockResolvedValue([
       { path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' },
@@ -284,6 +440,63 @@ describe('SelectorPanel', () => {
 
     expect(wrapper.findAll('[data-test="new-branch"]')).toHaveLength(1)
     expect(wrapper.findAll('[data-test="checkout-branch"]')).toHaveLength(1)
+  })
+
+  it('FR-WT-13 a WSL recent repo\'s calls all take the UNC path: expand, select, open in new window/editor, remove, prune', async () => {
+    const repoUNC = '\\\\wsl.localhost\\Ubuntu\\home\\u\\r'
+    const wtUNC = '\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt'
+    mockRecentRepos.mockResolvedValue([{ path: '/home/u/r', lastOpened: '2026-01-01T00:00:00Z', distro: 'Ubuntu' }])
+    mockListWorktrees.mockResolvedValue([
+      worktreeFixture({ path: '/home/u/r/wt' }),
+      worktreeFixture({ path: '/home/u/r/wt-missing', missing: true }),
+    ])
+    mockRemoveWorktree.mockResolvedValue(undefined)
+
+    const { wrapper } = await mountInBody(SelectorPanel, { props: { selectedPath: '' } })
+    await expandRepo(wrapper, '/home/u/r (Ubuntu)')
+
+    expect(mockListWorktrees).toHaveBeenCalledWith(repoUNC)
+    expect(mockListBranches).toHaveBeenCalledWith(repoUNC)
+
+    await repoTreeItem(wrapper, '/home/u/r (Ubuntu)')!.get('.p-tree-node-content').trigger('click')
+    expect(mockSelectWorktree).toHaveBeenCalledWith(repoUNC)
+
+    const row = wrapper.findAll('[data-test="worktree-row"]')[0]!
+    await row.trigger('click')
+    expect(mockSelectWorktree).toHaveBeenCalledWith(wtUNC)
+
+    await row.get('[data-test="open-in-new-window"]').trigger('click')
+    expect(mockOpenRecent).toHaveBeenCalledWith(wtUNC)
+
+    await row.get('[data-test="open-in-editor"]').trigger('click')
+    expect(mockOpenFolderAt).toHaveBeenCalledWith(wtUNC)
+
+    await row.get('[data-test="remove-worktree"]').trigger('click')
+    const accept = mockRequire.mock.calls[0]![0] as { accept: () => void }
+    accept.accept()
+    await flushPromises()
+    expect(mockRemoveWorktree).toHaveBeenCalledWith(repoUNC, wtUNC, false)
+
+    await wrapper.get('[data-test="prune-worktrees"]').trigger('click')
+    await flushPromises()
+    expect(mockPruneWorktrees).toHaveBeenCalledWith(repoUNC)
+
+    wrapper.unmount()
+  })
+
+  it('FR-WT-13 "+ New worktree" for a WSL repo opens CreateWorktreeDialog with its repo path and distro', async () => {
+    mockRecentRepos.mockResolvedValue([{ path: '/home/u/r', lastOpened: '2026-01-01T00:00:00Z', distro: 'Ubuntu' }])
+    mockListWorktrees.mockResolvedValue([worktreeFixture({ path: '/home/u/r/wt' })])
+
+    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
+    await flushPromises()
+    await expandRepo(wrapper, '/home/u/r (Ubuntu)')
+
+    await wrapper.get('[data-test="new-worktree"]').trigger('click')
+
+    const dialog = wrapper.findComponent(CreateWorktreeDialog)
+    expect(dialog.props('repoPath')).toBe('/home/u/r')
+    expect(dialog.props('distro')).toBe('Ubuntu')
   })
 
   it('FR-WT-13 clicking a branch row with checkedOutIn set calls SelectWorktree with that worktree\'s path', async () => {
@@ -318,9 +531,25 @@ describe('SelectorPanel', () => {
     expect(dialog.props('branches')).toEqual([{ name: 'feature', checkedOutIn: '' }])
   })
 
-  it('FR-UX-07 the collapse control hides and shows the panel\'s own content, staying visible itself', async () => {
-    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' }, attachTo: document.body })
+  it('FR-WT-02 after a worktree is created the expanded repo lists it, with no watcher event needed', async () => {
+    mockRecentRepos.mockResolvedValue([{ path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' }])
+    mockListWorktrees.mockResolvedValue([worktreeFixture()])
+    mockListBranches.mockResolvedValue([])
+    const wrapper = mount(SelectorPanel, { props: { selectedPath: '' } })
     await flushPromises()
+    await expandRepo(wrapper, '/repoA')
+    await wrapper.get('[data-test="new-worktree"]').trigger('click')
+
+    mockListWorktrees.mockResolvedValue([worktreeFixture(), worktreeFixture({ path: '/repoA-new', branch: 'fresh' })])
+    wrapper.findComponent(CreateWorktreeDialog).vm.$emit('created')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('fresh')
+    expect(wrapper.find('[data-test="new-worktree"]').exists()).toBe(true)
+  })
+
+  it('FR-UX-07 the collapse control hides and shows the panel\'s own content, staying visible itself', async () => {
+    const { wrapper } = await mountInBody(SelectorPanel, { props: { selectedPath: '' } })
 
     expect(wrapper.find('.panel-body').isVisible()).toBe(true)
 
@@ -360,7 +589,7 @@ describe('SelectorPanel', () => {
     await expandRepo(wrapper, '/repoB')
     mockListWorktrees.mockClear()
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'repo:changed')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'repo:changed')
     handler?.({ data: { scope: 'worktrees' } })
     await flushPromises()
 

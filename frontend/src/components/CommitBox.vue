@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
+import { onKeyStroke, useDebounceFn } from '@vueuse/core'
 import Textarea from 'openvue/textarea'
 import Checkbox from 'openvue/checkbox'
 import Button from 'openvue/button'
@@ -22,6 +22,7 @@ const { error, run, runAndClose } = useCoreCall()
 
 const message = ref('')
 const amend = ref(false)
+const pushAfterCommit = ref(false)
 const committing = ref(false)
 
 // Seed once from the session's own draft when Summary first carries one,
@@ -64,11 +65,19 @@ const amendDisabled = computed(() => !repo.summary?.sha || !!repo.summary?.opera
 // refs store's own ahead count instead of a fresh merge-base call: the
 // current branch is an ancestor-or-equal of its upstream exactly when
 // Ahead == 0.
+const currentBranch = computed(() => refs.refs?.branches?.find((b) => b.current))
 const pushedWarning = computed(() => {
   if (!amend.value) return false
-  const branch = refs.refs?.branches?.find((b) => b.current)
+  const branch = currentBranch.value
   return !!branch?.upstream && !branch.upstreamGone && branch.ahead === 0
 })
+
+// "Push after commit" is off while amending — an already-pushed commit
+// needs a force push, pushedWarning already tells the user so, and a
+// plain push right after would just be rejected — or with no upstream,
+// same gate buildBranchMenuItems' own "Update from upstream" item and
+// SyncControls' plain-Push button already apply.
+const pushAfterCommitDisabled = computed(() => amend.value || !currentBranch.value?.upstream)
 
 async function onAmendChange(checked: boolean): Promise<void> {
   // Pre-fill from HEAD's own message only when the field is still empty:
@@ -82,6 +91,10 @@ async function onAmendChange(checked: boolean): Promise<void> {
 
 async function onCommit(): Promise<void> {
   committing.value = true
+  // Read before runAndClose's own onSuccess resets amend, which would
+  // otherwise clear pushAfterCommitDisabled along with it and push after
+  // an amend.
+  const pushAfter = pushAfterCommit.value && !pushAfterCommitDisabled.value
   try {
     await runAndClose(
       () => Facade.Commit(props.wt, message.value, amend.value),
@@ -90,10 +103,26 @@ async function onCommit(): Promise<void> {
         amend.value = false
       },
     )
+    // A second, sequential use of run's own error ref: a push failure
+    // after a successful commit shows through the same ErrorBanner the
+    // commit itself uses.
+    if (!error.value && pushAfter) {
+      await run(() => Facade.Push(props.wt, ''))
+    }
   } finally {
     committing.value = false
   }
 }
+
+// an IDE's own commit binding. Gated the same as the Commit button: a
+// shortcut is never a bypass of the button's disabled state.
+onKeyStroke(
+  (event) => event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'k',
+  (event) => {
+    event.preventDefault()
+    if (!commitDisabled.value) void onCommit()
+  },
+)
 </script>
 
 <template>
@@ -107,6 +136,18 @@ async function onCommit(): Promise<void> {
     <p v-if="pushedWarning" class="warning">
       This commit has already been pushed. Amending will require a force push.
     </p>
+    <label>
+      <Checkbox v-model="pushAfterCommit" binary :disabled="pushAfterCommitDisabled" data-test="push-after-commit" />
+      Push after commit
+    </label>
     <Button :label="commitLabel" :disabled="commitDisabled" data-test="commit-submit" @click="onCommit" />
   </section>
 </template>
+
+<style scoped>
+.commit-box label {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+</style>

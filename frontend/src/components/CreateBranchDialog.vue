@@ -10,8 +10,8 @@ import ErrorBanner from './ErrorBanner.vue'
 
 // CreateBranchDialog is the "new branch from here" dialog. sha is the
 // start point: a commit's sha, or HEAD's sha while detached.
-const props = defineProps<{ wt: string; sha: string; visible: boolean }>()
-const emit = defineEmits<{ 'update:visible': [boolean] }>()
+const props = defineProps<{ wt: string; sha: string }>()
+const emit = defineEmits<{ close: [] }>()
 
 const name = ref('')
 const checkout = ref(true) // most git GUIs default to switching to a freshly created branch
@@ -22,19 +22,14 @@ async function submit(): Promise<void> {
     () => Facade.CreateBranch(props.wt, name.value, props.sha, checkout.value),
     () => {
       name.value = ''
-      emit('update:visible', false)
+      emit('close')
     },
   )
 }
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    header="New branch"
-    modal
-    @update:visible="(v: boolean) => emit('update:visible', v)"
-  >
+  <Dialog visible header="New branch" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
     <InputText v-model="name" placeholder="Branch name" />
     <label>

@@ -33,7 +33,9 @@ func TestFR_UX_02_CommandLogReturnsBufferedEntryAndSinkReceivesMatchingEvent(t *
 
 	// Summary can run more than one git call (ahead/behind);
 	// drain every "command" event the sink received and check the last
-	// one, not just the first.
+	// one, not just the first. payload is redeclared each iteration: reusing
+	// one var across json.Unmarshal calls would leak a field's stale value
+	// from an earlier event into a later one that omits it (omitempty).
 	var payload core.CommandLogEntry
 	received := 0
 	for drained := false; !drained; {
@@ -42,6 +44,7 @@ func TestFR_UX_02_CommandLogReturnsBufferedEntryAndSinkReceivesMatchingEvent(t *
 			if e.Name != "command" || e.Worktree != wt.ID {
 				t.Fatalf("event = %+v, want Name \"command\", Worktree %q", e, wt.ID)
 			}
+			payload = core.CommandLogEntry{}
 			if err := json.Unmarshal(e.Payload, &payload); err != nil {
 				t.Fatal(err)
 			}

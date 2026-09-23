@@ -2,9 +2,10 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockContinueOperation, mockAbortOperation, mockRequire } = vi.hoisted(() => ({
+const { mockContinueOperation, mockAbortOperation, mockSkipOperation, mockRequire } = vi.hoisted(() => ({
   mockContinueOperation: vi.fn(),
   mockAbortOperation: vi.fn(),
+  mockSkipOperation: vi.fn(),
   mockRequire: vi.fn(),
 }))
 
@@ -12,6 +13,7 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade: {
     ContinueOperation: mockContinueOperation,
     AbortOperation: mockAbortOperation,
+    SkipOperation: mockSkipOperation,
   },
 }))
 
@@ -34,6 +36,7 @@ describe('ConflictBanner', () => {
     setActivePinia(createPinia())
     mockContinueOperation.mockReset().mockResolvedValue(undefined)
     mockAbortOperation.mockReset().mockResolvedValue(undefined)
+    mockSkipOperation.mockReset().mockResolvedValue(undefined)
     mockRequire.mockReset()
   })
 
@@ -85,5 +88,33 @@ describe('ConflictBanner', () => {
     await findButton(wrapper, 'Abort…')!.trigger('click')
 
     expect(mockAbortOperation).not.toHaveBeenCalled()
+  })
+
+  it.each(['cherry-pick', 'revert'])('FR-CP-07 renders a Skip button while a %s is stopped', (operation) => {
+    const repo = useRepoStore()
+    repo.summary = summaryFixture({ operation })
+
+    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+
+    expect(findButton(wrapper, 'Skip')).toBeDefined()
+  })
+
+  it('FR-CP-07 does not render a Skip button for a merge', () => {
+    const repo = useRepoStore()
+    repo.summary = summaryFixture({ operation: 'merge' })
+
+    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+
+    expect(findButton(wrapper, 'Skip')).toBeUndefined()
+  })
+
+  it('FR-CP-07 clicking Skip calls Facade.SkipOperation', async () => {
+    const repo = useRepoStore()
+    repo.summary = summaryFixture({ operation: 'cherry-pick' })
+
+    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+    await findButton(wrapper, 'Skip')!.trigger('click')
+
+    expect(mockSkipOperation).toHaveBeenCalledWith('/repo')
   })
 })

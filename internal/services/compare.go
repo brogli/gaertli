@@ -25,6 +25,24 @@ func (c *Core) CompareCommits(ctx context.Context, id core.WorktreeID, a, b stri
 	return parseNameStatus(result.Stdout)
 }
 
+// CompareWithWorking implements core.API. Single-revision diff (sha, no
+// second revision): git compares it against the working tree implicitly,
+// bypassing the index entirely — unlike CompareCommits' two-revision form.
+func (c *Core) CompareWithWorking(ctx context.Context, id core.WorktreeID, sha string) ([]core.ChangedFile, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	result, err := wt.Runner.Run(ctx, git.Call{
+		Dir: wt.Path, ReadOnly: true,
+		Args: []string{"diff", "--name-status", "-z", "-M", "--end-of-options", sha},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return parseNameStatus(result.Stdout)
+}
+
 // DiffRange implements core.API.
 func (c *Core) DiffRange(ctx context.Context, id core.WorktreeID, a, b, path, oldPath string, force bool) (core.DiffFile, error) {
 	wt, err := c.sessions.Get(id)

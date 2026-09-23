@@ -27,35 +27,43 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 		return core.Summary{}, err
 	}
 
-	result, err := wt.Runner.Run(ctx, git.Call{
-		Dir: wt.Path, ReadOnly: true, Background: true,
-		Args: []string{"symbolic-ref", "--short", "-q", "HEAD"},
-	})
-	// exit 1 with empty stdout = detached HEAD (symbolic-ref -q); any other
-	// failure is returned as-is.
-	detached := quietFailure(err, result)
-	if err != nil && !detached {
+	branch, detached, err := headBranch(ctx, wt.Runner, wt.Path)
+	if err != nil {
 		return core.Summary{}, err
 	}
-
-	branch := strings.TrimSpace(string(result.Stdout))
-
-	sha, err := resolveHeadSHA(ctx, wt.Runner, wt.Path)
+	sha, err := verifyRev(ctx, wt.Runner, wt.Path, "HEAD")
+	if err != nil {
+		return core.Summary{}, err
+	}
+	stash, err := pullStash(ctx, wt.Runner, wt.Path)
 	if err != nil {
 		return core.Summary{}, err
 	}
 	return core.Summary{
 		Path: wt.Path, Branch: branch, Detached: detached, Operation: operation(wt.GitDir), SHA: sha,
-		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(),
+		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(), PullStash: stash,
 	}, nil
 }
 
-// resolveHeadSHA resolves HEAD's own commit: "" for an unborn HEAD, never
-// an error — the same exit-1/empty-stdout shape quietFailure covers.
-func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, error) {
+// headBranch returns HEAD's branch name, or detached if HEAD is not a
+// symbolic ref.
+func headBranch(ctx context.Context, r git.Runner, dir string) (branch string, detached bool, err error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
-		Args: []string{"rev-parse", "-q", "--verify", "--end-of-options", "HEAD"},
+		Args: []string{"symbolic-ref", "--short", "-q", "HEAD"},
+	})
+	if quietFailure(err, result) {
+		return "", true, nil
+	}
+	return strings.TrimSpace(string(result.Stdout)), false, err
+}
+
+// verifyRev resolves rev to its object name, "" if rev does not exist (an
+// unborn HEAD, no stash).
+func verifyRev(ctx context.Context, r git.Runner, dir, rev string) (string, error) {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true, Background: true,
+		Args: []string{"rev-parse", "-q", "--verify", "--end-of-options", rev},
 	})
 	if err != nil && !quietFailure(err, result) {
 		return "", err
@@ -63,18 +71,24 @@ func resolveHeadSHA(ctx context.Context, r git.Runner, dir string) (string, erro
 	return strings.TrimSpace(string(result.Stdout)), nil
 }
 
-// quietFailure reports whether err is git's own "-q ... nothing to report"
-// shape — Code GitFailed, exit 1, empty stdout — rather than a real
-// failure: an unattached HEAD's symbolic-ref, an unborn HEAD's rev-parse.
-// Classified from the exit code, never stderr text.
+// quietFailure reports whether err is a -q call's "nothing to report": exit
+// 1 with empty stdout.
 func quietFailure(err error, result git.Result) bool {
 	return gitExited(err, result, 1) && len(result.Stdout) == 0
 }
 
+// gitFailure returns err's *core.Error if it is git's own failure (Code
+// GitFailed), else nil.
+func gitFailure(err error) *core.Error {
+	if ce, ok := errors.AsType[*core.Error](err); ok && ce.Code == core.GitFailed {
+		return ce
+	}
+	return nil
+}
+
 // gitExited reports whether err is git's own failure with exit code code.
 func gitExited(err error, result git.Result, code int) bool {
-	var ce *core.Error
-	return errors.As(err, &ce) && ce.Code == core.GitFailed && result.ExitCode == code
+	return gitFailure(err) != nil && result.ExitCode == code
 }
 
 // operation checks the state files git-mapping.md names, in the worktree's
@@ -100,16 +114,11 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// remapIfPending reclassifies a failed GitFailed err as Code Conflicts when
-// pending is true — an operation-state file was left behind, so the caller
-// stopped mid-way rather than refusing outright. Shared by pull's own
-// merge/rebase step and cherry-pick/revert.
+// remapIfPending reclassifies git's failure as Code Conflicts if pending: an
+// operation-state file was left behind, so git stopped mid-way rather than
+// refusing outright.
 func remapIfPending(err error, pending bool) error {
-	if err == nil || !pending {
-		return err
-	}
-	var ce *core.Error
-	if errors.As(err, &ce) && ce.Code == core.GitFailed {
+	if ce := gitFailure(err); ce != nil && pending {
 		ce.Code = core.Conflicts
 	}
 	return err

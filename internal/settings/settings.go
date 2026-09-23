@@ -4,6 +4,8 @@ package settings
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -27,13 +29,25 @@ type Settings struct {
 	DefaultPullMode          string   `json:"defaultPullMode"`          // "merge" | "rebase"
 	DiffMode                 string   `json:"diffMode"`                 // "unified" | "side-by-side"
 	AutoFetchIntervalMinutes int      `json:"autoFetchIntervalMinutes"` // 0 = disabled
+	Theme                    string   `json:"theme"`                    // "" = follow the OS, "light", "dark"
+	IgnoreWhitespace         bool     `json:"ignoreWhitespace"`         // the diff view's whitespace toggle
 }
 
 // RecentRepo is one entry of Settings.RecentRepos.
 type RecentRepo struct {
 	Path       string `json:"path"`
-	LastOpened string `json:"lastOpened"`       // RFC3339
-	Distro     string `json:"distro,omitempty"` // "" = local; else the WSL distro name
+	LastOpened string `json:"lastOpened"`        // RFC3339
+	Distro     string `json:"distro,omitempty"`  // "" = local; else the WSL distro name
+	RepoKey    string `json:"repoKey,omitempty"` // common git dir, shared by every worktree of the repo
+}
+
+// sameRepo reports whether r and other name one repo in one environment:
+// the same path, or worktrees sharing a common git dir.
+func (r RecentRepo) sameRepo(other RecentRepo) bool {
+	if r.Distro != other.Distro {
+		return false
+	}
+	return r.Path == other.Path || (r.RepoKey != "" && r.RepoKey == other.RepoKey)
 }
 
 // Default is a fresh install's settings: no recents, nothing open, git's own
@@ -54,7 +68,7 @@ func Path() (string, error) {
 // Load reads path. A missing file returns Default(), nil (first run).
 func Load(path string) (Settings, error) {
 	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return Default(), nil
 	}
 	if err != nil {
@@ -85,13 +99,15 @@ func Save(path string, s Settings) error {
 	return os.Rename(tmp, path)
 }
 
-// AddRecent inserts path at the front with LastOpened = now, removing any
-// earlier entry for the same path, capped at maxRecent. distro is "" for a
-// local repo, else the WSL distro it was opened from.
-func (s *Settings) AddRecent(path string, now time.Time, distro string) {
-	entries := []RecentRepo{{Path: path, LastOpened: now.Format(time.RFC3339), Distro: distro}}
+// AddRecent moves repo to the front of RecentRepos, stamped now, capped at
+// maxRecent. A worktree of a repo already listed replaces that entry, so
+// each repo is listed once, by the worktree opened last: one that surely
+// still exists, unlike an earlier one that may have been removed since.
+func (s *Settings) AddRecent(repo RecentRepo, now time.Time) {
+	repo.LastOpened = now.Format(time.RFC3339)
+	entries := []RecentRepo{repo}
 	for _, r := range s.RecentRepos {
-		if r.Path != path {
+		if !r.sameRepo(repo) {
 			entries = append(entries, r)
 		}
 	}
@@ -99,9 +115,4 @@ func (s *Settings) AddRecent(path string, now time.Time, distro string) {
 		entries = entries[:maxRecent]
 	}
 	s.RecentRepos = entries
-}
-
-// SetOpenWorktrees replaces the restore-at-launch snapshot.
-func (s *Settings) SetOpenWorktrees(paths []string) {
-	s.OpenWorktrees = paths
 }

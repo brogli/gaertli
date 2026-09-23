@@ -1,5 +1,5 @@
-import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockAddWorktree, mockPickFolder, mockOpenRecent, mockOpenFolderAt } = vi.hoisted(() => ({
   mockAddWorktree: vi.fn(),
@@ -14,10 +14,9 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 }))
 
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
+import { mountInBody } from '../testing/mountInBody'
 
 describe('CreateWorktreeDialog', () => {
-  let wrapper: VueWrapper | undefined
-
   beforeEach(() => {
     mockAddWorktree.mockReset()
     mockPickFolder.mockReset().mockResolvedValue(['', false])
@@ -27,34 +26,24 @@ describe('CreateWorktreeDialog', () => {
 
   // createFollowUp submits with an existing branch and a successful
   // AddWorktree, landing on the "open the result" follow-up.
-  async function createFollowUp(): Promise<DOMWrapper<HTMLElement>> {
+  async function createFollowUp() {
     mockAddWorktree.mockResolvedValue({ path: '/repo-wt' })
-    wrapper = mount(CreateWorktreeDialog, {
-      props: { repoPath: '/repo', branches: [{ name: 'feature', checkedOutIn: '' }], visible: true },
-      attachTo: document.body,
+    const mounted = await mountInBody(CreateWorktreeDialog, {
+      props: { repoPath: '/repo', branches: [{ name: 'feature', checkedOutIn: '' }] },
     })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { body } = mounted
     await body.get('[data-test="existing-branch"]').setValue('feature')
     await body.get('input[placeholder="Target folder"]').setValue('/repo-wt')
     await body.get('[data-test="create-worktree-submit"]').trigger('click')
     await flushPromises()
-    return body
+    return mounted
   }
-
-  afterEach(() => {
-    wrapper?.unmount()
-    wrapper = undefined
-  })
 
   it('FR-WT-02 an existing branch chosen submits with an empty start and newBranch false', async () => {
     mockAddWorktree.mockResolvedValue({})
-    wrapper = mount(CreateWorktreeDialog, {
-      props: { repoPath: '/repo', branches: [{ name: 'feature', checkedOutIn: '' }], visible: true },
-      attachTo: document.body,
+    const { body } = await mountInBody(CreateWorktreeDialog, {
+      props: { repoPath: '/repo', branches: [{ name: 'feature', checkedOutIn: '' }] },
     })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
 
     await body.get('[data-test="existing-branch"]').setValue('feature')
     await body.get('input[placeholder="Target folder"]').setValue('/repo-wt')
@@ -67,12 +56,9 @@ describe('CreateWorktreeDialog', () => {
 
   it('FR-WT-02 a new branch with a start point submits with newBranch true', async () => {
     mockAddWorktree.mockResolvedValue({})
-    wrapper = mount(CreateWorktreeDialog, {
-      props: { repoPath: '/repo', branches: [], visible: true },
-      attachTo: document.body,
+    const { body } = await mountInBody(CreateWorktreeDialog, {
+      props: { repoPath: '/repo', branches: [] },
     })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
 
     await body.get('input[type="checkbox"]').setValue(true)
     await body.get('input[placeholder="Branch name"]').setValue('feature-x')
@@ -85,18 +71,87 @@ describe('CreateWorktreeDialog', () => {
     expect(mockAddWorktree).toHaveBeenCalledWith('/repo', '/repo-wt2', 'feature-x', 'main', true)
   })
 
+  it('FR-REPO-07 a WSL repo submits AddWorktree with the UNC repo and target paths', async () => {
+    mockAddWorktree.mockResolvedValue({})
+    const { body } = await mountInBody(CreateWorktreeDialog, {
+      props: {
+        repoPath: '/home/u/r',
+        distro: 'Ubuntu',
+        branches: [{ name: 'feature', checkedOutIn: '' }],
+      },
+    })
+
+    await body.get('[data-test="existing-branch"]').setValue('feature')
+    await body.get('input[placeholder="Target folder"]').setValue('/home/u/r/wt')
+    await body.get('[data-test="create-worktree-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mockAddWorktree).toHaveBeenCalledWith(
+      '\\\\wsl.localhost\\Ubuntu\\home\\u\\r',
+      '\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt',
+      'feature',
+      '',
+      false,
+    )
+  })
+
+  it("FR-REPO-07 Browse seeds PickFolder at the distro's UNC root for a WSL repo", async () => {
+    const { body } = await mountInBody(CreateWorktreeDialog, {
+      props: { repoPath: '/home/u/r', distro: 'Ubuntu', branches: [] },
+    })
+
+    await body.get('[data-test="browse-target"]').trigger('click')
+
+    expect(mockPickFolder).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu')
+  })
+
+  // wslFollowUp submits a WSL repo's dialog to its "open the result" follow-up.
+  async function wslFollowUp() {
+    mockAddWorktree.mockResolvedValue({ path: '/home/u/r/wt' })
+    const mounted = await mountInBody(CreateWorktreeDialog, {
+      props: {
+        repoPath: '/home/u/r',
+        distro: 'Ubuntu',
+        branches: [{ name: 'feature', checkedOutIn: '' }],
+      },
+    })
+    const { body } = mounted
+    await body.get('[data-test="existing-branch"]').setValue('feature')
+    await body.get('input[placeholder="Target folder"]').setValue('/home/u/r/wt')
+    await body.get('[data-test="create-worktree-submit"]').trigger('click')
+    await flushPromises()
+    return mounted
+  }
+
+  it('FR-REPO-07 "Open in app window" for a WSL repo calls OpenRecent with the UNC form of the created path', async () => {
+    const { body } = await wslFollowUp()
+
+    await body.get('[data-test="open-window"]').trigger('click')
+    await flushPromises()
+
+    expect(mockOpenRecent).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt')
+    expect(mockOpenFolderAt).not.toHaveBeenCalled()
+  })
+
+  it('FR-REPO-07 "Open in editor" for a WSL repo calls OpenFolderAt with the UNC form of the created path', async () => {
+    const { body } = await wslFollowUp()
+
+    await body.get('[data-test="open-editor"]').trigger('click')
+    await flushPromises()
+
+    expect(mockOpenFolderAt).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt')
+    expect(mockOpenRecent).not.toHaveBeenCalled()
+  })
+
   it('FR-WT-03 a rejected InvalidName shows the error and keeps the dialog open', async () => {
     mockAddWorktree.mockRejectedValueOnce(
       Object.assign(new Error('boom'), {
         cause: { message: '"-bad" is not a valid branch name', code: 'INVALID_NAME' },
       }),
     )
-    wrapper = mount(CreateWorktreeDialog, {
-      props: { repoPath: '/repo', branches: [], visible: true },
-      attachTo: document.body,
+    const { wrapper, body } = await mountInBody(CreateWorktreeDialog, {
+      props: { repoPath: '/repo', branches: [] },
     })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
 
     await body.get('input[type="checkbox"]').setValue(true)
     await body.get('input[placeholder="Branch name"]').setValue('-bad')
@@ -105,21 +160,17 @@ describe('CreateWorktreeDialog', () => {
     await flushPromises()
 
     expect(body.text()).toContain('is not a valid branch name')
-    expect(wrapper.emitted('update:visible')).toBeUndefined()
+    expect(wrapper.emitted('close')).toBeUndefined()
   })
 
   it('FR-WT-06 a newBranch start prefills the start point, leaving name empty', async () => {
-    wrapper = mount(CreateWorktreeDialog, {
+    const { body } = await mountInBody(CreateWorktreeDialog, {
       props: {
         repoPath: '/repo',
         branches: [],
-        visible: true,
         start: { newBranch: true, start: 'abc123' },
       },
-      attachTo: document.body,
     })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
 
     expect((body.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
     expect((body.get('input[placeholder="Start point (branch or commit)"]').element as HTMLInputElement).value).toBe(
@@ -129,33 +180,29 @@ describe('CreateWorktreeDialog', () => {
   })
 
   it('FR-WT-06 an existing-branch start preselects that branch in the dropdown', async () => {
-    wrapper = mount(CreateWorktreeDialog, {
+    const { body } = await mountInBody(CreateWorktreeDialog, {
       props: {
         repoPath: '/repo',
         branches: [{ name: 'feature', checkedOutIn: '' }],
-        visible: true,
         start: { newBranch: false, branch: 'feature' },
       },
-      attachTo: document.body,
     })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
 
     expect((body.get('[data-test="existing-branch"]').element as HTMLSelectElement).value).toBe('feature')
   })
 
   it('FR-WT-12 a successful create shows the follow-up instead of closing', async () => {
-    const body = await createFollowUp()
+    const { wrapper, body } = await createFollowUp()
 
     expect(body.text()).toContain('Open in app window')
     expect(body.text()).toContain('Open in editor')
     expect(body.text()).toContain('Both')
     expect(body.text()).toContain('Not now')
-    expect(wrapper!.emitted('update:visible')).toBeUndefined()
+    expect(wrapper.emitted('close')).toBeUndefined()
   })
 
   it('FR-WT-12 "Open in app window" calls OpenRecent with the new path, then closes', async () => {
-    const body = await createFollowUp()
+    const { wrapper, body } = await createFollowUp()
 
     await body.get('[data-test="open-window"]').trigger('click')
     await flushPromises()
@@ -163,11 +210,11 @@ describe('CreateWorktreeDialog', () => {
     expect(mockOpenRecent).toHaveBeenCalledTimes(1)
     expect(mockOpenRecent).toHaveBeenCalledWith('/repo-wt')
     expect(mockOpenFolderAt).not.toHaveBeenCalled()
-    expect(wrapper!.emitted('update:visible')).toEqual([[false]])
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('FR-WT-12 "Open in editor" calls OpenFolderAt with the new path, then closes', async () => {
-    const body = await createFollowUp()
+    const { wrapper, body } = await createFollowUp()
 
     await body.get('[data-test="open-editor"]').trigger('click')
     await flushPromises()
@@ -175,11 +222,11 @@ describe('CreateWorktreeDialog', () => {
     expect(mockOpenFolderAt).toHaveBeenCalledTimes(1)
     expect(mockOpenFolderAt).toHaveBeenCalledWith('/repo-wt')
     expect(mockOpenRecent).not.toHaveBeenCalled()
-    expect(wrapper!.emitted('update:visible')).toEqual([[false]])
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('FR-WT-12 "Both" calls OpenRecent then OpenFolderAt, then closes', async () => {
-    const body = await createFollowUp()
+    const { wrapper, body } = await createFollowUp()
 
     await body.get('[data-test="open-both"]').trigger('click')
     await flushPromises()
@@ -187,17 +234,17 @@ describe('CreateWorktreeDialog', () => {
     expect(mockOpenRecent).toHaveBeenCalledTimes(1)
     expect(mockOpenFolderAt).toHaveBeenCalledTimes(1)
     expect(mockOpenRecent.mock.invocationCallOrder[0]!).toBeLessThan(mockOpenFolderAt.mock.invocationCallOrder[0]!)
-    expect(wrapper!.emitted('update:visible')).toEqual([[false]])
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('FR-WT-12 "Not now" closes without calling either binding', async () => {
-    const body = await createFollowUp()
+    const { wrapper, body } = await createFollowUp()
 
     await body.get('[data-test="not-now"]').trigger('click')
     await flushPromises()
 
     expect(mockOpenRecent).not.toHaveBeenCalled()
     expect(mockOpenFolderAt).not.toHaveBeenCalled()
-    expect(wrapper!.emitted('update:visible')).toEqual([[false]])
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 })

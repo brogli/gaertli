@@ -31,4 +31,23 @@ describe('diff store', () => {
     expect(diff.file).toEqual(staged)
     expect(mockDiffWorking).toHaveBeenCalledTimes(2)
   })
+
+  it('FR-REPO-04 refetch re-runs the last load past the cache; unchanged content keeps the same file object', async () => {
+    const diff = useDiffStore()
+    const first = { path: 'a.txt', binary: false, tooLarge: false, oldContent: 'old', newContent: 'new' }
+    mockDiffWorking
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce({ ...first })
+      .mockResolvedValueOnce({ ...first, newContent: 'newer' })
+
+    await diff.loadWorking('/repo', 'a.txt', '', false)
+    const shown = diff.file
+    await diff.refetch()
+    expect(diff.file).toBe(shown)
+
+    await diff.refetch()
+    expect(diff.file?.newContent).toBe('newer')
+    expect(mockDiffWorking).toHaveBeenCalledTimes(3)
+    expect(mockDiffWorking).toHaveBeenLastCalledWith('/repo', 'a.txt', '', false, false)
+  })
 })

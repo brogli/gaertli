@@ -1,5 +1,5 @@
-import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockReset, mockUncommittedCount, mockRequire } = vi.hoisted(() => ({
   mockReset: vi.fn(),
@@ -16,11 +16,11 @@ vi.mock('openvue/useconfirm', () => ({
 }))
 
 import ResetDialog from './ResetDialog.vue'
+import { mountInBody } from '../testing/mountInBody'
 
 function mountDialog(branch = 'main') {
-  return mount(ResetDialog, {
-    props: { wt: '/repo', branch, sha: 'abc123', subject: 'Fix the bug', visible: true },
-    attachTo: document.body,
+  return mountInBody(ResetDialog, {
+    props: { wt: '/repo', branch, sha: 'abc123', subject: 'Fix the bug' },
   })
 }
 
@@ -30,8 +30,6 @@ function capturedOptions(): { message: string; accept: () => void } {
 }
 
 describe('ResetDialog', () => {
-  let wrapper: VueWrapper | undefined
-
   beforeEach(() => {
     mockReset.mockReset()
     mockUncommittedCount.mockReset()
@@ -39,15 +37,8 @@ describe('ResetDialog', () => {
     mockRequire.mockReset()
   })
 
-  afterEach(() => {
-    wrapper?.unmount()
-    wrapper = undefined
-  })
-
   it('FR-BR-02 renders the branch, the target subject, and all three mode explanations', async () => {
-    wrapper = mountDialog()
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { body } = await mountDialog()
 
     expect(body.text()).toContain('main')
     expect(body.text()).toContain('Fix the bug')
@@ -58,19 +49,37 @@ describe('ResetDialog', () => {
     )
   })
 
-  it('FR-BR-02 renders "HEAD" instead of a blank branch name while detached', async () => {
-    wrapper = mountDialog('')
+  it('FR-BR-07 renders a fourth radio option, Keep, with its fixed explanation', async () => {
+    const { body } = await mountDialog()
+
+    expect(body.find('input#reset-mode-keep').exists()).toBe(true)
+    expect(body.text()).toContain(
+      'moves the branch pointer, resets the index and working files, but refuses if any local change would be lost.',
+    )
+  })
+
+  it('FR-BR-07 clicking Reset at keep mode calls Facade.Reset directly, no confirmation', async () => {
+    mockReset.mockResolvedValue({ previousHead: 'def456' })
+    const { body } = await mountDialog()
+
+    await body.get('input#reset-mode-keep').setValue()
+    await body.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
-    const body = new DOMWrapper(document.body)
+
+    expect(mockReset).toHaveBeenCalledTimes(1)
+    expect(mockReset).toHaveBeenCalledWith('/repo', 'abc123', 'keep')
+    expect(mockRequire).not.toHaveBeenCalled()
+  })
+
+  it('FR-BR-02 renders "HEAD" instead of a blank branch name while detached', async () => {
+    const { body } = await mountDialog('')
 
     expect(body.text()).toContain('HEAD')
   })
 
   it('FR-BR-02 clicking Reset at the default mixed mode calls Facade.Reset directly, no confirmation', async () => {
     mockReset.mockResolvedValue({ previousHead: 'def456' })
-    wrapper = mountDialog()
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { body } = await mountDialog()
 
     await body.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
@@ -80,11 +89,9 @@ describe('ResetDialog', () => {
     expect(mockRequire).not.toHaveBeenCalled()
   })
 
-  it('FR-BR-04 shows the previous HEAD after a successful reset, and Close emits update:visible false', async () => {
+  it('FR-BR-04 shows the previous HEAD after a successful reset, and Close closes the dialog', async () => {
     mockReset.mockResolvedValue({ previousHead: 'abc123' })
-    wrapper = mountDialog()
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
@@ -93,15 +100,13 @@ describe('ResetDialog', () => {
 
     await body.get('[data-test="reset-close"]').trigger('click')
 
-    expect(wrapper.emitted('update:visible')).toEqual([[false]])
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('FR-BR-03 hard mode confirms first, naming the uncommitted count, before calling Facade.Reset', async () => {
     mockUncommittedCount.mockResolvedValue(4)
     mockReset.mockResolvedValue({ previousHead: 'def456' })
-    wrapper = mountDialog()
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { body } = await mountDialog()
 
     await body.get('input#reset-mode-hard').setValue()
     await body.get('[data-test="reset-submit"]').trigger('click')
@@ -120,9 +125,7 @@ describe('ResetDialog', () => {
 
   it('FR-UX-03 never calls Facade.Reset if the confirmation is not accepted (QA-SAFE-01)', async () => {
     mockUncommittedCount.mockResolvedValue(4)
-    wrapper = mountDialog()
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { body } = await mountDialog()
 
     await body.get('input#reset-mode-hard').setValue()
     await body.get('[data-test="reset-submit"]').trigger('click')

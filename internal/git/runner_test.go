@@ -159,6 +159,28 @@ func TestFR_UX_01_GitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
 	}
 }
 
+func TestFR_UX_01_AGitFailuresMessageIsGitsOwn(t *testing.T) {
+	cases := []struct{ name, stderr, want string }{
+		{"prefix stripped", "fatal: a branch named 'main' already exists\n", "a branch named 'main' already exists"},
+		{"hints dropped, following lines kept",
+			"error: Your local changes to the following files would be overwritten by checkout:\n\tconflict.txt\nhint: stash them\nAborting\n",
+			"Your local changes to the following files would be overwritten by checkout:\nconflict.txt\nAborting"},
+		{"at most four lines", "a\nb\nc\nd\ne\n", "a\nb\nc\nd"},
+		{"leads with the fatal line, not progress before it", "Preparing worktree (new branch 'x')\nfatal: '/t' already exists\n", "'/t' already exists"},
+		{"no output: the exit code", "", "git exited 3"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("FAKEGIT_STDERR", c.stderr)
+			t.Setenv("FAKEGIT_EXIT", "3")
+			_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+			if got := coretest.AsError(t, err, core.GitFailed).Message; got != c.want {
+				t.Errorf("Message = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
 func TestFR_UX_01_GitStderrPrefersStderrOverStdoutWhenBothArePresent(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "on stdout")
 	t.Setenv("FAKEGIT_STDERR", "on stderr")

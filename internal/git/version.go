@@ -1,6 +1,7 @@
 package git
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strconv"
@@ -17,13 +18,7 @@ var MinVersion = Version{Major: 2, Minor: 40, Patch: 0}
 
 // Less reports whether v is older than o.
 func (v Version) Less(o Version) bool {
-	if v.Major != o.Major {
-		return v.Major < o.Major
-	}
-	if v.Minor != o.Minor {
-		return v.Minor < o.Minor
-	}
-	return v.Patch < o.Patch
+	return cmp.Or(cmp.Compare(v.Major, o.Major), cmp.Compare(v.Minor, o.Minor), cmp.Compare(v.Patch, o.Patch)) < 0
 }
 
 func (v Version) String() string {

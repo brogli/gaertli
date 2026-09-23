@@ -19,6 +19,7 @@ vi.mock('@wailsio/runtime', () => ({
 
 import JobsStrip from './JobsStrip.vue'
 import ErrorBanner from './ErrorBanner.vue'
+import { registeredHandler } from '../testing/events'
 
 describe('JobsStrip', () => {
   beforeEach(() => {
@@ -62,7 +63,7 @@ describe('JobsStrip', () => {
     await wrapper.get('[data-test="job-cancel"]').trigger('click')
     expect(mockCancelJob).toHaveBeenCalledWith('/repo', 'j1')
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'job:update')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'job:update')
     handler?.({
       data: {
         id: 'j1',
@@ -82,7 +83,8 @@ describe('JobsStrip', () => {
     mockJobs.mockResolvedValue([
       {
         id: 'j1',
-        kind: 'update-branch:feature',
+        kind: 'update-branch',
+        branch: 'feature',
         state: 'running',
         progress: 40,
         message: '',
@@ -93,7 +95,7 @@ describe('JobsStrip', () => {
     await flushPromises()
 
     expect(wrapper.get('.job-row').text()).toContain('Update feature')
-    expect(wrapper.get('.job-row').text()).not.toContain('update-branch:feature')
+    expect(wrapper.get('.job-row').text()).not.toContain('update-branch')
   })
 
   it('FR-UX-01 a rejected Cancel renders ErrorBanner with the error', async () => {

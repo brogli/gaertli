@@ -4,6 +4,7 @@ import (
 	"context"
 	"maps"
 	"sync"
+	"sync/atomic"
 
 	"github.com/brogli/nebegit/internal/buildinfo"
 	"github.com/brogli/nebegit/internal/core"
@@ -87,6 +88,8 @@ type Registry struct {
 	compareWindows map[compareWindowKey]shellWindow // a distinct, non-selecting window kind
 	distros        map[string]distroCorer           // lazily created, one per distro in use
 	newDistroCore  func(distro string) distroCorer
+
+	quitting atomic.Bool // set by Quitting; the windows closing after it stay remembered
 }
 
 // NewRegistry builds an empty Registry.
@@ -207,7 +210,7 @@ func (r *Registry) CoreFor(path core.RepoPath) (core.API, error) {
 	if err != nil {
 		return nil, err
 	}
-	return remote.NewOpener(client, distro), nil
+	return remote.NewDistroPathClient(client, distro), nil
 }
 
 // findSelectingLocked returns the window currently selecting wt, or nil.
@@ -280,9 +283,10 @@ func (r *Registry) openOrRegister(id core.WorktreeID, path, distro string) shell
 		return e.window
 	}
 	var window shellWindow
-	window = r.newWindow(windowTitle(path, ""), selectionURL(path), func() {
+	window = r.newWindow(windowTitle(path, ""), selectionURL(path, distro), func() {
 		closed, distro := r.closeWindow(window.ID())
 		r.Release(closed, distro)
+		r.rememberOpenWorktrees()
 	})
 	wireFocusEvents(window, func(focused bool) { _ = r.local.SetFocused(context.Background(), id, focused) })
 	r.windows[window.ID()] = &windowEntry{window: window, selected: id, path: path, distro: distro}
@@ -391,15 +395,44 @@ func (r *Registry) removeCompareWindow(key compareWindowKey) {
 	delete(r.compareWindows, key)
 }
 
+// Quitting marks the app as shutting down: the shutdown then closes every
+// window, and those were all open at quit.
+func (r *Registry) Quitting() { r.quitting.Store(true) }
+
+// rememberOpenWorktrees records the windows still open for the next
+// launch's restore. Closing the last window quits the app, so a close that
+// leaves no window keeps that window recorded; so does every close during
+// a shutdown.
+func (r *Registry) rememberOpenWorktrees() {
+	if r.store == nil || r.quitting.Load() || r.windowCount() == 0 {
+		return
+	}
+	paths := r.OpenWorktreePaths()
+	_ = r.store.Update(func(s *settings.Settings) { s.OpenWorktrees = paths })
+}
+
+func (r *Registry) windowCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.windows)
+}
+
 // OpenWorktreePaths lists every currently selected worktree's path, one per
-// window that has one, for the restore-at-launch snapshot.
+// window that has one, for the restore-at-launch snapshot. A WSL window's
+// path comes back in its UNC form, so restore's OpenWorktree call routes
+// through CoreFor to the same distro.
 func (r *Registry) OpenWorktreePaths() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	paths := make([]string, 0, len(r.windows))
 	for _, entry := range r.windows {
-		if entry.selected != "" {
+		if entry.selected == "" {
+			continue
+		}
+		if entry.distro != "" {
+			paths = append(paths, remote.BuildWSLPath(entry.distro, entry.path))
+		} else {
 			paths = append(paths, entry.path)
 		}
 	}

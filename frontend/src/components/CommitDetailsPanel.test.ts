@@ -92,6 +92,57 @@ describe('CommitDetailsPanel', () => {
     expect(log.selectedFile).toEqual({ path: 'a.txt', status: 'M' })
   })
 
+  it('FR-UX-10 labels Author and Committer with dates when they differ, and shows short-hash parents with the full SHA in title', async () => {
+    mockCommitDetails.mockResolvedValue({
+      sha: 'a'.repeat(40),
+      parents: ['b'.repeat(40), 'c'.repeat(40)],
+      author: 'Alice',
+      authorEmail: 'alice@example.com',
+      authorAt: 1_700_000_000,
+      committer: 'Bob',
+      committerEmail: 'bob@example.com',
+      committerAt: 1_700_000_100,
+      body: 'Fix the bug',
+      files: [],
+    })
+
+    const wrapper = mount(CommitDetailsPanel, { props: { wt: '/repo' } })
+    const log = useLogStore()
+    await log.select(commitRow())
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Author')
+    expect(wrapper.text()).toContain('Committer')
+    expect(wrapper.find('li').exists()).toBe(false)
+    const parents = wrapper.findAll('.parents [title]')
+    expect(parents).toHaveLength(2)
+    expect(parents[0]!.text()).toBe('b'.repeat(7))
+    expect(parents[0]!.attributes('title')).toBe('b'.repeat(40))
+  })
+
+  it('FR-UX-10 hides the Committer field when author and committer match', async () => {
+    mockCommitDetails.mockResolvedValue({
+      sha: 'a'.repeat(40),
+      parents: [],
+      author: 'Alice',
+      authorEmail: 'alice@example.com',
+      authorAt: 1_700_000_000,
+      committer: 'Alice',
+      committerEmail: 'alice@example.com',
+      committerAt: 1_700_000_000,
+      body: 'Fix the bug',
+      files: [],
+    })
+
+    const wrapper = mount(CommitDetailsPanel, { props: { wt: '/repo' } })
+    const log = useLogStore()
+    await log.select(commitRow())
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Author')
+    expect(wrapper.text()).not.toContain('Committer')
+  })
+
   it('FR-ED-02 an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
     mockCommitDetails.mockResolvedValue({
       sha: 'abc123',

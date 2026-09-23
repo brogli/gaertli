@@ -1,7 +1,6 @@
 package jobs
 
 import (
-	"errors"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -12,6 +11,7 @@ func Info(j Job) core.JobInfo {
 	info := core.JobInfo{
 		ID:        string(j.ID),
 		Kind:      j.Kind,
+		Branch:    j.Branch,
 		State:     string(j.State),
 		Progress:  j.Percent,
 		Message:   j.Message,
@@ -22,12 +22,7 @@ func Info(j Job) core.JobInfo {
 		info.EndedAt = j.EndedAt.Format(time.RFC3339Nano)
 	}
 	if j.Err != nil {
-		var ce *core.Error
-		if errors.As(j.Err, &ce) {
-			info.Error = ce
-		} else {
-			info.Error = core.Errorf(core.Internal, "%v", j.Err)
-		}
+		info.Error = core.ErrorOf(j.Err)
 	}
 	return info
 }

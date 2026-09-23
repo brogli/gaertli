@@ -10,6 +10,7 @@ export function summaryFixture(overrides: Partial<Summary> = {}): Summary {
     operation: '',
     editorName: 'editor',
     messageDraft: '',
+    pullStash: '',
     ...overrides,
   }
 }

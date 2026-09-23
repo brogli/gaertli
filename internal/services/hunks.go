@@ -10,21 +10,19 @@ import (
 	"github.com/brogli/nebegit/internal/git"
 )
 
-// diffArgsFor is the fresh re-diff StageLines builds its patch from: the
-// staged diff when reverse (unstaging peels off what's already staged),
-// the unstaged diff otherwise. -U3: git apply needs at least one context
-// line by default.
-func diffArgsFor(path string, reverse bool) []string {
+// diffArgsFor is path's staged or unstaged diff. -U3: git apply needs at
+// least one context line by default.
+func diffArgsFor(path string, staged bool) []string {
 	args := []string{"diff"}
-	if reverse {
+	if staged {
 		args = append(args, "--cached")
 	}
 	return append(args, "-U3", "--", path)
 }
 
 // hunkFragments re-diffs path and parses it.
-func hunkFragments(ctx context.Context, r git.Runner, dir, path string, reverse bool) (frags []*gitdiff.TextFragment, header []byte, err error) {
-	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: diffArgsFor(path, reverse)})
+func hunkFragments(ctx context.Context, r git.Runner, dir, path string, staged bool) (frags []*gitdiff.TextFragment, header []byte, err error) {
+	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: diffArgsFor(path, staged)})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -164,23 +162,15 @@ func writeHunkLine(b *bytes.Buffer, prefix byte, l gitdiff.Line) {
 	}
 }
 
-// StageLines implements core.API. It re-diffs path under the write lock,
-// keeps only the lines sel selects from each fragment, and applies the
-// rebuilt patch to the index. A selection matching no changed line of the
-// fresh diff is stale: nothing is applied, Code Internal.
-func (c *Core) StageLines(ctx context.Context, id core.WorktreeID, path string, sel core.LineSelection, reverse bool) error {
-	wt, err := c.sessions.Get(id)
+// selectionPatch re-diffs path (the staged diff if staged, else the unstaged
+// one) and rebuilds it keeping only sel's lines, for git apply [--reverse
+// if reverse]. A selection matching no changed line is stale: Code
+// Internal.
+func selectionPatch(ctx context.Context, r git.Runner, dir, path string, sel core.LineSelection, staged, reverse bool) ([]byte, error) {
+	frags, header, err := hunkFragments(ctx, r, dir, path, staged)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	wt.Lock() // writes this worktree's index
-	defer wt.Unlock()
-
-	frags, header, err := hunkFragments(ctx, wt.Runner, wt.Path, path, reverse)
-	if err != nil {
-		return err
-	}
-
 	patch := append([]byte{}, header...)
 	matched := false
 	for _, frag := range frags {
@@ -192,9 +182,25 @@ func (c *Core) StageLines(ctx context.Context, id core.WorktreeID, path string, 
 		patch = append(patch, buildPartialPatch(frag, selected, reverse)...)
 	}
 	if !matched {
-		return core.Errorf(core.Internal, "line selection matches no changed line of %s's current diff", path)
+		return nil, core.Errorf(core.Internal, "line selection matches no changed line of %s's current diff", path)
 	}
+	return patch, nil
+}
 
+// StageLines implements core.API: it applies selectionPatch to the index
+// under the write lock.
+func (c *Core) StageLines(ctx context.Context, id core.WorktreeID, path string, sel core.LineSelection, reverse bool) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	wt.Lock() // writes this worktree's index
+	defer wt.Unlock()
+
+	patch, err := selectionPatch(ctx, wt.Runner, wt.Path, path, sel, reverse, reverse)
+	if err != nil {
+		return err
+	}
 	args := []string{"apply", "--cached", "--recount"}
 	if reverse {
 		args = append(args, "--reverse")

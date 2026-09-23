@@ -70,4 +70,4 @@ Clone · built-in merge editor · interactive rebase · stash management (beyond
 | Log actions in v1 | Cherry-pick, revert, check out commit. Reset mode "keep" stays SHOULD. |
 | Process | Hands-off by Claude sessions; critical decisions to the owner. |
 
-No open questions. Technical unknowns are spike items in `architecture.md`.
+No open questions.

@@ -166,12 +166,14 @@ func TestTR_23_PnpmIsTheOnlyPackageManager(t *testing.T) {
 // offlineEnv is what a test run must set so it can never reach the network.
 var offlineEnv = []string{"GOPROXY: off", "GOFLAGS: -mod=readonly", "GOTOOLCHAIN: local"}
 
-// taskBody returns the YAML block of one top-level task in a Taskfile.
-func taskBody(t *testing.T, taskfile, name string) string {
+// yamlBlock returns the two-space-indented body of a top-level YAML key
+// ("key:\n" through the next line at that indent) — the shape of both a
+// Taskfile task and a GitHub Actions job.
+func yamlBlock(t *testing.T, text, key string) string {
 	t.Helper()
-	m := regexp.MustCompile(`(?ms)^  ` + name + `:\n(.*?)(?:^  \S|\z)`).FindStringSubmatch(taskfile)
+	m := regexp.MustCompile(`(?ms)^  ` + key + `:\n(.*?)(?:^  \S|\z)`).FindStringSubmatch(text)
 	if m == nil {
-		t.Fatalf("no task %q", name)
+		t.Fatalf("no key %q", key)
 	}
 	return m[1]
 }
@@ -179,7 +181,7 @@ func taskBody(t *testing.T, taskfile, name string) string {
 func TestQA_MNT_03_TestTaskAndCIRunOffline(t *testing.T) {
 	root := repoRoot(t)
 
-	testTask := taskBody(t, readFile(t, root, "Taskfile.yml"), "test")
+	testTask := yamlBlock(t, readFile(t, root, "Taskfile.yml"), "test")
 	assertContainsAll(t, "Taskfile.yml test task", testTask, offlineEnv...)
 	assertContainsAll(t, "ci.yml", readFile(t, root, ".github/workflows/ci.yml"), offlineEnv...)
 	assertContainsAll(t, "build/Taskfile.yml", readFile(t, root, "build/Taskfile.yml"), "pnpm install --frozen-lockfile")
@@ -204,9 +206,9 @@ func TestTR_31_PerfBenchAndPlaywrightWiring(t *testing.T) {
 	assertContainsAll(t, ".gitignore", readFile(t, root, ".gitignore"), ".bench/")
 
 	taskfile := readFile(t, root, "Taskfile.yml")
-	ciTask := taskBody(t, taskfile, "ci")
+	ciTask := yamlBlock(t, taskfile, "ci")
 	for _, name := range []string{"bench", "e2e"} {
-		taskBody(t, taskfile, name) // fails via t.Fatalf if the task is missing
+		yamlBlock(t, taskfile, name) // fails via t.Fatalf if the task is missing
 		if strings.Contains(ciTask, "task: "+name) {
 			t.Errorf("ci task must not run %s", name)
 		}
@@ -480,13 +482,13 @@ func TestTR_33_TaskfileCallersUseRenamedScripts(t *testing.T) {
 	root := repoRoot(t)
 	taskfile := readFile(t, root, "Taskfile.yml")
 
-	testTask := taskBody(t, taskfile, "test")
+	testTask := yamlBlock(t, taskfile, "test")
 	assertContainsAll(t, "Taskfile.yml test task", testTask, "SCRIPT: test:unit")
 
-	lintTask := taskBody(t, taskfile, "lint")
+	lintTask := yamlBlock(t, taskfile, "lint")
 	assertContainsAll(t, "Taskfile.yml lint task", lintTask, "SCRIPT: lint", "SCRIPT: type-check")
 
-	e2eTask := taskBody(t, taskfile, "e2e")
+	e2eTask := yamlBlock(t, taskfile, "e2e")
 	assertContainsAll(t, "Taskfile.yml e2e task", e2eTask, "common:frontend:run", "SCRIPT: test:e2e")
 
 	for _, tf := range []string{"Taskfile.yml", "build/Taskfile.yml"} {
@@ -502,4 +504,209 @@ func TestTR_33_DocsNameOxlint(t *testing.T) {
 	root := repoRoot(t)
 	assertContainsAll(t, "CONTRIBUTING.md", readFile(t, root, "CONTRIBUTING.md"), "oxlint")
 	assertContainsAll(t, "docs/architecture/testing.md", readFile(t, root, "docs/architecture/testing.md"), "oxlint")
+}
+
+// matrixEntry is one `- os: ..." / "task: ...` pair of a CI matrix.
+type matrixEntry struct{ os, task string }
+
+var matrixEntryPattern = regexp.MustCompile(`(?m)^\s*-\s*os:\s*(\S+)\n\s*task:\s*(\S+)`)
+
+func matrixEntries(workflow string) []matrixEntry {
+	var entries []matrixEntry
+	for _, m := range matrixEntryPattern.FindAllStringSubmatch(workflow, -1) {
+		entries = append(entries, matrixEntry{os: m[1], task: m[2]})
+	}
+	return entries
+}
+
+func TestQA_PORT_01_TR_22_CIMatrixCoversSupportedPlatforms(t *testing.T) {
+	root := repoRoot(t)
+	entries := matrixEntries(readFile(t, root, ".github/workflows/ci.yml"))
+
+	want := []matrixEntry{
+		{os: "ubuntu-24.04", task: "ci"},
+		{os: "ubuntu-24.04", task: "e2e:real"},
+		{os: "windows-latest", task: "ci"},
+		{os: "macos-latest", task: "build"},
+	}
+	if !slices.Equal(entries, want) {
+		t.Errorf("CI matrix = %v, want %v", entries, want)
+	}
+}
+
+// TestQA_PORT_04_ReleaseDarwinJobIsBestEffort also checks that each release
+// job runs on a host of its target architecture, so no GOARCH override is
+// needed.
+func TestQA_PORT_04_ReleaseDarwinJobIsBestEffort(t *testing.T) {
+	root := repoRoot(t)
+	release := readFile(t, root, ".github/workflows/release.yml")
+
+	darwin := yamlBlock(t, release, "darwin")
+	if !strings.Contains(darwin, "continue-on-error: true") {
+		t.Error(`darwin job missing "continue-on-error: true"`)
+	}
+
+	publish := yamlBlock(t, release, "publish")
+	if strings.Contains(publish, "needs.darwin.result") {
+		t.Error("publish job's if: must not gate on needs.darwin.result")
+	}
+
+	runsOn := map[string]string{"windows": "windows-latest", "linux": "ubuntu-24.04", "darwin": "macos-latest"}
+	for job, want := range runsOn {
+		body := yamlBlock(t, release, job)
+		if !strings.Contains(body, "runs-on: "+want) {
+			t.Errorf("%s job missing \"runs-on: %s\"", job, want)
+		}
+		if strings.Contains(body, "GOARCH") || strings.Contains(body, "GOOS:") {
+			t.Errorf("%s job sets an explicit GOOS/GOARCH override; the runner's own architecture already matches the target", job)
+		}
+	}
+}
+
+func TestQA_INST_02_ReleaseWorkflowTriggersOnVersionTagOnly(t *testing.T) {
+	root := repoRoot(t)
+	release := readFile(t, root, ".github/workflows/release.yml")
+
+	on := regexp.MustCompile(`(?ms)^on:\n(.*?)(?:^\S|\z)`).FindStringSubmatch(release)
+	if on == nil {
+		t.Fatal("no on: trigger block")
+	}
+	assertContainsAll(t, "release.yml on:", on[1], "tags: ['v*']")
+	for _, unwanted := range []string{"branches:", "workflow_dispatch", "schedule:"} {
+		if strings.Contains(on[1], unwanted) {
+			t.Errorf("release.yml on: must not contain %q, only a version-tag push", unwanted)
+		}
+	}
+
+	publish := yamlBlock(t, release, "publish")
+	if !strings.Contains(publish, "sha256sum") {
+		t.Error("publish job missing a checksum command")
+	}
+	if !strings.Contains(publish, "action-gh-release") {
+		t.Error("publish job missing a GitHub Release upload action")
+	}
+}
+
+// forbiddenInstallerTasks are task names release.yml must never invoke: they
+// build an installer or a package format v1 doesn't ship.
+var forbiddenInstallerTasks = []string{
+	"linux:create:deb", "linux:create:rpm", "linux:create:aur",
+	"darwin:package:dmg", "create:nsis:installer", "create:msix:package",
+}
+
+// bareWindowsPackage matches windows:package, with or without a :dryrun
+// suffix; only the :dryrun form (the zip-into-dist/ step) is allowed.
+var bareWindowsPackage = regexp.MustCompile(`\bwindows:package\b(?::dryrun)?`)
+
+func TestQA_INST_03_ReleaseWorkflowBuildsNoInstaller(t *testing.T) {
+	root := repoRoot(t)
+	release := readFile(t, root, ".github/workflows/release.yml")
+
+	for i, line := range strings.Split(release, "\n") {
+		if !strings.Contains(line, "task") {
+			continue
+		}
+		for _, forbidden := range forbiddenInstallerTasks {
+			if strings.Contains(line, forbidden) {
+				t.Errorf("release.yml:%d invokes an installer task (%q): %s", i+1, forbidden, strings.TrimSpace(line))
+			}
+		}
+		if m := bareWindowsPackage.FindString(line); m != "" && m != "windows:package:dryrun" {
+			t.Errorf("release.yml:%d invokes windows:package (an installer), not windows:package:dryrun: %s", i+1, strings.TrimSpace(line))
+		}
+	}
+}
+
+func TestQA_OSS_03_ReadmeDocumentsInstallAndLimits(t *testing.T) {
+	root := repoRoot(t)
+	assertContainsAll(t, "README.md", readFile(t, root, "README.md"),
+		"## Install", "## First start", "## Editor setup", "## Known limits", "WSL", "ssh-agent")
+}
+
+// homePathPattern, remoteURLPattern, and branchFieldPattern flag content
+// that assumes one developer's own setup: an absolute home directory, a
+// hard-coded git remote address, or a hard-coded "branch" field.
+var (
+	homePathPattern    = regexp.MustCompile(`/home/[a-z][a-z0-9_-]*/|C:\\Users\\[A-Za-z0-9_ .-]+`)
+	remoteURLPattern   = regexp.MustCompile(`git@[A-Za-z0-9._-]+:|[a-z][a-z0-9+.-]*://[^\s"']*\.git\b|ssh://`)
+	branchFieldPattern = regexp.MustCompile(`(?i)(?:^|[^a-z0-9_-])branch\b\s*[:=]\s*"([^"]+)"`)
+)
+
+// allowedPlumbingBranches are the branch names git itself defaults to;
+// anything else hard-coded as a "branch" field is a suspect owner default.
+var allowedPlumbingBranches = map[string]bool{"main": true, "master": true, "HEAD": true}
+
+// findOwnerSpecificDefaults walks root's files, skipping _test.go/.test.ts
+// files and any testing/fixtures directory, and returns the paths of files
+// containing a hard-coded home directory, remote URL, or non-plumbing
+// branch name.
+func findOwnerSpecificDefaults(t *testing.T, root string) []string {
+	t.Helper()
+	var violations []string
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if d.Name() == "fixtures" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(path, "_test.go") || strings.HasSuffix(path, ".test.ts") {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(content)
+
+		if homePathPattern.MatchString(text) || remoteURLPattern.MatchString(text) {
+			violations = append(violations, path)
+			return nil
+		}
+		if strings.HasSuffix(path, ".go") || strings.HasSuffix(path, ".ts") {
+			for _, m := range branchFieldPattern.FindAllStringSubmatch(text, -1) {
+				if !allowedPlumbingBranches[m[1]] {
+					violations = append(violations, path)
+					break
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return violations
+}
+
+func TestQA_OSS_04_NoOwnerSpecificDefaults(t *testing.T) {
+	t.Run("fixture", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFixture := func(name, content string) {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		writeFixture("dirty.go", "package fixture\n\n// installed at /home/user/repos/nebegit\n")
+		writeFixture("clean.go", "package fixture\n")
+
+		got := findOwnerSpecificDefaults(t, dir)
+		if len(got) != 1 || !strings.HasSuffix(got[0], "dirty.go") {
+			t.Errorf("findOwnerSpecificDefaults(fixture) = %v, want exactly one match, dirty.go", got)
+		}
+	})
+
+	t.Run("real tree", func(t *testing.T) {
+		root := repoRoot(t)
+		var violations []string
+		for _, dir := range []string{"internal", "cmd", "frontend/src"} {
+			violations = append(violations, findOwnerSpecificDefaults(t, filepath.Join(root, dir))...)
+		}
+		if len(violations) > 0 {
+			t.Errorf("owner-specific defaults found:\n%s", strings.Join(violations, "\n"))
+		}
+	})
 }

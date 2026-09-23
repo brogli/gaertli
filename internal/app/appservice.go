@@ -151,3 +151,16 @@ func (s *AppService) InstallWSLLauncher(ctx context.Context, distro string) erro
 	}
 	return s.reg.distroCore(distro).InstallLauncher(ctx, guiExe)
 }
+
+// TestEditorProfile tries profile on env's core: "" is the local core, else
+// a WSL distro's, connected (and deployed, with consent) on demand.
+func (s *AppService) TestEditorProfile(ctx context.Context, env string, profile core.EditorProfile) error {
+	if env == "" {
+		return s.reg.Local().TestEditorProfile(ctx, profile)
+	}
+	client, _, err := s.reg.distroCore(env).Ensure(ctx)
+	if err != nil {
+		return err
+	}
+	return client.TestEditorProfile(ctx, profile)
+}

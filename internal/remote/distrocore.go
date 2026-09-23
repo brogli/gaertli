@@ -155,26 +155,95 @@ func closed(ch <-chan struct{}) bool {
 	}
 }
 
-// openingWSLWorktree adapts a live DistroCore client to core.API for the
-// one call that needs path translation: only OpenWorktree takes a RepoPath,
-// every other method takes a WorktreeID the distro's own core minted.
-// Embedding promotes the rest straight through to *Client.
-type openingWSLWorktree struct {
+// distroPathClient is a DistroCore client that translates every
+// core.RepoPath argument, and the target argument of AddWorktree and
+// RemoveWorktree, from the WSL UNC form the shell holds to the POSIX form
+// distro's own core expects; embedding passes every other method straight
+// to *Client. Returned values are already POSIX (the distro core's own
+// paths), so nothing translates them back.
+type distroPathClient struct {
 	*Client
 	distro string
 }
 
-// NewOpener wraps client so OpenWorktree translates a WSL UNC path
-// (\\wsl.localhost\<distro>\... or \\wsl$\<distro>\...) to the POSIX path
-// distro's own core expects.
-func NewOpener(client *Client, distro string) core.API {
-	return openingWSLWorktree{Client: client, distro: distro}
+// NewDistroPathClient wraps client so every core.RepoPath argument, and the
+// target argument of AddWorktree and RemoveWorktree, translates a WSL UNC
+// path (\\wsl.localhost\<distro>\... or \\wsl$\<distro>\...) to the POSIX
+// path distro's own core expects.
+func NewDistroPathClient(client *Client, distro string) core.API {
+	return distroPathClient{Client: client, distro: distro}
 }
 
-func (o openingWSLWorktree) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
-	_, linuxPath, ok := ClassifyWSLPath(string(path))
-	if !ok {
-		return core.WorktreeInfo{}, core.Errorf(core.Internal, "not a WSL path for distro %s: %s", o.distro, path)
+// posix translates path, a WSL UNC path naming o.distro, to its POSIX form.
+// A path naming another distro, or no WSL path at all, is core.Internal.
+func (o distroPathClient) posix(path string) (string, error) {
+	distro, linuxPath, ok := ClassifyWSLPath(path)
+	if !ok || distro != o.distro {
+		return "", core.Errorf(core.Internal, "not a WSL path for distro %s: %s", o.distro, path)
 	}
-	return o.Client.OpenWorktree(ctx, core.RepoPath(linuxPath))
+	return linuxPath, nil
+}
+
+func (o distroPathClient) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+	p, err := o.posix(string(path))
+	if err != nil {
+		return core.WorktreeInfo{}, err
+	}
+	return o.Client.OpenWorktree(ctx, core.RepoPath(p))
+}
+
+func (o distroPathClient) OpenFolderAt(ctx context.Context, path core.RepoPath) error {
+	p, err := o.posix(string(path))
+	if err != nil {
+		return err
+	}
+	return o.Client.OpenFolderAt(ctx, core.RepoPath(p))
+}
+
+func (o distroPathClient) ListWorktrees(ctx context.Context, path core.RepoPath) ([]core.Worktree, error) {
+	p, err := o.posix(string(path))
+	if err != nil {
+		return nil, err
+	}
+	return o.Client.ListWorktrees(ctx, core.RepoPath(p))
+}
+
+func (o distroPathClient) ListBranches(ctx context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
+	p, err := o.posix(string(path))
+	if err != nil {
+		return nil, err
+	}
+	return o.Client.ListBranches(ctx, core.RepoPath(p))
+}
+
+func (o distroPathClient) AddWorktree(ctx context.Context, path core.RepoPath, target, branch, start string, newBranch bool) (core.Worktree, error) {
+	p, err := o.posix(string(path))
+	if err != nil {
+		return core.Worktree{}, err
+	}
+	t, err := o.posix(target)
+	if err != nil {
+		return core.Worktree{}, err
+	}
+	return o.Client.AddWorktree(ctx, core.RepoPath(p), t, branch, start, newBranch)
+}
+
+func (o distroPathClient) RemoveWorktree(ctx context.Context, path core.RepoPath, target string, force bool) error {
+	p, err := o.posix(string(path))
+	if err != nil {
+		return err
+	}
+	t, err := o.posix(target)
+	if err != nil {
+		return err
+	}
+	return o.Client.RemoveWorktree(ctx, core.RepoPath(p), t, force)
+}
+
+func (o distroPathClient) PruneWorktrees(ctx context.Context, path core.RepoPath) error {
+	p, err := o.posix(string(path))
+	if err != nil {
+		return err
+	}
+	return o.Client.PruneWorktrees(ctx, core.RepoPath(p))
 }

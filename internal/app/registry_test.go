@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"testing/fstest"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/remote"
@@ -27,6 +28,7 @@ type emittedEvent struct {
 type fakeWindow struct {
 	id         uint
 	title      string
+	url        string
 	focusCount int
 	emitCount  int
 	emitted    []emittedEvent
@@ -68,7 +70,7 @@ type fakeOpener struct {
 }
 
 func (o *fakeOpener) NewWithOptions(opts application.WebviewWindowOptions) shellWindow {
-	w := &fakeWindow{id: uint(len(o.windows)) + 1, title: opts.Title}
+	w := &fakeWindow{id: uint(len(o.windows)) + 1, title: opts.Title, url: opts.URL}
 	o.windows = append(o.windows, w)
 	return w
 }
@@ -215,6 +217,30 @@ func TestOpenWorktreePathsListsOpenWindows(t *testing.T) {
 	}
 }
 
+// A WSL window's path comes back as its UNC form, so restore's OpenWorktree
+// call routes through Registry.CoreFor to the same distro instead of the
+// local core.
+func TestFR_REPO_02_OpenWorktreePathsBuildsUNCForADistroWindow(t *testing.T) {
+	r, _ := newTestRegistry()
+
+	r.OpenOrFocus("wt", "/home/u/r", "Ubuntu")
+
+	got := r.OpenWorktreePaths()
+	if want := []string{`\\wsl.localhost\Ubuntu\home\u\r`}; !slices.Equal(got, want) {
+		t.Errorf("OpenWorktreePaths() = %v, want %v", got, want)
+	}
+}
+
+func TestFR_REPO_02_OpenOrFocusBuildsAURLWithTheDistro(t *testing.T) {
+	r, opener := newTestRegistry()
+
+	r.OpenOrFocus("wt", "/home/u/r", "Ubuntu")
+
+	if want := "/?path=%2Fhome%2Fu%2Fr&distro=Ubuntu"; opener.windows[0].url != want {
+		t.Errorf("url = %q, want %q", opener.windows[0].url, want)
+	}
+}
+
 func TestQA_PERF_06_ClosingAWindowCallsCloseWorktreeOnTheLocalCore(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
@@ -236,6 +262,58 @@ func TestOpenWorktreePathsDropsAClosedWindow(t *testing.T) {
 
 	if got := r.OpenWorktreePaths(); len(got) != 0 {
 		t.Errorf("OpenWorktreePaths() = %v, want empty", got)
+	}
+}
+
+func TestFR_REPO_02_ClosingAWindowForgetsItForTheNextLaunch(t *testing.T) {
+	r, opener := newTestRegistry()
+	store := newTestStore(t)
+	r.SetStore(store)
+	r.OpenOrFocus("a", "/a", "")
+	r.OpenOrFocus("b", "/b", "")
+
+	opener.windows[0].close()
+
+	if got := store.Get().OpenWorktrees; !slices.Equal(got, []string{"/b"}) {
+		t.Errorf("OpenWorktrees = %v, want [/b]", got)
+	}
+}
+
+// Closing the last window quits the app: that window was open at quit.
+func TestFR_REPO_02_ClosingTheLastWindowKeepsItForTheNextLaunch(t *testing.T) {
+	r, opener := newTestRegistry()
+	store := newTestStore(t)
+	r.SetStore(store)
+	r.OpenOrFocus("a", "/a", "")
+	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/a"} }); err != nil {
+		t.Fatal(err)
+	}
+
+	opener.windows[0].close()
+
+	if got := store.Get().OpenWorktrees; !slices.Equal(got, []string{"/a"}) {
+		t.Errorf("OpenWorktrees = %v, want [/a]", got)
+	}
+}
+
+// Quitting closes every window through the same close event a user's close
+// fires; the app's shutdown hook runs first.
+func TestFR_REPO_02_QuittingKeepsEveryOpenWindowForTheNextLaunch(t *testing.T) {
+	r, opener := newTestRegistry()
+	store := newTestStore(t)
+	r.SetStore(store)
+	r.OpenOrFocus("a", "/a", "")
+	r.OpenOrFocus("b", "/b", "")
+	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/a", "/b"} }); err != nil {
+		t.Fatal(err)
+	}
+
+	options(fstest.MapFS{}, r, func(string) {}).OnShutdown()
+	opener.windows[0].close()
+	opener.windows[1].close()
+
+	if got := store.Get().OpenWorktrees; !slices.Equal(got, []string{"/a", "/b"}) {
+		t.Errorf("OpenWorktrees = %v, want [/a /b]", got)
 	}
 }
 

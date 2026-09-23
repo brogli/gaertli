@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"regexp"
 	"strings"
 
@@ -39,7 +38,7 @@ func LogArgs(f core.LogFilter) []string {
 	if len(f.Branches) == 0 {
 		args = append(args, "--exclude=refs/stash", "--all") // same as the unfiltered load
 	}
-	args = append(args, "--format="+LogFormat, "--end-of-options")
+	args = append(args, "--format="+logFormat, "--end-of-options")
 	args = append(args, f.Branches...)
 	if f.Path != "" {
 		args = append(args, "--", f.Path)
@@ -84,15 +83,14 @@ func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filt
 // streamFilteredHashHit finishes a filtered load whose Query resolved to an
 // existing commit: a single-record result, not a walk.
 func (c *Core) streamFilteredHashHit(wt *session.Worktree, sha string, gen int) {
-	commit, err := loadSingleCommit(context.Background(), wt.Runner, wt.Path, sha)
 	var logErr *core.Error
-	if err == nil {
+	if commit, err := loadSingleCommit(context.Background(), wt.Runner, wt.Path, sha); err != nil {
+		logErr = core.ErrorOf(err)
+	} else {
 		if checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path, false); ckErr == nil {
 			commit.CheckedOutIn = checkedOut[commit.SHA]
 		}
 		wt.FilterAppend(gen, commit)
-	} else {
-		errors.As(err, &logErr)
 	}
 	wt.FilterFinish(gen, logErr)
 	c.emitFilterProgress(wt.ID, 1, true)
@@ -119,14 +117,14 @@ func resolveHash(ctx context.Context, r git.Runner, dir, q string) (sha string, 
 	return strings.TrimSpace(string(result.Stdout)), true
 }
 
-// loadSingleCommit fetches one LogCommit by sha, reusing LogFormat and
+// loadSingleCommit fetches one LogCommit by sha, reusing logFormat and
 // parseLogRecord instead of a second parser. -1 must come before
 // --end-of-options: git rejects a "-"-prefixed option after it as a bad
 // revision.
 func loadSingleCommit(ctx context.Context, r git.Runner, dir, sha string) (core.LogCommit, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
-		Args: []string{"log", "--decorate=full", "--format=" + LogFormat, "-1", "--end-of-options", sha},
+		Args: []string{"log", "--decorate=full", "--format=" + logFormat, "-1", "--end-of-options", sha},
 	})
 	if err != nil {
 		return core.LogCommit{}, err

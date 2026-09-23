@@ -7,14 +7,20 @@ import Button from 'openvue/button'
 import { useCoreCall } from '../composables/useCoreCall'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { BranchSummary, Worktree } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { repoPath as toRepoPath } from '../lib/path'
 import ErrorBanner from './ErrorBanner.vue'
 import type { WorktreeStart } from './worktreeStart'
 
 // CreateWorktreeDialog is "+ New worktree": an existing branch, or a new
 // one from a branch/commit start point. git itself refuses a non-empty
 // target.
-const props = defineProps<{ repoPath: string; branches: BranchSummary[]; visible: boolean; start?: WorktreeStart }>()
-const emit = defineEmits<{ 'update:visible': [boolean]; created: [] }>()
+const props = defineProps<{
+  repoPath: string
+  distro?: string | undefined
+  branches: BranchSummary[]
+  start?: WorktreeStart
+}>()
+const emit = defineEmits<{ created: []; close: [] }>()
 
 const newBranch = ref(props.start?.newBranch ?? false)
 const existingBranch = ref(props.start?.newBranch === false ? props.start.branch : (props.branches[0]?.name ?? ''))
@@ -27,27 +33,36 @@ const { error, run, runAndClose } = useCoreCall()
 // then offers to open the result.
 const created = ref<Worktree | null>(null)
 
-// PickFolder, not PickAndOpen: the target is not an existing repo.
+// PickFolder, not PickAndOpen: the target is not an existing repo. Seeded at
+// the distro's UNC root for a WSL repo, so the native picker browses there.
 async function browse(): Promise<void> {
-  const [path, ok] = await AppService.PickFolder('')
+  const [path, ok] = await AppService.PickFolder(toRepoPath('', props.distro))
   if (ok) target.value = path
 }
 
 async function submit(): Promise<void> {
   const branch = newBranch.value ? name.value : existingBranch.value
   const startPoint = newBranch.value ? start.value : ''
-  const wt = await run(() => Facade.AddWorktree(props.repoPath, target.value, branch, startPoint, newBranch.value))
+  const wt = await run(() =>
+    Facade.AddWorktree(
+      toRepoPath(props.repoPath, props.distro),
+      toRepoPath(target.value, props.distro),
+      branch,
+      startPoint,
+      newBranch.value,
+    ),
+  )
   if (wt) created.value = wt
 }
 
 function openWindow(): Promise<void> {
-  return runAndClose(() => AppService.OpenRecent(created.value!.path), finish)
+  return runAndClose(() => AppService.OpenRecent(toRepoPath(created.value!.path, props.distro)), finish)
 }
 function openEditor(): Promise<void> {
-  return runAndClose(() => Facade.OpenFolderAt(created.value!.path), finish)
+  return runAndClose(() => Facade.OpenFolderAt(toRepoPath(created.value!.path, props.distro)), finish)
 }
 async function openBoth(): Promise<void> {
-  await run(() => AppService.OpenRecent(created.value!.path))
+  await run(() => AppService.OpenRecent(toRepoPath(created.value!.path, props.distro)))
   if (!error.value) await openEditor()
 }
 
@@ -58,17 +73,12 @@ function finish(): void {
   emit('created')
   created.value = null
   name.value = ''
-  emit('update:visible', false)
+  emit('close')
 }
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    header="New worktree"
-    modal
-    @update:visible="(v: boolean) => emit('update:visible', v)"
-  >
+  <Dialog visible header="New worktree" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
     <template v-if="created">
       <p>Worktree created at {{ created.path }}.</p>

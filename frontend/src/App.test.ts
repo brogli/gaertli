@@ -26,6 +26,7 @@ vi.mock('@wailsio/runtime', () => ({
 import App from './App.vue'
 import CompareDiffView from './views/CompareDiffView.vue'
 import MainView from './views/MainView.vue'
+import { useSettingsStore } from './stores/settings'
 import { defaultSettingsFixture } from './testing/fixtures/settings'
 
 mockSettingsGet.mockResolvedValue(defaultSettingsFixture())
@@ -37,6 +38,7 @@ describe('App', () => {
 
   afterEach(() => {
     window.history.pushState({}, '', '/')
+    document.documentElement.classList.remove('nebegit-dark')
   })
 
   it('QA-OSS-02 renders the app name with no worktree open', () => {
@@ -55,5 +57,31 @@ describe('App', () => {
 
     expect(wrapper.findComponent(CompareDiffView).exists()).toBe(true)
     expect(wrapper.findComponent(MainView).exists()).toBe(false)
+  })
+
+  it('FR-UX-06 follows the OS by default, then applies a forced theme once settings change', async () => {
+    const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('dark'),
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }) as unknown as MediaQueryList,
+    )
+    mockSettingsGet.mockResolvedValueOnce(defaultSettingsFixture({ theme: '' }))
+
+    const wrapper = mount(App)
+    await flushPromises()
+
+    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
+
+    useSettingsStore().settings!.theme = 'light'
+    await flushPromises()
+
+    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(false)
+
+    wrapper.unmount()
+    matchMediaSpy.mockRestore()
   })
 })

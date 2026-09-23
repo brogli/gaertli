@@ -1,88 +1,94 @@
 # Components
 
-### Backend (Go)
+## Backend (Go)
 
-| Package | Job |
+| Package | Responsibility |
 |---|---|
-| `internal/core` | The core API: one interface, event stream, DTOs (TR-28). |
-| `internal/core/coretest` | Test-only assertions on `core.Error`/`core.Code`, shared by other packages' tests. |
-| `internal/remote` | Generated JSON-RPC client (implements `core.API`) and dispatcher (serves it in `nebegit-core --stdio`). WSL detection, starting a core through `wsl.exe`, deployment into a distro, version handshake, reconnect. Delivered, including the WSL-side launcher (`nebegit <path>`, FR-REPO-06) and the per-connect hook (`OnConnect`/`LiveClient`, TR-13). |
-| `internal/app` | Wails setup, window manager (one window per worktree, focus existing), single-instance hand-over, event bridge, settings. Binds the generated facade. The only package that imports Wails. |
-| `internal/session` | Repo and worktree sessions (ADR-9): mints/reuses a session from a validated path, buffers the command log. Later specs add caches, write queues, watchers. |
-| `internal/git` | Runner (exec, env, timeout, cancel, stderr capture, command log) and parsers (log, refs, status v2, worktree list, diff name-status, hunks). |
-| `internal/proc` | Child-process attributes (TR-12): `HiddenConsole()`, the `CREATE_NO_WINDOW` flag every Windows child (git, `wsl.exe`) starts with, nil elsewhere; `Detach(cmd)`, a new session/process group so an editor or the handed-off GUI outlives nebegit. |
-| `internal/testbin` | Test support: `Build(out, pkg)` compiles a helper binary from a `TestMain` (`nebegit-core`, the editor's argv writer, the protocol-mismatch core). |
-| `internal/graph` | Lane layout. Pure function over a commit stream. Delivered. |
-| `internal/jobs` | Long-running tasks: id, state, progress, cancel. Emits events. Delivered. |
-| `internal/watch` | Debounced "changed" signals with a scope (refs, index, worktrees, state): a repo-dir watcher (fsnotify + poll fallback) and a worktree status poller. Delivered. |
-| `internal/settings` | Settings JSON load/save (TR-13): recent repos, windows open at last quit, per-environment editor profiles (FR-ED-11), and the FR-UX-04 fields. |
-| `internal/editor` | Editor profiles (presets + custom); builds and starts the editor command. Delivered. |
-| `internal/services` | Implements `core.API`. Validates input, calls git, returns DTOs. One service per feature area. |
-| `internal/buildinfo` | Version string stamped by `-ldflags -X` in release builds; `dev` otherwise. |
+| `internal/core` | The core contract: the `API` interface, its DTOs, the error type and events (ADR-3, TR-28). |
+| `internal/services` | Implements `core.API` in one `Core` type, one file per feature area. Validates input, calls git, returns DTOs. |
+| `internal/session` | Repo and worktree sessions (ADR-9): caches, write locks, watchers, the command log buffer, the commit message draft. |
+| `internal/git` | The git runner (environment, timeout, cancel, stderr capture, command log) and the parsers for git's machine-readable output. |
+| `internal/graph` | Commit graph lane layout. A pure function over the commit stream. |
+| `internal/watch` | Debounced change signals: a git-dir watcher (fsnotify with a poll fallback) and a worktree status poller. |
+| `internal/jobs` | Long-running tasks: id, state, progress, cancel. |
+| `internal/editor` | Editor profiles and starting the editor command. |
+| `internal/proc` | Child-process attributes: hidden console on Windows, detaching an editor so it outlives nebegit (TR-12). |
+| `internal/remote` | The generated JSON-RPC client and dispatcher. WSL detection, starting and deploying a core in a distro, the version handshake, reconnect, and the WSL-side launcher. |
+| `internal/app` | The shell: Wails setup, the generated facade, the window registry, single-instance hand-over, event routing, settings. The only package that imports Wails. |
+| `internal/settings` | Loading and saving the settings file (TR-13). |
+| `internal/buildinfo` | The version string, stamped at release build time. |
 
-Services and the requirements they serve:
+Test helpers: `internal/core/coretest` (assertions on core errors), `internal/git/gittest` (temp repos), `internal/testbin` (builds helper binaries for tests).
 
-| Service | Covers |
+Binaries: `cmd/nebegit` is the GUI with an in-process core. `cmd/nebegit-core` is the headless core for WSL; it serves JSON-RPC on `--stdio`, and acts as the launcher when given a path. It builds without cgo.
+
+Dependencies point one way: `app` → `services` and `remote` → `core`. `services` uses `session`, `git`, `graph`, `watch`, `jobs` and `editor`. Nothing below `app` knows about windows or Wails.
+
+Feature areas in `internal/services`:
+
+| Files | Requirements |
 |---|---|
-| `RepoService` | FR-REPO-*: open, recent, summary (branch, ahead/behind, state). `OpenWorktree`/`Summary` delivered; ahead/behind come from `LogService`'s `Refs`; `Refresh`/`SetFocused`/`CloseWorktree` (manual refresh, focus-driven poll, session teardown) delivered |
-| `LogService` | FR-LOG-*: load, row window, details, search, filters. `LoadLog`/`LogRows`/`CommitDetails`, `ReloadLog` (reload only if ref tips changed), `Refs` (branches/remotes/tags for the sidebar), `LogIndexOf` (a ref's row index, for click-to-jump) and `SetLogFilter` (text/hash, author, branch, path search, all combinable — a window's own filtered view, independent of the shared unfiltered cache) delivered, as is the commit-row context-menu shell (FR-LOG-11: copy hash/subject only; the branch, compare, cherry-pick and worktree items belong to their own features) |
-| `DiffService` | FR-CMP-*, FR-DIFF-*, FR-LOG-04, FR-CHG-04: file lists, file contents, hunks. `DiffFile` (one file's two-sided content at a commit, size cap, binary detection), `CompareCommits`/`DiffRange` (changed files and content between two arbitrary commits) and `DiffWorking` (a working-tree change's two-sided content: staged against the index, unstaged/untracked against the literal file on disk) delivered; changes-view hunks still open |
-| `BranchService` | FR-BR-*, FR-UPD-*, FR-CP-*, FR-RV-*: create, reset, checkout, rename, delete, update in background, cherry-pick, revert, checkout commit. `CreateBranch` (a commit, an existing branch, or HEAD as the start point; optional atomic checkout), `Checkout` (local or remote-tracking, git's own DWIM), `CheckoutCommit` (detach HEAD), `Reset` (soft/mixed/hard, moves the current branch or a detached HEAD, returns the pre-reset HEAD), `UncommittedCount` (the hard-reset confirmation's count), `CherryPick`/`Revert` (one or more commits onto the current worktree's HEAD, app-sorted oldest/newest-first, merge commits refused up front) and `UpdateBranch` (fast-forwards a branch from its upstream as a job, FR-UPD-01..05: not checked out anywhere fetches straight into it, checked out in another worktree fetches the remote-tracking ref and fast-forwards that worktree's files too under its own lock; `RefsSidebar.vue`'s "Update from upstream" menu item and result banner, `JobsStrip.vue`'s friendly running-job label) delivered; rename/delete still open |
-| `WorktreeService` | FR-WT-*: list, add, remove, prune. `ListWorktrees`/`ListBranches` (stateless reads, `session.Manager.Resolve`, no session minted) and `AddWorktree` (existing or new branch, `check-ref-format` validated first) delivered. "Open in app window" (FR-WT-08) is a shell action in `internal/app`; a core has no windows. FR-WT-04 ("switch to worktree" = open in the editor via `EditorService.OpenFolderAt`, a path, no session), FR-WT-06 ("create worktree here…" from a log commit or a sidebar branch, pre-filling `AddWorktree`) and FR-WT-12 (after a create, offer to open the result in a window, the editor, both, or neither) delivered. Remove/prune still open. |
-| `ChangesService` | FR-CHG-*: status, stage/unstage (file, lines), commit, amend, discard. `Status` (FR-CHG-01, one `git status --porcelain=v2` call grouped into staged/unstaged/untracked/conflicted), `StageFile`/`UnstageFile`/`StageAll`/`UnstageAll` (FR-CHG-02) and `StageLines` (FR-CHG-03: re-diffs the one path fresh each call, selects by each changed line's own line number on the diff's old/new side — a `LineSelection` of `Old`/`New` line numbers, not a hunk or chunk index from either diff engine — folds every other changed line of each fragment into context or drops it, applies the rebuilt patch with `git apply --cached --recount [--reverse] -`) delivered; `Commit`/`SetMessageDraft` (FR-CHG-05, FR-CHG-06, FR-CHG-07, FR-CHG-08: message piped over stdin, the amend-only "already pushed" warning read from `Refs`, hook output already carried by `GitFailed`'s `GitStderr`, the draft on `session.Worktree`, `Summary.MessageDraft`) delivered — `CommitBox.vue`, mounted in `ChangesPanel.vue` right after its header; discard still open |
-| `SyncService` | FR-SYNC-*: fetch, pull, push, force push, auto-fetch. `Fetch`/`Pull`/`Push`/`ForcePush` (FR-SYNC-01, 02, 03, 05) delivered, each a job; rejection classification (FR-SYNC-04) and sign-in failure classification (FR-SYNC-08, QA-SEC-02) delivered with them. `SyncControls.vue` (Fetch/Pull/Push top-bar controls, force-push confirmation with its protected-branch warning FR-SYNC-06, the push-rejection banner) mounted in `WorktreeContent.vue`. Auto-fetch (FR-SYNC-10) still open |
-| `ConflictService` | FR-CONF-*: state, mark resolved, continue, abort. State (`Summary.Operation`, `Status.Conflicted`) and mark resolved (`StageFile`) reuse existing calls unchanged, delivered as part of `RepoService`/`ChangesService`; `ContinueOperation`/`AbortOperation` (each kind's own `--continue`/`--abort`) delivered. `ConflictBanner.vue` (operation name, Continue/Abort) mounted above the changes column in `WorktreeContent.vue`; `ChangesPanel.vue`'s Conflicted group opens a file in the editor and marks it resolved. No merge-editor UI (FR-CONF-05): resolution happens in the external editor |
-| `EditorService` | FR-ED-*: editor profiles and launch. `SetEditorProfile`/`OpenFolder`/`OpenFile` (FR-ED-01, 03, 04, 05, 06, 11), `OpenFolderAt` (a path, no session) and `OpenFile`'s path resolved against the worktree with `FILE_NOT_FOUND` for a since-deleted or renamed file (FR-ED-02: the commit-details, compare and compare-diff-window file lists, the diff pane's toolbar, and the conflict list) delivered; the presets picker, the "test" button, open-at-line/column from the diff view, and the git-editor/OS-opener fallback chain (FR-ED-07..10) still open |
-| `JobService` | list jobs, cancel. Delivered; fetch/pull/push/force push are its first real job kinds. |
-| `CommandLogService` | FR-UX-02. Delivered |
+| `repo.go` | FR-REPO: open, summary, refresh, focus, close |
+| `log.go`, `logfilter.go`, `refs.go`, `commitdetails.go` | FR-LOG: log rows, filters and search, refs, commit details |
+| `diff.go`, `compare.go` | FR-DIFF, FR-CMP: file content for diffs, comparing commits and the working tree |
+| `changes.go`, `hunks.go`, `discard.go` | FR-CHG: status, staging files and lines, commit, discard |
+| `branch.go`, `cherrypick.go` | FR-BR, FR-CP, FR-RV: create, checkout, reset, rename, delete, cherry-pick, revert |
+| `worktree.go` | FR-WT: list, add, remove, prune |
+| `sync.go` | FR-SYNC, FR-UPD: fetch, pull, push, stash-and-pull, updating other branches |
+| `conflicts.go` | FR-CONF: continue, abort, skip |
+| `editor.go` | FR-ED: open folder and file, test a profile, fallbacks |
+| `jobs.go`, `commandlog.go` | job list and cancel; FR-UX-02 |
 
-Settings (FR-UX-04) are a shell service (TR-13), not part of `core.API`.
+Settings (FR-UX-04) belong to the shell, not to `core.API`. The shell pushes the relevant subset, such as a distro's editor profile, to each core on connect (TR-13). Opening a worktree in a new app window (FR-WT-08) is a shell action too, because a core has no windows.
 
-### Frontend (Vue)
+## Frontend (Vue)
 
-- Generated Wails bindings of the facade are the only way to reach Go. One Pinia store per area: `repo`, `commandLog`, `log`, `refs`, `diff`, `compare`, `changes`, `jobs`, `settings`. The selector panel's own recent-repo/worktree/branch state is component-local (`SelectorPanel.vue`), not a store — nothing else in the app reads it, and each window's panel is independent.
-- Stores hold view state only. After a write action the store reloads from Go. No optimistic updates (QA-COMP-01).
-- OpenVue's `ConfirmationService`/`ConfirmDialog`/`useConfirm` (registered once in `main.ts`/`App.vue`) back QA-SAFE-01/FR-UX-03's shared hard-action confirmation, wrapped in `composables/useConfirmAction.ts`, first used by `ResetDialog.vue`'s hard reset.
+- The generated Wails bindings of the facade are the only way to reach Go.
+- Each window is its own WebView with its own Pinia instance, so window state is isolated by construction.
+- One setup store per area: `repo`, `log`, `refs`, `diff`, `compare`, `changes`, `jobs`, `commandLog`, `settings`.
+- Stores hold view state only. After a write the store reloads from Go; there are no optimistic updates (QA-COMP-01).
+- Hard actions share one confirmation (`composables/useConfirmAction.ts`, QA-SAFE-01). Core calls share one error handling path (`composables/useCoreCall.ts`, FR-UX-01).
+- Context menus are built in `menus/`, one builder per object (commit, branch), so features add items without touching the list components.
+- Theme (FR-UX-06): OpenVue's Aura preset. The `settings` store toggles a dark class on the document from the theme setting and the OS preference.
 
-Main layout:
+### Main layout
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ project name | branch ↑2 ↓1 | Refresh  Open in editor                    │
+│ project name | branch ↑2 ↓1 | Fetch Pull Push | Refresh  Open in editor  │
 ├───────────┬───────────┬────────────┬─────────────────┬───────────────────┤
 │ Selector  │ Refs      │ Changes    │ Log             │ Commit details /  │
-│ ▾ repo A  │ Branches  │ Staged     │ (graph + virtual│ compare, changed  │
-│  ● wt main│ Remotes   │ Unstaged   │  scroll)        │ files             │
-│  ○ wt feat│ Tags      │ Untracked  │                 ├───────────────────┤
+│ ▾ repo A  │ Branches  │ Staged     │ filter bar      │ compare, changed  │
+│  ● wt main│ Remotes   │ Unstaged   │ (graph + virtual│ files             │
+│  ○ wt feat│ Tags      │ Untracked  │  scroll)        ├───────────────────┤
 │  + wt     │           │ Conflicted │                 │ Diff              │
-│ ▸ repo B  │           │            │                 │ (unified |        │
+│ ▸ repo B  │           │ Commit box │                 │ (unified |        │
 │ ⚙ Settings│           │            │                 │  side-by-side)    │
 ├───────────┴───────────┴────────────┴─────────────────┴───────────────────┤
 │ Status bar: running jobs · last result · command log                     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-The left column is the selector panel (FR-WT-13, ADR-9 as revised 2026-09-22, delivered): `SelectorPanel.vue`, present in every window (not gated behind a selection, FR-UX-04), replacing the old dedicated home window — "Open folder…"/"Open WSL folder…"/the recent-repos list moved in unchanged, an OpenVue `Tree` below them lists each recent repo's worktrees (● = this window's own selection, ○ otherwise, `ListWorktrees`) and branches (`ListBranches`), lazily fetched on first expand; "+ New worktree" (`CreateWorktreeDialog.vue`, `AddWorktree`) and "New branch…"/per-branch "Checkout" (reusing `CreateBranchDialog.vue`/`Facade.Checkout`, scoped to the repo matching this window's own selection) sit under each repo node, and a "Settings" entry point (`SettingsPanel.vue`) needs no selection. Clicking a worktree row switches this window's own selection (`AppService.SelectWorktree`) in place; a small control opens it in a new window instead (`OpenRecent`, FR-WT-08's existing dedup). `MainView.vue` hosts the panel beside the selected worktree's own content (`WorktreeContent.vue`) or its empty state, a resizable/collapsible left column (CSS `resize: horizontal`, no splitter component — OpenVue's `Splitter` renders unstyled, so every resizable panel in this app uses this same plain pattern instead); the panel's own "collapsed" toggle is local state, not persisted. Selecting a worktree switches the whole window, no new OS window.
+- **Selector panel** (`SelectorPanel.vue`, FR-WT-13): in every window. Open folder, open WSL folder, recent repos, and per repo its worktrees and branches, fetched when first expanded. Clicking a worktree switches this window's selection; a separate control opens it in a new window. With no selection it is the window's empty state.
+- **Worktree content** (`WorktreeContent.vue`): everything to the right of the selector, for the selected worktree. Refs, changes, log and the details/diff column are panels of one splitter, in that fixed order (FR-UX-08). The details never sit below the log.
+- No tabs and no navigation (FR-UX-07). Every panel is resizable and collapsible.
+- Changes sit left of the log, next to the refs: selector, refs and changes describe the worktree's current state, while log, details and diff describe history.
+- **Compare**: selecting two commits replaces the commit details with the comparison (FR-CMP). Double-clicking a file opens that comparison in its own window (`CompareDiffView.vue`), one window per comparison.
+- **Diff** (`DiffView.vue`, ADR-7): unified or side-by-side, syntax highlighting, ignore-whitespace, next/previous change and file. For a modified working-tree file it offers hunk and line staging and discard.
 
-FR-UX-07: no tabs or views — every panel is resizable and collapsible, never navigated to. The working-tree changes get their own `.changes-column` (`ChangesPanel.vue`, `stores/changes.ts`, delivered), between `RefsSidebar` and `.log-column` inside `WorktreeContent.vue`'s own flex row — left of the log, right of the selector/refs zone. Placed there rather than inside the details+diff column because this diagram already sketched it there; because FR-UX-08's three fixed relationships (refs leftmost, the log between two other things, the details+diff pairing one unbroken column immediately right of the log) stay literally true only to the log's left; and because selector, refs, and changes are all facts about the worktree's *current* state, kept apart from the log/details/diff cluster's own *history* facts. FR-UX-08: `WorktreeContent.vue` lays out a `.log-column` (filter bar, log) and a `.side-column` (commit details or compare view, then the diff) side by side; the details never sit below the log.
+## Communication
 
-Sidebar's Branches/Remotes/Tags trees, the current-branch marker, click-to-jump into the log, and the toolbar's ahead/behind counts are delivered (`RefsSidebar.vue`, `stores/refs.ts`) — a different, richer view of the *selected* worktree's own refs (full upstream/ahead-behind detail) than the selector panel's lightweight per-repo branches list above.
+- **Calls** (UI → Go): generated bindings. Each returns a DTO or rejects with the core error (`errors-security.md`).
+- **Events** (Go → UI), small payloads only:
 
-The diff pane (`DiffView.vue`, `stores/diff.ts`) is delivered (FR-DIFF-01..04, FR-LOG-04): a changed file clicked in `CommitDetailsPanel` renders its visual diff below the commit list/details row, unified or side-by-side via `@codemirror/merge` (ADR-7), with next/previous-change and next/previous-file navigation.
+| Event | Payload | Meaning |
+|---|---|---|
+| `repo:changed` | `{scope}` | something changed outside or inside the app; `scope` is `refs`, `index`, `worktrees` or `state` (`git-mapping.md`) |
+| `log:progress` | `{loaded, done, filtered}` | more log rows are available; `filtered` tells a window's filtered load from the shared one |
+| `job:update` | `{id, state, progress, message}` | a job started, progressed or ended |
+| `command` | one command log entry | a git command ran (FR-UX-02) |
+| `core:reconnected` | none | a WSL core was restarted; the window reloads from scratch |
+| `compare:show-file` | `{path, oldPath}` | the shell retargets an open compare window |
 
-Hunk and line staging (`DiffView.vue`, FR-CHG-03) is delivered for working-tree mode (the `working` prop): one "Stage hunk"/"Unstage hunk" button per entry of the mounted view's own `getChunks()` (unified mode only so far — side-by-side's `MergeView.chunks` is read for the button row, but the selection mapping below is unified-only), each sending every changed line of its own chunk — the chunk's old-side lines (`fromA`/`endA`) as `LineSelection.Old`, its new-side lines (`fromB`/`endB`) as `LineSelection.New`, read via the mounted documents' own `lineAt` — to `StageLines(wt, path, sel, working.staged)`. A "Stage selected lines"/"Unstage selected lines" button sends only the current text selection's own new-side line numbers (`LineSelection.Old` empty: a unified-mode text selection can only ever land on new content, deleted lines are decorations) the same way, and is disabled unless that selection falls entirely inside one chunk (tracked reactively off an `EditorView.updateListener`, since CodeMirror's own state lives outside Vue's reactivity) — a click can no longer be a silent no-op. Both actions reload the changes panel and this diff on success.
-
-The controls render only for a plain content modification, `working.status === "M"` — `ChangedFile.Status`, carried from `changes.selectFile` into `changes.selectedFile` and on into the `working` prop. Every other status falls back to whole-file `StageFile`/`UnstageFile` instead: an untracked file ("?") has nothing for `git diff` to re-diff; an added ("A") or deleted ("D") file's patch is one `git apply` refuses outright ("new file ... depends on old contents", "deleted file ... still has contents"); a renamed file ("R"/"C") would need rename-aware rewriting of the reused diff header, which this spec doesn't add. `Core.StageLines`' own re-diff defends the same boundary server-side: an empty result (no file to parse) is `Code Internal` naming the path, not a formatted nil error. Not yet handled: a side-by-side selection (which pane, `a` or `b`).
-
-Comparing two commits (`CompareView.vue`, `stores/compare.ts`) is delivered (FR-CMP-01..03): Ctrl/Cmd-click two rows in `LogList` selects them (FIFO of 2), replacing `CommitDetailsPanel` with `CompareView`'s from→to header, swap action, and changed-file list (`ChangedFileList.vue`, extracted for reuse between the two panels); a file clicked there opens in `DiffView` via its `range` prop (`DiffRange`, next/previous-file hidden), and Escape leaves compare mode. Double-clicking a file there, or right-clicking a commit and choosing "Compare with selected" (FR-LOG-11), opens the comparison's own OS window (FR-CMP-01/02, `CompareDiffView.vue`, `internal/app`'s window registry): the full changed-file list beside a `DiffView` with next/previous-file (`files` prop) added, keyed per `(wt, a, b)` comparison so a second double-click retargets the existing window (`"compare:show-file"`) instead of opening another.
-
-The filter bar (`FilterBar.vue`, `stores/log.ts`) is delivered (FR-LOG-05..08): text/hash, author, branch, and path search sit directly above the commit list, debounced free-text fields, an OpenVue `MultiSelect` for branches, active-filter chips, one clear action (button or Escape). A text/author query hides the graph column (FR-LOG-02, `LogRowsResult.Flat`). Right-clicking a commit row opens an OpenVue `ContextMenu` (FR-LOG-11) with "copy hash"/"copy subject" (FR-LOG-12); later specs append their own items to `menus/commitMenu.ts`'s builder.
-
-### Communication
-
-- Calls (UI → Go): generated bindings, returning a DTO or a typed error.
-- Events (Go → UI): `repo:changed {scope}`, `job:update {id, state, progress, message}`, `log:progress {loaded, done, filtered}` (`filtered` tells apart the repo-wide unfiltered stream from a window's own filtered one — one window can have both running at once), `core:reconnected` (no payload; a WSL window's distro core respawned after dying, ADR-4 — `repo`/`log`/`refs` stores each reload from scratch, not folded into `repo:changed`'s scoped reload).
-- Cancel is a call: `JobService.Cancel(id)`.
-- Events carry small payloads only. Large data (log rows, file contents) goes through bound method calls.
-
----
+- Cancel is a call: `CancelJob(id)`.
+- Large data (log rows, file contents) always goes through calls, never events.

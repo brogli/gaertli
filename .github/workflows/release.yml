@@ -1,0 +1,182 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: Build and package
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: go tool task windows:package:dryrun VERSION=${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nebegit-windows-amd64.zip
+          path: dist/nebegit-windows-amd64.zip
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Linux native deps
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: Build and package
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: go tool task linux:package:dryrun VERSION=${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nebegit-linux-amd64.AppImage
+          path: dist/nebegit-linux-amd64.AppImage
+
+  darwin:
+    runs-on: macos-latest
+    continue-on-error: true # a failing macOS build never holds back the release
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: Build and package
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: go tool task darwin:package:dryrun VERSION=${{ github.ref_name }}
+
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: nebegit-darwin-arm64.zip
+          path: dist/nebegit-darwin-arm64.zip
+          if-no-files-found: ignore
+
+  notices:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: Licence check
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: |
+          mkdir -p dist
+          go tool task licence-check OUT=dist/THIRD-PARTY-NOTICES.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: THIRD-PARTY-NOTICES.txt
+          path: dist/THIRD-PARTY-NOTICES.txt
+
+  publish:
+    needs: [windows, linux, darwin, notices]
+    if: always() && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.notices.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+
+      - name: Flatten and checksum
+        run: |
+          cd dist
+          find . -mindepth 2 -type f -exec mv {} . \;
+          find . -mindepth 1 -type d -empty -delete
+          sha256sum * > SHA256SUMS
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -68,6 +68,16 @@ func (c *Client) CherryPick(ctx context.Context, wt core.WorktreeID, shas []stri
 	return c.call(ctx, "CherryPick", cherryPickParams{Wt: wt, Shas: shas}, nil)
 }
 
+type cherryPickWithParams struct {
+	Wt   core.WorktreeID  `json:"wt"`
+	Shas []string         `json:"shas"`
+	Opts core.PickOptions `json:"opts"`
+}
+
+func (c *Client) CherryPickWith(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+	return c.call(ctx, "CherryPickWith", cherryPickWithParams{Wt: wt, Shas: shas, Opts: opts}, nil)
+}
+
 type closeWorktreeParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -119,6 +129,17 @@ func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a strin
 	return result, err
 }
 
+type compareWithWorkingParams struct {
+	Wt  core.WorktreeID `json:"wt"`
+	Sha string          `json:"sha"`
+}
+
+func (c *Client) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha string) ([]core.ChangedFile, error) {
+	var result []core.ChangedFile
+	err := c.call(ctx, "CompareWithWorking", compareWithWorkingParams{Wt: wt, Sha: sha}, &result)
+	return result, err
+}
+
 type continueOperationParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -136,6 +157,30 @@ type createBranchParams struct {
 
 func (c *Client) CreateBranch(ctx context.Context, wt core.WorktreeID, name string, start string, checkout bool) error {
 	return c.call(ctx, "CreateBranch", createBranchParams{Wt: wt, Name: name, Start: start, Checkout: checkout}, nil)
+}
+
+type deleteBranchParams struct {
+	Wt    core.WorktreeID `json:"wt"`
+	Name  string          `json:"name"`
+	Force bool            `json:"force"`
+}
+
+func (c *Client) DeleteBranch(ctx context.Context, wt core.WorktreeID, name string, force bool) error {
+	return c.call(ctx, "DeleteBranch", deleteBranchParams{Wt: wt, Name: name, Force: force}, nil)
+}
+
+type diffAgainstWorkingParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Sha     string          `json:"sha"`
+	Path    string          `json:"path"`
+	OldPath string          `json:"oldPath"`
+	Force   bool            `json:"force"`
+}
+
+func (c *Client) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, force bool) (core.DiffFile, error) {
+	var result core.DiffFile
+	err := c.call(ctx, "DiffAgainstWorking", diffAgainstWorkingParams{Wt: wt, Sha: sha, Path: path, OldPath: oldPath, Force: force}, &result)
+	return result, err
 }
 
 type diffFileParams struct {
@@ -179,6 +224,35 @@ func (c *Client) DiffWorking(ctx context.Context, wt core.WorktreeID, path strin
 	var result core.DiffFile
 	err := c.call(ctx, "DiffWorking", diffWorkingParams{Wt: wt, Path: path, OldPath: oldPath, Staged: staged, Force: force}, &result)
 	return result, err
+}
+
+type discardFileParams struct {
+	Wt        core.WorktreeID `json:"wt"`
+	Path      string          `json:"path"`
+	Untracked bool            `json:"untracked"`
+}
+
+func (c *Client) DiscardFile(ctx context.Context, wt core.WorktreeID, path string, untracked bool) error {
+	return c.call(ctx, "DiscardFile", discardFileParams{Wt: wt, Path: path, Untracked: untracked}, nil)
+}
+
+type discardLinesParams struct {
+	Wt   core.WorktreeID    `json:"wt"`
+	Path string             `json:"path"`
+	Sel  core.LineSelection `json:"sel"`
+}
+
+func (c *Client) DiscardLines(ctx context.Context, wt core.WorktreeID, path string, sel core.LineSelection) error {
+	return c.call(ctx, "DiscardLines", discardLinesParams{Wt: wt, Path: path, Sel: sel}, nil)
+}
+
+type dropStashParams struct {
+	Wt  core.WorktreeID `json:"wt"`
+	Sha string          `json:"sha"`
+}
+
+func (c *Client) DropStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+	return c.call(ctx, "DropStash", dropStashParams{Wt: wt, Sha: sha}, nil)
 }
 
 type fetchParams struct {
@@ -273,6 +347,17 @@ func (c *Client) OpenFile(ctx context.Context, wt core.WorktreeID, path string, 
 	return c.call(ctx, "OpenFile", openFileParams{Wt: wt, Path: path, Line: line}, nil)
 }
 
+type openFileFallbackParams struct {
+	Wt   core.WorktreeID         `json:"wt"`
+	Path string                  `json:"path"`
+	Line int                     `json:"line"`
+	Kind core.EditorFallbackKind `json:"kind"`
+}
+
+func (c *Client) OpenFileFallback(ctx context.Context, wt core.WorktreeID, path string, line int, kind core.EditorFallbackKind) error {
+	return c.call(ctx, "OpenFileFallback", openFileFallbackParams{Wt: wt, Path: path, Line: line, Kind: kind}, nil)
+}
+
 type openFolderParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -289,6 +374,15 @@ func (c *Client) OpenFolderAt(ctx context.Context, path core.RepoPath) error {
 	return c.call(ctx, "OpenFolderAt", openFolderAtParams{Path: path}, nil)
 }
 
+type openFolderFallbackParams struct {
+	Wt   core.WorktreeID         `json:"wt"`
+	Kind core.EditorFallbackKind `json:"kind"`
+}
+
+func (c *Client) OpenFolderFallback(ctx context.Context, wt core.WorktreeID, kind core.EditorFallbackKind) error {
+	return c.call(ctx, "OpenFolderFallback", openFolderFallbackParams{Wt: wt, Kind: kind}, nil)
+}
+
 type openWorktreeParams struct {
 	Path core.RepoPath `json:"path"`
 }
@@ -299,6 +393,23 @@ func (c *Client) OpenWorktree(ctx context.Context, path core.RepoPath) (core.Wor
 	return result, err
 }
 
+type popStashParams struct {
+	Wt  core.WorktreeID `json:"wt"`
+	Sha string          `json:"sha"`
+}
+
+func (c *Client) PopStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+	return c.call(ctx, "PopStash", popStashParams{Wt: wt, Sha: sha}, nil)
+}
+
+type pruneWorktreesParams struct {
+	Path core.RepoPath `json:"path"`
+}
+
+func (c *Client) PruneWorktrees(ctx context.Context, path core.RepoPath) error {
+	return c.call(ctx, "PruneWorktrees", pruneWorktreesParams{Path: path}, nil)
+}
+
 type pullParams struct {
 	Wt   core.WorktreeID `json:"wt"`
 	Mode core.PullMode   `json:"mode"`
@@ -307,6 +418,17 @@ type pullParams struct {
 func (c *Client) Pull(ctx context.Context, wt core.WorktreeID, mode core.PullMode) (string, error) {
 	var result string
 	err := c.call(ctx, "Pull", pullParams{Wt: wt, Mode: mode}, &result)
+	return result, err
+}
+
+type pullWithStashParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Mode core.PullMode   `json:"mode"`
+}
+
+func (c *Client) PullWithStash(ctx context.Context, wt core.WorktreeID, mode core.PullMode) (string, error) {
+	var result string
+	err := c.call(ctx, "PullWithStash", pullWithStashParams{Wt: wt, Mode: mode}, &result)
 	return result, err
 }
 
@@ -347,6 +469,26 @@ func (c *Client) ReloadLog(ctx context.Context, wt core.WorktreeID) error {
 	return c.call(ctx, "ReloadLog", reloadLogParams{Wt: wt}, nil)
 }
 
+type removeWorktreeParams struct {
+	Path   core.RepoPath `json:"path"`
+	Target string        `json:"target"`
+	Force  bool          `json:"force"`
+}
+
+func (c *Client) RemoveWorktree(ctx context.Context, path core.RepoPath, target string, force bool) error {
+	return c.call(ctx, "RemoveWorktree", removeWorktreeParams{Path: path, Target: target, Force: force}, nil)
+}
+
+type renameBranchParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Name    string          `json:"name"`
+	NewName string          `json:"newName"`
+}
+
+func (c *Client) RenameBranch(ctx context.Context, wt core.WorktreeID, name string, newName string) error {
+	return c.call(ctx, "RenameBranch", renameBranchParams{Wt: wt, Name: name, NewName: newName}, nil)
+}
+
 type resetParams struct {
 	Wt   core.WorktreeID `json:"wt"`
 	Sha  string          `json:"sha"`
@@ -366,6 +508,16 @@ type revertParams struct {
 
 func (c *Client) Revert(ctx context.Context, wt core.WorktreeID, shas []string) error {
 	return c.call(ctx, "Revert", revertParams{Wt: wt, Shas: shas}, nil)
+}
+
+type revertWithParams struct {
+	Wt   core.WorktreeID  `json:"wt"`
+	Shas []string         `json:"shas"`
+	Opts core.PickOptions `json:"opts"`
+}
+
+func (c *Client) RevertWith(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+	return c.call(ctx, "RevertWith", revertWithParams{Wt: wt, Shas: shas, Opts: opts}, nil)
 }
 
 type setEditorProfileParams struct {
@@ -401,6 +553,14 @@ type setMessageDraftParams struct {
 
 func (c *Client) SetMessageDraft(ctx context.Context, wt core.WorktreeID, message string) error {
 	return c.call(ctx, "SetMessageDraft", setMessageDraftParams{Wt: wt, Message: message}, nil)
+}
+
+type skipOperationParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) SkipOperation(ctx context.Context, wt core.WorktreeID) error {
+	return c.call(ctx, "SkipOperation", skipOperationParams{Wt: wt}, nil)
 }
 
 type stageAllParams struct {
@@ -449,6 +609,14 @@ func (c *Client) Summary(ctx context.Context, wt core.WorktreeID) (core.Summary,
 	var result core.Summary
 	err := c.call(ctx, "Summary", summaryParams{Wt: wt}, &result)
 	return result, err
+}
+
+type testEditorProfileParams struct {
+	Profile core.EditorProfile `json:"profile"`
+}
+
+func (c *Client) TestEditorProfile(ctx context.Context, profile core.EditorProfile) error {
+	return c.call(ctx, "TestEditorProfile", testEditorProfileParams{Profile: profile}, nil)
 }
 
 type uncommittedCountParams struct {

@@ -2,17 +2,16 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVueConfig from 'openvue/config'
 import ConfirmationService from 'openvue/confirmationservice'
+import Aura from '@openvue/themes/aura'
 import App from './App.vue'
 import './style.css'
 
-// PrimeVueConfig is required wiring, not theming: OpenVue's form components
-// (InputText, AutoComplete, MultiSelect) read $primevue.config during render
-// and crash without it. theme: 'none' loads no CSS theme.
-//
-// ConfirmationService backs useConfirm()/<ConfirmDialog> in App.vue, the
-// shared confirmation for destructive actions.
+// PrimeVueConfig themes OpenVue's components with Aura; without it they
+// render unstyled and the form components crash reading $primevue.config.
+// darkModeSelector is the class the settings store toggles on <html>.
+// ConfirmationService backs useConfirm() and App.vue's <ConfirmDialog>.
 createApp(App)
   .use(createPinia())
-  .use(PrimeVueConfig, { theme: 'none' })
+  .use(PrimeVueConfig, { theme: { preset: Aura, options: { darkModeSelector: '.nebegit-dark', cssLayer: false } } })
   .use(ConfirmationService)
   .mount('#app')

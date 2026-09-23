@@ -1,6 +1,12 @@
-import { config } from '@vue/test-utils'
+import { afterEach } from 'vitest'
+import { config, enableAutoUnmount } from '@vue/test-utils'
 import PrimeVueConfig from 'openvue/config'
 import ConfirmationService from 'openvue/confirmationservice'
+
+// Components with a window-level listener (onKeyStroke's shortcuts) would
+// otherwise keep firing into later tests in the same file: every mount
+// needs an unmount.
+enableAutoUnmount(afterEach)
 
 // OpenVue's form components (InputText/AutoComplete/MultiSelect) read
 // $primevue.config, which exists only once its config plugin is installed

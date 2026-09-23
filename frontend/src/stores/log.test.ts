@@ -28,6 +28,7 @@ vi.mock('@wailsio/runtime', () => ({
 
 import { useLogStore } from './log'
 import { commitRow } from '../testing/fixtures/log-rows'
+import { registeredHandler } from '../testing/events'
 
 function rowFixture(sha: string) {
   return commitRow({ sha, shortSha: sha, subject: 'x' })
@@ -51,10 +52,6 @@ describe('log store', () => {
     mockEventsOn.mockReset()
     mockEventsOn.mockReturnValue(() => {})
   })
-
-  function changedHandler() {
-    return mockEventsOn.mock.calls.find((call) => call[0] === 'repo:changed')?.[1]
-  }
 
   it('FR-LOG-01 rows(from, to) caches its window: a repeated request does not call LogRows again', async () => {
     const log = useLogStore()
@@ -87,7 +84,7 @@ describe('log store', () => {
     await log.load('/repo')
     expect(log.done).toBe(false)
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'log:progress')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'log:progress')
     handler?.({ data: { loaded: 5, done: true } })
 
     expect(log.done).toBe(true)
@@ -98,7 +95,7 @@ describe('log store', () => {
     const log = useLogStore()
     await log.load('/repo')
 
-    const handler = changedHandler()
+    const handler = registeredHandler(mockEventsOn, 'repo:changed')
     handler?.({ data: { scope: 'refs' } })
     await Promise.resolve()
     handler?.({ data: { scope: 'state' } })
@@ -113,7 +110,7 @@ describe('log store', () => {
     await log.load('/repo')
     mockLoadLog.mockClear()
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'core:reconnected')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'core:reconnected')
     handler?.({})
     await Promise.resolve()
 
@@ -144,6 +141,37 @@ describe('log store', () => {
 
     expect(log.rowCache.size).toBe(1)
     expect(log.rowCache.get(5)?.sha).toBe('c')
+    expect(log.rowCache.has(0)).toBe(false)
+  })
+
+  it('FR-REPO-04 a log:progress naming a new generation drops the cached rows, even at the same count', async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+    await log.rows(0, 1)
+
+    registeredHandler(mockEventsOn, 'log:progress')?.({
+      data: { loaded: 1, done: true, generation: 1 },
+    })
+    expect(log.rowCache.size).toBe(0)
+
+    mockLogRows.mockResolvedValueOnce({ rows: [rowFixture('b')], loaded: 1, done: true, generation: 1 })
+    await log.rows(0, 1)
+    expect(log.rowCache.get(0)?.sha).toBe('b')
+  })
+
+  it('FR-REPO-04 rows fetched before a reload do not refill the cache after it', async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+    let resolve!: (value: unknown) => void
+    mockLogRows.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+    const stale = log.rows(0, 1)
+
+    registeredHandler(mockEventsOn, 'log:progress')?.({
+      data: { loaded: 1, done: true, generation: 1 },
+    })
+    resolve({ rows: [rowFixture('old')], loaded: 1, done: true, generation: 0 })
+    await stale
+
     expect(log.rowCache.has(0)).toBe(false)
   })
 

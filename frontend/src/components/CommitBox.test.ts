@@ -2,14 +2,15 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCommit, mockSetMessageDraft, mockCommitDetails } = vi.hoisted(() => ({
+const { mockCommit, mockSetMessageDraft, mockCommitDetails, mockPush } = vi.hoisted(() => ({
   mockCommit: vi.fn(),
   mockSetMessageDraft: vi.fn(),
   mockCommitDetails: vi.fn(),
+  mockPush: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { Commit: mockCommit, SetMessageDraft: mockSetMessageDraft, CommitDetails: mockCommitDetails },
+  Facade: { Commit: mockCommit, SetMessageDraft: mockSetMessageDraft, CommitDetails: mockCommitDetails, Push: mockPush },
 }))
 
 import CommitBox from './CommitBox.vue'
@@ -19,11 +20,12 @@ import { useRefsStore } from '../stores/refs'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 import { summaryFixture } from '../testing/fixtures/summary'
 import type { Branch, Refs } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { branchFixture } from '../testing/fixtures/branch'
 
 const props = { wt: '/repo' }
 
 function refsFixture(overrides: Partial<Branch> = {}): Refs {
-  return { branches: [{ name: 'main', sha: 'x', ahead: 0, behind: 0, upstreamGone: false, current: true, ...overrides }], remotes: [], tags: [] }
+  return { branches: [branchFixture(overrides)], remotes: [], tags: [] }
 }
 
 describe('CommitBox', () => {
@@ -35,6 +37,7 @@ describe('CommitBox', () => {
     mockCommit.mockReset().mockResolvedValue(undefined)
     mockSetMessageDraft.mockReset().mockResolvedValue(undefined)
     mockCommitDetails.mockReset()
+    mockPush.mockReset().mockResolvedValue('job-1')
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -227,5 +230,97 @@ describe('CommitBox', () => {
     await vi.advanceTimersByTimeAsync(300)
 
     expect(mockSetMessageDraft).not.toHaveBeenCalled()
+  })
+
+  it('FR-UX-05 Ctrl+K commits, same as clicking Commit', async () => {
+    const changes = useChangesStore()
+    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    const wrapper = mount(CommitBox, { props })
+    await wrapper.get('textarea').setValue('a message')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
+    await flushPromises()
+
+    expect(mockCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-UX-05 Ctrl+K with nothing staged does not commit, same gating as the button', async () => {
+    const changes = useChangesStore()
+    changes.files = changedFilesFixture()
+    const wrapper = mount(CommitBox, { props })
+    await wrapper.get('textarea').setValue('a message')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
+    await flushPromises()
+
+    expect(mockCommit).not.toHaveBeenCalled()
+  })
+
+  it('FR-CHG-09 with an upstream, checking "Push after commit" then clicking Commit calls Facade.Commit then Facade.Push', async () => {
+    const changes = useChangesStore()
+    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    const refs = useRefsStore()
+    refs.refs = refsFixture({ upstream: 'origin/main' })
+
+    const wrapper = mount(CommitBox, { props })
+    await wrapper.get('textarea').setValue('a message')
+    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
+    await wrapper.get('[data-test="commit-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mockCommit).toHaveBeenCalledTimes(1)
+    expect(mockPush).toHaveBeenCalledTimes(1)
+    expect(mockPush).toHaveBeenCalledWith('/repo', '')
+    expect(mockCommit.mock.invocationCallOrder[0]!).toBeLessThan(mockPush.mock.invocationCallOrder[0]!)
+  })
+
+  it('FR-CHG-09 the "Push after commit" checkbox is disabled while Amend is checked', async () => {
+    const repo = useRepoStore()
+    repo.summary = summaryFixture({ sha: 'abc123' })
+    const refs = useRefsStore()
+    refs.refs = refsFixture({ upstream: 'origin/main' })
+
+    const wrapper = mount(CommitBox, { props })
+    await wrapper.get('input[type=checkbox]').setValue(true) // Amend
+
+    expect((wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('FR-CHG-09 the "Push after commit" checkbox is disabled with no upstream', () => {
+    const refs = useRefsStore()
+    refs.refs = refsFixture({ upstream: '' })
+
+    const wrapper = mount(CommitBox, { props })
+
+    expect((wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('FR-CHG-09 checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
+    const repo = useRepoStore()
+    repo.summary = summaryFixture({ sha: 'abc123' })
+    const refs = useRefsStore()
+    refs.refs = refsFixture({ upstream: 'origin/main' })
+
+    const wrapper = mount(CommitBox, { props })
+    await wrapper.get('textarea').setValue('a message')
+    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
+    await wrapper.get('input[type=checkbox]').setValue(true) // Amend, ticked after Push after commit
+    await wrapper.get('[data-test="commit-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mockCommit).toHaveBeenCalledTimes(1)
+    expect(mockCommit).toHaveBeenCalledWith('/repo', 'a message', true)
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('FR-UX-09 each checkbox is inside a label whose text names it', () => {
+    const wrapper = mount(CommitBox, { props })
+
+    const labels = wrapper.findAll('label')
+    const amendLabel = labels.find((l) => l.text().includes('Amend last commit'))
+    const pushLabel = labels.find((l) => l.text().includes('Push after commit'))
+
+    expect(amendLabel?.find('input[type=checkbox]').exists()).toBe(true)
+    expect(pushLabel?.find('input[type=checkbox]').exists()).toBe(true)
   })
 })

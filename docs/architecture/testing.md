@@ -1,46 +1,51 @@
 # Testing
 
-Flow: requirement → feature spec (plans dir) → failing test → code (TR-29). Each acceptance case becomes one test whose name carries the ID (TR-30).
+Every acceptance case in a feature spec becomes one test, written before the code (TR-29). The test name carries the requirement ID (TR-30).
 
 | Level | What | Tools |
 |---|---|---|
-| Parser unit tests | Recorded git output → structs. Odd file names, renames, empty repo, detached HEAD. | Go test, golden files |
+| Parser unit tests | Recorded git output → structs: odd file names, renames, empty repo, detached HEAD. | Go test, inline fixtures |
 | Graph unit tests | Hand-made histories → expected lanes. | Go test |
-| Integration tests | Real git, temp repos built by a helper DSL, local bare repo as remote. Every service call. | Go test |
-| Protocol tests | A slice of the integration suite runs a second time through the RPC client and a real `nebegit-core --stdio` child, covering the WSL transport without WSL. | Go test |
-| Frontend component tests | Stores and components with mocked bindings. Default for UI cases (TR-31). | Vitest, Vue Test Utils |
-| Frontend e2e | Only cases a component test cannot prove. Vite dev server with a mocked Go layer. | Playwright |
-| Performance checks | Generated 100k-commit repo. Asserts QA-PERF-02/04/07. On demand and nightly. | Go benchmark + script |
-| Manual checklist | The QA-MNT-02 exceptions (below). | owner, per platform |
+| Integration tests | Real git against temp repos built by a helper, with a local bare repo as the remote. Every core method. | Go test |
+| Protocol tests | A slice of the integration suite runs a second time through the RPC client and a real `nebegit-core --stdio` child. This tests the WSL transport without WSL. | Go test |
+| Frontend component tests | Stores and components with mocked bindings. The default for UI cases (TR-31). | Vitest, Vue Test Utils |
+| Frontend e2e | Only cases a component test cannot prove, such as virtual scrolling. Vite dev server with a mocked Go layer. | Playwright |
+| Performance checks | A generated 100k-commit repo; asserts QA-PERF-02/04/07. On demand and nightly. | Go benchmark + script |
+| Manual checklist | What needs real windows, a real WSL distro or a human judgement (below). | owner, per platform |
 | Traceability check | Every MUST ID has a test name or a manual entry. | `tools/trace`, in CI |
 
-### Manual test checklist
+## Manual test checklist
 
-Run by the owner per platform before a release. `tools/trace` accepts these IDs without an automated test.
+The owner runs this per platform before a release. `tools/trace` accepts the IDs listed here without an automated test.
 
 | ID | Check | Platform |
 |---|---|---|
-| FR-REPO-04 | Edit a file in the editor, commit in a terminal: window updates within the stated times; immediately on focus. | Windows, Linux |
-| FR-REPO-06 | `nebegit <path>` from a Windows, Linux, and WSL terminal opens or focuses the right window. From inside a WSL distro's own shell, after clicking "Install nebegit command" for it: `nebegit <path>` and `nebegit` (no argument, opens the cwd) both open or focus the right window, whether the app is already running or closed. | Windows, WSL, Linux |
-| FR-REPO-07 | "Open WSL folder" on a machine with ≥ 2 distros, one WSL 1: both list, the WSL 1 one visibly disabled; picking a WSL 2 one and browsing opens the right folder at the UNC root, and the repo opens in a native window. | Windows |
-| FR-WT-04, FR-ED-01, FR-ED-02 | Open folder and file in the configured editor from Windows, WSL, and Linux. Configure the editor, another editor, and a custom command, each for a different environment (a local Windows install and a WSL distro, FR-ED-11): "Open in editor" from each environment's own window, and from a selector-panel worktree row (FR-WT-04, no window needed), opens the right folder, matching that environment's own profile; "open in editor" from the commit-details, compare, and compare-diff-window file lists, and from the diff pane's own toolbar (FR-ED-02), opens the right file the same way. | all |
-| FR-ED-06 | Misconfigured editor: error with a link to the setting. Misconfigure an editor command, click "Open in editor": the error names the problem and the "Open editor setting" link opens the settings panel. | all |
-| FR-WT-08, FR-WT-09 | A second window for the same worktree focuses the existing one; titles show worktree and branch. | all |
-| QA-PORT-02 | First use of a distro with no core deployed yet, opened via "Open WSL folder": the consent dialog names the exact distro and target path before any copy; declining leaves no file behind and shows `DEPLOY_REFUSED`'s message; accepting opens the repo normally thereafter, same as a local one; git and hooks run inside WSL. With that distro's own editor profile configured, "Open in editor" from that window starts the editor process inside the distro too, not on Windows. | Windows |
-| QA-PORT-02 | A WSL repo already open in a window: `wsl --shutdown` (or `wsl --terminate <distro>`) from a Windows terminal, then retry an action (e.g. Refresh) in the still-open window: it recovers without the user closing/reopening it — a brief error is acceptable, but a retry succeeds and the log/summary reload correctly. | Windows |
-| QA-PERF-03 | Scroll the 100k-commit log: no visible freeze. | Windows, Linux |
-| QA-INST-01 | Start without WebView2 (Windows) or the webkitgtk package (Linux): Windows shows a native message naming WebView2; on Linux WebKitGTK links before any Go code runs, so no in-app message is possible — confirm the failure is visible in the terminal, not silent. Git presence is covered by `TestQA_INST_01_GitPresent`. | Windows, Linux |
-| QA-USE-01, QA-USE-02 | An an IDE git user finds each action within two steps, under familiar names. | all |
-| QA-MNT-01 | Every spec in the plans dir lists the IDs it covers; the plans dir is outside the repo, so no tool can check it. | — |
-| FR-REPO-01 | The native "Open folder…" dialog opens and a picked directory opens as a worktree; component tests only prove the binding is called. | Windows, Linux |
-| TR-13, FR-REPO-02 | Quit and relaunch nebegit: recent repos and the windows open at last quit persist across an actual process restart, not just a mocked `Store`. | Windows, Linux |
-| QA-PERF-01 | Fresh `task dev` / `bin/nebegit` launch, stopwatch: a usable window appears within 2s. No window-ready signal exists in `internal/app` to automate against; building one is a bigger, separate piece of plumbing. | Windows, Linux |
-| FR-CMP-01, FR-CMP-02 | Compare two commits (click one, Ctrl-click another, or right-click a commit and choose "Compare with selected"), then double-click a file: a separate OS window opens, file list left, diff right; next/previous change and file work; the main window stays usable behind it; Escape and its own close button both close it; double-clicking a second file of the same comparison while its window is open focuses and switches it, not a second window. | Windows, Linux |
-| ADR-9, FR-WT-05 | With a repo open in a window, select a different worktree in the panel: the window's title and content swap in place, no new OS window; switching away and back shows the previous worktree's state was reloaded fresh, not stale. | Windows, Linux |
-| FR-WT-11 | Open two different repos, each once, one worktree of each in its own window: both windows work independently at the same time (log, refs, worktree list all stay correct per window). | Windows, Linux |
-| FR-WT-02, FR-WT-03 | The panel's "+ New worktree": create one from an existing branch, then one with a new branch — both succeed and show up in the panel; try a target folder that already has files in it — rejected with git's own clear message. | Windows, Linux |
-| FR-CONF-05 | Resolve a conflict from a pull, merge, cherry-pick, or revert stop, opened from the banner or the changes panel: nebegit shows no merge editor of its own anywhere in the flow — resolution happens entirely in the external editor. | all |
+| FR-REPO-01 | "Open folder…" shows the native dialog, and the picked directory opens as a worktree. | Windows, Linux |
+| TR-13, FR-REPO-02 | Quit and relaunch: recent repos and the windows open at quit are restored. | Windows, Linux |
+| FR-REPO-04 | Edit a file in the editor, commit in a terminal: the window updates within the stated times, and at once on focus. | Windows, Linux |
+| FR-REPO-06 | `nebegit <path>` from a Windows, Linux and WSL terminal opens or focuses the right window. Inside a distro, after "Install nebegit command": `nebegit <path>` and `nebegit` (the current directory) work whether the app is running or not. | Windows, WSL, Linux |
+| FR-REPO-07 | "Open WSL folder" with two or more distros, one of them WSL 1: both are listed, WSL 1 disabled; a WSL 2 distro opens at its root and the repo opens in a native window. | Windows |
+| ADR-9, FR-WT-05 | Select another worktree in the panel: title and content switch in place, no new window. Switching back shows fresh state. | Windows, Linux |
+| FR-WT-02, FR-WT-03 | "+ New worktree" from an existing branch and with a new branch: both appear in the panel. A target folder that has files in it is refused with git's message. | Windows, Linux |
+| FR-WT-04, FR-ED-01, FR-ED-02 | Configure the editor, another editor and a custom command, each for a different environment (Windows, a WSL distro). "Open in editor" from a window, from a worktree row in the panel, and for a file from commit details, compare, the compare window and the diff toolbar opens the right folder or file with that environment's profile. | all |
+| FR-WT-08, FR-WT-09 | Opening a worktree that already has a window focuses it. Titles show worktree and branch. | all |
+| FR-WT-11 | Two repos, one worktree of each in its own window: both work independently at the same time. | Windows, Linux |
+| FR-CMP-01, FR-CMP-02 | Compare two commits (Ctrl-click, or "Compare with selected") and double-click a file: a separate window opens with the file list and diff; next/previous change and file work; the main window stays usable; Escape and the close button close it; double-clicking another file of the same comparison reuses the window. | Windows, Linux |
+| FR-CONF-05 | Resolve a conflict from a pull, merge, cherry-pick or revert: nebegit shows no merge editor of its own; resolution happens in the external editor. | all |
+| FR-ED-06 | Misconfigure the editor command and open something: the error names the problem and its link opens the setting. | all |
+| FR-ED-08 | "Test" on a WSL distro's profile with a command that exists only inside the distro: the editor starts inside the distro. | Windows |
+| FR-ED-10 | Inside a WSL worktree, misconfigure that distro's profile and choose "Open with system default": `xdg-open` runs inside the distro. Without an opener, `EDITOR_NOT_FOUND` shows again with both fallbacks. | Windows |
+| QA-PORT-02 | First use of a distro via "Open WSL folder": the consent dialog names the distro and target path before any copy. Declining leaves no file and shows `DEPLOY_REFUSED`. Accepting opens the repo; git, hooks and the editor run inside WSL. | Windows |
+| QA-PORT-02 | With a WSL repo open, run `wsl --shutdown`, then retry an action: the window recovers without being reopened; a brief error is acceptable. | Windows |
+| QA-PORT-03 | Across this checklist, no feature exists on one of Windows and Linux but not the other, apart from the documented WSL and macOS exceptions. | Windows, Linux |
+| QA-PERF-01 | A fresh launch shows a usable window within 2 s (stopwatch; there is no window-ready signal to automate against). | Windows, Linux |
+| QA-PERF-03 | Scrolling the 100k-commit log shows no visible freeze. | Windows, Linux |
+| QA-INST-01 | Start without WebView2 (Windows) or WebKitGTK (Linux): Windows shows a native message naming WebView2; on Linux the loader fails before any Go code runs, so check the failure is visible in the terminal. | Windows, Linux |
+| QA-INST-01 | On a fresh machine, download the release zip or AppImage and run it: it starts with only git and the webview runtime installed, as the README says. | Windows, Linux |
+| QA-USE-01 | An an IDE git user finds commit (Ctrl+K), pull (Ctrl+T), push (Ctrl+Shift+K) and "Compare with working tree" (commit context menu) where they expect them. | all |
+| QA-USE-02 | Editor presets, "Test", ignore-whitespace, the theme picker and the editor fallbacks are each at most two steps from the main window. | all |
+| QA-MNT-01 | Every feature spec lists the IDs it covers. The specs live outside the repo, so no tool checks this. | — |
 
-CI: GitHub Actions (`actions/setup-go`, `actions/setup-node` with pnpm cache, golangci-lint's action). Matrix windows-latest and ubuntu-24.04 (`libgtk-4-dev`, `libwebkitgtk-6.0-dev`). Two steps per job: install dependencies with network; then lint (`golangci-lint`, `oxlint`, `eslint`, `vue-tsc`), tests, build, offline (TR-14). The Linux job runs the Go tests against git 2.40 and the runner's current git. macos-latest: build only (QA-PORT-04).
+## CI
 
----
+GitHub Actions, on `windows-latest` and `ubuntu-24.04` (with `libgtk-4-dev` and `libwebkitgtk-6.0-dev`). Each job has two steps: install dependencies with network access, then run offline (TR-14): lint (`golangci-lint`, `oxlint`, `eslint`, `vue-tsc`), tests, build. The Linux job runs the Go tests against git 2.40 and against the runner's current git. `macos-latest` only builds (QA-PORT-04).

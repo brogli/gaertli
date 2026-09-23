@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +38,7 @@ func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
 		DefaultPullMode:          "rebase",
 		DiffMode:                 "side-by-side",
 		AutoFetchIntervalMinutes: 5,
+		Theme:                    "dark",
 	}
 
 	if err := settings.Save(path, want); err != nil {
@@ -64,22 +66,79 @@ func TestFR_UX_04_LoadOnMissingFileReturnsDefault(t *testing.T) {
 	}
 }
 
+func TestFR_UX_06_ThemeRoundTrips(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	want := settings.Settings{Theme: "dark"}
+
+	if err := settings.Save(path, want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := settings.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Theme != "dark" {
+		t.Errorf("Theme = %q, want %q", got.Theme, "dark")
+	}
+}
+
+func TestFR_UX_06_LoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := settings.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Theme != "" {
+		t.Errorf("Theme = %q, want empty (follow the OS)", got.Theme)
+	}
+}
+
 func TestFR_REPO_02_AddRecentMovesToFrontAndDedupes(t *testing.T) {
 	s := settings.Settings{}
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Hour)
 	t3 := t2.Add(time.Hour)
 
-	s.AddRecent("/a", t1, "")
-	s.AddRecent("/b", t2, "")
-	s.AddRecent("/a", t3, "")
+	s.AddRecent(settings.RecentRepo{Path: "/a"}, t1)
+	s.AddRecent(settings.RecentRepo{Path: "/b"}, t2)
+	s.AddRecent(settings.RecentRepo{Path: "/a"}, t3)
 
 	want := []settings.RecentRepo{
 		{Path: "/a", LastOpened: t3.Format(time.RFC3339)},
 		{Path: "/b", LastOpened: t2.Format(time.RFC3339)},
 	}
-	if !equalRecents(s.RecentRepos, want) {
+	if !slices.Equal(s.RecentRepos, want) {
 		t.Errorf("RecentRepos = %+v, want %+v", s.RecentRepos, want)
+	}
+}
+
+func TestFR_WT_13_AddRecentListsARepoOnceAcrossItsWorktrees(t *testing.T) {
+	s := settings.Settings{}
+	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Hour)
+
+	s.AddRecent(settings.RecentRepo{Path: "/r/main", RepoKey: "/r/main/.git"}, t1)
+	s.AddRecent(settings.RecentRepo{Path: "/r/linked", RepoKey: "/r/main/.git"}, t2)
+
+	want := []settings.RecentRepo{{Path: "/r/linked", LastOpened: t2.Format(time.RFC3339), RepoKey: "/r/main/.git"}}
+	if !slices.Equal(s.RecentRepos, want) {
+		t.Errorf("RecentRepos = %+v, want %+v", s.RecentRepos, want)
+	}
+}
+
+func TestFR_WT_13_AddRecentKeepsSameRepoKeyInTwoDistrosApart(t *testing.T) {
+	s := settings.Settings{}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	s.AddRecent(settings.RecentRepo{Path: "/home/u/r", Distro: "Ubuntu", RepoKey: "/home/u/r/.git"}, now)
+	s.AddRecent(settings.RecentRepo{Path: "/home/u/r", Distro: "Debian", RepoKey: "/home/u/r/.git"}, now)
+
+	if len(s.RecentRepos) != 2 {
+		t.Errorf("RecentRepos = %+v, want one entry per distro", s.RecentRepos)
 	}
 }
 
@@ -88,7 +147,7 @@ func TestFR_REPO_02_AddRecentCapsAtTen(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for i := range 11 {
-		s.AddRecent(string(rune('a'+i)), now.Add(time.Duration(i)*time.Hour), "")
+		s.AddRecent(settings.RecentRepo{Path: string(rune('a' + i))}, now.Add(time.Duration(i)*time.Hour))
 	}
 
 	if len(s.RecentRepos) != 10 {
@@ -108,8 +167,8 @@ func TestFR_REPO_07_AddRecentRoundTripsDistroOmittingItForLocal(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s := settings.Settings{}
-	s.AddRecent("/wsl/path", now, "Ubuntu-22.04")
-	s.AddRecent("/local/path", now, "")
+	s.AddRecent(settings.RecentRepo{Path: "/wsl/path", Distro: "Ubuntu-22.04"}, now)
+	s.AddRecent(settings.RecentRepo{Path: "/local/path"}, now)
 
 	if err := settings.Save(path, s); err != nil {
 		t.Fatal(err)
@@ -139,7 +198,7 @@ func TestFR_REPO_07_AddRecentRoundTripsDistroOmittingItForLocal(t *testing.T) {
 		{Path: "/local/path", LastOpened: now.Format(time.RFC3339)},
 		{Path: "/wsl/path", LastOpened: now.Format(time.RFC3339), Distro: "Ubuntu-22.04"},
 	}
-	if !equalRecents(got.RecentRepos, want) {
+	if !slices.Equal(got.RecentRepos, want) {
 		t.Errorf("RecentRepos = %+v, want %+v", got.RecentRepos, want)
 	}
 }
@@ -209,35 +268,12 @@ func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
 }
 
 func equalSettings(a, b settings.Settings) bool {
-	return equalRecents(a.RecentRepos, b.RecentRepos) &&
-		equalStrings(a.OpenWorktrees, b.OpenWorktrees) &&
+	return slices.Equal(a.RecentRepos, b.RecentRepos) &&
+		slices.Equal(a.OpenWorktrees, b.OpenWorktrees) &&
 		maps.Equal(a.EditorProfiles, b.EditorProfiles) &&
-		equalStrings(a.ProtectedBranches, b.ProtectedBranches) &&
+		slices.Equal(a.ProtectedBranches, b.ProtectedBranches) &&
 		a.DefaultPullMode == b.DefaultPullMode &&
 		a.DiffMode == b.DiffMode &&
-		a.AutoFetchIntervalMinutes == b.AutoFetchIntervalMinutes
-}
-
-func equalRecents(a, b []settings.RecentRepo) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+		a.AutoFetchIntervalMinutes == b.AutoFetchIntervalMinutes &&
+		a.Theme == b.Theme
 }

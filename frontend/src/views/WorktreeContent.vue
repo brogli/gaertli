@@ -1,22 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Events } from '@wailsio/runtime'
+import { onKeyStroke } from '@vueuse/core'
+import Splitter from 'openvue/splitter'
+import SplitterPanel from 'openvue/splitterpanel'
 import { useRepoStore } from '../stores/repo'
 import { useRefsStore } from '../stores/refs'
 import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
 import { useChangesStore } from '../stores/changes'
 import { useCoreCall } from '../composables/useCoreCall'
+import { useAutoFetch } from '../composables/useAutoFetch'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { BranchSummary } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type {
+  BranchSummary,
+  EditorFallbackKind,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from '../components/ErrorBanner.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import JobsStrip from '../components/JobsStrip.vue'
 import LogList from '../components/LogList.vue'
 import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
 import CompareView from '../components/CompareView.vue'
+import CompareWorkingView from '../components/CompareWorkingView.vue'
 import ChangesPanel from '../components/ChangesPanel.vue'
 import ConflictBanner from '../components/ConflictBanner.vue'
+import StashNotice from '../components/StashNotice.vue'
 import DiffView from '../components/DiffView.vue'
 import RefsSidebar from '../components/RefsSidebar.vue'
 import FilterBar from '../components/FilterBar.vue'
@@ -26,10 +35,9 @@ import ResetDialog from '../components/ResetDialog.vue'
 import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
 import SyncControls from '../components/SyncControls.vue'
 import type { WorktreeStart } from '../components/worktreeStart'
-import { basename } from '../lib/path'
+import { basename, repoPath } from '../lib/path'
 
-const props = defineProps<{ path: string }>()
-const emit = defineEmits<{ 'open-settings': [] }>()
+const props = defineProps<{ path: string; distro?: string | undefined }>()
 const name = basename(props.path)
 const repo = useRepoStore()
 const refs = useRefsStore()
@@ -46,16 +54,32 @@ const compareRange = computed(() => {
     : null
 })
 
-// Three mutually exclusive diff sources: a compared file wins while compare
-// is active, then a changes-panel selection, then a commit's file. LogList
-// and CommitDetailsPanel clear the changes selection themselves.
+// The working-tree-compare file's diff target; null outside that mode or
+// before a file is picked.
+const compareAgainstWorking = computed(() => {
+  const { workingCommit, selectedFile } = compare
+  return workingCommit && selectedFile
+    ? { sha: workingCommit.sha, path: selectedFile.path, oldPath: selectedFile.oldPath ?? '' }
+    : null
+})
+
+// Four mutually exclusive diff sources: a two-commit compare wins while
+// active, then a working-tree compare, then a changes-panel selection,
+// then a commit's file. LogList and CommitDetailsPanel clear the changes
+// selection themselves.
 const workingTarget = computed(() => changes.selectedFile)
-const showChangesDiff = computed(() => !compare.active && !!workingTarget.value)
-const showCommitDiff = computed(() => !compare.active && !workingTarget.value && !!log.selectedFile)
+const inCompareMode = computed(() => compare.active || !!compare.workingCommit)
+const showChangesDiff = computed(() => !inCompareMode.value && !!workingTarget.value)
+const showCommitDiff = computed(() => !inCompareMode.value && !workingTarget.value && !!log.selectedFile)
 const showDiff = computed(
-  () => (compare.active && compareRange.value !== null) || showChangesDiff.value || showCommitDiff.value,
+  () =>
+    (compare.active && compareRange.value !== null) ||
+    (!!compare.workingCommit && compareAgainstWorking.value !== null) ||
+    showChangesDiff.value ||
+    showCommitDiff.value,
 )
 const { error, run } = useCoreCall()
+useAutoFetch(() => props.path)
 
 // The dialogs LogList's context menu opens, one instance each.
 const createBranchSha = ref<string | null>(null)
@@ -68,7 +92,7 @@ const createWorktreeStart = ref<WorktreeStart | null>(null)
 const createWorktreeBranches = ref<BranchSummary[]>([])
 
 async function openCreateWorktree(start: WorktreeStart): Promise<void> {
-  const branches = await run(() => Facade.ListBranches(props.path))
+  const branches = await run(() => Facade.ListBranches(repoPath(props.path, props.distro)))
   if (branches === undefined) return
   createWorktreeBranches.value = branches ?? []
   createWorktreeStart.value = start
@@ -99,11 +123,22 @@ function refresh(): void {
   void run(() => Facade.Refresh(props.path))
 }
 
+// F5 needs its own preventDefault: unlike a browser tab, the WebView would
+// otherwise reload the whole page.
+onKeyStroke('F5', (event) => {
+  event.preventDefault()
+  refresh()
+})
+
 // labelled with the effective editor profile's name once the summary loads
 const editorLabel = computed(() => `Open in ${repo.summary?.editorName || 'editor'}`)
 
 function openInEditor(): void {
   void run(() => Facade.OpenFolder(props.path))
+}
+
+function openInEditorFallback(kind: EditorFallbackKind): void {
+  void run(() => Facade.OpenFolderFallback(props.path, kind))
 }
 
 // The current branch, if it tracks an upstream that still exists.
@@ -117,37 +152,51 @@ const tracked = computed(() => {
 function openCreateBranchHere(): void {
   createBranchSha.value = repo.summary!.sha ?? null
 }
+
+// SplitterPanel has no built-in collapse; ChangesPanel's own toggle shrinks
+// its size to a sliver instead, reactively.
+const changesCollapsed = ref(false)
 </script>
 
 <template>
   <main>
-    <h1>{{ name }}</h1>
-    <button type="button" @click="refresh">Refresh</button>
-    <button type="button" @click="openInEditor">{{ editorLabel }}</button>
+    <header class="toolbar">
+      <h1 class="repo-name">{{ name }}</h1>
+      <ErrorBanner v-if="error" :error="error" @fallback="openInEditorFallback" />
+      <div v-else-if="repo.summary" class="branch-summary">
+        <span>
+          {{ repo.summary.detached ? 'detached HEAD' : repo.summary.branch }}
+          <template v-if="repo.summary.operation"> ({{ repo.summary.operation }})</template>
+        </span>
+        <span v-if="tracked" class="ahead-behind" data-test="ahead-behind">
+          ↑{{ tracked.ahead }} ↓{{ tracked.behind }}
+        </span>
+        <button v-if="repo.summary.detached" type="button" @click="openCreateBranchHere">
+          Create branch here
+        </button>
+        <SyncControls :wt="path" />
+      </div>
+      <div class="toolbar-spacer"></div>
+      <button type="button" @click="refresh">Refresh</button>
+      <button type="button" @click="openInEditor">{{ editorLabel }}</button>
+    </header>
     <JobsStrip :wt="path" />
-    <ErrorBanner v-if="error" :error="error" @open-settings="emit('open-settings')" />
-    <p v-else-if="repo.summary">
-      {{ repo.summary.detached ? 'detached HEAD' : repo.summary.branch }}
-      <template v-if="repo.summary.operation"> ({{ repo.summary.operation }})</template>
-      <span v-if="tracked" class="ahead-behind" data-test="ahead-behind">
-        ↑{{ tracked.ahead }} ↓{{ tracked.behind }}
-      </span>
-      <button v-if="repo.summary.detached" type="button" @click="openCreateBranchHere">
-        Create branch here
-      </button>
-      <SyncControls :wt="path" />
-    </p>
     <ConflictBanner :wt="path" />
-    <div class="worktree-body">
-      <RefsSidebar
-        :wt="path"
-        @create-worktree="
-          (name, isRemote) =>
-            openCreateWorktree(isRemote ? { newBranch: true, start: name } : { newBranch: false, branch: name })
-        "
-      />
-      <ChangesPanel :wt="path" />
-      <div class="log-column">
+    <StashNotice :wt="path" />
+    <Splitter layout="horizontal" class="worktree-body">
+      <SplitterPanel :size="15" :min-size="10">
+        <RefsSidebar
+          :wt="path"
+          @create-worktree="
+            (name, isRemote) =>
+              openCreateWorktree(isRemote ? { newBranch: true, start: name } : { newBranch: false, branch: name })
+          "
+        />
+      </SplitterPanel>
+      <SplitterPanel :size="changesCollapsed ? 4 : 20" :min-size="changesCollapsed ? 4 : 12">
+        <ChangesPanel v-model:collapsed="changesCollapsed" :wt="path" />
+      </SplitterPanel>
+      <SplitterPanel :size="40" :min-size="15" class="log-column">
         <FilterBar />
         <LogList
           :wt="path"
@@ -156,27 +205,32 @@ function openCreateBranchHere(): void {
           @reset="(sha, subject) => (resetTarget = { sha, subject })"
           @create-worktree="(sha) => openCreateWorktree({ newBranch: true, start: sha })"
         />
-      </div>
-      <div class="side-column">
+      </SplitterPanel>
+      <SplitterPanel :size="25" :min-size="15" class="side-column">
         <CompareView v-if="compare.active" :wt="path" />
+        <CompareWorkingView v-else-if="compare.workingCommit" :wt="path" />
         <CommitDetailsPanel v-else :wt="path" />
-        <DiffView v-if="showDiff" :wt="path" :range="compareRange" :working="workingTarget" />
-      </div>
-    </div>
+        <DiffView
+          v-if="showDiff"
+          :wt="path"
+          :range="compareRange"
+          :working-compare="compareAgainstWorking"
+          :working="workingTarget"
+        />
+      </SplitterPanel>
+    </Splitter>
     <CommandLogPanel :wt="path" />
     <CreateBranchDialog
       v-if="createBranchSha !== null"
       :wt="path"
       :sha="createBranchSha"
-      :visible="true"
-      @update:visible="createBranchSha = null"
+      @close="createBranchSha = null"
     />
     <DetachWarningDialog
       v-if="checkoutCommitSha !== null"
       :wt="path"
       :sha="checkoutCommitSha"
-      :visible="true"
-      @update:visible="checkoutCommitSha = null"
+      @close="checkoutCommitSha = null"
     />
     <ResetDialog
       v-if="resetTarget !== null"
@@ -184,16 +238,15 @@ function openCreateBranchHere(): void {
       :branch="currentBranch"
       :sha="resetTarget.sha"
       :subject="resetTarget.subject"
-      :visible="true"
-      @update:visible="resetTarget = null"
+      @close="resetTarget = null"
     />
     <CreateWorktreeDialog
       v-if="createWorktreeStart"
       :repo-path="path"
+      :distro="distro"
       :branches="createWorktreeBranches"
       :start="createWorktreeStart"
-      :visible="true"
-      @update:visible="createWorktreeStart = null"
+      @close="createWorktreeStart = null"
     />
   </main>
 </template>
@@ -208,9 +261,36 @@ main {
   height: 100%;
   min-height: 0;
 }
+/* One compact row: name, branch/sync status (or the error replacing it),
+   then the actions, pushed right by the spacer. */
+.toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+.repo-name {
+  flex: none;
+  white-space: nowrap;
+}
+.branch-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  white-space: nowrap;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+.toolbar :deep(.error-banner) {
+  flex: 1;
+  min-width: 0;
+}
 .worktree-body {
   display: flex;
-  gap: 1em;
   flex: 1;
   min-height: 0;
 }
@@ -218,7 +298,6 @@ main {
 .side-column {
   display: flex;
   flex-direction: column;
-  flex: 1;
   min-width: 0;
   min-height: 0;
 }

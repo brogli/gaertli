@@ -1,9 +1,10 @@
 // Command trace checks requirement traceability: every required
-// requirement ID must be named by a Go test, a Vitest test, or a manual
-// checklist entry.
+// requirement ID must be named by a Go test, a Vitest or Playwright test,
+// or a manual checklist entry.
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -53,7 +54,7 @@ func run(cfg Config, out io.Writer) (int, error) {
 // missing file is an empty list.
 func pendingIDs(path string) (map[string]bool, error) {
 	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return map[string]bool{}, nil
 	}
 	if err != nil {
@@ -74,16 +75,14 @@ func coverage(cfg Config) (map[string]bool, error) {
 	covered := map[string]bool{}
 	for _, ids := range []func() (map[string]bool, error){
 		func() (map[string]bool, error) { return goCoverage(cfg.GoRoot) },
-		func() (map[string]bool, error) { return vitestCoverage(cfg.FrontendRoot) },
+		func() (map[string]bool, error) { return frontendCoverage(cfg.FrontendRoot) },
 		func() (map[string]bool, error) { return manualCoverage(cfg.TestingPath) },
 	} {
 		found, err := ids()
 		if err != nil {
 			return nil, err
 		}
-		for id := range found {
-			covered[id] = true
-		}
+		maps.Copy(covered, found)
 	}
 	return covered, nil
 }
@@ -137,7 +136,7 @@ func report(out io.Writer, required, covered, pending map[string]bool, pendingPa
 // goCoverage returns the requirement IDs named by Go test functions below
 // root.
 func goCoverage(root string) (map[string]bool, error) {
-	return coverageInFiles(root, "_test.go", func(src string, covered map[string]bool) {
+	return coverageInFiles(root, []string{"_test.go"}, func(src string, covered map[string]bool) {
 		for _, m := range goTestFunc.FindAllStringSubmatch(src, -1) {
 			if id, ok := idFromGoTestName(m[1]); ok {
 				covered[id] = true
@@ -146,10 +145,11 @@ func goCoverage(root string) (map[string]bool, error) {
 	})
 }
 
-// vitestCoverage returns the requirement IDs named by the first string
-// argument of an it(...) or test(...) call in *.test.ts files below root.
-func vitestCoverage(root string) (map[string]bool, error) {
-	return coverageInFiles(root, ".test.ts", func(src string, covered map[string]bool) {
+// frontendCoverage returns the requirement IDs named by the first string
+// argument of an it(...) or test(...) call in Vitest (*.test.ts) and
+// Playwright (*.spec.ts) files below root.
+func frontendCoverage(root string) (map[string]bool, error) {
+	return coverageInFiles(root, []string{".test.ts", ".spec.ts"}, func(src string, covered map[string]bool) {
 		for _, m := range vitestCall.FindAllStringSubmatch(src, -1) {
 			if id := vitestID.FindStringSubmatch(m[1]); id != nil {
 				covered[id[1]] = true
@@ -159,8 +159,8 @@ func vitestCoverage(root string) (map[string]bool, error) {
 }
 
 // coverageInFiles walks root, skipping vendor and hidden dirs, and lets
-// collect add the IDs it finds in every file ending in suffix.
-func coverageInFiles(root, suffix string, collect func(src string, covered map[string]bool)) (map[string]bool, error) {
+// collect add the IDs it finds in every file ending in one of suffixes.
+func coverageInFiles(root string, suffixes []string, collect func(src string, covered map[string]bool)) (map[string]bool, error) {
 	covered := map[string]bool{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -172,7 +172,7 @@ func coverageInFiles(root, suffix string, collect func(src string, covered map[s
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, suffix) {
+		if !slices.ContainsFunc(suffixes, func(suffix string) bool { return strings.HasSuffix(path, suffix) }) {
 			return nil
 		}
 		data, err := os.ReadFile(path)

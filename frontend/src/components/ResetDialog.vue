@@ -9,13 +9,13 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ResetMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
-// ResetDialog is the reset mode picker (soft/mixed/hard). Soft/mixed run
-// immediately; hard asks for confirmation, naming how many uncommitted
-// changes would be lost. After a successful reset the dialog stays open
-// and shows the previous HEAD, which the user might want to copy or reset
-// back to.
-const props = defineProps<{ wt: string; branch: string; sha: string; subject: string; visible: boolean }>()
-const emit = defineEmits<{ 'update:visible': [boolean] }>()
+// ResetDialog is the reset mode picker (soft/mixed/hard/keep). Every mode
+// but hard runs immediately; hard asks for confirmation, naming how many
+// uncommitted changes would be lost. After a successful reset the dialog
+// stays open and shows the previous HEAD, which the user might want to
+// copy or reset back to.
+const props = defineProps<{ wt: string; branch: string; sha: string; subject: string }>()
+const emit = defineEmits<{ close: [] }>()
 
 const mode = ref<ResetMode>(ResetMode.ResetMixed) // git's own default
 const uncommittedCount = ref<number | null>(null) // null while loading
@@ -49,12 +49,12 @@ function onResetClick(): void {
 
 function close(): void {
   previousHead.value = null
-  emit('update:visible', false)
+  emit('close')
 }
 </script>
 
 <template>
-  <Dialog :visible="visible" header="Reset" modal @update:visible="(v: boolean) => emit('update:visible', v)">
+  <Dialog visible header="Reset" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
     <template v-if="previousHead !== null">
       <p>Reset done. Previous HEAD: {{ previousHead }}</p>
@@ -73,6 +73,10 @@ function close(): void {
         <label>
           <RadioButton v-model="mode" :value="ResetMode.ResetHard" name="reset-mode" input-id="reset-mode-hard" />
           Hard — moves the branch pointer, resets the index, and overwrites working files. Uncommitted changes are lost.
+        </label>
+        <label>
+          <RadioButton v-model="mode" :value="ResetMode.ResetKeep" name="reset-mode" input-id="reset-mode-keep" />
+          Keep — moves the branch pointer, resets the index and working files, but refuses if any local change would be lost.
         </label>
       </div>
     </template>

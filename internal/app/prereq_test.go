@@ -22,8 +22,8 @@ func TestQA_INST_01_GitPresent(t *testing.T) {
 }
 
 func TestQA_INST_01_Messages(t *testing.T) {
-	if !strings.Contains(missingGitMessage(), "git") {
-		t.Errorf("missingGitMessage() = %q, want it to mention git", missingGitMessage())
+	if !strings.Contains(missingGitMessage, "git") {
+		t.Errorf("missingGitMessage = %q, want it to mention git", missingGitMessage)
 	}
 
 	msg := startupFailedMessage(errors.New("x"))

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"time"
 
@@ -23,43 +22,7 @@ import (
 //
 // Result.Stdout is left empty; everything else matches Run.
 func (r Runner) Stream(ctx context.Context, call Call, onRecord func([]byte) error) (Result, error) {
-	cmd, effectiveCtx, cancel, command, err := r.prepare(ctx, call)
-	if err != nil {
-		result := Result{ExitCode: -1}
-		r.log(call, command, result, 0, err)
-		return result, err
-	}
-	defer cancel()
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	stdout, pipeErr := cmd.StdoutPipe()
-	if pipeErr == nil {
-		pipeErr = cmd.Start()
-	}
-
-	start := time.Now()
-	if pipeErr != nil {
-		result := Result{ExitCode: -1}
-		err := core.Errorf(core.Internal, "%v", pipeErr)
-		r.log(call, command, result, time.Since(start), err)
-		return result, err
-	}
-
-	recordErr := scanRecords(stdout, splitNUL, onRecord)
-	if recordErr != nil {
-		_ = cmd.Process.Kill()
-	}
-	runErr := cmd.Wait()
-	duration := time.Since(start)
-
-	result := Result{Stderr: stderr.Bytes(), ExitCode: cmd.ProcessState.ExitCode()}
-	err = classify(effectiveCtx, cmd, runErr, result, command)
-	if recordErr != nil {
-		err = asCoreError(recordErr)
-	}
-	r.log(call, command, result, duration, err)
-	return result, err
+	return r.stream(ctx, call, false, onRecord)
 }
 
 // StreamErr runs call like Run, but instead of buffering stderr, calls
@@ -71,45 +34,61 @@ func (r Runner) Stream(ctx context.Context, call Call, onRecord func([]byte) err
 // returns; copy anything kept past that. A non-nil error from onLine stops
 // reading and kills the process, same contract as Stream's onRecord.
 func (r Runner) StreamErr(ctx context.Context, call Call, onLine func([]byte) error) (Result, error) {
+	return r.stream(ctx, call, true, onLine)
+}
+
+// stream is Stream's and StreamErr's shared body: it scans stdout, or
+// stderr if fromStderr, as it arrives and buffers the other. Scanned stderr
+// lines are kept whole too, for the error a failure carries.
+//
+// exec copies the scanned output into a pipe, so Wait's WaitDelay also
+// covers it: a grandchild (a stalled ssh, a transport's delay) that still
+// holds the output after git exited or was killed is cut off.
+func (r Runner) stream(ctx context.Context, call Call, fromStderr bool, onRecord func([]byte) error) (Result, error) {
 	cmd, effectiveCtx, cancel, command, err := r.prepare(ctx, call)
 	if err != nil {
-		result := Result{ExitCode: -1}
-		r.log(call, command, result, 0, err)
-		return result, err
+		return r.notStarted(call, command, err)
 	}
 	defer cancel()
 
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	stderr, pipeErr := cmd.StderrPipe()
-	if pipeErr == nil {
-		pipeErr = cmd.Start()
+	var stdout, stderr bytes.Buffer
+	records, output := io.Pipe()
+	split, scan := splitNUL, onRecord
+	if fromStderr {
+		cmd.Stdout, cmd.Stderr = &stdout, output
+		split = splitCRLF
+		scan = func(line []byte) error {
+			stderr.Write(line)
+			stderr.WriteByte('\n')
+			return onRecord(line)
+		}
+	} else {
+		cmd.Stdout, cmd.Stderr = output, &stderr
 	}
+	if err := cmd.Start(); err != nil {
+		return r.notStarted(call, command, core.Errorf(core.Internal, "%v", err))
+	}
+
+	scanned := make(chan error, 1)
+	go func() {
+		err := scanRecords(records, split, scan)
+		if err != nil {
+			cancel()                    // stops git
+			records.CloseWithError(err) // and exec's copy into output
+		}
+		scanned <- err
+	}()
 
 	start := time.Now()
-	if pipeErr != nil {
-		result := Result{ExitCode: -1}
-		err := core.Errorf(core.Internal, "%v", pipeErr)
-		r.log(call, command, result, time.Since(start), err)
-		return result, err
-	}
-
-	var stderrText bytes.Buffer // kept whole for the error message a failure carries
-	recordErr := scanRecords(stderr, splitCRLF, func(line []byte) error {
-		stderrText.Write(line)
-		stderrText.WriteByte('\n')
-		return onLine(line)
-	})
-	if recordErr != nil {
-		_ = cmd.Process.Kill()
-	}
 	runErr := cmd.Wait()
 	duration := time.Since(start)
+	_ = output.Close()
+	recordErr := <-scanned
 
-	result := Result{Stdout: stdout.Bytes(), Stderr: stderrText.Bytes(), ExitCode: cmd.ProcessState.ExitCode()}
+	result := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), ExitCode: cmd.ProcessState.ExitCode()}
 	err = classify(effectiveCtx, cmd, runErr, result, command)
 	if recordErr != nil {
-		err = asCoreError(recordErr)
+		err = core.ErrorOf(recordErr)
 	}
 	r.log(call, command, result, duration, err)
 	return result, err
@@ -158,14 +137,4 @@ func splitCRLF(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		return len(data), data, nil
 	}
 	return 0, nil, nil
-}
-
-// asCoreError wraps err as *core.Error{Code: Internal} unless it already is
-// one.
-func asCoreError(err error) error {
-	var ce *core.Error
-	if errors.As(err, &ce) {
-		return err
-	}
-	return core.Errorf(core.Internal, "%v", err)
 }

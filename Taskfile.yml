@@ -9,6 +9,9 @@ vars:
   # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
   # tasks below dispatch to the matching platform Taskfile via this variable.
   GOOS: '{{.GOOS | default OS}}'
+  # Stamped into internal/buildinfo.App via -ldflags -X. Set to a release tag
+  # (e.g. v0.1.0) by the release workflow; "dev" for every local build.
+  VERSION: '{{.VERSION | default "dev"}}'
 
 includes:
   common: ./build/Taskfile.yml
@@ -72,6 +75,27 @@ tasks:
     cmds:
       - go run ./tools/trace
 
+  licence-check:
+    summary: Every shipped dependency has an allowed licence; writes the third-party notices
+    vars:
+      OUT: '{{.OUT | default "THIRD-PARTY-NOTICES.txt"}}'
+    cmds:
+      - go run ./tools/licensecheck -out {{.OUT}}
+
+  release:dry-run:
+    summary: Builds this platform's release artifact and licence notices into dist/, mirroring release.yml without publishing
+    vars:
+      VERSION: '{{.VERSION | default "v0.0.0-dryrun"}}'
+    cmds:
+      - rm -rf dist && mkdir -p dist
+      - task: build
+        vars: { VERSION: '{{.VERSION}}' }
+      - task: "{{OS}}:package:dryrun"
+      - task: licence-check
+        vars: { OUT: dist/THIRD-PARTY-NOTICES.txt }
+      - cp LICENSE dist/
+      - sh -c 'cd dist && sha256sum * > SHA256SUMS'
+
   bench:
     summary: Builds/refreshes the reference repo and runs the perf checks (on demand, also nightly)
     env: { GOPROXY: off, GOFLAGS: -mod=readonly, GOTOOLCHAIN: local }
@@ -87,6 +111,21 @@ tasks:
     cmds:
       - task: common:frontend:run
         vars: { SCRIPT: test:e2e }
+
+  build:server:
+    summary: Builds the app in Wails server mode (UI served over HTTP) for the real-backend e2e suite; Linux only
+    cmds:
+      - task: linux:build
+        vars: { EXTRA_TAGS: server, OUTPUT: '{{.BIN_DIR}}/nebegit-server' }
+
+  e2e:real:
+    summary: Playwright against the app in server mode, with the real core and git on scratch repos
+    platforms: [linux]
+    deps:
+      - task: build:server
+    cmds:
+      - task: common:frontend:run
+        vars: { SCRIPT: test:e2e:real }
 
   build:core:
     summary: Builds the headless core as pure Go
@@ -108,6 +147,7 @@ tasks:
     cmds:
       - task: lint
       - task: trace
+      - task: licence-check
       - task: test
       - task: build
       - task: build:core

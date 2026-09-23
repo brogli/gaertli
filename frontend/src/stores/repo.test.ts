@@ -17,17 +17,14 @@ vi.mock('@wailsio/runtime', () => ({
 }))
 
 import { useRepoStore } from './repo'
+import { registeredHandler } from '../testing/events'
+import { summaryFixture } from '../testing/fixtures/summary'
 
 describe('repo store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockSummary.mockReset()
-    mockSummary.mockResolvedValue({
-      path: '/repo',
-      branch: 'main',
-      detached: false,
-      operation: '',
-    })
+    mockSummary.mockResolvedValue(summaryFixture())
     mockEventsOn.mockReset()
     mockEventsOn.mockReturnValue(() => {})
     mockUpdateWindowTitle.mockReset().mockResolvedValue(undefined)
@@ -47,7 +44,7 @@ describe('repo store', () => {
     await repo.loadSummary('/repo')
     mockSummary.mockClear()
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'repo:changed')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'repo:changed')
     handler?.({ data: { scope: 'state' } })
     await Promise.resolve()
     handler?.({ data: { scope: 'refs' } })
@@ -66,7 +63,7 @@ describe('repo store', () => {
     await repo.loadSummary('/repo')
     mockSummary.mockClear()
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'core:reconnected')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'core:reconnected')
     handler?.({})
     await Promise.resolve()
 

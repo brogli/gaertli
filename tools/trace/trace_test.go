@@ -147,6 +147,20 @@ func TestQA_MNT_02_VitestCoversRequiredID(t *testing.T) {
 	}
 }
 
+func TestQA_MNT_02_PlaywrightSpecCoversRequiredID(t *testing.T) {
+	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	writeFile(t, filepath.Join(cfg.FrontendRoot, "e2e-real", "foo.spec.ts"),
+		"import { test } from './fixtures'\n\ntest('FR-AB-01 does a thing', async () => {})\n")
+
+	out, code := runFixture(t, cfg)
+	if code != 0 {
+		t.Errorf("code = %d, want 0; output:\n%s", code, out)
+	}
+	if out != "" {
+		t.Errorf("output = %q, want empty", out)
+	}
+}
+
 func TestQA_MNT_02_ManualChecklistCoversRequiredID(t *testing.T) {
 	checklist := "| FR-AB-01 | some manual check | all |\n"
 	cfg := newConfig(t, oneMustFR, noRows, checklist)

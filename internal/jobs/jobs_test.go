@@ -271,6 +271,32 @@ func TestFR_SYNC_07_StartDedupesAKindAlreadyQueuedOrRunning(t *testing.T) {
 	}
 }
 
+func TestFR_UPD_01_StartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
+	m := NewManager(func(Job) {})
+	release := make(chan struct{})
+	defer close(release)
+	fn := func(ctx context.Context, progress Progress) (any, error) {
+		<-release
+		return nil, nil
+	}
+
+	a := m.StartForBranch("update-branch", "A", fn)
+	b := m.StartForBranch("update-branch", "B", fn)
+	again := m.StartForBranch("update-branch", "A", fn)
+
+	if a == b {
+		t.Errorf("branches A and B share job %q, want one job each", a)
+	}
+	if again != a {
+		t.Errorf("a second start for A returned %q, want the running job %q", again, a)
+	}
+	for _, j := range m.List() {
+		if info := Info(j); info.Kind != "update-branch" || (info.Branch != "A" && info.Branch != "B") {
+			t.Errorf("Info = kind %q, branch %q, want update-branch on A or B", info.Kind, info.Branch)
+		}
+	}
+}
+
 func TestQA_RESP_02_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing.T) {
 	m := NewManager(func(Job) {})
 

@@ -7,34 +7,25 @@ import ErrorBanner from './ErrorBanner.vue'
 
 // DetachWarningDialog confirms "Check out commit". A warning, not a hard
 // action, so it does not use useConfirmAction.
-const props = defineProps<{ wt: string; sha: string; visible: boolean }>()
-const emit = defineEmits<{ 'update:visible': [boolean] }>()
+const props = defineProps<{ wt: string; sha: string }>()
+const emit = defineEmits<{ close: [] }>()
 
 const { error, runAndClose } = useCoreCall()
 
 async function confirm(): Promise<void> {
   await runAndClose(
     () => Facade.CheckoutCommit(props.wt, props.sha),
-    () => emit('update:visible', false),
+    () => emit('close'),
   )
-}
-
-function cancel(): void {
-  emit('update:visible', false)
 }
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    header="Check out commit"
-    modal
-    @update:visible="(v: boolean) => emit('update:visible', v)"
-  >
+  <Dialog visible header="Check out commit" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
     <p>Checking out this commit detaches HEAD. Commits made in this state belong to no branch.</p>
     <template #footer>
-      <Button label="Cancel" severity="secondary" data-test="detach-cancel" @click="cancel" />
+      <Button label="Cancel" severity="secondary" data-test="detach-cancel" @click="emit('close')" />
       <Button label="Check out" data-test="detach-confirm" @click="confirm" />
     </template>
   </Dialog>

@@ -16,12 +16,8 @@ import (
 func TestFR_SYNC_07_QA_RESP_02_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sess, err := c.sessions.Get(wt.ID)
+	c, wt := openWorktree(t, repo.Dir)
+	sess, err := c.sessions.Get(wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,12 +44,12 @@ func TestFR_SYNC_07_QA_RESP_02_JobsPollsGrowingProgressThenCancelKillsProcess(t 
 		return nil, err
 	})
 
-	job := waitForJob(t, c, wt.ID, func(j core.JobInfo) bool { return j.Progress > 0 })
+	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.Progress > 0 })
 
-	if err := c.CancelJob(context.Background(), wt.ID, job.ID); err != nil {
+	if err := c.CancelJob(context.Background(), wt, job.ID); err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt.ID, func(j core.JobInfo) bool { return j.State == "cancelled" })
+	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.State == "cancelled" })
 
 	stopped := mtime(t, heartbeat)
 	time.Sleep(300 * time.Millisecond)

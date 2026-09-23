@@ -6,3 +6,106 @@ body,
   margin: 0;
   height: 100%;
 }
+
+/* A dense, tool-like base size: OpenVue's own component tokens (button and
+   form-field padding, tree indents, icon sizes, ...) are rem-based, so this
+   one change tightens paddings and gaps everywhere, not just in app code. */
+html {
+  font-size: 13px;
+}
+
+/* Panel and section headings are compact labels, not document titles: the
+   app never uses the browser's default h1/h2/h3 sizes. h1 names a panel or
+   view (the app name, a worktree name); h2/h3 name a section within one. */
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+h1 {
+  font-size: 0.95rem;
+}
+h2,
+h3 {
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Plain native controls (every button/input/select that isn't one of
+   OpenVue's own styled components) get the same bordered, token-coloured
+   look, so the app reads as one theme instead of OS-default form chrome
+   next to themed OpenVue components. :not(.p-button) leaves OpenVue's own
+   Button alone; app code is free to add its own classes to a plain button
+   without losing this base look. */
+button:not(.p-button) {
+  font: inherit;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 4px;
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+  cursor: pointer;
+}
+button:not(.p-button):hover:not(:disabled) {
+  background: var(--p-content-hover-background);
+}
+button:not(.p-button):disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+select:not([class]),
+input:not([class]) {
+  font: inherit;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 4px;
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+}
+
+/* Compact icon-only buttons (file actions, diff toolbar): a fixed square
+   holding one Unicode glyph, no icon library. The glyph carries no
+   readable text of its own, so callers always pair it with title and
+   aria-label naming the action. A toggle sets aria-pressed for its state. */
+button.glyph-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+button.glyph-btn[aria-pressed='true'] {
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
+  border-color: var(--p-primary-color);
+}
+
+/* Text that may not fit its row ends in an ellipsis; the element carries
+   the full text as its title. In a flex row it is the item that shrinks. */
+.ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Trees never scroll sideways; a row too long for its panel wraps or ends
+   in an ellipsis. Under WebKitGTK a sideways-scrolling tree gets an overlay
+   scrollbar on top of its last row, which swallows clicks on that row.
+   OpenVue injects its own .p-tree-root rule after this file, hence the
+   extra class. */
+.p-tree .p-tree-root {
+  overflow-x: hidden;
+}
+.p-tree .p-tree-node-content,
+.p-tree .p-tree-node-label {
+  min-width: 0;
+}

@@ -12,6 +12,8 @@ export function defaultSettingsFixture(overrides: Partial<Settings> = {}): Setti
     defaultPullMode: 'merge',
     diffMode: 'unified',
     autoFetchIntervalMinutes: 0,
+    theme: '',
+    ignoreWhitespace: false,
     ...overrides,
   }
 }

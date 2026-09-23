@@ -19,10 +19,10 @@ function newRowView(): RowView {
   return { cache: reactive(new Map<number, LogCommit>()), generation: 0, pending: new Map() }
 }
 
-function resetView(view: RowView): void {
+function resetView(view: RowView, generation = 0): void {
   view.cache.clear()
   view.pending.clear()
-  view.generation = 0
+  view.generation = generation
 }
 
 // cachedWindow returns rows [from, to) if every one is cached, else null.
@@ -77,8 +77,9 @@ export const useLogStore = defineStore('log', () => {
   // One row-window cache per view (base log, filtered view): clearing a
   // filter shows the base rows already fetched, and a slow response lands
   // in its own view's cache. generation is LogRowsResult.Generation as last
-  // seen for that view; a change means the view restarted from row 0.
-  // pending dedupes a window already in flight.
+  // seen for that view, and for the base view also log:progress's: a higher
+  // one means the view restarted from row 0, a lower one is a response from
+  // before that. pending dedupes a window already in flight.
   const baseView = newRowView()
   const filterView = newRowView()
   const activeView = computed(() => (filterActive.value ? filterView : baseView))
@@ -107,11 +108,18 @@ export const useLogStore = defineStore('log', () => {
 
     unlistenProgress?.()
     unlistenProgress = Events.On('log:progress', (ev) => {
-      const payload = ev.data as { loaded: number; done: boolean; filtered?: boolean }
+      const payload = ev.data as {
+        loaded: number
+        done: boolean
+        filtered?: boolean
+        generation: number
+      }
       if (payload.filtered) {
         filterLoaded.value = payload.loaded
         filterDone.value = payload.done
       } else {
+        // a reload restarts the log even when the row count stays the same
+        if (payload.generation !== baseView.generation) resetView(baseView, payload.generation)
         loaded.value = payload.loaded
         done.value = payload.done
       }
@@ -166,11 +174,9 @@ export const useLogStore = defineStore('log', () => {
 
   async function fetchRows(view: RowView, from: number, to: number): Promise<LogCommit[]> {
     const result = await Facade.LogRows(wt, from, to)
-    if (result.generation !== view.generation) {
-      view.generation = result.generation
-      view.cache.clear() // the view restarted from row 0
-    }
     const fetched = result.rows ?? []
+    if (result.generation < view.generation) return fetched // from before the view restarted
+    if (result.generation > view.generation) resetView(view, result.generation)
     fetched.forEach((row, i) => {
       view.cache.set(from + i, row)
       authors.add(row.author)

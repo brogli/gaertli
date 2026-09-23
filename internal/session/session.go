@@ -46,24 +46,19 @@ type Worktree struct {
 	poller worktreePoller // the working-file half of outside-change detection, focused while the window is
 
 	// writeMu serialises everything that writes this worktree's index or
-	// files, one at a time per worktree — stage, commit, reset, checkout,
-	// cherry-pick, revert, merge/rebase steps, discard. A distinct mutex
-	// from mu below, which guards the unrelated command-log ring buffer and
-	// filter state.
+	// files: stage, commit, reset, checkout, cherry-pick, revert,
+	// merge/rebase steps, discard.
 	writeMu sync.Mutex
 
 	mu  sync.Mutex
 	log []core.CommandLogEntry // ring buffer, capped at logCap
 
-	// messageMu guards messageDraft, kept separate from writeMu: reading or
-	// replacing the draft is not a git write and must never contend with a
-	// running commit/stage/reset call.
+	// messageMu guards messageDraft apart from writeMu, so the draft never
+	// waits on a running git write.
 	messageMu    sync.Mutex
 	messageDraft string
 
-	// Per-window filtered log view, not per-repo: shaped like Repo's own log
-	// cache but scoped to this window alone, so one window's search never
-	// overwrites what another window of the same repo is browsing.
+	// The window's own filtered log view, apart from the repo's shared log.
 	filterMu     sync.Mutex
 	filterActive bool
 	filterFlat   bool
@@ -120,11 +115,9 @@ type Repo struct {
 	watcher repoWatcher   // the git-state half of outside-change detection
 	jobs    *jobs.Manager // remote jobs
 
-	// writeMu serialises this repo's write one-offs: worktree
-	// add/remove/prune, branch delete/rename, plus branch create without
-	// checkout — a plain ref create touches no worktree's index or files, so
-	// it belongs here, not on a worktree's queue. Distinct from mu below
-	// (log cache/refcount state).
+	// writeMu serialises this repo's writes that touch no worktree's index
+	// or files: worktree add/remove/prune, branch create (without checkout),
+	// rename, delete.
 	writeMu sync.Mutex
 
 	mu       sync.Mutex
@@ -269,17 +262,15 @@ func (r *Repo) LogSnapshot(from, to int) LogView {
 
 // window copies rows [from, to), clamped to [0, len(rows)).
 func window(rows []core.LogCommit, from, to int) []core.LogCommit {
-	from = clamp(from, 0, len(rows))
-	to = clamp(to, from, len(rows))
+	from = min(max(from, 0), len(rows))
+	to = min(max(to, from), len(rows))
 	return append([]core.LogCommit(nil), rows[from:to]...)
 }
 
 // LogIndexOf returns sha's row index in the currently loaded log and
-// whether it was found. A linear scan under r.mu over the same r.log
-// slice LogSnapshot reads — O(loaded), in-memory only. Reads whatever is
-// loaded right now regardless of r.gen: a reload racing a lookup can at
-// worst make the result momentarily stale, self-corrected by the
-// frontend's own next LogRows call.
+// whether it was found: a linear scan, regardless of r.gen. A racing reload
+// can make the result momentarily stale; the frontend's next LogRows call
+// corrects it.
 func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -291,13 +282,10 @@ func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
 	return 0, false
 }
 
-// FilterBegin starts a new filtered load, cancelling and superseding
-// whatever filtered load is already running: a new filter kills the running
-// git log and starts a new one (git-mapping.md, "Log loading and graph"
-// §7). The returned generation stamps every FilterAppend/FilterFinish call
-// for this load, so a stale call from the load just cancelled is dropped
-// even before the cancel takes effect — the cancel only stops wasted work,
-// the gen-guard is what prevents corruption.
+// FilterBegin starts a new filtered load, cancelling whatever filtered load
+// is running. The returned generation stamps this load's
+// FilterAppend/FilterFinish calls, so a late call from the cancelled load is
+// dropped even before its cancel takes effect.
 func (w *Worktree) FilterBegin(flat bool, cancel context.CancelFunc) (gen int) {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
@@ -369,17 +357,6 @@ func (w *Worktree) FilterClear() {
 	}
 	w.filterActive, w.filterCancel = false, nil
 	w.filterRows, w.filterDone, w.filterErr = nil, false, nil
-}
-
-func clamp(v, lo, hi int) int {
-	switch {
-	case v < lo:
-		return lo
-	case v > hi:
-		return hi
-	default:
-		return v
-	}
 }
 
 // Manager mints and reuses sessions: opening the same worktree twice (by
@@ -497,7 +474,7 @@ func (m *Manager) newRepo(key string) *Repo {
 		m.sink(core.Event{Name: "repo:changed", Repo: key, Payload: changedPayload(scope)})
 	})
 	repo.jobs = jobs.NewManager(func(j jobs.Job) {
-		m.sink(core.Event{Name: "job:update", Repo: key, Payload: marshalJob(j)})
+		m.sink(core.Event{Name: "job:update", Repo: key, Payload: payload(jobs.Info(j))})
 	})
 	return repo
 }
@@ -510,7 +487,7 @@ func (m *Manager) newWorktree(id core.WorktreeID, toplevel, gitDir string, repo 
 	wt.Runner = git.Runner{Log: func(e git.Entry) {
 		entry := toCommandLogEntry(e)
 		wt.append(entry)
-		m.sink(core.Event{Name: "command", Worktree: id, Payload: marshalEntry(entry)})
+		m.sink(core.Event{Name: "command", Worktree: id, Payload: payload(entry)})
 	}}
 	wt.poller = m.newPoller(wt.Runner, toplevel, func(scope watch.Scope) {
 		m.sink(core.Event{Name: "repo:changed", Worktree: id, Payload: changedPayload(scope)})
@@ -519,12 +496,14 @@ func (m *Manager) newWorktree(id core.WorktreeID, toplevel, gitDir string, repo 
 	return wt
 }
 
-// changedPayload is a "repo:changed" event's payload (components.md).
+// changedPayload is a "repo:changed" event's payload.
 func changedPayload(scope watch.Scope) json.RawMessage {
-	b, err := json.Marshal(core.RepoChanged{Scope: string(scope)})
-	if err != nil {
-		return nil
-	}
+	return payload(core.RepoChanged{Scope: string(scope)})
+}
+
+// payload marshals an event's payload; nil if v cannot be marshalled.
+func payload(v any) json.RawMessage {
+	b, _ := json.Marshal(v)
 	return b
 }
 
@@ -555,8 +534,7 @@ func (m *Manager) Close(id core.WorktreeID) {
 // remapNotARepo turns a discovery failure into Code NotARepo with
 // notARepo's own message, keeping GitStderr/Command for the details.
 func remapNotARepo(err error, path core.RepoPath) error {
-	var src *core.Error
-	if errors.As(err, &src) {
+	if src, ok := errors.AsType[*core.Error](err); ok {
 		src.Code, src.Message = core.NotARepo, notARepo(path).Message
 		return src
 	}
@@ -580,30 +558,8 @@ func toCommandLogEntry(e git.Entry) core.CommandLogEntry {
 		ExitCode:   e.Result.ExitCode,
 		Stderr:     string(e.Result.Stderr),
 	}
-	var ce *core.Error
-	if errors.As(e.Err, &ce) {
+	if ce, ok := errors.AsType[*core.Error](e.Err); ok {
 		entry.ErrorCode = string(ce.Code)
 	}
 	return entry
-}
-
-func marshalEntry(entry core.CommandLogEntry) json.RawMessage {
-	b, err := json.Marshal(entry)
-	if err != nil {
-		return nil
-	}
-	return b
-}
-
-// marshalJob is a "job:update" event's payload (components.md), converting
-// a jobs.Job to the JSON DTO the same way toCommandLogEntry/marshalEntry
-// convert a git.Entry — internal/services' toJobInfo does the same
-// conversion again for Jobs' read path: internal/services is where every
-// other leaf-package-to-DTO conversion for a read already lives.
-func marshalJob(j jobs.Job) json.RawMessage {
-	b, err := json.Marshal(jobs.Info(j))
-	if err != nil {
-		return nil
-	}
-	return b
 }

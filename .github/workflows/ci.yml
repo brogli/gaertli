@@ -14,6 +14,8 @@ jobs:
         include:
           - os: ubuntu-24.04
             task: ci
+          - os: ubuntu-24.04
+            task: e2e:real
           - os: windows-latest
             task: ci
           - os: macos-latest
@@ -49,6 +51,10 @@ jobs:
         run: |
           go tool task setup
           go install tool
+
+      - name: Chromium for Playwright (online)
+        if: matrix.task == 'e2e:real'
+        run: pnpm --dir frontend exec playwright install --with-deps chromium
 
       - name: ${{ matrix.task }} (offline)
         env:

@@ -1,6 +1,14 @@
 # ADR-8: Reuse before build
 
-Rules: TR-17 to TR-20. Added dependencies are recorded in `dependencies.md`.
+Status: accepted
+
+## Context
+
+nebegit is built by a small team of sessions and must stay maintainable as open source (G7). Every line of own code is code to test and maintain.
+
+## Decision
+
+For every non-trivial problem we look for an established library or proven pattern first, and write our own code only when nothing fits (TR-17 to TR-19). Every added dependency is recorded in `dependencies.md` (TR-20).
 
 Go:
 
@@ -9,31 +17,31 @@ Go:
 | Git access | system git via `os/exec` (ADR-1) |
 | Logging | `log/slog` |
 | Processes, cancel | `os/exec` + `context` |
-| Parallel work | `golang.org/x/sync` (`errgroup`, `singleflight`) |
 | JSON-RPC over stdio | `creachadair/jrpc2` (ADR-3) |
-| Facade, RPC client, dispatcher | own `tools/gencore` on `golang.org/x/tools/go/packages`; no library exists |
-| File watching | `fsnotify/fsnotify`; no recursive watch, so the git dir is watched and status is polled (`git-mapping.md`) |
+| Facade, RPC client, dispatcher | own generator `tools/gencore` on `golang.org/x/tools/go/packages` |
+| File watching | `fsnotify/fsnotify`; it has no recursive watch, so the git dir is watched and status is polled (`git-mapping.md`) |
 | Parse unified diffs | `bluekeyes/go-gitdiff` (parsing only) |
-| Partial patches for hunk/line staging | own code after lazygit's `pkg/commands/patch`: parse the real diff once, track selected line ranges, re-render a restricted patch, apply with `git apply --cached` |
-| Split editor command templates | own splitter with table tests; `google/shlex` and `kballard/go-shellquote` are unmaintained |
+| Partial patches for hunk and line staging | own code after lazygit's `pkg/commands/patch`: parse the real diff, keep the selected lines, render a restricted patch, `git apply --cached` |
+| Split editor command templates | own splitter; `google/shlex` and `kballard/go-shellquote` are unmaintained |
 | Config dir | `os.UserConfigDir` |
-| Test asserts | `google/go-cmp`; `testing/synctest` for concurrent core tests |
-| Script-style integration tests | `rogpeppe/go-internal/testscript` |
 | Lint | `golangci-lint` v2 |
+
+Preferred when the need arises: `golang.org/x/sync` (`errgroup`, `singleflight`) for parallel work, `google/go-cmp` for test assertions, `testing/synctest` for concurrent tests, `rogpeppe/go-internal/testscript` for script-style integration tests.
 
 Frontend:
 
 | Need | Choice |
 |---|---|
-| UI components | OpenVue 1.0 (continuation of PrimeVue 4.5, same API): tree, context menu, dialog, splitter, toast, data table, tabs, menubar |
-| Composables | VueUse: `useTimeAgo`, `useMagicKeys`, `onKeyStroke`, `useStorage`, `useDebounceFn`, `useWindowFocus`, `useResizeObserver` |
-| State | Pinia 4, setup stores; `createTestingPinia` in tests |
-| Virtual list for the log | `@tanstack/vue-virtual` (dynamic row height). VueUse `useVirtualList` is fixed-height only. Confirmed by the 100k-row benchmark (M1). |
+| UI components | OpenVue 1.0, the continuation of PrimeVue 4.5 with the same API: tree, context menu, dialog, confirm dialog, splitter, multiselect |
+| Composables | VueUse |
+| State | Pinia, setup stores; `createTestingPinia` in tests |
+| Virtual list for the log | `@tanstack/vue-virtual`, because commit rows wrap and VueUse's `useVirtualList` handles fixed row heights only |
 | Diff view | `@codemirror/merge` (ADR-7) |
-| Commit graph layout | own code in `internal/graph`, ported from lazygit's streaming pipe model; no maintained library exists |
+| Commit graph layout | own code in `internal/graph`, ported from lazygit's streaming model |
 | Dates | `Intl.*`, VueUse `useTimeAgo` |
-| Tests | Vitest, Vue Test Utils, happy-dom; `vi.mock` for generated bindings |
-| Lint / format | ESLint flat config (`eslint-plugin-vue`, `@vue/eslint-config-typescript`), `vue-tsc`, Prettier separate |
+| Tests | Vitest, Vue Test Utils, happy-dom; generated bindings mocked with `vi.mock` |
+| Lint and format | ESLint flat config with oxlint, `vue-tsc`, Prettier (TR-33) |
 
-Own code, with reason: graph layout, partial-patch builder, command splitter, `tools/gencore` (no library in each case); job manager (small; `context` + `errgroup` do most of it).
+## Consequences
 
+Own code exists only where no library fits, each for a stated reason: the graph layout and `tools/gencore` (no maintained library), the partial-patch builder, the command splitter, and the job manager (small; `context` does most of the work).

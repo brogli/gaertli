@@ -98,8 +98,6 @@ func TestFR_ED_06_OpenFolderReturnsEditorNotFoundWhenNotOnPath(t *testing.T) {
 
 func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	profile := core.EditorProfile{FolderCmd: argvWriterBin + " {path}"}
-	outFile := argvWriterBin + ".out"
-	t.Cleanup(func() { _ = os.Remove(outFile) })
 
 	start := time.Now()
 	if err := OpenFolder(profile, "/tmp/x"); err != nil {
@@ -108,21 +106,32 @@ func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 250*time.Millisecond {
 		t.Errorf("OpenFolder took %v, want promptly (detached, not waiting on the editor)", elapsed)
 	}
+	if got := awaitArgv(t); got != "/tmp/x" {
+		t.Errorf("helper argv = %q, want %q", got, "/tmp/x")
+	}
+}
 
+func TestFR_ED_10_ALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
+	profile := core.EditorProfile{FileCmd: argvWriterBin + " {path}"}
+
+	if err := OpenFile(profile, "/tmp/x", 0); err != nil {
+		t.Fatalf("OpenFile = %v, want nil: argvwriter exits 1 like explorer.exe after a successful open", err)
+	}
+	awaitArgv(t)
+}
+
+// awaitArgv waits up to 2s for argvwriter's output file and returns it.
+func awaitArgv(t *testing.T) string {
+	t.Helper()
+	outFile := argvWriterBin + ".out"
+	t.Cleanup(func() { _ = os.Remove(outFile) })
 	deadline := time.Now().Add(2 * time.Second)
-	var content []byte
-	var err error
 	for time.Now().Before(deadline) {
-		content, err = os.ReadFile(outFile)
-		if err == nil {
-			break
+		if content, err := os.ReadFile(outFile); err == nil {
+			return string(content)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if err != nil {
-		t.Fatal("helper never wrote its argv file")
-	}
-	if got := string(content); got != "/tmp/x" {
-		t.Errorf("helper argv = %q, want %q", got, "/tmp/x")
-	}
+	t.Fatal("helper never wrote its argv file")
+	return ""
 }

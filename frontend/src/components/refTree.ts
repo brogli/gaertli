@@ -13,6 +13,7 @@ export interface RefTreeLeaf {
 export interface RefTreeNode {
   key: string
   label: string
+  leaf?: boolean
   children?: RefTreeNode[]
   data?: { sha: string; current: boolean; checkedOutIn: string; upstream: string }
 }
@@ -47,5 +48,15 @@ export function buildRefTree(refs: RefTreeLeaf[]): RefTreeNode[] {
     })
   }
 
+  markLeaves(roots)
   return roots
+}
+
+// markLeaves flags every childless node so OpenVue's Tree stops drawing an
+// expand chevron it can never use.
+function markLeaves(nodes: RefTreeNode[]): void {
+  for (const node of nodes) {
+    if (node.children) markLeaves(node.children)
+    else node.leaf = true
+  }
 }

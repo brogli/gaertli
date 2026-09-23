@@ -4,9 +4,11 @@ package git
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
@@ -67,9 +69,7 @@ const defaultTimeout = 30 * time.Second
 func (r Runner) Run(ctx context.Context, call Call) (Result, error) {
 	cmd, effectiveCtx, cancel, command, err := r.prepare(ctx, call)
 	if err != nil {
-		result := Result{ExitCode: -1}
-		r.log(call, command, result, 0, err)
-		return result, err
+		return r.notStarted(call, command, err)
 	}
 	defer cancel()
 
@@ -113,6 +113,13 @@ func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, effectiv
 	return cmd, effectiveCtx, cancel, command, nil
 }
 
+// notStarted logs and returns a call that never ran.
+func (r Runner) notStarted(call Call, command string, err error) (Result, error) {
+	result := Result{ExitCode: -1}
+	r.log(call, command, result, 0, err)
+	return result, err
+}
+
 func (r Runner) log(call Call, command string, result Result, duration time.Duration, err error) {
 	if r.Log == nil {
 		return
@@ -141,7 +148,8 @@ func withTimeout(ctx context.Context, timeout time.Duration) (context.Context, c
 
 // classify turns cmd's outcome into Run's error: Cancelled beats every
 // other cause, a nil ProcessState means git never started, and everything
-// else is a plain exit-code failure; Stderr text is never inspected.
+// else is a plain exit-code failure. Git's output never changes the code;
+// it only becomes the message.
 func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, command string) error {
 	switch {
 	case ctx.Err() != nil:
@@ -149,13 +157,42 @@ func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, comm
 	case cmd.ProcessState == nil:
 		return core.Errorf(core.Internal, "%v", err)
 	case err != nil:
-		gitErr := core.Errorf(core.GitFailed, "git exited %d", result.ExitCode)
-		gitErr.GitStderr = gitDetails(result)
+		details := gitDetails(result)
+		gitErr := core.Errorf(core.GitFailed, "%s", gitMessage(details, result.ExitCode))
+		gitErr.GitStderr = details
 		gitErr.Command = command
 		return gitErr
 	default:
 		return nil
 	}
+}
+
+// gitMessage is a failure's user-facing message: up to four of git's own
+// lines, starting at its first "fatal:"/"error:" line when there is one
+// (progress lines come before it), without those prefixes or hint lines;
+// the exit code when git printed nothing.
+func gitMessage(details string, exitCode int) string {
+	var lines []string
+	for line := range strings.Lines(details) {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "hint:") {
+			lines = append(lines, line)
+		}
+	}
+	if i := slices.IndexFunc(lines, isGitReason); i > 0 {
+		lines = lines[i:]
+	}
+	if len(lines) == 0 {
+		return fmt.Sprintf("git exited %d", exitCode)
+	}
+	lines = lines[:min(len(lines), 4)]
+	for i, line := range lines {
+		lines[i] = strings.TrimPrefix(strings.TrimPrefix(line, "fatal: "), "error: ")
+	}
+	return strings.Join(lines, "\n")
+}
+
+func isGitReason(line string) bool {
+	return strings.HasPrefix(line, "fatal: ") || strings.HasPrefix(line, "error: ")
 }
 
 // gitDetails is the text for GitStderr: git's stderr, or stdout when
@@ -188,8 +225,8 @@ func buildEnv(call Call) []string {
 // re-executed.
 func formatCommand(args []string, hasStdin bool) string {
 	quoted := make([]string, len(args))
-	for i, a := range maskCredentials(args) {
-		quoted[i] = quoteArg(a)
+	for i, a := range args {
+		quoted[i] = quoteArg(maskCredential(a))
 	}
 	command := "git " + strings.Join(quoted, " ")
 	if hasStdin {
@@ -206,16 +243,8 @@ func quoteArg(a string) string {
 	return a
 }
 
-// maskCredentials replaces the userinfo of every arg that parses as an
-// absolute URL with a non-nil User with "***".
-func maskCredentials(args []string) []string {
-	masked := make([]string, len(args))
-	for i, a := range args {
-		masked[i] = maskCredential(a)
-	}
-	return masked
-}
-
+// maskCredential replaces a's userinfo with "***" if a parses as an
+// absolute URL with a User.
 func maskCredential(a string) string {
 	u, err := url.Parse(a)
 	if err != nil || !u.IsAbs() || u.User == nil {

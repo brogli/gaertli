@@ -9,26 +9,34 @@ const {
   mockDiffFile,
   mockDiffRange,
   mockDiffWorking,
+  mockDiffAgainstWorking,
   mockSettingsGet,
   mockSettingsSet,
   mockLoadLog,
   mockLogRows,
   mockLogIndexOf,
   mockOpenFile,
+  mockOpenFileFallback,
   mockStageLines,
+  mockDiscardLines,
   mockStatus,
+  mockRequire,
 } = vi.hoisted(() => ({
   mockDiffFile: vi.fn(),
   mockDiffRange: vi.fn(),
   mockDiffWorking: vi.fn(),
+  mockDiffAgainstWorking: vi.fn(),
   mockSettingsGet: vi.fn(),
   mockSettingsSet: vi.fn(),
   mockLoadLog: vi.fn(),
   mockLogRows: vi.fn(),
   mockLogIndexOf: vi.fn(),
   mockOpenFile: vi.fn(),
+  mockOpenFileFallback: vi.fn(),
   mockStageLines: vi.fn(),
+  mockDiscardLines: vi.fn(),
   mockStatus: vi.fn(),
+  mockRequire: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -36,15 +44,22 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     DiffFile: mockDiffFile,
     DiffRange: mockDiffRange,
     DiffWorking: mockDiffWorking,
+    DiffAgainstWorking: mockDiffAgainstWorking,
     LoadLog: mockLoadLog,
     LogRows: mockLogRows,
     CommitDetails: vi.fn(),
     LogIndexOf: mockLogIndexOf,
     OpenFile: mockOpenFile,
+    OpenFileFallback: mockOpenFileFallback,
     StageLines: mockStageLines,
+    DiscardLines: mockDiscardLines,
     Status: mockStatus,
   },
   SettingsService: { Get: mockSettingsGet, Set: mockSettingsSet },
+}))
+
+vi.mock('openvue/useconfirm', () => ({
+  useConfirm: () => ({ require: mockRequire, close: vi.fn() }),
 }))
 
 vi.mock('@wailsio/runtime', () => ({
@@ -52,8 +67,10 @@ vi.mock('@wailsio/runtime', () => ({
 }))
 
 import DiffView from './DiffView.vue'
+import { Events } from '@wailsio/runtime'
 import { useLogStore } from '../stores/log'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
+import { changedFilesFixture } from '../testing/fixtures/changes'
 
 const settings = defaultSettingsFixture()
 
@@ -84,6 +101,7 @@ describe('DiffView', () => {
     setActivePinia(createPinia())
     mockDiffFile.mockReset()
     mockDiffRange.mockReset()
+    mockDiffAgainstWorking.mockReset()
     mockDiffWorking.mockReset()
     mockSettingsGet.mockReset()
     mockSettingsSet.mockReset()
@@ -91,10 +109,160 @@ describe('DiffView', () => {
     mockSettingsSet.mockResolvedValue(undefined)
     mockOpenFile.mockReset()
     mockOpenFile.mockResolvedValue(undefined)
+    mockOpenFileFallback.mockReset()
+    mockOpenFileFallback.mockResolvedValue(undefined)
     mockStageLines.mockReset()
+    mockDiscardLines.mockReset()
+    mockRequire.mockReset()
     mockStatus.mockReset()
-    mockStatus.mockResolvedValue({ staged: [], unstaged: [], untracked: [], conflicted: [] })
+    mockStatus.mockResolvedValue(changedFilesFixture())
     open('a.txt')
+  })
+
+  it('FR-DIFF-05 a .ts path gets syntax highlighting: a keyword token class appears', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.ts',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'const x = 1\n',
+      newContent: 'let x = 1\n',
+    })
+    open('a.ts')
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+    await flushPromises() // the language extension's own async load()
+
+    expect(wrapper.find('.tok-keyword').exists()).toBe(true)
+  })
+
+  it('FR-DIFF-05 an unmatched filename renders plain text without throwing', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'Makefile',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old target\n',
+      newContent: 'new target\n',
+    })
+    open('Makefile')
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('old target')
+    expect(wrapper.text()).toContain('new target')
+  })
+
+  it('FR-DIFF-06 toggling "ignore whitespace" clears a whitespace-only chunk', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2\nline3\n',
+      newContent: 'line1\nline2   \nline3\n',
+    })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    const before = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!before) throw new Error('no EditorView mounted')
+    expect(getChunks(before.state)?.chunks.length).toBeGreaterThanOrEqual(1)
+
+    await wrapper.get('[data-test="ignore-whitespace-toggle"]').trigger('click')
+    await flushPromises()
+
+    const after = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!after) throw new Error('no EditorView mounted')
+    expect(getChunks(after.state)?.chunks.length ?? 0).toBe(0)
+  })
+
+  it('FR-DIFF-06 toggling "ignore whitespace" keeps a chunk that differs by a real word', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2\nline3\n',
+      newContent: 'line1\nlineX\nline3\n',
+    })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    await wrapper.get('[data-test="ignore-whitespace-toggle"]').trigger('click')
+    await flushPromises()
+
+    const view = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!view) throw new Error('no EditorView mounted')
+    expect(getChunks(view.state)?.chunks.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // Chunks are [fromA, toA, fromB, toB]; a chunk spans whole lines,
+  // newline included, and the last line's toA/toB point one past the text.
+  it.each([
+    ['a short word swap', 'a b\n', 'a c\n', [[0, 4, 0, 4]]],
+    ['a change at the text end after differing whitespace', 'x\na b', 'x\na  c', [[2, 6, 2, 7]]],
+    ['a change followed by stripped trailing whitespace', 'a b  \nz\n', 'a c\nz\n', [[0, 6, 0, 4]]],
+    ['an empty old text', '', 'a b\n', [[0, 0, 0, 4]]],
+    ['an empty new text', 'a b\n', '', [[0, 4, 0, 0]]],
+    ['two empty texts', '', '', []],
+    ['CRLF lines differing only in whitespace', 'a b\r\nz\r\n', 'a  b\r\nz\r\n', []],
+    ['CRLF lines with a real change', 'a b\r\nz\r\n', 'a c\r\nz\r\n', [[0, 4, 0, 4]]],
+  ])('FR-DIFF-06 ignoring whitespace chunks exactly the changed lines: %s', async (_, oldContent, newContent, want) => {
+    mockSettingsGet.mockResolvedValue(defaultSettingsFixture({ ignoreWhitespace: true }))
+    mockDiffFile.mockResolvedValue({ path: 'a.txt', binary: false, tooLarge: false, oldContent, newContent })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    const view = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!view) throw new Error('no EditorView mounted')
+    const chunks = getChunks(view.state)?.chunks ?? []
+    expect(chunks.map((c) => [c.fromA, c.toA, c.fromB, c.toB])).toEqual(want)
+  })
+
+  it('FR-DIFF-06 ignoring whitespace in side-by-side mode renders a short word swap', async () => {
+    mockSettingsGet.mockResolvedValue(defaultSettingsFixture({ ignoreWhitespace: true, diffMode: 'side-by-side' }))
+    mockDiffFile.mockResolvedValue({ path: 'a.txt', binary: false, tooLarge: false, oldContent: 'a b\n', newContent: 'a c\n' })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    expect(wrapper.findAll('.cm-editor')).toHaveLength(2)
+    expect(wrapper.text()).toContain('a b')
+    expect(wrapper.text()).toContain('a c')
+  })
+
+  // repoChanged calls the component's own repo:changed handler.
+  function repoChanged(scope: string): void {
+    for (const [name, handler] of vi.mocked(Events.On).mock.calls as unknown as [string, (ev: unknown) => void][]) {
+      if (name === 'repo:changed') handler({ data: { scope } })
+    }
+  }
+
+  it('FR-REPO-04 a working-tree diff refetches on an outside change to the working tree', async () => {
+    vi.mocked(Events.On).mockClear()
+    mockDiffWorking.mockResolvedValue({ path: 'a.txt', binary: false, tooLarge: false, oldContent: 'a\n', newContent: 'b\n' })
+    mount(DiffView, { props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: 'M' } } })
+    await flushPromises()
+
+    repoChanged('index')
+    await flushPromises()
+
+    expect(mockDiffWorking).toHaveBeenCalledTimes(2)
+  })
+
+  it("FR-REPO-04 a commit's diff does not refetch on a working-tree change", async () => {
+    vi.mocked(Events.On).mockClear()
+    mockDiffFile.mockResolvedValue({ path: 'a.txt', binary: false, tooLarge: false, oldContent: 'a\n', newContent: 'b\n' })
+    mount(DiffView, { props })
+    await flushPromises()
+
+    repoChanged('index')
+    await flushPromises()
+
+    expect(mockDiffFile).toHaveBeenCalledTimes(1)
   })
 
   it('FR-DIFF-01 renders the computed diff in unified mode from real old/new content', async () => {
@@ -132,6 +300,21 @@ describe('DiffView', () => {
     expect(mockSettingsSet).toHaveBeenCalledTimes(1)
     expect(mockSettingsSet.mock.calls[0]?.[0]).toMatchObject({ diffMode: 'side-by-side' })
     expect(wrapper.findAll('.cm-editor')).toHaveLength(2)
+  })
+
+  it.each([
+    ['binary', { binary: true, tooLarge: false }],
+    ['too large', { binary: false, tooLarge: true }],
+  ])('FR-DIFF-02 a %s file keeps Previous/Next file, so stepping through files goes on past it', async (_, flags) => {
+    mockDiffFile.mockResolvedValue({ path: 'img.png', ...flags })
+    open('img.png', 'b.txt')
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="prev-file"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="next-file"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="next-change"]').exists()).toBe(false)
   })
 
   it('FR-DIFF-03 shows a binary placeholder and mounts no CodeMirror container', async () => {
@@ -299,6 +482,113 @@ describe('DiffView', () => {
     expect(wrapper.emitted('update:range')).toBeUndefined()
   })
 
+  it('FR-ED-09 "Open in editor" opens at the mounted view\'s current cursor line', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2\nline3\nline4\nline5\nline6\nline7\n',
+      newContent: 'line1\nline2\nline3\nline4\nline5\nline6\nline7\n',
+    })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    const view = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!view) throw new Error('no EditorView mounted')
+    view.dispatch({ selection: EditorSelection.cursor(view.state.doc.line(5).from) })
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 5)
+  })
+
+  it('FR-ED-09 in side-by-side mode, "Open in editor" opens at the new/right side\'s cursor line', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2\nline3\n',
+      newContent: 'line1\nlineTWO\nlineTHREE\nline4\nline5\n',
+    })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+    await wrapper.get('[data-test="mode-toggle"]').trigger('click')
+    await flushPromises()
+
+    const editors = wrapper.findAll('.cm-editor')
+    expect(editors).toHaveLength(2)
+    const newView = EditorView.findFromDOM(editors[1]!.element as HTMLElement)
+    if (!newView) throw new Error('no new-side EditorView mounted')
+    newView.dispatch({ selection: EditorSelection.cursor(newView.state.doc.line(4).from) })
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 4)
+  })
+
+  it('FR-ED-09 a deleted-lines-only region has no line of its own: the cursor lands on a real new-side line', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2\nline3\nline4\nline5\n',
+      newContent: 'line1\nline5\n', // line2-4 deleted entirely, no new-side counterpart
+    })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    const view = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+    if (!view) throw new Error('no EditorView mounted')
+    // The line right after the deleted block: doc has no line for the
+    // deletion itself to place a cursor on.
+    view.dispatch({ selection: EditorSelection.cursor(view.state.doc.line(2).from) })
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 2)
+  })
+
+  it('FR-ED-09 "Open in editor" with nothing mounted (too-large placeholder) opens at line 0', async () => {
+    open('big.txt')
+    mockDiffFile.mockResolvedValue({ path: 'big.txt', binary: false, tooLarge: true })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'big.txt', 0)
+  })
+
+  it('FR-ED-10 clicking "Open with git\'s editor" on an EDITOR_NOT_FOUND error calls Facade.OpenFileFallback', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+    mockOpenFile.mockRejectedValue(
+      Object.assign(new Error('editor not found'), { cause: { message: 'no editor', code: 'EDITOR_NOT_FOUND' } }),
+    )
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+    await flushPromises()
+
+    const fallbackButton = wrapper
+      .get('.error-banner')
+      .findAll('button')
+      .find((b) => b.text() === "Open with git's editor")
+    await fallbackButton!.trigger('click')
+
+    expect(mockOpenFileFallback).toHaveBeenCalledWith('/repo', 'a.txt', 1, 'git')
+  })
+
   it('FR-ED-02 "Open in editor" calls Facade.OpenFile with the commit-mode file, in commit mode', async () => {
     mockDiffFile.mockResolvedValue({
       path: 'a.txt',
@@ -313,8 +603,9 @@ describe('DiffView', () => {
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')
 
+    // The cursor's own default position (untouched): document start, line 1.
     expect(mockOpenFile).toHaveBeenCalledTimes(1)
-    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 1)
   })
 
   it('FR-ED-02 "Open in editor" calls Facade.OpenFile with the range-mode file, in range mode', async () => {
@@ -334,7 +625,27 @@ describe('DiffView', () => {
     await wrapper.get('[data-test="open-editor"]').trigger('click')
 
     expect(mockOpenFile).toHaveBeenCalledTimes(1)
-    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
+    expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 1)
+  })
+
+  it('FR-CMP-04 with a workingCompare prop, loads via DiffAgainstWorking and hides next/previous-file', async () => {
+    mockDiffAgainstWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, workingCompare: { sha: 'sha-a', path: 'a.txt', oldPath: '' } },
+    })
+    await flushPromises()
+
+    expect(mockDiffAgainstWorking).toHaveBeenCalledWith('/repo', 'sha-a', 'a.txt', '', false)
+    expect(mockDiffFile).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="prev-file"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="next-file"]').exists()).toBe(false)
   })
 
   it('FR-CHG-04 with a working prop, loads via DiffWorking and renders the fetched content', async () => {
@@ -565,5 +876,93 @@ describe('DiffView', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('FR-CHG-10 with an unstaged working prop, "Discard hunk" confirms then calls Facade.DiscardLines and reloads', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2 old\nline3\nline4\nline5\nline6 old\nline7\n',
+      newContent: 'line1\nline2 new\nline3\nline4\nline5\nline6 new\nline7\n',
+    })
+    mockDiscardLines.mockResolvedValue(undefined)
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: false, status: 'M' } },
+    })
+    await flushPromises()
+
+    const buttons = wrapper.findAll('[data-test="discard-hunk"]')
+    expect(buttons.length).toBeGreaterThanOrEqual(2)
+    expect(buttons[0]!.text()).toBe('Discard hunk')
+
+    await buttons[0]!.trigger('click')
+
+    expect(mockRequire).toHaveBeenCalledTimes(1)
+    const options = mockRequire.mock.calls[0]![0] as { accept: () => void }
+    expect(mockDiscardLines).not.toHaveBeenCalled()
+
+    options.accept()
+    await flushPromises()
+
+    // The first hunk is the single-line substitution at line 2, the same
+    // line number on both diff sides.
+    expect(mockDiscardLines).toHaveBeenCalledTimes(1)
+    expect(mockDiscardLines).toHaveBeenCalledWith('/repo', 'a.txt', { old: [2], new: [2] })
+    expect(mockStatus).toHaveBeenCalledTimes(1)
+    expect(mockDiffWorking).toHaveBeenCalledTimes(2)
+  })
+
+  it('FR-CHG-10 with a staged working prop, no discard button renders', async () => {
+    mockDiffWorking.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'line1\nline2 old\nline3\n',
+      newContent: 'line1\nline2 new\nline3\n',
+    })
+
+    const wrapper = mount(DiffView, {
+      props: { ...props, working: { path: 'a.txt', oldPath: '', staged: true, status: 'M' } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="discard-hunk"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="discard-selected-lines"]').exists()).toBe(false)
+  })
+
+  it('FR-UX-09 every toolbar button has a title and aria-label; the mode and ignore-whitespace toggles expose aria-pressed', async () => {
+    mockDiffFile.mockResolvedValue({
+      path: 'a.txt',
+      binary: false,
+      tooLarge: false,
+      oldContent: 'old\n',
+      newContent: 'new\n',
+    })
+
+    const wrapper = mount(DiffView, { props })
+    await flushPromises()
+
+    for (const selector of [
+      'mode-toggle',
+      'ignore-whitespace-toggle',
+      'prev-change',
+      'next-change',
+      'prev-file',
+      'next-file',
+      'open-editor',
+    ]) {
+      const button = wrapper.get(`[data-test="${selector}"]`)
+      expect(button.attributes('title')).toBeTruthy()
+      expect(button.attributes('aria-label')).toBeTruthy()
+    }
+    expect(wrapper.get('[data-test="mode-toggle"]').attributes('aria-pressed')).toBe('false')
+    expect(wrapper.get('[data-test="ignore-whitespace-toggle"]').attributes('aria-pressed')).toBe('false')
+
+    await wrapper.get('[data-test="mode-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="mode-toggle"]').attributes('aria-pressed')).toBe('true')
   })
 })

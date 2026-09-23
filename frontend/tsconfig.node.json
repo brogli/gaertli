@@ -17,5 +17,5 @@
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  "include": ["*.ts", "e2e/**/*.ts"]
+  "include": ["*.ts", "e2e/**/*.ts", "e2e-real/**/*.ts", "bindings/**/*.ts"]
 }

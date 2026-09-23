@@ -8,13 +8,15 @@ function actions() {
     openCheckoutCommit: vi.fn(),
     openReset: vi.fn(),
     cherryPick: vi.fn(),
+    cherryPickOptions: vi.fn(),
     revert: vi.fn(),
+    revertOptions: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
 }
 
 describe('buildCommitMenuItems', () => {
-  it('FR-LOG-11 returns copy hash, copy subject, new branch, check out commit, reset, cherry-pick, revert, and create worktree, in that order', () => {
+  it('FR-LOG-11 returns copy hash, copy subject, new branch, check out commit, reset, cherry-pick (plain and "…"), revert (plain and "…"), and create worktree, in that order', () => {
     const items = buildCommitMenuItems(row(), actions())
 
     expect(items.map((i) => i.label)).toEqual([
@@ -24,7 +26,9 @@ describe('buildCommitMenuItems', () => {
       'Check out commit',
       'Reset current branch to here…',
       'Cherry-pick',
+      'Cherry-pick…',
       'Revert',
+      'Revert…',
       'Create worktree here…',
     ])
   })
@@ -80,6 +84,17 @@ describe('buildCommitMenuItems', () => {
     expect(a.revert).toHaveBeenCalledTimes(1)
   })
 
+  it('FR-CP-06, FR-CP-08, FR-RV-04 "Cherry-pick…" and "Revert…" each call their own options spy once', () => {
+    const a = actions()
+    const items = buildCommitMenuItems(row(), a)
+
+    items.find((i) => i.label === 'Cherry-pick…')?.command()
+    items.find((i) => i.label === 'Revert…')?.command()
+
+    expect(a.cherryPickOptions).toHaveBeenCalledTimes(1)
+    expect(a.revertOptions).toHaveBeenCalledTimes(1)
+  })
+
   it('FR-LOG-12 the two existing copy items are unchanged', () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
@@ -102,10 +117,21 @@ describe('buildCommitMenuItems', () => {
     expect(compareWithSelected).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CMP-01 with compareWithSelected omitted, returns exactly the existing 8 items', () => {
+  it('FR-CMP-01 with compareWithSelected omitted, returns exactly the existing 10 items', () => {
     const items = buildCommitMenuItems(row(), actions())
 
-    expect(items).toHaveLength(8)
+    expect(items).toHaveLength(10)
     expect(items.map((i) => i.label)).not.toContain('Compare with selected')
+  })
+
+  it('FR-CMP-04 with compareWithWorking provided, includes "Compare with working tree" and calls it', () => {
+    const compareWithWorking = vi.fn()
+    const items = buildCommitMenuItems(row(), { ...actions(), compareWithWorking })
+
+    const item = items.find((i) => i.label === 'Compare with working tree')
+    expect(item).toBeTruthy()
+    item?.command()
+
+    expect(compareWithWorking).toHaveBeenCalledTimes(1)
   })
 })

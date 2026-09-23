@@ -3,6 +3,10 @@ package watch
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,7 +18,9 @@ import (
 var StatusArgs = []string{"status", "--porcelain=v2", "-z", "--branch", "--untracked-files=all"}
 
 // WorktreePoller polls one worktree's git status while its window has
-// focus. It compares Result.Stdout's raw bytes only.
+// focus. It compares the status output plus the size and modification time
+// of every file whose working-tree side is changed: a further edit to a
+// file already listed leaves the status output identical.
 type WorktreePoller struct {
 	runner   git.Runner
 	dir      string
@@ -113,9 +119,10 @@ func (p *WorktreePoller) CheckNow() {
 		return
 	}
 
+	fp := fingerprint(p.dir, result.Stdout)
 	p.mu.Lock()
-	changed := p.haveBase && !bytes.Equal(p.baseline, result.Stdout)
-	p.baseline = result.Stdout
+	changed := p.haveBase && !bytes.Equal(p.baseline, fp)
+	p.baseline = fp
 	p.haveBase = true
 	p.mu.Unlock()
 
@@ -143,4 +150,49 @@ func (p *WorktreePoller) endPoll() {
 // Close stops the poller.
 func (p *WorktreePoller) Close() {
 	p.Blur()
+}
+
+// fingerprint is status's porcelain v2 -z output followed by the size and
+// modification time of each path whose working-tree side is changed
+// (modified, unmerged, untracked); a path that can't be read counts as gone.
+func fingerprint(dir string, status []byte) []byte {
+	out := bytes.Clone(status)
+	for _, path := range worktreeChangedPaths(status) {
+		info, err := os.Lstat(filepath.Join(dir, path))
+		if err != nil {
+			out = append(out, "\x00gone"...)
+			continue
+		}
+		out = fmt.Appendf(out, "\x00%d %d", info.Size(), info.ModTime().UnixNano())
+	}
+	return out
+}
+
+// worktreeChangedPaths picks from porcelain v2 -z records the paths whose
+// working-tree side differs: an ordinary or rename record with a Y status,
+// every unmerged and every untracked record.
+func worktreeChangedPaths(status []byte) []string {
+	records := strings.Split(strings.TrimSuffix(string(status), "\x00"), "\x00")
+	var paths []string
+	for i := 0; i < len(records); i++ {
+		rec := records[i]
+		switch {
+		case strings.HasPrefix(rec, "1 "):
+			if f := strings.SplitN(rec[2:], " ", 8); len(f) == 8 && f[0][1] != '.' {
+				paths = append(paths, f[7])
+			}
+		case strings.HasPrefix(rec, "2 "):
+			if f := strings.SplitN(rec[2:], " ", 9); len(f) == 9 && f[0][1] != '.' {
+				paths = append(paths, f[8])
+			}
+			i++ // the original path is the next record
+		case strings.HasPrefix(rec, "u "):
+			if f := strings.SplitN(rec[2:], " ", 10); len(f) == 10 {
+				paths = append(paths, f[9])
+			}
+		case strings.HasPrefix(rec, "? "):
+			paths = append(paths, rec[2:])
+		}
+	}
+	return paths
 }

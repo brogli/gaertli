@@ -55,6 +55,7 @@ func TestFR_CHG_01_ParseStatusRenameWithUnstagedEditKeepsGroupsSeparate(t *testi
 	}
 }
 
+// openWorktree opens dir on a fresh core that discards its events.
 func openWorktree(t *testing.T, dir string) (*Core, core.WorktreeID) {
 	t.Helper()
 	c := New(func(core.Event) {})
@@ -206,13 +207,9 @@ func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T)
 	}
 }
 
-// UnstageFile on a genuinely clean tracked file with nothing staged is a
-// silent no-op in real git (restore --staged just resets the index entry
-// to HEAD, which is already what it is) — confirmed against git 2.43.0,
-// contradicting the spec's own claim that this fixture fails as
-// GitFailed. The refusal that IS real (spec's own research, cited
-// verbatim) is git restore --staged on a path with no index entry at
-// all — reproduced here instead.
+// git restore --staged is a silent no-op on a clean tracked file; it
+// refuses a path with no index entry at all, so the race is a
+// never-tracked path.
 func TestFR_CHG_02_UnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "clean\n", "add a.txt")
@@ -346,6 +343,23 @@ func TestFR_CHG_04_DiffWorkingUnstagedReturnsIndexAndWorkingTreeContent(t *testi
 	}
 }
 
+func TestFR_CHG_04_DiffWorkingUnstagedDeletionHasNoNewContent(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "a.txt", "index content\n", "add a.txt")
+	if err := os.Remove(filepath.Join(repo.Dir, "a.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	c, id := openWorktree(t, repo.Dir)
+	diff, err := c.DiffWorking(context.Background(), id, "a.txt", "", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff.OldContent != "index content\n" || diff.NewContent != "" {
+		t.Errorf("DiffWorking = %+v, want OldContent %q NewContent \"\"", diff, "index content\n")
+	}
+}
+
 func TestFR_CHG_04_DiffWorkingUntrackedHasNoOldContent(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "existing.txt", "x\n", "add existing.txt")
@@ -458,7 +472,7 @@ func TestFR_CHG_04_DiffWorkingIsBinaryTreatsNoIndexExit1AsATolerableDifference(t
 			t.Setenv("FAKEGIT_EXIT", tt.exit)
 			r := git.Runner{Git: fakegit}
 
-			binary, err := diffWorkingIsBinary(context.Background(), r, t.TempDir(), "file", true)
+			binary, err := diffWorkingIsBinary(context.Background(), r, t.TempDir(), "file", true, oldSide{})
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("diffWorkingIsBinary() error = nil, want an error")
@@ -472,5 +486,30 @@ func TestFR_CHG_04_DiffWorkingIsBinaryTreatsNoIndexExit1AsATolerableDifference(t
 				t.Errorf("binary = %v, want %v", binary, tt.wantBinary)
 			}
 		})
+	}
+}
+
+func TestFR_CHG_04_DiffWorkingTreeOldSideIsPassedExplicitlyNotParsedFromAString(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "a.txt", "head\n", "add a.txt")
+	head := gittest.HeadSHA(t, repo.Dir)
+	writeFile(t, repo.Dir, "a.txt", "working\n") // unstaged edit, index still holds "head\n"
+
+	r := git.Runner{}
+
+	index, err := diffWorkingTree(context.Background(), r, repo.Dir, "a.txt", oldSide{path: "a.txt"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if index.OldContent != "head\n" || index.NewContent != "working\n" {
+		t.Errorf("diffWorkingTree(index old side) = %+v, want OldContent %q NewContent %q", index, "head\n", "working\n")
+	}
+
+	commit, err := diffWorkingTree(context.Background(), r, repo.Dir, "a.txt", oldSide{sha: head, path: "a.txt"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commit.OldContent != "head\n" || commit.NewContent != "working\n" {
+		t.Errorf("diffWorkingTree(commit old side) = %+v, want OldContent %q NewContent %q", commit, "head\n", "working\n")
 	}
 }

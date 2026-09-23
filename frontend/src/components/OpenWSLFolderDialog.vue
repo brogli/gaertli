@@ -6,13 +6,13 @@ import Button from 'openvue/button'
 import { useCoreCall } from '../composables/useCoreCall'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { Distro } from '../../bindings/github.com/brogli/nebegit/internal/remote'
+import { repoPath } from '../lib/path'
 import ErrorBanner from './ErrorBanner.vue'
 
 // OpenWSLFolderDialog is "Open WSL folder": pick an installed distro, then
 // either browse (the native picker, seeded at its UNC root) or type a
 // folder inside it. WSL 1 distros are listed but cannot be picked.
-defineProps<{ visible: boolean }>()
-const emit = defineEmits<{ 'update:visible': [boolean] }>()
+const emit = defineEmits<{ close: [] }>()
 
 const distros = ref<Distro[]>([])
 const selected = ref<Distro | null>(null)
@@ -27,18 +27,12 @@ function select(distro: Distro): void {
   if (distro.version !== 1) selected.value = distro
 }
 
-// uncPath builds \\wsl.localhost\<distro>\<typed>, flipping the typed
-// folder's forward slashes to the backslashes wsl.exe/Windows expect.
-function uncPath(distro: string, typed: string): string {
-  return `\\\\wsl.localhost\\${distro}\\${typed.replaceAll('/', '\\')}`
-}
-
 function browse(): void {
   const distro = selected.value
   if (!distro) return
   void runAndClose(
     () => AppService.PickAndOpenWSL(distro.name),
-    () => emit('update:visible', false),
+    () => emit('close'),
   )
 }
 
@@ -46,19 +40,14 @@ function openTyped(): void {
   const distro = selected.value
   if (!distro || !typedPath.value) return
   void runAndClose(
-    () => AppService.OpenPath(uncPath(distro.name, typedPath.value)),
-    () => emit('update:visible', false),
+    () => AppService.OpenPath(repoPath('/' + typedPath.value.replace(/^\/+/, ''), distro.name)),
+    () => emit('close'),
   )
 }
 </script>
 
 <template>
-  <Dialog
-    :visible="visible"
-    header="Open WSL folder"
-    modal
-    @update:visible="(v: boolean) => emit('update:visible', v)"
-  >
+  <Dialog visible header="Open WSL folder" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
     <ul>
       <li v-for="distro in distros" :key="distro.name">

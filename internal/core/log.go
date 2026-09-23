@@ -20,6 +20,7 @@ type LogCommit struct {
 	Refs         []RefLabel `json:"refs,omitempty"`
 	CheckedOutIn []string   `json:"checkedOutIn,omitempty"` // paths of worktrees whose HEAD is this commit
 	Graph        GraphRow   `json:"graph"`
+	Merge        bool       `json:"merge"` // two or more parents
 }
 
 // RefLabel is one decoration on a commit. Name is the short
@@ -88,9 +89,12 @@ func (f LogFilter) Empty() bool {
 
 // LogProgress is "log:progress"'s payload. Filtered tells the repo-wide
 // unfiltered log apart from a window's own filtered view: one window can
-// have both streams running at once.
+// have both streams running at once. Generation is the repo-wide log's
+// LogRowsResult.Generation: a reload that keeps the commit count still
+// tells a window its cached rows are stale.
 type LogProgress struct {
-	Loaded   int  `json:"loaded"`
-	Done     bool `json:"done"`
-	Filtered bool `json:"filtered"`
+	Loaded     int  `json:"loaded"`
+	Done       bool `json:"done"`
+	Filtered   bool `json:"filtered"`
+	Generation int  `json:"generation"`
 }

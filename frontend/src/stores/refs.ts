@@ -5,8 +5,7 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { Refs } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // refs holds the sidebar's branches, remotes, and tags, reloaded only when
-// a ref actually moved (the "refs" scope) — unlike repo/log, a state-only
-// change such as an in-progress rebase leaves refs untouched.
+// a ref moved (the "refs" scope).
 export const useRefsStore = defineStore('refs', () => {
   const refs = ref<Refs | null>(null)
   let wt = ''

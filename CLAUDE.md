@@ -8,4 +8,5 @@ Rules:
 - No feature code without an approved spec in the plans dir. Specs are self-approved after the template checklist; critical decisions (listed in HANDOVER.md) go to the user.
 - TDD: failing test first. Test names carry requirement IDs: Go `TestFR_LOG_01_...`, Vitest `it('FR-LOG-01 ...')`.
 - `docs/` holds only requirements and architecture. Keep them current. Everything throwaway (specs, research notes, task lists, logs) lives in the plans dir.
+- Write `docs/architecture/` at design level, the way people write a design doc: decisions, structure, git command shapes. Implementation detail (exact flags, exit codes, per-method notes) belongs in code, tests and doc comments; delivery status in the plans dir.
 - Frontend tests: Vitest component tests first; Playwright only where a component test cannot cover it, and the spec says why.

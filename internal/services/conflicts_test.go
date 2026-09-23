@@ -387,6 +387,175 @@ func TestFR_CP_03_AStoppedCherryPickResolvesAndCompletesThroughContinueOperation
 	assertOperationCompleted(t, c, wt, dir, beforeHEAD)
 }
 
+func TestFR_CP_07_SkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheSurvivor(t *testing.T) {
+	repo := gittest.New(t)
+	dir := repo.Dir
+	gittest.Commit(t, dir, "conflict.txt", "orig\n", "base")
+	gittest.Run(t, dir, "branch", "feature")
+	gittest.Run(t, dir, "checkout", "feature")
+	gittest.Commit(t, dir, "conflict.txt", "feature\n", "feature change")
+	conflictSHA := gittest.HeadSHA(t, dir)
+	gittest.Commit(t, dir, "other.txt", "other\n", "clean change")
+	cleanSHA := gittest.HeadSHA(t, dir)
+	gittest.Run(t, dir, "checkout", "master")
+	gittest.Commit(t, dir, "conflict.txt", "master\n", "master change")
+
+	c, wt := openWorktree(t, dir)
+	// oldest-first: conflictSHA (older) is attempted before cleanSHA.
+	if err := c.CherryPick(context.Background(), wt, []string{cleanSHA, conflictSHA}); err == nil {
+		t.Fatal("CherryPick = nil, want a conflict on conflictSHA")
+	}
+	if !fileExists(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")) {
+		t.Fatal("fixture did not leave CHERRY_PICK_HEAD")
+	}
+
+	if err := c.SkipOperation(context.Background(), wt); err != nil {
+		t.Fatalf("SkipOperation = %v, want nil", err)
+	}
+
+	if fileExists(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")) {
+		t.Error("CHERRY_PICK_HEAD present, want gone once the sequence completed")
+	}
+	summary, err := c.Summary(context.Background(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Operation != "" {
+		t.Errorf("Operation = %q, want cleared", summary.Operation)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, "other.txt")); statErr != nil {
+		t.Errorf("other.txt missing after skip, want cleanSHA's own pick applied: %v", statErr)
+	}
+	content, readErr := os.ReadFile(filepath.Join(dir, "conflict.txt"))
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(content) == "feature\n" {
+		t.Error("conflict.txt carries the skipped commit's own change, want it absent")
+	}
+}
+
+func TestFR_CP_07_SkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvivor(t *testing.T) {
+	repo := gittest.New(t)
+	dir := repo.Dir
+	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")
+	gittest.Commit(t, dir, "other.txt", "obase\n", "other base")
+	gittest.Commit(t, dir, "other.txt", "applied\n", "older change")
+	cleanSHA := gittest.HeadSHA(t, dir)
+	gittest.Commit(t, dir, "conflict.txt", "applied\n", "newer change")
+	conflictSHA := gittest.HeadSHA(t, dir)
+	gittest.Commit(t, dir, "conflict.txt", "applied2\n", "further change on top")
+
+	c, wt := openWorktree(t, dir)
+	// newest-first: conflictSHA (newer) is attempted before cleanSHA.
+	if err := c.Revert(context.Background(), wt, []string{cleanSHA, conflictSHA}); err == nil {
+		t.Fatal("Revert = nil, want a conflict on conflictSHA")
+	}
+	if !fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
+		t.Fatal("fixture did not leave REVERT_HEAD")
+	}
+
+	if err := c.SkipOperation(context.Background(), wt); err != nil {
+		t.Fatalf("SkipOperation = %v, want nil", err)
+	}
+
+	if fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
+		t.Error("REVERT_HEAD present, want gone once the sequence completed")
+	}
+	summary, err := c.Summary(context.Background(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Operation != "" {
+		t.Errorf("Operation = %q, want cleared", summary.Operation)
+	}
+	content, readErr := os.ReadFile(filepath.Join(dir, "other.txt"))
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(content) != "obase\n" {
+		t.Errorf("other.txt = %q, want reverted back to obase (cleanSHA's own revert)", content)
+	}
+	conflictContent, readErr := os.ReadFile(filepath.Join(dir, "conflict.txt"))
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(conflictContent) != "applied2\n" {
+		t.Errorf("conflict.txt = %q, want unchanged (the skipped revert's own change is absent)", conflictContent)
+	}
+}
+
+// Skipping the last (here, only) pending commit of a sequence leaves
+// nothing for git to apply next: the sequence just ends, same as any other
+// skip, with the operation state file gone and HEAD unmoved.
+func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
+	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
+
+	if err := c.SkipOperation(context.Background(), wt); err != nil {
+		t.Fatalf("SkipOperation = %v, want nil", err)
+	}
+
+	if fileExists(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")) {
+		t.Error("CHERRY_PICK_HEAD present, want gone")
+	}
+	if got := gittest.HeadSHA(t, dir); got != beforeHEAD {
+		t.Errorf("HEAD = %s, want unchanged %s (the skipped commit was the whole sequence)", got, beforeHEAD)
+	}
+	summary, err := c.Summary(context.Background(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Operation != "" {
+		t.Errorf("Operation = %q, want cleared", summary.Operation)
+	}
+}
+
+// Same as above, for revert.
+func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
+	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
+
+	if err := c.SkipOperation(context.Background(), wt); err != nil {
+		t.Fatalf("SkipOperation = %v, want nil", err)
+	}
+
+	if fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
+		t.Error("REVERT_HEAD present, want gone")
+	}
+	if got := gittest.HeadSHA(t, dir); got != beforeHEAD {
+		t.Errorf("HEAD = %s, want unchanged %s (the skipped commit was the whole sequence)", got, beforeHEAD)
+	}
+	summary, err := c.Summary(context.Background(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Operation != "" {
+		t.Errorf("Operation = %q, want cleared", summary.Operation)
+	}
+}
+
+func TestFR_CP_07_SkipOperationRefusesMidMergeIsAppBugBeforeAnyGitCall(t *testing.T) {
+	dir, c, wt, _ := stoppedRepo(t, "merge")
+
+	before, err := c.CommandLog(context.Background(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = c.SkipOperation(context.Background(), wt)
+
+	coretest.AssertCode(t, err, core.Internal)
+	after, aerr := c.CommandLog(context.Background(), wt)
+	if aerr != nil {
+		t.Fatal(aerr)
+	}
+	if len(after) != len(before) {
+		t.Errorf("CommandLog grew from %d to %d entries, want unchanged (no git call made)", len(before), len(after))
+	}
+	if !fileExists(filepath.Join(dir, ".git", "MERGE_HEAD")) {
+		t.Error("MERGE_HEAD gone, want the merge left untouched")
+	}
+}
+
 func TestFR_RV_03_AStoppedRevertResolvesAndCompletesThroughContinueOperation(t *testing.T) {
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
 

@@ -15,6 +15,7 @@ vi.mock('@wailsio/runtime', () => ({
 }))
 
 import { useRefsStore } from './refs'
+import { registeredHandler } from '../testing/events'
 
 describe('refs store', () => {
   beforeEach(() => {
@@ -30,7 +31,7 @@ describe('refs store', () => {
     await refs.load('/repo')
     expect(mockRefs).toHaveBeenCalledTimes(1)
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'repo:changed')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'repo:changed')
     handler?.({ data: { scope: 'refs' } })
     await Promise.resolve()
     handler?.({ data: { scope: 'state' } })
@@ -44,7 +45,7 @@ describe('refs store', () => {
     await refs.load('/repo')
     expect(mockRefs).toHaveBeenCalledTimes(1)
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'core:reconnected')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'core:reconnected')
     handler?.({})
     await Promise.resolve()
 

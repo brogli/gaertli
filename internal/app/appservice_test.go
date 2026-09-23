@@ -72,7 +72,7 @@ func TestAppService_OpenRecentOpensThePath(t *testing.T) {
 
 func TestAppService_RecentReposListsStoredEntries(t *testing.T) {
 	store := newTestStore(t)
-	if err := store.Update(func(s *settings.Settings) { s.AddRecent("/a", time.Now(), "") }); err != nil {
+	if err := store.Update(func(s *settings.Settings) { s.AddRecent(settings.RecentRepo{Path: "/a"}, time.Now()) }); err != nil {
 		t.Fatal(err)
 	}
 	s := &AppService{shell: shell{store: store}}

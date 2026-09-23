@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -99,7 +100,7 @@ func TestADR_3_OpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
 	}
 
 	uncPath := `\\wsl.localhost\Ubuntu-22.04\` + strings.ReplaceAll(strings.TrimPrefix(repo, "/"), "/", `\`)
-	info, err := remote.NewOpener(client, "Ubuntu-22.04").OpenWorktree(context.Background(), core.RepoPath(uncPath))
+	info, err := remote.NewDistroPathClient(client, "Ubuntu-22.04").OpenWorktree(context.Background(), core.RepoPath(uncPath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +124,7 @@ func TestADR_4_EnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	uncPath := `\\wsl.localhost\Ubuntu-22.04\` + strings.ReplaceAll(strings.TrimPrefix(repo, "/"), "/", `\`)
-	info, err := remote.NewOpener(client1, "Ubuntu-22.04").OpenWorktree(context.Background(), core.RepoPath(uncPath))
+	info, err := remote.NewDistroPathClient(client1, "Ubuntu-22.04").OpenWorktree(context.Background(), core.RepoPath(uncPath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,6 +188,111 @@ func TestADR_4_LiveClientReportsTheCurrentConnectionState(t *testing.T) {
 	got, ok := dc.LiveClient()
 	if !ok || got != client {
 		t.Errorf("LiveClient = (%v, %v), want (%v, true)", got, ok, client)
+	}
+}
+
+// repoPathMethods finds every core.API method with a core.RepoPath
+// parameter by reflection, so a method added to the interface without a
+// matching case in distroPathClient fails the tests below instead of going
+// unnoticed.
+func repoPathMethods(t *testing.T) []reflect.Method {
+	t.Helper()
+	apiType := reflect.TypeOf((*core.API)(nil)).Elem()
+	repoPathType := reflect.TypeOf(core.RepoPath(""))
+
+	var methods []reflect.Method
+	for i := range apiType.NumMethod() {
+		m := apiType.Method(i)
+		for j := range m.Type.NumIn() {
+			if m.Type.In(j) == repoPathType {
+				methods = append(methods, m)
+				break
+			}
+		}
+	}
+	return methods
+}
+
+// callArgs builds reflect.Call arguments for fnType, m's signature: ctx,
+// path for the RepoPath parameter, and, for AddWorktree/RemoveWorktree
+// only, target at its fixed position (both take it third); every other
+// parameter is left zero.
+func callArgs(fnType reflect.Type, m string, path, target string) []reflect.Value {
+	args := make([]reflect.Value, fnType.NumIn())
+	for i := range args {
+		switch paramType := fnType.In(i); {
+		case paramType == reflect.TypeOf((*context.Context)(nil)).Elem():
+			args[i] = reflect.ValueOf(context.Background())
+		case paramType == reflect.TypeOf(core.RepoPath("")):
+			args[i] = reflect.ValueOf(core.RepoPath(path))
+		case (m == "AddWorktree" || m == "RemoveWorktree") && i == 2:
+			args[i] = reflect.ValueOf(target)
+		default:
+			args[i] = reflect.Zero(paramType)
+		}
+	}
+	return args
+}
+
+// lastError reads a Call result's trailing error, core.API's rule for every
+// method.
+func lastError(results []reflect.Value) error {
+	last := results[len(results)-1]
+	if last.IsNil() {
+		return nil
+	}
+	return last.Interface().(error)
+}
+
+func TestFR_REPO_07_TranslatesEveryRepoPathMethod(t *testing.T) {
+	const uncPath = `\\wsl.localhost\Ubuntu-22.04\home\u\r`
+	const uncTarget = `\\wsl.localhost\Ubuntu-22.04\home\u\r\wt`
+
+	f := &fake{version: func() (core.Version, error) { return core.Version{}, nil }}
+	client := pipeClient(t, f, nil)
+	wrapped := reflect.ValueOf(remote.NewDistroPathClient(client, "Ubuntu-22.04"))
+
+	for _, m := range repoPathMethods(t) {
+		t.Run(m.Name, func(t *testing.T) {
+			method := wrapped.MethodByName(m.Name)
+			if err := lastError(method.Call(callArgs(method.Type(), m.Name, uncPath, uncTarget))); err != nil {
+				t.Fatalf("%s(%s) = %v, want success", m.Name, uncPath, err)
+			}
+
+			if got := f.paths[m.Name]; got != `/home/u/r` {
+				t.Errorf("%s: fake received path %q, want %q", m.Name, got, `/home/u/r`)
+			}
+			if m.Name == "AddWorktree" || m.Name == "RemoveWorktree" {
+				if got := f.paths[m.Name+":target"]; got != `/home/u/r/wt` {
+					t.Errorf("%s: fake received target %q, want %q", m.Name, got, `/home/u/r/wt`)
+				}
+			}
+		})
+	}
+}
+
+func TestFR_REPO_07_RejectsAPathForAnotherDistroOrLocal(t *testing.T) {
+	cases := []struct{ name, path string }{
+		{"another distro", `\\wsl.localhost\Debian\home\u\r`},
+		{"local path", `C:\Users\u\r`},
+	}
+
+	f := &fake{version: func() (core.Version, error) { return core.Version{}, nil }}
+	client := pipeClient(t, f, nil)
+	wrapped := reflect.ValueOf(remote.NewDistroPathClient(client, "Ubuntu-22.04"))
+
+	for _, m := range repoPathMethods(t) {
+		for _, c := range cases {
+			t.Run(m.Name+"/"+c.name, func(t *testing.T) {
+				method := wrapped.MethodByName(m.Name)
+				err := lastError(method.Call(callArgs(method.Type(), m.Name, c.path, c.path)))
+				coretest.AssertCode(t, err, core.Internal)
+
+				if _, called := f.paths[m.Name]; called {
+					t.Errorf("%s: fake was called with %q, want nothing forwarded", m.Name, c.path)
+				}
+			})
+		}
 	}
 }
 

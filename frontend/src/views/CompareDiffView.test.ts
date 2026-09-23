@@ -33,6 +33,7 @@ vi.mock('@wailsio/runtime', () => ({
 import CompareDiffView from './CompareDiffView.vue'
 
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
+import { registeredHandler } from '../testing/events'
 
 const files = [
   { path: 'a.txt', status: 'M' },
@@ -116,7 +117,7 @@ describe('CompareDiffView', () => {
     await flushPromises()
     mockDiffRange.mockClear()
 
-    const handler = mockEventsOn.mock.calls.find((call) => call[0] === 'compare:show-file')?.[1]
+    const handler = registeredHandler(mockEventsOn, 'compare:show-file')
     handler?.({ data: { path: 'b.txt', oldPath: '' } })
     await flushPromises()
 

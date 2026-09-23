@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest'
+import { basename, parentPath, repoPath } from './path'
+
+describe('basename and parentPath', () => {
+  it.each([
+    ['POSIX', '/home/u/repo', '/home/u', 'repo'],
+    ['POSIX root child', '/repo', '/', 'repo'],
+    ['Windows', 'C:\\Users\\u\\repo', 'C:\\Users\\u', 'repo'],
+    ['UNC', '\\\\wsl.localhost\\Ubuntu\\home\\x', '\\\\wsl.localhost\\Ubuntu\\home', 'x'],
+    ['drive root child', 'C:\\repo', 'C:', 'repo'],
+    ['drive root', 'C:\\', '', 'C:'],
+    ['POSIX root', '/', '', '/'],
+    ['trailing separator', '/home/u/repo/', '/home/u', 'repo'],
+    ['Windows trailing separator', 'C:\\Users\\u\\repo\\', 'C:\\Users\\u', 'repo'],
+    ['relative', 'docs/readme.md', 'docs', 'readme.md'],
+    ['no separator', 'repo', '', 'repo'],
+  ])('FR-UX-09 splits a %s path', (_, path, parent, name) => {
+    expect(parentPath(path)).toBe(parent)
+    expect(basename(path)).toBe(name)
+  })
+})
+
+describe('repoPath', () => {
+  it('FR-WT-13 returns a local path unchanged (no distro)', () => {
+    expect(repoPath('/home/u/r')).toBe('/home/u/r')
+  })
+
+  it('FR-WT-13 builds the UNC form for a WSL repo', () => {
+    expect(repoPath('/home/u/r', 'Ubuntu')).toBe('\\\\wsl.localhost\\Ubuntu\\home\\u\\r')
+  })
+
+  it('FR-WT-13 leaves an already-UNC path unchanged', () => {
+    const unc = '\\\\wsl.localhost\\Ubuntu\\home\\u\\r'
+    expect(repoPath(unc, 'Ubuntu')).toBe(unc)
+  })
+})

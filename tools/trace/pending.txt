@@ -1,10 +1,2 @@
 # IDs whose tests are still owed. The change that adds an ID's test removes
 # its line in the same commit; task trace fails otherwise.
-QA-INST-02
-QA-INST-03
-QA-OSS-01
-QA-OSS-03
-QA-OSS-04
-QA-PORT-01
-QA-PORT-03
-QA-PORT-04

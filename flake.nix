@@ -1,5 +1,5 @@
 {
-  description = "nebegit dev shell: everything except Go (TR-24, TR-25)";
+  description = "nebegit dev shell: everything except Go";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";

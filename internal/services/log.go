@@ -3,10 +3,10 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,9 +27,8 @@ const progressInterval = 100 * time.Millisecond
 // for a large repo.
 const logTimeout = 10 * time.Minute
 
-// LogFormat is the git log record layout LoadLog streams; exported so
-// tools/bench measures exactly what the app runs.
-const LogFormat = "%H%x1f%h%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x00"
+// logFormat is the git log record layout LoadLog streams.
+const logFormat = "%H%x1f%h%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x00"
 
 // LoadLog implements core.API.
 func (c *Core) LoadLog(ctx context.Context, id core.WorktreeID) error {
@@ -39,6 +38,10 @@ func (c *Core) LoadLog(ctx context.Context, id core.WorktreeID) error {
 	}
 	gen, ok := wt.Repo.LogBeginLoad()
 	if !ok {
+		// Another window of this repo loaded it, or is loading it: the
+		// caller's window learns the current count the same way.
+		view := wt.LogSnapshot(0, 0)
+		c.emitLogProgress(wt.Repo.Key, view.Generation, view.Loaded, view.Done)
 		return nil
 	}
 	go c.streamLog(wt, gen)
@@ -53,9 +56,25 @@ func (c *Core) LogRows(ctx context.Context, id core.WorktreeID, from, to int) (c
 	}
 	view := wt.LogSnapshot(from, to)
 	return core.LogRowsResult{
-		Rows: view.Rows, Loaded: view.Loaded, Done: view.Done, Error: view.Err,
+		Rows: headFor(view.Rows, wt.Path), Loaded: view.Loaded, Done: view.Done, Error: view.Err,
 		Generation: view.Generation, Flat: view.Flat,
 	}, nil
+}
+
+// headFor puts the HEAD label on path's own HEAD commit. The log is loaded
+// once per repo, so its decoration names the HEAD of whichever worktree
+// ran git log.
+func headFor(rows []core.LogCommit, path string) []core.LogCommit {
+	out := make([]core.LogCommit, len(rows))
+	for i, row := range rows {
+		refs := slices.DeleteFunc(slices.Clone(row.Refs), func(r core.RefLabel) bool { return r.Kind == "head" })
+		if slices.Contains(row.CheckedOutIn, path) {
+			refs = slices.Insert(refs, 0, core.RefLabel{Name: "HEAD", Kind: "head"})
+		}
+		row.Refs = refs
+		out[i] = row
+	}
+	return out
 }
 
 // ReloadLog implements core.API.
@@ -97,7 +116,7 @@ func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha string) (
 // guards every LogAppend/LogFinish against a reload that superseded it.
 func (c *Core) streamLog(wt *session.Worktree, gen int) {
 	repo := wt.Repo
-	progress := func(loaded int, done bool) { c.emitLogProgress(repo.Key, loaded, done) }
+	progress := func(loaded int, done bool) { c.emitLogProgress(repo.Key, gen, loaded, done) }
 	loaded, logErr := streamCommits(context.Background(), wt, LogArgs(core.LogFilter{}), false, true,
 		func(commit core.LogCommit) { repo.LogAppend(gen, commit) }, progress)
 
@@ -122,8 +141,7 @@ func streamCommits(ctx context.Context, wt *session.Worktree, args []string, fla
 	appendRow func(core.LogCommit), progress func(loaded int, done bool)) (loaded int, err *core.Error) {
 	checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path, background)
 	if ckErr != nil {
-		errors.As(ckErr, &err)
-		return 0, err
+		return 0, core.ErrorOf(ckErr)
 	}
 
 	layout := graph.NewLayout()
@@ -147,8 +165,10 @@ func streamCommits(ctx context.Context, wt *session.Worktree, args []string, fla
 		}
 		return nil
 	})
-	errors.As(runErr, &err)
-	return loaded, err
+	if runErr != nil {
+		return loaded, core.ErrorOf(runErr)
+	}
+	return loaded, nil
 }
 
 // writeCommitGraphIfLarge runs `git commit-graph write --reachable` after
@@ -182,17 +202,15 @@ func refTips(ctx context.Context, r git.Runner, dir string) (map[string]string, 
 	}
 	tips := parseRefTips(result.Stdout)
 
-	branch, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Background: true, Args: []string{"symbolic-ref", "--short", "-q", "HEAD"}})
-	detached := quietFailure(err, branch)
-	if err != nil && !detached {
+	branch, detached, err := headBranch(ctx, r, dir)
+	if err != nil {
 		return nil, err
 	}
 	if !detached {
-		tips["HEAD"] = "ref:" + strings.TrimSpace(string(branch.Stdout))
+		tips["HEAD"] = "ref:" + branch
 		return tips, nil
 	}
-
-	sha, err := resolveHeadSHA(ctx, r, dir) // an unresolvable HEAD reads as ""; the next log load reports it
+	sha, err := verifyRev(ctx, r, dir, "HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -213,13 +231,13 @@ func parseRefTips(out []byte) map[string]string {
 	return tips
 }
 
-func (c *Core) emitLogProgress(repoKey string, loaded int, done bool) {
-	payload, _ := json.Marshal(core.LogProgress{Loaded: loaded, Done: done})
+func (c *Core) emitLogProgress(repoKey string, gen, loaded int, done bool) {
+	payload, _ := json.Marshal(core.LogProgress{Loaded: loaded, Done: done, Generation: gen})
 	c.sink(core.Event{Name: "log:progress", Repo: repoKey, Payload: payload})
 }
 
-// parseLogRecord parses one LogFormat record (7 fields, %x1f-separated) as
-// streamed by git log --format=LogFormat.
+// parseLogRecord parses one logFormat record (7 fields, %x1f-separated) as
+// streamed by git log --format=logFormat.
 func parseLogRecord(record []byte) (commit core.LogCommit, parents []string, err error) {
 	fields := strings.Split(string(record), "\x1f")
 	if len(fields) != 7 {
@@ -229,6 +247,7 @@ func parseLogRecord(record []byte) (commit core.LogCommit, parents []string, err
 	if convErr != nil {
 		return core.LogCommit{}, nil, core.Errorf(core.Internal, "log record authorAt: %v", convErr)
 	}
+	parents = strings.Fields(fields[2])
 	commit = core.LogCommit{
 		SHA:      fields[0],
 		ShortSHA: fields[1],
@@ -236,8 +255,9 @@ func parseLogRecord(record []byte) (commit core.LogCommit, parents []string, err
 		AuthorAt: authorAt,
 		Refs:     parseRefs(fields[5]),
 		Subject:  fields[6],
+		Merge:    len(parents) >= 2,
 	}
-	return commit, strings.Fields(fields[2]), nil
+	return commit, parents, nil
 }
 
 // parseRefs classifies --decorate=full's %D decoration string into labels.

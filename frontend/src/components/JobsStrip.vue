@@ -27,12 +27,9 @@ function cancelJob(id: string): void {
   void run(() => jobs.cancel(id))
 }
 
-// jobLabel replaces an update-branch job's own kind ("update-branch:B")
-// with a friendly label naming the branch.
+// jobLabel names an update-branch job by its branch instead of its kind.
 function jobLabel(job: JobInfo): string {
-  return job.kind.startsWith('update-branch:')
-    ? `Update ${job.kind.slice('update-branch:'.length)}`
-    : job.kind
+  return job.kind === 'update-branch' ? `Update ${job.branch}` : job.kind
 }
 </script>
 

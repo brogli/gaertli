@@ -7,19 +7,23 @@ const {
   mockUnstageFile,
   mockStageAll,
   mockUnstageAll,
+  mockDiscardFile,
   mockStatus,
   mockOpenFile,
   mockCommit,
   mockSetMessageDraft,
+  mockRequire,
 } = vi.hoisted(() => ({
   mockStageFile: vi.fn(),
   mockUnstageFile: vi.fn(),
   mockStageAll: vi.fn(),
   mockUnstageAll: vi.fn(),
+  mockDiscardFile: vi.fn(),
   mockStatus: vi.fn(),
   mockOpenFile: vi.fn(),
   mockCommit: vi.fn(),
   mockSetMessageDraft: vi.fn(),
+  mockRequire: vi.fn(),
 }))
 
 vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
@@ -28,11 +32,16 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
     UnstageFile: mockUnstageFile,
     StageAll: mockStageAll,
     UnstageAll: mockUnstageAll,
+    DiscardFile: mockDiscardFile,
     Status: mockStatus,
     OpenFile: mockOpenFile,
     Commit: mockCommit,
     SetMessageDraft: mockSetMessageDraft,
   },
+}))
+
+vi.mock('openvue/useconfirm', () => ({
+  useConfirm: () => ({ require: mockRequire, close: vi.fn() }),
 }))
 
 import ChangesPanel from './ChangesPanel.vue'
@@ -50,10 +59,12 @@ describe('ChangesPanel', () => {
     mockUnstageFile.mockReset().mockResolvedValue(undefined)
     mockStageAll.mockReset().mockResolvedValue(undefined)
     mockUnstageAll.mockReset().mockResolvedValue(undefined)
+    mockDiscardFile.mockReset().mockResolvedValue(undefined)
     mockStatus.mockReset().mockResolvedValue(empty)
     mockOpenFile.mockReset().mockResolvedValue(undefined)
     mockCommit.mockReset().mockResolvedValue(undefined)
     mockSetMessageDraft.mockReset().mockResolvedValue(undefined)
+    mockRequire.mockReset()
   })
 
   it('FR-CHG-05 CommitBox renders between the header and the Staged group', () => {
@@ -145,7 +156,7 @@ describe('ChangesPanel', () => {
     changes.files = { ...empty, conflicted: [{ path: 'c.txt', status: 'UU' }] }
 
     const wrapper = mount(ChangesPanel, { props })
-    expect(wrapper.get('[data-test="action"]').text()).toBe('Mark resolved')
+    expect(wrapper.get('[data-test="action"]').attributes('aria-label')).toBe('Mark resolved')
     await wrapper.get('[data-test="action"]').trigger('click')
 
     expect(mockStageFile).toHaveBeenCalledWith('/repo', 'c.txt')
@@ -159,5 +170,65 @@ describe('ChangesPanel', () => {
     await wrapper.get('li').trigger('click')
 
     expect(changes.selectedFile).toBeNull()
+  })
+
+  it('FR-CHG-10, FR-UX-03, QA-SAFE-01 an unstaged row\'s "Discard" confirms naming the path, then calls Facade.DiscardFile untracked=false', async () => {
+    const changes = useChangesStore()
+    changes.files = { ...empty, unstaged: [{ path: 'a.txt', status: 'M' }] }
+
+    const wrapper = mount(ChangesPanel, { props })
+    const discard = wrapper
+      .findAll('[data-test="second-action"]')
+      .find((b) => b.attributes('aria-label') === 'Discard')
+    await discard?.trigger('click')
+
+    expect(mockRequire).toHaveBeenCalledTimes(1)
+    const options = mockRequire.mock.calls[0]![0] as { message: string; accept: () => void }
+    expect(options.message).toContain('a.txt')
+    expect(mockDiscardFile).not.toHaveBeenCalled()
+
+    options.accept()
+
+    expect(mockDiscardFile).toHaveBeenCalledWith('/repo', 'a.txt', false)
+  })
+
+  it('FR-CHG-10 declining the confirm does not call Facade.DiscardFile', async () => {
+    const changes = useChangesStore()
+    changes.files = { ...empty, unstaged: [{ path: 'a.txt', status: 'M' }] }
+
+    const wrapper = mount(ChangesPanel, { props })
+    const discard = wrapper
+      .findAll('[data-test="second-action"]')
+      .find((b) => b.attributes('aria-label') === 'Discard')
+    await discard?.trigger('click')
+
+    expect(mockDiscardFile).not.toHaveBeenCalled()
+  })
+
+  it('FR-CHG-10 an untracked row\'s "Discard" confirm wording says the file will be deleted, then calls Facade.DiscardFile untracked=true', async () => {
+    const changes = useChangesStore()
+    changes.files = { ...empty, untracked: [{ path: 'new.txt', status: '?' }] }
+
+    const wrapper = mount(ChangesPanel, { props })
+    const discard = wrapper
+      .findAll('[data-test="second-action"]')
+      .find((b) => b.attributes('aria-label') === 'Discard')
+    await discard?.trigger('click')
+
+    const options = mockRequire.mock.calls[0]![0] as { message: string; accept: () => void }
+    expect(options.message.toLowerCase()).toContain('delete')
+
+    options.accept()
+
+    expect(mockDiscardFile).toHaveBeenCalledWith('/repo', 'new.txt', true)
+  })
+
+  it('FR-CHG-10 the Staged group offers no Discard button', () => {
+    const changes = useChangesStore()
+    changes.files = { ...empty, staged: [{ path: 'a.txt', status: 'M' }] }
+
+    const wrapper = mount(ChangesPanel, { props })
+
+    expect(wrapper.findAll('[data-test="second-action"]').length).toBe(0)
   })
 })

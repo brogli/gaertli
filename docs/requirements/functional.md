@@ -180,10 +180,12 @@ The app is editor-neutral. the editor is only the default.
 | FR-UX-01 | MUST | Every action ends with a visible result. Errors include git's original message. |
 | FR-UX-02 | MUST | A command log shows every git operation the app ran, with its output. Operations started by the user are shown by default. Automatic background reads (refresh, polling) are hidden by default and can be switched on. |
 | FR-UX-03 | MUST | Confirmation before: hard reset, force push, discard changes, remove worktree, delete unmerged branch. |
-| FR-UX-04 | MUST | Settings: external editor (ED), protected branches, default pull mode, diff mode, auto-fetch interval. Reached from the selector panel (FR-WT-13). |
+| FR-UX-04 | MUST | Settings: external editor (ED), protected branches, default pull mode, diff mode, auto-fetch interval. Reached from the selector panel (FR-WT-13); opens as a dialog over the window. |
 | FR-UX-05 | SHOULD | Keyboard shortcuts for the main actions. |
 | FR-UX-06 | SHOULD | Light and dark theme. |
 | FR-UX-07 | MUST | Everything for the daily flow is in sight at once: selector panel, refs, log, commit details, diff, and the working-tree changes share one window. No switching between views or tabs to reach any of them; panels may be resized or collapsed. |
 | FR-UX-08 | MUST | Layout of the window: the selector panel and refs on the left, the working-tree changes panel between them and the log, the log with its graph in the middle, the selected commit's details and the diff in a column to the right of the log, never below it. |
+| FR-UX-09 | SHOULD | At a 1200 × 800 px window with every column open, controls fit their panel: a file's actions stay on its row, a toolbar stays on one row, a checkbox stays beside its label. Text too long for its space ends in an ellipsis and shows in full on hover. A control without visible text has a tooltip naming its action. |
+| FR-UX-10 | SHOULD | Panels show data formatted, not raw: the commit details show the subject in the UI font, author and committer as labelled fields with dates (the committer only when it differs from the author), and parents as short hashes on one line; the command log shows one command per line, monospace, without bullets. |
 
 ---

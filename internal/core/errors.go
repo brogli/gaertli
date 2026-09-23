@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Code is the machine-readable failure class.
 type Code string
@@ -16,6 +19,10 @@ const (
 	Locked         Code = "LOCKED"
 	InvalidName    Code = "INVALID_NAME"
 	NoUpstream     Code = "NO_UPSTREAM"
+	// Unmerged: DeleteBranch without force refused a branch with commits
+	// not merged into HEAD (or its upstream). Force fixes it, unlike a
+	// GitFailed "used by worktree" refusal.
+	Unmerged       Code = "UNMERGED_BRANCH"
 	EditorNotFound Code = "EDITOR_NOT_FOUND"
 	// FileNotFound: OpenFile's path no longer exists in the worktree (a
 	// deleted or since-renamed file shown from a historical diff).
@@ -52,4 +59,13 @@ func (e *Error) Error() string { return fmt.Sprintf("%s: %s", e.Code, e.Message)
 // Errorf builds an Error without git context.
 func Errorf(code Code, format string, args ...any) *Error {
 	return &Error{Code: code, Message: fmt.Sprintf(format, args...)}
+}
+
+// ErrorOf returns the *Error in err's chain, or wraps a non-nil err of any
+// other type as Code Internal.
+func ErrorOf(err error) *Error {
+	if ce, ok := errors.AsType[*Error](err); ok {
+		return ce
+	}
+	return Errorf(Internal, "%v", err)
 }
