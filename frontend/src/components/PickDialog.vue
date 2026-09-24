@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import Dialog from 'openvue/dialog'
 import Checkbox from 'openvue/checkbox'
 import Button from 'openvue/button'
+import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
@@ -23,9 +24,12 @@ const noCommit = ref(false)
 const recordOrigin = ref(false)
 const mainline = ref(0)
 const { error, runAndClose } = useCoreCall()
+const { t } = useI18n()
 
 const showMainline = computed(() => props.verb === 'cherry-pick' && props.singleMerge)
-const header = computed(() => (props.verb === 'cherry-pick' ? 'Cherry-pick' : 'Revert'))
+const header = computed(() =>
+  props.verb === 'cherry-pick' ? t('dialogs.pick.cherryPick') : t('dialogs.pick.revert'),
+)
 
 async function onSubmit(): Promise<void> {
   const opts = {
@@ -33,11 +37,11 @@ async function onSubmit(): Promise<void> {
     recordOrigin: recordOrigin.value,
     mainline: showMainline.value ? mainline.value : 0,
   }
-  const call =
-    props.verb === 'cherry-pick'
-      ? () => Facade.CherryPickWith(props.wt, props.shas, opts)
-      : () => Facade.RevertWith(props.wt, props.shas, opts)
-  await runAndClose(call, () => emit('close'))
+  const pick = props.verb === 'cherry-pick' ? Facade.CherryPick : Facade.Revert
+  await runAndClose(
+    () => pick(props.wt, props.shas, opts),
+    () => emit('close'),
+  )
 }
 </script>
 
@@ -46,18 +50,18 @@ async function onSubmit(): Promise<void> {
     <ErrorBanner v-if="error" :error="error" />
     <label>
       <Checkbox v-model="noCommit" binary />
-      Apply without committing
+      {{ t('dialogs.pick.applyWithoutCommitting') }}
     </label>
     <label v-if="verb === 'cherry-pick'">
       <Checkbox v-model="recordOrigin" binary />
-      Add "cherry picked from" line
+      {{ t('dialogs.pick.recordOrigin') }}
     </label>
     <label v-if="showMainline">
-      Pick against parent
+      {{ t('dialogs.pick.pickAgainstParent') }}
       <input v-model.number="mainline" type="number" min="1" data-test="pick-mainline" />
     </label>
     <template #footer>
-      <Button label="Confirm" data-test="pick-submit" @click="onSubmit" />
+      <Button :label="t('dialogs.pick.confirm')" data-test="pick-submit" @click="onSubmit" />
     </template>
   </Dialog>
 </template>

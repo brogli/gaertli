@@ -22,9 +22,8 @@ import (
 	"github.com/brogli/nebegit/tools/mkrepo"
 )
 
-// refDir is relative to this package's own directory (go test's cwd), not
-// the repo root Taskfile's "bench" task runs from — "../.." gets back to
-// the same .bench/reference-repo either way.
+// refDir is the reference repo `task bench` builds, relative to this
+// package's directory, go test's working directory.
 const refDir = "../../.bench/reference-repo"
 
 // openReference builds (or reuses) the reference repo and returns a real
@@ -39,6 +38,7 @@ func openReference(t *testing.T) (*services.Core, core.WorktreeID) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = c.CloseWorktree(t.Context(), wt.ID) })
 	return c, wt.ID
 }
 
@@ -48,18 +48,27 @@ func TestQA_PERF_02_FirstLogRowUnder1s(t *testing.T) {
 	if err := c.LoadLog(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
+	elapsed := firstRowAfter(t, c, id, start)
+	t.Logf("first row after %s", elapsed)
+	if elapsed > time.Second {
+		t.Fatalf("QA-PERF-02: first row after %s, want <= 1s", elapsed)
+	}
+}
+
+// firstRowAfter polls LogRows until the log shows its first row and returns
+// the time since start.
+func firstRowAfter(t *testing.T, c *services.Core, id core.WorktreeID, start time.Time) time.Duration {
+	t.Helper()
 	for {
 		rows, err := c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(rows.Rows) > 0 {
-			elapsed := time.Since(start)
-			t.Logf("first row after %s", elapsed)
-			if elapsed > time.Second {
-				t.Fatalf("QA-PERF-02: first row after %s, want <= 1s", elapsed)
-			}
-			return
+			return time.Since(start)
+		}
+		if rows.Done {
+			t.Fatal("log finished with zero rows")
 		}
 	}
 }

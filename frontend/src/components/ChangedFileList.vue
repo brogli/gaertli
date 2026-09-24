@@ -1,21 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '../i18n'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { basename, parentPath } from '../lib/path'
+import { iconClass, oiClass, statusIcon } from '../lib/icons'
+import type { ChangedFileAction } from './changedFileAction'
 
 // ChangedFileList renders one row per changed file (status, and oldPath ->
-// path for a rename). actionLabel, when set, adds a per-row action button
-// (the changes panel's stage/unstage); secondActionLabel adds a second one
-// (discard).
+// path for a rename). A click selects a row; a double-click, or Enter on
+// the focused row, opens it. action, when set, adds a per-row action button
+// (the changes view's stage/unstage); secondAction adds a second one
+// (discard). Each names its icon and its own translated label.
 const props = defineProps<{
   files: ChangedFile[]
   selected?: ChangedFile | null
-  actionLabel?: string
-  // | undefined, not just optional: callers (ChangesPanel) bind this from a
-  // per-group value that is itself string | undefined, which
-  // exactOptionalPropertyTypes treats as distinct from a merely absent prop.
-  secondActionLabel?: string | undefined
+  action?: ChangedFileAction
+  // | undefined, not just optional: ChangesView binds a per-group value that
+  // may be undefined, which exactOptionalPropertyTypes tells from absent.
+  secondAction?: ChangedFileAction | undefined
 }>()
+const { t } = useI18n()
 const emit = defineEmits<{
   select: [file: ChangedFile]
   open: [file: ChangedFile]
@@ -24,32 +28,39 @@ const emit = defineEmits<{
   'second-action': [file: ChangedFile]
 }>()
 
-// GLYPH is each action's compact button content; title/aria-label carry the
-// actual name, since the glyph alone isn't readable as text.
-const GLYPH: Record<string, string> = {
-  Stage: '+',
-  Unstage: '−',
-  Discard: '✕',
-  'Mark resolved': '✓',
+function actionLabel(kind: ChangedFileAction): string {
+  return t(`changesView.${kind}`)
 }
 
-// rows splits each path into its directory (rendered muted) and basename
-// once per file, rather than in the template on every access.
+// rows splits each path into its directory (rendered muted) and basename,
+// and resolves its status icon, once per file rather than on every access.
 const rows = computed(() =>
-  props.files.map((file) => ({ file, dir: parentPath(file.path), base: basename(file.path) })),
+  props.files.map((file) => ({
+    file,
+    dir: parentPath(file.path),
+    base: basename(file.path),
+    status: statusIcon(file.status, t),
+  })),
 )
 </script>
 
 <template>
   <ul class="files">
     <li
-      v-for="{ file, dir, base } in rows"
+      v-for="{ file, dir, base, status } in rows"
       :key="file.path"
       :class="{ selected: file.path === selected?.path }"
+      tabindex="0"
       @click="emit('select', file)"
       @dblclick="emit('open', file)"
+      @keydown.enter.self="emit('open', file)"
     >
-      <span class="status">{{ file.status }}</span>
+      <span class="status" role="img" :aria-label="status.label" :title="status.label">
+        <i
+          :class="oiClass(status.icon)"
+          :style="{ '--nb-tone': `var(--nb-tone-${status.tone})` }"
+        ></i>
+      </span>
       <span class="path" :title="file.path">
         <template v-if="file.oldPath">{{ file.oldPath }} &rarr; </template>
         <span v-if="dir" class="dir">{{ dir }}/</span>{{ base }}
@@ -59,33 +70,33 @@ const rows = computed(() =>
           type="button"
           class="glyph-btn"
           data-test="open-editor"
-          title="Open in editor"
-          aria-label="Open in editor"
+          :title="t('common.openInEditor')"
+          :aria-label="t('common.openInEditor')"
           @click.stop="emit('open-editor', file)"
         >
-          &#9998;
+          <i :class="iconClass('openEditor')" aria-hidden="true"></i>
         </button>
         <button
-          v-if="actionLabel"
+          v-if="action"
           type="button"
           class="glyph-btn"
           data-test="action"
-          :title="actionLabel"
-          :aria-label="actionLabel"
+          :title="actionLabel(action)"
+          :aria-label="actionLabel(action)"
           @click.stop="emit('action', file)"
         >
-          {{ GLYPH[actionLabel] ?? actionLabel }}
+          <i :class="iconClass(action)" aria-hidden="true"></i>
         </button>
         <button
-          v-if="secondActionLabel"
+          v-if="secondAction"
           type="button"
           class="glyph-btn"
           data-test="second-action"
-          :title="secondActionLabel"
-          :aria-label="secondActionLabel"
+          :title="actionLabel(secondAction)"
+          :aria-label="actionLabel(secondAction)"
           @click.stop="emit('second-action', file)"
         >
-          {{ GLYPH[secondActionLabel] ?? secondActionLabel }}
+          <i :class="iconClass(secondAction)" aria-hidden="true"></i>
         </button>
       </span>
     </li>
@@ -116,8 +127,10 @@ const rows = computed(() =>
 .status {
   flex: none;
   width: 1.2em;
-  font-family: monospace;
-  opacity: 0.75;
+  text-align: center;
+}
+.status i {
+  color: var(--nb-tone);
 }
 /* The one column that shrinks: actions stay put, ellipsis eats the path. */
 .path {

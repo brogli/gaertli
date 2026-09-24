@@ -39,10 +39,8 @@ func (cfg Config) Fingerprint() string {
 
 const fingerprintFile = ".mkrepo-fingerprint"
 
-// runner executes every git call Build makes. A package var, not a field on
-// Config or a Build parameter, so tests can wrap its Log to count calls
-// (e.g. proving a cache hit runs no git process at all) without widening
-// Build's signature.
+// runner runs every git call Build makes; a package var, so tests can count
+// the calls through its Log.
 var runner = git.Runner{}
 
 // Build makes dir a checkout matching cfg: a cache hit if dir already holds
@@ -124,8 +122,7 @@ func addWorktrees(ctx context.Context, dir string, cfg Config) error {
 
 // isolateConfig points HOME and git's global config at a fresh temp
 // directory and disables the system config, so Build never reads the
-// developer's own git configuration. Same approach as gittest's, which
-// takes a *testing.T and so cannot be called from a plain main.
+// developer's own git configuration.
 func isolateConfig() (restore func(), err error) {
 	home, err := os.MkdirTemp("", "mkrepo-home")
 	if err != nil {
@@ -183,22 +180,22 @@ func stream(w io.Writer, cfg Config) {
 	tip := map[string]int{} // branch -> its current tip's mark
 	opened, tagged := 0, 0
 
-	for i := 0; i < cfg.Commits; i++ {
+	for i := range cfg.Commits {
 		switch {
 		case opened < len(openAt) && i == openAt[opened]:
 			branch := featureBranchName(opened + 1)
-			tip[branch] = fi.commit(branch, fmt.Sprintf("start %s", branch), "main")
+			tip[branch] = fi.commit(branch, "start "+branch, "main")
 			active = append(active, branch)
 			opened++
 
 		case len(active) > 0 && (i+1)%cfg.MergeEvery == 0:
 			branch := active[0]
 			active = active[1:]
-			tip["main"] = fi.merge("main", fmt.Sprintf("merge %s", branch), tip[branch])
+			tip["main"] = fi.merge("main", "merge "+branch, tip[branch])
 
 		case len(active) > 0 && i%branchAdvanceEvery == 0:
 			branch := active[i/branchAdvanceEvery%len(active)]
-			tip[branch] = fi.commit(branch, fmt.Sprintf("advance %s", branch), "")
+			tip[branch] = fi.commit(branch, "advance "+branch, "")
 
 		default:
 			tip["main"] = fi.commit("main", fmt.Sprintf("commit %d", i), "")
@@ -223,14 +220,9 @@ func schedulePositions(rng *rand.Rand, total, count int) []int {
 	for i := range positions {
 		pos := step * (i + 1)
 		if step > 1 {
-			pos += int(rng.IntN(step)) - step/2
+			pos += rng.IntN(step) - step/2
 		}
-		if pos <= prev {
-			pos = prev + 1
-		}
-		if pos > total-1 {
-			pos = total - 1
-		}
+		pos = min(max(pos, prev+1), total-1)
 		positions[i] = pos
 		prev = pos
 	}
@@ -249,29 +241,30 @@ type fastImport struct {
 // (an existing ref's own tip is otherwise implicit from the stream so far).
 // Returns the commit's own mark.
 func (fi *fastImport) commit(ref, message, from string) int {
-	blobMark := fi.blob(message)
-
-	fi.mark++
-	commitMark := fi.mark
-	fi.writeCommitHeader(ref, commitMark, message)
+	parent := ""
 	if from != "" {
-		_, _ = fmt.Fprintf(fi.w, "from refs/heads/%s\n", from)
+		parent = "from refs/heads/" + from + "\n"
 	}
-	_, _ = fmt.Fprintf(fi.w, "M 100644 :%d file.txt\n\n", blobMark)
-	return commitMark
+	return fi.writeCommit(ref, message, parent)
 }
 
 // merge writes a merge commit on ref whose first parent is ref's own
 // current tip (implicit) and whose second parent is otherMark.
 func (fi *fastImport) merge(ref, message string, otherMark int) int {
-	blobMark := fi.blob(message)
+	return fi.writeCommit(ref, message, fmt.Sprintf("merge :%d\n", otherMark))
+}
 
+// writeCommit writes a blob holding message and a commit on ref that sets
+// file.txt to it, with parents as its from/merge lines. Returns the
+// commit's mark.
+func (fi *fastImport) writeCommit(ref, message, parents string) int {
+	blobMark := fi.blob(message)
 	fi.mark++
-	commitMark := fi.mark
-	fi.writeCommitHeader(ref, commitMark, message)
-	_, _ = fmt.Fprintf(fi.w, "merge :%d\n", otherMark)
-	_, _ = fmt.Fprintf(fi.w, "M 100644 :%d file.txt\n\n", blobMark)
-	return commitMark
+	when := baseTime + fi.mark
+	data := message + "\n"
+	_, _ = fmt.Fprintf(fi.w, "commit refs/heads/%s\nmark :%d\nauthor %s <%s> %d +0000\ncommitter %s <%s> %d +0000\ndata %d\n%s%sM 100644 :%d file.txt\n\n",
+		ref, fi.mark, authorName, authorEmail, when, authorName, authorEmail, when, len(data), data, parents, blobMark)
+	return fi.mark
 }
 
 // blob writes one blob command and returns its mark.
@@ -280,15 +273,6 @@ func (fi *fastImport) blob(content string) int {
 	data := content + "\n"
 	_, _ = fmt.Fprintf(fi.w, "blob\nmark :%d\ndata %d\n%s\n", fi.mark, len(data), data)
 	return fi.mark
-}
-
-// writeCommitHeader writes the "commit"/mark/author/committer/data lines
-// shared by commit and merge.
-func (fi *fastImport) writeCommitHeader(ref string, mark int, message string) {
-	when := baseTime + mark
-	data := message + "\n"
-	_, _ = fmt.Fprintf(fi.w, "commit refs/heads/%s\nmark :%d\nauthor %s <%s> %d +0000\ncommitter %s <%s> %d +0000\ndata %d\n%s",
-		ref, mark, authorName, authorEmail, when, authorName, authorEmail, when, len(data), data)
 }
 
 // tag writes a lightweight tag ref at commitMark.

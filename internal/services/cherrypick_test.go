@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -78,7 +77,7 @@ func TestFR_CP_01_RunSequenceRejectsEmptyShasBeforeAnyGitCall(t *testing.T) {
 	// without the guard, "git log --no-walk" with no revision defaults to HEAD
 	wt := &session.Worktree{}
 
-	err := runSequence(context.Background(), wt, nil, "cherry-pick", "CHERRY_PICK_HEAD", true, core.PickOptions{})
+	err := runSequence(t.Context(), wt, nil, "cherry-pick", "CHERRY_PICK_HEAD", true, core.PickOptions{})
 
 	coretest.AssertCode(t, err, core.Internal)
 }
@@ -94,7 +93,7 @@ func TestFR_CP_01_CherryPickAppliesACommitOntoCurrentHEAD(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CherryPick(context.Background(), wt, []string{bSHA}); err != nil {
+	if err := c.CherryPick(t.Context(), wt, []string{bSHA}, core.PickOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +114,7 @@ func TestFR_CP_04_CherryPickRefusesWithADirtyFileInTheWay(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.CherryPick(context.Background(), wt, []string{pickSHA})
+	err := c.CherryPick(t.Context(), wt, []string{pickSHA}, core.PickOptions{})
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "would be overwritten") {
@@ -151,7 +150,7 @@ func TestFR_CP_04_CherryPickFailsWhenAnotherPickIsAlreadyStuck(t *testing.T) {
 
 	// Real conflict, set up directly via the runner, not via our own
 	// CherryPick — leaves CHERRY_PICK_HEAD stuck, unresolved.
-	_, _ = (git.Runner{}).Run(context.Background(), git.Call{
+	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
 		Dir: repo.Dir, Args: []string{"cherry-pick", "--end-of-options", conflSHA},
 	})
 	stuckHead, err := os.ReadFile(filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD"))
@@ -162,7 +161,7 @@ func TestFR_CP_04_CherryPickFailsWhenAnotherPickIsAlreadyStuck(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err = c.CherryPick(context.Background(), wt, []string{otherSHA})
+	err = c.CherryPick(t.Context(), wt, []string{otherSHA}, core.PickOptions{})
 	if err == nil {
 		t.Fatal("CherryPick = nil, want an error while a prior pick is stuck")
 	}
@@ -194,7 +193,7 @@ func TestFR_CP_01_CherryPickWorksOnADetachedHEAD(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CherryPick(context.Background(), wt, []string{bSHA}); err != nil {
+	if err := c.CherryPick(t.Context(), wt, []string{bSHA}, core.PickOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -226,18 +225,15 @@ func TestFR_CP_02_CherryPickAppliesOldestFirstRegardlessOfCallOrder(t *testing.T
 
 	// Deliberately out of order: the service must sort to oldest-first
 	// (A, B, C) before calling git, regardless of this call's own order.
-	if err := c.CherryPick(context.Background(), wt, []string{cSHA, aSHA, bSHA}); err != nil {
+	if err := c.CherryPick(t.Context(), wt, []string{cSHA, aSHA, bSHA}, core.PickOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	if got := commitSubjects(t, repo.Dir, "master", "fresh"); !slices.Equal(got, []string{"A", "B", "C"}) {
 		t.Errorf("commit order on fresh = %v, want [A B C] (oldest first)", got)
 	}
-	content, readErr := os.ReadFile(filepath.Join(repo.Dir, "chain.txt"))
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	if string(content) != "A\nB\nC\n" {
+	content := readFile(t, repo.Dir, "chain.txt")
+	if content != "A\nB\nC\n" {
 		t.Errorf("chain.txt = %q, want the cumulative A\\nB\\nC\\n", content)
 	}
 }
@@ -249,9 +245,15 @@ func TestFR_CP_05_CherryPickRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.CherryPick(context.Background(), wt, []string{x1SHA, mSHA, x2SHA})
+	err := c.CherryPick(t.Context(), wt, []string{x1SHA, mSHA, x2SHA}, core.PickOptions{})
 
-	coretest.AssertCode(t, err, core.GitFailed)
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Args["sha"] == "" || ce.Args["verb"] != "cherry-pick" {
+		t.Errorf("Args = %+v, want a non-empty sha and verb=cherry-pick", ce.Args)
+	}
+	if ce.Key != "mergeCommitNotPickable" {
+		t.Errorf("Key = %q, want mergeCommitNotPickable", ce.Key)
+	}
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s (the pre-check must run before any real cherry-pick)", got, beforeHEAD)
 	}
@@ -264,7 +266,7 @@ func TestFR_RV_03_RevertRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t *te
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.Revert(context.Background(), wt, []string{x1SHA, mSHA, x2SHA})
+	err := c.Revert(t.Context(), wt, []string{x1SHA, mSHA, x2SHA}, core.PickOptions{})
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
@@ -286,15 +288,12 @@ func TestFR_RV_02_RevertAppliesNewestFirstRegardlessOfCallOrder(t *testing.T) {
 	// Deliberately oldest-first call order: the service must reorder to
 	// newest-first (C, then B) before calling git — the reverse order
 	// conflicts on this same fixture.
-	if err := c.Revert(context.Background(), wt, []string{bSHA, cSHA}); err != nil {
+	if err := c.Revert(t.Context(), wt, []string{bSHA, cSHA}, core.PickOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	content, readErr := os.ReadFile(filepath.Join(repo.Dir, "chain.txt"))
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	if string(content) != "A\n" {
+	content := readFile(t, repo.Dir, "chain.txt")
+	if content != "A\n" {
 		t.Errorf("chain.txt = %q, want exactly A's own line", content)
 	}
 }
@@ -307,7 +306,7 @@ func TestFR_RV_01_RevertUndoesACommitLeavingItInHistory(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.Revert(context.Background(), wt, []string{bSHA}); err != nil {
+	if err := c.Revert(t.Context(), wt, []string{bSHA}, core.PickOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -328,7 +327,7 @@ func TestFR_RV_03_RevertRefusesWithADirtyFileInTheWay(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.Revert(context.Background(), wt, []string{revertSHA})
+	err := c.Revert(t.Context(), wt, []string{revertSHA}, core.PickOptions{})
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "would be overwritten") {
@@ -348,7 +347,7 @@ func TestFR_CP_01_CherryPickReportsCodeConflictsOnARealStopLeftInPlace(t *testin
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.CherryPick(context.Background(), wt, []string{featureSHA})
+	err := c.CherryPick(t.Context(), wt, []string{featureSHA}, core.PickOptions{})
 
 	coretest.AssertCode(t, err, core.Conflicts)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD")) {
@@ -362,7 +361,7 @@ func TestFR_RV_01_RevertReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T)
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.Revert(context.Background(), wt, []string{c1SHA})
+	err := c.Revert(t.Context(), wt, []string{c1SHA}, core.PickOptions{})
 
 	coretest.AssertCode(t, err, core.Conflicts)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "REVERT_HEAD")) {
@@ -381,7 +380,7 @@ func TestFR_CP_06_CherryPickWithRecordOriginAppendsTheCherryPickedFromLine(t *te
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CherryPickWith(context.Background(), wt, []string{bSHA}, core.PickOptions{RecordOrigin: true}); err != nil {
+	if err := c.CherryPick(t.Context(), wt, []string{bSHA}, core.PickOptions{RecordOrigin: true}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -404,14 +403,14 @@ func TestFR_CP_06_CherryPickWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T)
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CherryPickWith(context.Background(), wt, []string{bSHA}, core.PickOptions{NoCommit: true}); err != nil {
+	if err := c.CherryPick(t.Context(), wt, []string{bSHA}, core.PickOptions{NoCommit: true}); err != nil {
 		t.Fatal(err)
 	}
 
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
 	}
-	status, err := c.Status(context.Background(), wt)
+	status, err := c.Status(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,14 +428,14 @@ func TestFR_RV_04_RevertWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.RevertWith(context.Background(), wt, []string{bSHA}, core.PickOptions{NoCommit: true}); err != nil {
+	if err := c.Revert(t.Context(), wt, []string{bSHA}, core.PickOptions{NoCommit: true}); err != nil {
 		t.Fatal(err)
 	}
 
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
 	}
-	status, err := c.Status(context.Background(), wt)
+	status, err := c.Status(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -450,20 +449,20 @@ func TestFR_RV_04_RevertWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T) {
 // -n's own revert equivalent below): the error stays GitFailed rather
 // than being remapped to Conflicts, and operation() reports nothing in
 // progress, so ConflictBanner never shows. The conflicted file itself
-// still surfaces through Status, for the changes panel's own resolve flow.
+// still surfaces through Status, for the changes view's own resolve flow.
 func TestFR_CP_06_CherryPickWithNoCommitOnARealConflictLeavesNoOperationState(t *testing.T) {
 	repo := gittest.New(t)
 	featureSHA := realConflictFixture(t, repo.Dir, "cherry-pick")
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.CherryPickWith(context.Background(), wt, []string{featureSHA}, core.PickOptions{NoCommit: true})
+	err := c.CherryPick(t.Context(), wt, []string{featureSHA}, core.PickOptions{NoCommit: true})
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if fileExists(filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD")) {
 		t.Error("CHERRY_PICK_HEAD present, want none")
 	}
-	status, statusErr := c.Status(context.Background(), wt)
+	status, statusErr := c.Status(t.Context(), wt)
 	if statusErr != nil {
 		t.Fatal(statusErr)
 	}
@@ -481,13 +480,13 @@ func TestFR_RV_04_RevertWithNoCommitOnARealConflictStillReportsConflicts(t *test
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.RevertWith(context.Background(), wt, []string{revertSHA}, core.PickOptions{NoCommit: true})
+	err := c.Revert(t.Context(), wt, []string{revertSHA}, core.PickOptions{NoCommit: true})
 
 	coretest.AssertCode(t, err, core.Conflicts)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "REVERT_HEAD")) {
 		t.Error("REVERT_HEAD missing, want it left in place for the conflict flow")
 	}
-	status, statusErr := c.Status(context.Background(), wt)
+	status, statusErr := c.Status(t.Context(), wt)
 	if statusErr != nil {
 		t.Fatal(statusErr)
 	}
@@ -522,8 +521,8 @@ func TestFR_CP_08_CherryPickWithMainlineChoosesTheParentToDiffAgainst(t *testing
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CherryPickWith(context.Background(), wt, []string{mSHA}, core.PickOptions{Mainline: 1}); err != nil {
-		t.Fatalf("CherryPickWith mainline 1 = %v, want nil (no merge-commit refusal)", err)
+	if err := c.CherryPick(t.Context(), wt, []string{mSHA}, core.PickOptions{Mainline: 1}); err != nil {
+		t.Fatalf("CherryPick mainline 1 = %v, want nil (no merge-commit refusal)", err)
 	}
 	if _, err := os.Stat(filepath.Join(repo.Dir, "side.txt")); err != nil {
 		t.Errorf("side.txt missing after picking against mainline 1: %v", err)
@@ -539,8 +538,8 @@ func TestFR_CP_08_CherryPickWithMainlineTwoDiffersFromMainlineOne(t *testing.T) 
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CherryPickWith(context.Background(), wt, []string{mSHA}, core.PickOptions{Mainline: 2}); err != nil {
-		t.Fatalf("CherryPickWith mainline 2 = %v, want nil", err)
+	if err := c.CherryPick(t.Context(), wt, []string{mSHA}, core.PickOptions{Mainline: 2}); err != nil {
+		t.Fatalf("CherryPick mainline 2 = %v, want nil", err)
 	}
 	if _, err := os.Stat(filepath.Join(repo.Dir, "master2.txt")); err != nil {
 		t.Errorf("master2.txt missing after picking against mainline 2: %v", err)
@@ -557,10 +556,10 @@ func TestFR_RV_04_RevertWithIgnoresMainlineKeepingTheMergeRefusal(t *testing.T) 
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	// Unlike CherryPickWith, a Mainline choice must not let RevertWith
-	// revert this merge commit (git revert -m 1 would succeed): it refuses
-	// exactly like Revert with no options.
-	err := c.RevertWith(context.Background(), wt, []string{mSHA}, core.PickOptions{Mainline: 1})
+	// Unlike CherryPick, a Mainline choice must not let Revert revert this
+	// merge commit (git revert -m 1 would succeed): it refuses exactly like
+	// Revert with zero options.
+	err := c.Revert(t.Context(), wt, []string{mSHA}, core.PickOptions{Mainline: 1})
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
@@ -576,20 +575,13 @@ func TestFR_CP_08_CherryPickWithMainlineOnMultipleCommitsIsAppBugBeforeAnyGitCal
 	bSHA := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	before, err := c.CommandLog(context.Background(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rec := recordCommands(t, c, wt)
 
-	err = c.CherryPickWith(context.Background(), wt, []string{aSHA, bSHA}, core.PickOptions{Mainline: 1})
+	err := c.CherryPick(t.Context(), wt, []string{aSHA, bSHA}, core.PickOptions{Mainline: 1})
 
 	coretest.AssertCode(t, err, core.Internal)
-	after, aerr := c.CommandLog(context.Background(), wt)
-	if aerr != nil {
-		t.Fatal(aerr)
-	}
-	if len(after) != len(before) {
-		t.Errorf("CommandLog grew from %d to %d entries, want unchanged (no git call made)", len(before), len(after))
+	if got := len(rec.snapshot()); got != 0 {
+		t.Errorf("git calls = %d, want 0 (no git call made)", got)
 	}
 }
 
@@ -636,9 +628,7 @@ func revertConflictFixture(t *testing.T, dir string) (revertSHA, beforeHEAD stri
 	gittest.Commit(t, dir, "conflict.txt", "applied\n", "applies the change")
 	revertSHA = gittest.HeadSHA(t, dir)
 	beforeHEAD = revertSHA
-	if err := os.WriteFile(filepath.Join(dir, "conflict.txt"), []byte("dirty"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, dir, "conflict.txt", "dirty")
 	return revertSHA, beforeHEAD
 }
 
@@ -655,16 +645,14 @@ func cherryPickConflictFixture(t *testing.T, dir string) (pickSHA, beforeHEAD st
 	pickSHA = gittest.HeadSHA(t, dir)
 	gittest.Run(t, dir, "checkout", "master")
 	beforeHEAD = gittest.HeadSHA(t, dir)
-	if err := os.WriteFile(filepath.Join(dir, "conflict.txt"), []byte("dirty"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, dir, "conflict.txt", "dirty")
 	return pickSHA, beforeHEAD
 }
 
 // commitExists reports whether sha still resolves to a real commit object.
 func commitExists(t *testing.T, dir, sha string) bool {
 	t.Helper()
-	_, err := (git.Runner{}).Run(context.Background(), git.Call{
+	_, err := (git.Runner{}).Run(t.Context(), git.Call{
 		Dir: dir, ReadOnly: true, Args: []string{"cat-file", "-e", sha + "^{commit}"},
 	})
 	return err == nil

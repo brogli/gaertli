@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import Dialog from 'openvue/dialog'
 import InputText from 'openvue/inputtext'
 import Button from 'openvue/button'
+import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
@@ -14,6 +15,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const newName = ref(props.name)
 const { error, runAndClose } = useCoreCall()
+const { t } = useI18n()
 
 async function submit(): Promise<void> {
   await runAndClose(
@@ -24,11 +26,15 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <Dialog visible header="Rename branch" modal @update:visible="emit('close')">
+  <Dialog visible :header="t('dialogs.renameBranch.header')" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
-    <InputText v-model="newName" placeholder="Branch name" />
+    <InputText v-model="newName" :placeholder="t('dialogs.renameBranch.namePlaceholder')" />
     <template #footer>
-      <Button label="Rename" data-test="rename-branch-submit" @click="submit" />
+      <Button
+        :label="t('dialogs.renameBranch.rename')"
+        data-test="rename-branch-submit"
+        @click="submit"
+      />
     </template>
   </Dialog>
 </template>

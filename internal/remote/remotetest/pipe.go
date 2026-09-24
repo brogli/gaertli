@@ -13,13 +13,13 @@ import (
 
 // NewPipeClient serves the API newAPI builds (given the server-side event
 // sink) and returns a client on it; sink receives the client-side events.
-func NewPipeClient(t testing.TB, newAPI func(core.EventSink) core.API, sink core.EventSink) *remote.Client {
-	t.Helper()
+func NewPipeClient(tb testing.TB, newAPI func(core.EventSink) core.API, sink core.EventSink) *remote.Client {
+	tb.Helper()
 	clientIn, serverOut := io.Pipe()
 	serverIn, clientOut := io.Pipe()
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { _ = remote.Serve(ctx, serverIn, serverOut, newAPI) }()
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		cancel()
 		_ = clientOut.Close()
 		_ = serverOut.Close()

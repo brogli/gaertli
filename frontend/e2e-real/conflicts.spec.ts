@@ -4,23 +4,23 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import type { Git, Repos } from './repos'
 import {
+  choosePull,
+  clickConfirm,
   commitFiles,
   commitSha,
-  confirmDialog,
   conflictBanner,
   fileGroup,
   fileRow,
+  hunksText,
   logRow,
+  parents,
   pickFromContextMenu,
+  pushFromClone,
+  rev,
 } from './helpers'
 
 // Operations stopped on conflicts: started outside the app or from it,
 // resolved, continued and aborted through the conflict banner.
-
-// hunksWith is hunks.txt with its first line replaced.
-function hunksWith(first: string): string {
-  return [first, ...Array.from({ length: 29 }, (_, i) => `line ${i + 2}`)].join('\n') + '\n'
-}
 
 // stopOnConflicts runs a git command that must stop on conflicts, which
 // git reports with a non-zero exit.
@@ -30,7 +30,7 @@ function stopOnConflicts(git: Git, repo: string, ...args: string[]): void {
 
 async function abort(page: Page): Promise<void> {
   await conflictBanner(page).getByRole('button', { name: 'Abort…' }).click()
-  await confirmDialog(page).getByRole('button', { name: 'Confirm' }).click()
+  await clickConfirm(page)
 }
 
 async function markResolved(page: Page, file: string, text: string, repos: Repos): Promise<void> {
@@ -41,9 +41,11 @@ async function markResolved(page: Page, file: string, text: string, repos: Repos
 test.describe('a merge of feature stopped on two conflicting files', () => {
   test.beforeEach(({ repos, git }) => {
     git(repos.work, 'checkout', '-q', 'feature')
-    commitFiles(git, repos.work, 'feature: hunks line 1', { 'hunks.txt': hunksWith('feature') })
+    commitFiles(git, repos.work, 'feature: hunks line 1', {
+      'hunks.txt': hunksText({ 1: 'feature' }),
+    })
     git(repos.work, 'checkout', '-q', 'main')
-    commitFiles(git, repos.work, 'main: hunks line 1', { 'hunks.txt': hunksWith('main') })
+    commitFiles(git, repos.work, 'main: hunks line 1', { 'hunks.txt': hunksText({ 1: 'main' }) })
   })
 
   test('FR-CONF-01 the banner names the merge and Conflicted lists both files', async ({
@@ -108,12 +110,12 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
   }) => {
     stopOnConflicts(git, repos.work, 'merge', 'feature')
     await markResolved(app, 'conflict.txt', 'resolved\n', repos)
-    await markResolved(app, 'hunks.txt', hunksWith('resolved'), repos)
+    await markResolved(app, 'hunks.txt', hunksText({ 1: 'resolved' }), repos)
 
     await conflictBanner(app).getByRole('button', { name: 'Continue' }).click()
 
     await expect(conflictBanner(app)).toBeHidden()
-    expect(git(repos.work, 'log', '-1', '--format=%P').trim().split(' ')).toHaveLength(2)
+    expect(parents(git, repos.work)).toBe(2)
     expect(editorCalls()).toEqual([])
   })
 
@@ -122,13 +124,13 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
     repos,
     git,
   }) => {
-    const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+    const head = rev(git, repos.work, 'HEAD')
     stopOnConflicts(git, repos.work, 'merge', 'feature')
 
     await abort(app)
 
     await expect(conflictBanner(app)).toBeHidden()
-    expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+    expect(rev(git, repos.work, 'HEAD')).toBe(head)
     expect(git(repos.work, 'status', '--porcelain')).toBe('')
   })
 })
@@ -138,14 +140,14 @@ test('FR-CONF-01 a rebase stopped on conflicts is named in the banner and can be
   repos,
   git,
 }) => {
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
   stopOnConflicts(git, repos.work, 'rebase', 'feature')
 
   await expect(conflictBanner(app)).toContainText('rebase stopped on conflicts')
   await abort(app)
 
   await expect(conflictBanner(app)).toBeHidden()
-  expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
   expect(fs.existsSync(path.join(repos.work, '.git', 'rebase-merge'))).toBe(false)
 })
 
@@ -155,7 +157,7 @@ test('FR-CONF-01 a revert stopped on conflicts is named in the banner and can be
   git,
 }) => {
   commitFiles(git, repos.work, 'change conflict.txt again', { 'conflict.txt': 'changed again\n' })
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
   stopOnConflicts(
     git,
     repos.work,
@@ -168,7 +170,7 @@ test('FR-CONF-01 a revert stopped on conflicts is named in the banner and can be
   await abort(app)
 
   await expect(conflictBanner(app)).toBeHidden()
-  expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
   expect(fs.existsSync(path.join(repos.work, '.git', 'REVERT_HEAD'))).toBe(false)
 })
 
@@ -177,21 +179,23 @@ test('FR-CONF-01 a pull that stops on conflicts shows the merge in the banner; A
   repos,
   git,
 }) => {
-  git(repos.other, 'checkout', '-q', 'main')
-  commitFiles(git, repos.other, 'remote: conflict.txt', { 'conflict.txt': 'remote side\n' })
-  git(repos.other, 'push', '-q', 'origin', 'main')
+  pushFromClone(
+    git,
+    repos.other,
+    'main',
+    { 'conflict.txt': 'remote side\n' },
+    'remote: conflict.txt',
+  )
   commitFiles(git, repos.work, 'local: conflict.txt', { 'conflict.txt': 'local side\n' })
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
 
-  const sync = app.locator('.sync-controls')
-  await sync.getByRole('combobox').selectOption('merge')
-  await sync.getByRole('button', { name: 'Pull', exact: true }).click()
+  await choosePull(app, 'merge')
 
   await expect(conflictBanner(app)).toContainText('merge stopped on conflicts')
   await abort(app)
 
   await expect(conflictBanner(app)).toBeHidden()
-  expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 
 test('FR-CP-03 a cherry-pick from the menu that stops on conflicts is handed to the banner; Abort undoes it', async ({
@@ -199,7 +203,7 @@ test('FR-CP-03 a cherry-pick from the menu that stops on conflicts is handed to 
   repos,
   git,
 }) => {
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
 
   await pickFromContextMenu(app, logRow(app, 'feature: change conflict.txt'), 'Cherry-pick')
 
@@ -207,5 +211,5 @@ test('FR-CP-03 a cherry-pick from the menu that stops on conflicts is handed to 
   await abort(app)
 
   await expect(conflictBanner(app)).toBeHidden()
-  expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })

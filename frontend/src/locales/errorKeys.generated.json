@@ -1,0 +1,55 @@
+{
+  "authFailed": [],
+  "branchCheckedOutDirty": [
+    "branch",
+    "path"
+  ],
+  "branchDiverged": [
+    "branch"
+  ],
+  "deployRefused": [
+    "distro"
+  ],
+  "editorCommandInvalid": [
+    "command"
+  ],
+  "editorNotOnPath": [
+    "command"
+  ],
+  "editorStartFailed": [
+    "command"
+  ],
+  "fileNotFound": [
+    "path"
+  ],
+  "gitTooOld": [
+    "version",
+    "minVersion"
+  ],
+  "invalidBranchName": [
+    "name"
+  ],
+  "mergeCommitNotPickable": [
+    "sha",
+    "verb"
+  ],
+  "noUpstream": [
+    "branch"
+  ],
+  "noWorktreeLeft": [
+    "path"
+  ],
+  "notARepo": [
+    "path"
+  ],
+  "pushFetchFirst": [],
+  "pushNotFastForward": [],
+  "pushRefUpdatedSinceCheckout": [],
+  "pushRejected": [
+    "reason"
+  ],
+  "pushStaleInfo": [],
+  "worktreeExists": [
+    "path"
+  ]
+}

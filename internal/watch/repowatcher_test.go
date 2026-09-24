@@ -1,7 +1,6 @@
 package watch
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,17 +12,17 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-// setInterval overrides a timing var for the duration of a test, restoring
-// it afterwards (the vars are process-wide; tests never run in parallel
-// with each other in this package).
-func setInterval(v *time.Duration, d time.Duration) func() {
+// setInterval overrides a process-wide timing var for the duration of t;
+// tests in this package never run in parallel.
+func setInterval(t *testing.T, v *time.Duration, d time.Duration) {
+	t.Helper()
 	orig := *v
 	*v = d
-	return func() { *v = orig }
+	t.Cleanup(func() { *v = orig })
 }
 
 func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
-	defer setInterval(&DebounceInterval, 20*time.Millisecond)()
+	setInterval(t, &DebounceInterval, 20*time.Millisecond)
 
 	var mu sync.Mutex
 	var got []Scope
@@ -50,18 +49,13 @@ func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
 }
 
 func TestQA_PERF_06_FallbackTickerCallsCheckNowAtABoundedRate(t *testing.T) {
-	defer setInterval(&FallbackPollInterval, 20*time.Millisecond)()
-
+	const interval = 20 * time.Millisecond
 	var count atomic.Int32
-	w := &RepoWatcher{
-		fallback:   time.NewTicker(FallbackPollInterval),
-		fallbackFn: func() { count.Add(1) },
-		done:       make(chan struct{}),
-	}
-	go w.fallbackLoop()
+	w := &RepoWatcher{done: make(chan struct{})}
+	go w.fallbackLoop(interval, func() { count.Add(1) })
 	defer func() { _ = w.Close() }()
 
-	time.Sleep(4*FallbackPollInterval + FallbackPollInterval/2)
+	time.Sleep(4*interval + interval/2)
 
 	if got := count.Load(); got < 3 || got > 5 {
 		t.Errorf("CheckNow invocations = %d, want 4±1", got)
@@ -71,32 +65,31 @@ func TestQA_PERF_06_FallbackTickerCallsCheckNowAtABoundedRate(t *testing.T) {
 func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromOutside(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	commonDir := filepath.Join(repo.Dir, ".git")
-
-	got := make(chan Scope, 10)
-	w, err := NewRepoWatcher(commonDir, func(s Scope) { got <- s })
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = w.Close() }()
+	_, got := watchRepo(t, repo)
 
 	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
 
 	waitForScope(t, got, Refs)
 }
 
-func TestFR_REPO_04_RepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
-	repo := gittest.New(t)
-	commonDir := filepath.Join(repo.Dir, ".git")
-
+// watchRepo starts a RepoWatcher on repo's git dir, closed when the test
+// ends, and returns it with the channel its onChange feeds.
+func watchRepo(t *testing.T, repo *gittest.Repo) (*RepoWatcher, chan Scope) {
+	t.Helper()
 	got := make(chan Scope, 10)
-	w, err := NewRepoWatcher(commonDir, func(s Scope) { got <- s })
+	w, err := NewRepoWatcher(filepath.Join(repo.Dir, ".git"), func(s Scope) { got <- s })
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = w.Close() }()
+	t.Cleanup(func() { _ = w.Close() })
+	return w, got
+}
 
-	if err := os.Mkdir(filepath.Join(commonDir, "rebase-merge"), 0o755); err != nil {
+func TestFR_REPO_04_RepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
+	repo := gittest.New(t)
+	_, got := watchRepo(t, repo)
+
+	if err := os.Mkdir(filepath.Join(repo.Dir, ".git", "rebase-merge"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,37 +99,26 @@ func TestFR_REPO_04_RepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
 func TestQA_COMP_02_RepoWatcherToleratesConcurrentReadsWhileWriting(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	commonDir := filepath.Join(repo.Dir, ".git")
-
-	got := make(chan Scope, 10)
-	w, err := NewRepoWatcher(commonDir, func(s Scope) { got <- s })
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = w.Close() }()
+	w, got := watchRepo(t, repo)
 
 	var wg sync.WaitGroup
 	errs := make(chan error, 10)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if _, err := (git.Runner{}).Run(context.Background(), git.Call{
+	wg.Go(func() {
+		if _, err := (git.Runner{}).Run(t.Context(), git.Call{
 			Dir: repo.Dir, Args: []string{"commit", "--allow-empty", "-m", "concurrent"},
 		}); err != nil {
 			errs <- err
 		}
-	}()
+	})
 	for range 5 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			w.CheckNow()
-			if _, err := (git.Runner{}).Run(context.Background(), git.Call{
+			if _, err := (git.Runner{}).Run(t.Context(), git.Call{
 				Dir: repo.Dir, ReadOnly: true, Args: []string{"status"},
 			}); err != nil {
 				errs <- err
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)

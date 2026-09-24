@@ -2,7 +2,11 @@
 
 ## Errors
 
-One error type crosses the core boundary, in-process and over RPC alike: `{code, message, gitStderr, command}`. The UI shows the message and always offers the raw stderr and command behind "show details" (FR-UX-01).
+One error type crosses the core boundary, in-process and over RPC alike: `{code, message, key, args, gitStderr, command}`. `code` is the machine-readable failure class. `key` names the message's wording, since one code can read several ways (`GIT_FAILED` covers both "worktree already exists" and "can't cherry-pick a merge commit"), and `args` holds its variable parts, so the UI can translate it (FR-UX-11). `message` stays English: the app log's record and the UI's fallback where `key` has no translation yet or is empty (`Internal`, or git's own message).
+
+`internal/core` keeps one table of every key and its args' names. A generated, checked-in JSON copy lets a Vitest test check the frontend's catalogue against it without running Go. Code outside `internal/core` changes `message` and `key` only through its constructors and `Retag`, so a message cannot drift from its key.
+
+`Internal` shows a fixed headline with `message` behind "show details". Other errors put git's stderr and command there (FR-UX-01), except an editor start failure, whose message already names the command.
 
 | Code | Meaning |
 |---|---|
@@ -26,12 +30,12 @@ One error type crosses the core boundary, in-process and over RPC alike: `{code,
 | `DISTRO_NOT_FOUND` | the named WSL distro is unknown or not running |
 | `DEPLOY_REFUSED` | the user declined copying the core into a distro |
 
-Known failures are detected from exit codes and machine-readable state, not by matching message text. Git's messages are pinned to English (TR-09), which keeps the text stable for the few cases where matching cannot be avoided because git or `wsl.exe` gives no other signal: sign-in failures, a non-fast-forward fetch, `branch -d` refusing an unmerged branch, and `wsl.exe` not telling an unknown distro from one that is not running.
+Known failures are detected from exit codes and machine-readable state, not by matching message text. Git's messages are pinned to English (TR-09), which keeps the text stable for the few cases where matching cannot be avoided because git gives no other signal: sign-in failures, a non-fast-forward fetch, `branch -d` refusing an unmerged branch, `worktree remove` refusing a dirty worktree, and a pull's merge or rebase refusing to start over local changes.
 
 ## Security
 
-- No shell anywhere. Arguments are lists; `--` goes before paths and `--end-of-options` before revisions (TR-10).
+- No shell anywhere, and repo text never becomes an option (TR-10).
 - Branch and worktree names are validated with `git check-ref-format`.
-- The command log never records environment variables, and masks credentials embedded in URLs.
+- The app log (`components.md`) never records environment variables, and masks credentials embedded in a command's arguments or in a failed command's stderr.
 - The WebView loads bundled assets only. Commit messages and file contents are rendered as text, never as HTML.
 - No telemetry and no update check (QA-SEC-01).

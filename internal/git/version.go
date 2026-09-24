@@ -38,7 +38,8 @@ func (r Runner) CheckVersion(ctx context.Context) (Version, error) {
 		return Version{}, core.Errorf(core.GitTooOld, "%v", err)
 	}
 	if v.Less(MinVersion) {
-		return Version{}, core.Errorf(core.GitTooOld, "git %s is older than the minimum %s", v, MinVersion)
+		args := map[string]string{"version": v.String(), "minVersion": MinVersion.String()}
+		return Version{}, core.ErrorfArgs(core.GitTooOld, "gitTooOld", args, "git %s is older than the minimum %s", v, MinVersion)
 	}
 	return v, nil
 }
@@ -47,7 +48,7 @@ func (r Runner) CheckVersion(ctx context.Context) (Version, error) {
 // dot-separated numeric groups of "git --version"'s stdout, e.g.
 // "git version 2.43.0" or "git version 2.43.0.windows.1".
 func parseVersion(out string) (Version, error) {
-	for _, field := range strings.Fields(out) {
+	for field := range strings.FieldsSeq(out) {
 		nums, ok := leadingDotted3(field)
 		if ok {
 			return Version{Major: nums[0], Minor: nums[1], Patch: nums[2]}, nil

@@ -1,22 +1,20 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import AutoComplete from 'openvue/autocomplete'
 import MultiSelect from 'openvue/multiselect'
 
 const mockApplyFilter = vi.fn()
-const mockClearFilter = vi.fn()
 
 const mockLogStore: {
   filter: { query?: string; author?: string; branches?: string[]; path?: string }
   filterActive: boolean
   knownAuthors: string[]
   applyFilter: typeof mockApplyFilter
-  clearFilter: typeof mockClearFilter
 } = {
   filter: {},
   filterActive: false,
   knownAuthors: [],
   applyFilter: mockApplyFilter,
-  clearFilter: mockClearFilter,
 }
 
 const mockRefsStore: { refs: { branches: unknown[]; remotes: unknown[]; tags: unknown[] } } = {
@@ -31,7 +29,6 @@ import FilterBar from './FilterBar.vue'
 describe('FilterBar', () => {
   beforeEach(() => {
     mockApplyFilter.mockReset()
-    mockClearFilter.mockReset()
     mockLogStore.filter = {}
     mockLogStore.filterActive = false
     mockLogStore.knownAuthors = []
@@ -58,6 +55,15 @@ describe('FilterBar', () => {
     }
   })
 
+  it('FR-LOG-06 the branch MultiSelect can be searched, has no select-all, and clears itself', () => {
+    const wrapper = mount(FilterBar)
+    const props = wrapper.findComponent(MultiSelect).props()
+
+    expect(props.filter).toBe(true)
+    expect(props.showToggleAll).toBe(false)
+    expect(props.showClear).toBe(true)
+  })
+
   it('FR-LOG-06 selecting branches in the MultiSelect applies immediately, local and remote names', async () => {
     mockRefsStore.refs = {
       branches: [{ name: 'main' }, { name: 'feature' }],
@@ -75,25 +81,51 @@ describe('FilterBar', () => {
     )
   })
 
-  it('FR-LOG-08 shows a chip per active filter and clears them all on click', async () => {
+  it("FR-LOG-08 clicking the message field's clear icon empties it and applies at once", async () => {
+    mockLogStore.filter = { query: 'fix' }
+    const wrapper = mount(FilterBar)
+
+    await wrapper.get('[data-test="clear-query"]').trigger('click')
+
+    expect(
+      (wrapper.get('input[placeholder="Search message"]').element as HTMLInputElement).value,
+    ).toBe('')
+    expect(mockApplyFilter).toHaveBeenCalledTimes(1)
+    expect(mockApplyFilter).toHaveBeenCalledWith({})
+  })
+
+  it('FR-LOG-08 clearing the path keeps the other active filters', async () => {
+    mockLogStore.filter = { path: 'src/', branches: ['main'] }
+    const wrapper = mount(FilterBar)
+
+    await wrapper.get('[data-test="clear-path"]').trigger('click')
+
+    expect(mockApplyFilter).toHaveBeenCalledWith({ branches: ['main'] })
+  })
+
+  it('FR-LOG-08 an empty message field shows no clear icon', () => {
+    const wrapper = mount(FilterBar)
+
+    expect(wrapper.find('[data-test="clear-query"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="clear-path"]').exists()).toBe(false)
+  })
+
+  it('FR-LOG-08 shows no chip list and no clear-filters button', () => {
     mockLogStore.filter = { query: 'x', path: 'y' }
     mockLogStore.filterActive = true
     const wrapper = mount(FilterBar)
 
-    const chips = wrapper.findAll('.p-chip')
-    expect(chips).toHaveLength(2)
-
-    await wrapper.get('[data-test="clear-filters"]').trigger('click')
-    expect(mockClearFilter).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.p-chip').exists()).toBe(false)
+    expect(wrapper.find('[data-test="clear-filters"]').exists()).toBe(false)
   })
 
-  it('FR-LOG-08 Escape inside the bar clears the filter', async () => {
-    mockLogStore.filter = { query: 'x' }
-    mockLogStore.filterActive = true
+  it('FR-LOG-08 clearing the author AutoComplete applies without the author', async () => {
+    mockLogStore.filter = { author: 'ann' }
     const wrapper = mount(FilterBar)
 
-    await wrapper.get('.filter-bar').trigger('keydown.escape')
+    wrapper.findComponent(AutoComplete).vm.$emit('clear')
+    await wrapper.vm.$nextTick()
 
-    expect(mockClearFilter).toHaveBeenCalledTimes(1)
+    expect(mockApplyFilter).toHaveBeenCalledWith({})
   })
 })

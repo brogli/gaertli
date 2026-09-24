@@ -3,7 +3,7 @@
 //
 // Implemented in-process by internal/services and over JSON-RPC by
 // internal/remote.Client. The shell binds the generated app.Facade, which
-// forwards each call to the core that owns the window's worktree.
+// forwards each call to the core that owns the call's worktree or path.
 package core
 
 import "context"
@@ -25,18 +25,14 @@ type API interface {
 	// Idempotent: opening an already-open worktree returns the same ID.
 	OpenWorktree(ctx context.Context, path RepoPath) (WorktreeInfo, error)
 
-	// Summary is the always-shown panel minus ahead/behind and refs. Cheap:
-	// the watcher calls it again on every change.
+	// Summary is the worktree's branch and state, without ahead/behind and
+	// refs. Cheap: the watcher calls it again on every change.
 	Summary(ctx context.Context, wt WorktreeID) (Summary, error)
 
-	// Refs lists local branches, remote-tracking branches, and tags for the
-	// sidebar. Not cached: one for-each-ref call costs one process spawn
-	// regardless of the ref count.
+	// Refs lists local branches, remote-tracking branches, and tags. Not
+	// cached: one for-each-ref call costs one process spawn regardless of
+	// the ref count.
 	Refs(ctx context.Context, wt WorktreeID) (Refs, error)
-
-	// CommandLog returns the entries buffered so far; later ones arrive via
-	// the "command" event.
-	CommandLog(ctx context.Context, wt WorktreeID) ([]CommandLogEntry, error)
 
 	// LoadLog starts loading the repo's commit log and graph unless already
 	// loading or loaded (idempotent per repo). Returns once the load has
@@ -67,10 +63,12 @@ type API interface {
 
 	// StageLines stages (or, if reverse, unstages) the changed lines sel
 	// names in a fresh diff of path: the unstaged diff, or the staged diff
-	// if reverse. Lines are named by number, not by chunk ordinal, because
-	// the UI's diff engine may split changes differently from git. A
-	// selection matching no changed line is Code Internal (stale); other
-	// refusals are GitFailed.
+	// if reverse. If that diff's sides no longer match sel.Fingerprint,
+	// path changed since it was shown: Code Internal, nothing written. Of
+	// the selected lines, those the fresh diff changes are staged; one it
+	// shows unchanged is skipped (as can happen for a selection taken from
+	// git diff -w's hunks), and a selection with no changed line is Code
+	// Internal too. Other refusals are GitFailed.
 	StageLines(ctx context.Context, wt WorktreeID, path string, sel LineSelection, reverse bool) error
 
 	// DiscardFile discards path's working-tree changes: git clean for an
@@ -99,13 +97,17 @@ type API interface {
 	// index if staged, else the index (nothing for an untracked path) vs.
 	// the working-tree file. Same rules as DiffFile. oldPath is a staged
 	// rename's source.
-	DiffWorking(ctx context.Context, wt WorktreeID, path, oldPath string, staged, force bool) (DiffFile, error)
+	DiffWorking(ctx context.Context, wt WorktreeID, path, oldPath string, staged bool, opts DiffOptions) (DiffFile, error)
 
-	// DiffFile returns path's content at sha's first parent (at oldPath for
-	// a rename) and at sha; a root commit has no old side. Binary files and
-	// files over the size cap come without content; force bypasses the
-	// size cap only.
-	DiffFile(ctx context.Context, wt WorktreeID, sha, path, oldPath string, force bool) (DiffFile, error)
+	// DiffFile returns path at sha's first parent (at oldPath for a rename)
+	// and at sha, and git's hunks between them; a root commit has no old
+	// side. Both sides are in the form git diffs them: the clean form,
+	// after clean filters and line-ending conversion, for a working-tree
+	// side too. Binary files and files over the size cap come without
+	// content or hunks; opts.Force bypasses the size cap only.
+	// opts.IgnoreWhitespace takes the hunks from git diff -w; the contents
+	// stay exact.
+	DiffFile(ctx context.Context, wt WorktreeID, sha, path, oldPath string, opts DiffOptions) (DiffFile, error)
 
 	// Refresh checks wt's repo and worktree for outside changes now. Any
 	// resulting "repo:changed" event follows asynchronously.
@@ -133,12 +135,12 @@ type API interface {
 	CompareCommits(ctx context.Context, wt WorktreeID, a, b string) ([]ChangedFile, error)
 
 	// DiffRange is DiffFile for two arbitrary revisions a and b.
-	DiffRange(ctx context.Context, wt WorktreeID, a, b, path, oldPath string, force bool) (DiffFile, error)
+	DiffRange(ctx context.Context, wt WorktreeID, a, b, path, oldPath string, opts DiffOptions) (DiffFile, error)
 
 	// DiffAgainstWorking returns path at sha (at oldPath for a rename)
-	// against the file on disk, bypassing the index (git diff <sha>). Same
-	// rules as DiffFile.
-	DiffAgainstWorking(ctx context.Context, wt WorktreeID, sha, path, oldPath string, force bool) (DiffFile, error)
+	// against the working-tree file, bypassing the index (git diff <sha>).
+	// Same rules as DiffFile.
+	DiffAgainstWorking(ctx context.Context, wt WorktreeID, sha, path, oldPath string, opts DiffOptions) (DiffFile, error)
 
 	// CompareWithWorking lists the files that differ between sha and wt's
 	// working tree (git diff <sha>).
@@ -179,33 +181,21 @@ type API interface {
 
 	// CherryPick applies shas onto wt's HEAD, oldest first by committer date
 	// (ties: reverse of the given order, so pass log order). A merge commit
-	// among shas refuses the whole call before git runs. A stop that leaves
-	// CHERRY_PICK_HEAD (a conflict or an empty result) is Code Conflicts,
-	// left in place; any other refusal is GitFailed. Same as CherryPickWith
-	// with zero options.
-	CherryPick(ctx context.Context, wt WorktreeID, shas []string) error
-
-	// CherryPickWith is CherryPick with options. opts.Mainline > 0 needs
-	// exactly one sha (else Code Internal), which must be a merge commit.
-	CherryPickWith(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
+	// among shas refuses the whole call before git runs, unless
+	// opts.Mainline > 0, which needs exactly one sha (else Code Internal).
+	// A stop that leaves CHERRY_PICK_HEAD (a conflict or an empty result) is
+	// Code Conflicts, left in place; any other refusal is GitFailed.
+	CherryPick(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
 
 	// Revert is CherryPick's counterpart, applied newest first, with the
-	// same merge refusal and errors. Same as RevertWith with zero options.
-	Revert(ctx context.Context, wt WorktreeID, shas []string) error
-
-	// RevertWith is Revert with options; RecordOrigin and Mainline are
+	// same merge refusal and errors; opts.RecordOrigin and opts.Mainline are
 	// ignored.
-	RevertWith(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
+	Revert(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
 
 	// SetEditorProfile sets the profile this core's OpenFolder/OpenFile use.
 	// The shell calls it directly on each core when connecting: the
 	// generated Facade would route it to the local core only.
 	SetEditorProfile(ctx context.Context, profile EditorProfile) error
-
-	// TestEditorProfile runs profile's FolderCmd on this core's home
-	// directory (the local machine's, or a WSL distro's), with no worktree.
-	// Called directly on a core, like SetEditorProfile.
-	TestEditorProfile(ctx context.Context, profile EditorProfile) error
 
 	// OpenFolder starts the configured editor on wt's folder.
 	OpenFolder(ctx context.Context, wt WorktreeID) error
@@ -215,17 +205,8 @@ type API interface {
 	OpenFile(ctx context.Context, wt WorktreeID, path string, line int) error
 
 	// OpenFolderAt starts the configured editor on path, a worktree with no
-	// session (an unselected panel row).
+	// session (a worktree picker row other than the window's own).
 	OpenFolderAt(ctx context.Context, path RepoPath) error
-
-	// OpenFolderFallback starts the fallback editor kind on wt's folder,
-	// offered after OpenFolder returned EditorNotFound. Can itself return
-	// EditorNotFound, e.g. no desktop opener on a headless distro.
-	OpenFolderFallback(ctx context.Context, wt WorktreeID, kind EditorFallbackKind) error
-
-	// OpenFileFallback is OpenFolderFallback for a file. line is unused:
-	// neither fallback takes a line number.
-	OpenFileFallback(ctx context.Context, wt WorktreeID, path string, line int, kind EditorFallbackKind) error
 
 	// ListWorktrees lists every worktree of path's repo: branch or detached
 	// commit, clean/dirty, main/locked/missing. Stateless: starts no
@@ -235,6 +216,12 @@ type API interface {
 	// ListBranches lists path's repo's local branches and where each is
 	// checked out, for a repo with no open worktree. Stateless.
 	ListBranches(ctx context.Context, path RepoPath) ([]BranchSummary, error)
+
+	// MainWorktree finds a repo's main worktree straight from its common
+	// git dir (gitDir), with no worktree of the caller's own needed: the
+	// repo picker's fallback when a repo's remembered worktree is gone.
+	// Bare with no worktree left is Code NotARepo.
+	MainWorktree(ctx context.Context, gitDir RepoPath) (Worktree, error)
 
 	// AddWorktree creates a worktree at target on the existing branch, or,
 	// if newBranch, on a new branch started at start. target must not exist
@@ -257,9 +244,11 @@ type API interface {
 	Fetch(ctx context.Context, wt WorktreeID, remote string) (string, error)
 
 	// Pull fetches the current branch's upstream without a lock, then
-	// merges or rebases under wt's write lock, as one job. Detached or
-	// without an upstream, git's refusal surfaces as-is. A stop mid-way is
-	// Code Conflicts, left for the resolve flow.
+	// merges or rebases under wt's write lock, as one job. The step equals
+	// git pull --no-rebase or --rebase with the user's config: the merge
+	// follows pull.ff, the rebase uses the fork point. Detached or without
+	// an upstream, git's refusal surfaces as-is. A stop mid-way is Code
+	// Conflicts, left for the resolve flow.
 	Pull(ctx context.Context, wt WorktreeID, mode PullMode) (string, error)
 
 	// PullWithStash is Pull with local changes in the way: after fetching,
@@ -268,6 +257,11 @@ type API interface {
 	// cleanly. An integrate failure keeps the stash and is returned as-is;
 	// a conflicting pop is GitFailed.
 	PullWithStash(ctx context.Context, wt WorktreeID, mode PullMode) (string, error)
+
+	// ConfiguredPullMode is the pull mode wt's git config names for its
+	// current branch: branch.<name>.rebase, else pull.rebase. "" if neither
+	// is set or HEAD is detached.
+	ConfiguredPullMode(ctx context.Context, wt WorktreeID) (PullMode, error)
 
 	// PopStash applies the stash entry whose commit is sha and drops it on
 	// success; sha is resolved to its current stash@{n} at call time. A
@@ -342,7 +336,10 @@ type Version struct {
 const Protocol = 1
 
 // WorktreeID names a worktree session. Issued by the core that owns the
-// repo; opaque to the UI.
+// repo; opaque to the UI. The shell and the UI name a WSL distro's
+// worktree by its core's id in UNC form (\\wsl.localhost\<distro>\...),
+// which routes each call to that distro's core; the shell hands the core
+// back its own id.
 type WorktreeID string
 
 // RepoPath is a user-supplied path, classified by the shell as local or WSL.
@@ -355,9 +352,8 @@ type WorktreeInfo struct {
 	RepoKey string     `json:"repoKey"` // common git dir; shell bookkeeping (Registry.SetRepo), opaque to the UI
 }
 
-// Summary is the worktree's always-shown branch/state panel.
+// Summary is the worktree's branch and state.
 type Summary struct {
-	Path         string `json:"path"`
 	Branch       string `json:"branch"` // "" when Detached
 	Detached     bool   `json:"detached"`
 	Operation    string `json:"operation"`     // "", "merge", "rebase", "cherry-pick", "revert"

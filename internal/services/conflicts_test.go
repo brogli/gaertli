@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -46,34 +45,28 @@ func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Cor
 
 		remoteAppendCommitFiles(t, origin, "", upstream, "upstream commit")
 
-		info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-		if err != nil {
-			t.Fatal(err)
-		}
+		info := openOn(t, c, repo.Dir)
 		mode := core.PullMerge
 		if kind == "rebase" {
 			mode = core.PullRebase
 		}
-		jobID, err := c.Pull(context.Background(), info.ID, mode)
+		jobID, err := c.Pull(t.Context(), info.ID, mode)
 		if err != nil {
 			t.Fatal(err)
 		}
-		waitForJob(t, c, info.ID, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+		waitForJobState(t, c, info.ID, jobID, "failed")
 		return repo.Dir, c, info.ID, beforeHEAD
 	}
 
 	repo := gittest.New(t)
 	sha := realConflictFixture(t, repo.Dir, kind, files...)
 	beforeHEAD = gittest.HeadSHA(t, repo.Dir)
-	info, err := c.OpenWorktree(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
+	info := openOn(t, c, repo.Dir)
 	var opErr error
 	if kind == "cherry-pick" {
-		opErr = c.CherryPick(context.Background(), info.ID, []string{sha})
+		opErr = c.CherryPick(t.Context(), info.ID, []string{sha}, core.PickOptions{})
 	} else {
-		opErr = c.Revert(context.Background(), info.ID, []string{sha})
+		opErr = c.Revert(t.Context(), info.ID, []string{sha}, core.PickOptions{})
 	}
 	if opErr == nil {
 		t.Fatalf("%s: want a conflict, got nil error", kind)
@@ -99,7 +92,7 @@ func assertOperationCompleted(t *testing.T, c *Core, wt core.WorktreeID, dir, be
 	if got := gittest.HeadSHA(t, dir); got == beforeHEAD {
 		t.Error("HEAD did not advance with the completed operation's own commit")
 	}
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,11 +105,11 @@ func TestFR_CONF_04_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *te
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
 			dir, c, wt, beforeHEAD := stoppedRepo(t, kind)
-			if err := c.StageFile(context.Background(), wt, conflictPath(kind)); err != nil {
+			if err := c.StageFile(t.Context(), wt, conflictPath(kind)); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := c.ContinueOperation(context.Background(), wt); err != nil {
+			if err := c.ContinueOperation(t.Context(), wt); err != nil {
 				t.Fatalf("ContinueOperation = %v, want nil", err)
 			}
 
@@ -127,11 +120,11 @@ func TestFR_CONF_04_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *te
 
 func TestFR_CONF_04_ContinueOperationRebaseNeverWaitsOnACommitMessageEditor(t *testing.T) {
 	_, c, wt, _ := stoppedRepo(t, "rebase")
-	if err := c.StageFile(context.Background(), wt, conflictPath("rebase")); err != nil {
+	if err := c.StageFile(t.Context(), wt, conflictPath("rebase")); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := c.ContinueOperation(context.Background(), wt); err != nil {
+	if err := c.ContinueOperation(t.Context(), wt); err != nil {
 		t.Fatalf("ContinueOperation = %v, want nil, no hang on a commit-message editor", err)
 	}
 }
@@ -150,7 +143,7 @@ func TestFR_CONF_04_AbortOperationRestoresTheFreshStop(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			dir, c, wt, beforeHEAD := stoppedRepo(t, kind)
 
-			if err := c.AbortOperation(context.Background(), wt); err != nil {
+			if err := c.AbortOperation(t.Context(), wt); err != nil {
 				t.Fatalf("AbortOperation = %v, want nil", err)
 			}
 
@@ -163,7 +156,7 @@ func TestFR_CONF_04_AbortOperationRestoresTheFreshStop(t *testing.T) {
 			if got := currentBranch(t, dir); got != "master" {
 				t.Errorf("current branch = %q, want master, not left detached", got)
 			}
-			status, err := c.Status(context.Background(), wt)
+			status, err := c.Status(t.Context(), wt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -178,21 +171,13 @@ func TestFR_CONF_04_ContinueAndAbortOperationRefuseWithNoOperationInProgress(t *
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
 
-	before, err := c.CommandLog(context.Background(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
+	coretest.AssertCode(t, c.ContinueOperation(t.Context(), wt), core.Internal)
+	coretest.AssertCode(t, c.AbortOperation(t.Context(), wt), core.Internal)
 
-	coretest.AssertCode(t, c.ContinueOperation(context.Background(), wt), core.Internal)
-	coretest.AssertCode(t, c.AbortOperation(context.Background(), wt), core.Internal)
-
-	after, err := c.CommandLog(context.Background(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(after) != len(before) {
-		t.Errorf("CommandLog grew from %d to %d entries, want unchanged (no git call made)", len(before), len(after))
+	if got := len(rec.snapshot()); got != 0 {
+		t.Errorf("git calls = %d, want 0 (no git call made)", got)
 	}
 }
 
@@ -211,11 +196,11 @@ func TestFR_CONF_04_ContinueOperationRefusesWhileAConflictedFileRemains(t *testi
 		t.Run(kind, func(t *testing.T) {
 			dir, c, wt, _ := stoppedRepo(t, kind, conflictPath(kind), "other.txt")
 			// resolves only one of the two conflicted files
-			if err := c.StageFile(context.Background(), wt, conflictPath(kind)); err != nil {
+			if err := c.StageFile(t.Context(), wt, conflictPath(kind)); err != nil {
 				t.Fatal(err)
 			}
 
-			err := c.ContinueOperation(context.Background(), wt)
+			err := c.ContinueOperation(t.Context(), wt)
 
 			ce := coretest.AsError(t, err, core.Conflicts)
 			if want := unresolvedMessage[kind]; !strings.Contains(ce.GitStderr, want) {
@@ -224,7 +209,7 @@ func TestFR_CONF_04_ContinueOperationRefusesWhileAConflictedFileRemains(t *testi
 			if !fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
 				t.Errorf("%s missing, want it left in place (still stopped)", operationStateFile[kind])
 			}
-			summary, err := c.Summary(context.Background(), wt)
+			summary, err := c.Summary(t.Context(), wt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -240,7 +225,7 @@ func TestFR_CONF_01_SummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T
 		t.Run(kind, func(t *testing.T) {
 			_, c, wt, _ := stoppedRepo(t, kind)
 
-			summary, err := c.Summary(context.Background(), wt)
+			summary, err := c.Summary(t.Context(), wt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -248,7 +233,7 @@ func TestFR_CONF_01_SummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T
 				t.Errorf("Operation = %q, want %q", summary.Operation, kind)
 			}
 
-			status, err := c.Status(context.Background(), wt)
+			status, err := c.Status(t.Context(), wt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -272,13 +257,13 @@ func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *t
 	c, wt := openWorktree(t, repo.Dir)
 	// Real merge conflict, direct via the runner: leaves MERGE_HEAD and an
 	// unmerged conflict.txt (UU, both modified).
-	_, _ = (git.Runner{}).Run(context.Background(), git.Call{
+	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
 		Dir: repo.Dir, Args: []string{"merge", "--end-of-options", "feature"},
 	})
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Fatal("fixture did not leave MERGE_HEAD")
 	}
-	status, err := c.Status(context.Background(), wt)
+	status, err := c.Status(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,11 +273,11 @@ func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *t
 
 	writeFile(t, repo.Dir, "conflict.txt", "resolved\n") // edited in place, markers gone
 
-	if err := c.StageFile(context.Background(), wt, "conflict.txt"); err != nil {
+	if err := c.StageFile(t.Context(), wt, "conflict.txt"); err != nil {
 		t.Fatalf("StageFile = %v, want nil", err)
 	}
 
-	status, err = c.Status(context.Background(), wt)
+	status, err = c.Status(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,10 +288,10 @@ func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *t
 		t.Errorf("Staged = %+v, want [%+v]", status.Staged, want)
 	}
 
-	if err := c.ContinueOperation(context.Background(), wt); err != nil {
+	if err := c.ContinueOperation(t.Context(), wt); err != nil {
 		t.Fatalf("ContinueOperation = %v, want nil", err)
 	}
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,13 +311,13 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 	gittest.Commit(t, repo.Dir, "shared.txt", "master change\n", "master change") // ours modifies; theirs (feature) deletes
 
 	c, wt := openWorktree(t, repo.Dir)
-	_, _ = (git.Runner{}).Run(context.Background(), git.Call{
+	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
 		Dir: repo.Dir, Args: []string{"merge", "--end-of-options", "feature"},
 	})
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Fatal("fixture did not leave MERGE_HEAD")
 	}
-	status, err := c.Status(context.Background(), wt)
+	status, err := c.Status(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,11 +329,11 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 		t.Fatal(err)
 	}
 
-	if err := c.StageFile(context.Background(), wt, "shared.txt"); err != nil {
+	if err := c.StageFile(t.Context(), wt, "shared.txt"); err != nil {
 		t.Fatalf("StageFile = %v, want nil (accepts the deletion)", err)
 	}
 
-	status, err = c.Status(context.Background(), wt)
+	status, err = c.Status(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,10 +344,10 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 		t.Errorf("Staged = %+v, want [%+v] (a staged deletion)", status.Staged, want)
 	}
 
-	if err := c.ContinueOperation(context.Background(), wt); err != nil {
+	if err := c.ContinueOperation(t.Context(), wt); err != nil {
 		t.Fatalf("ContinueOperation = %v, want nil", err)
 	}
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,10 +359,10 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 func TestFR_CP_03_AStoppedCherryPickResolvesAndCompletesThroughContinueOperation(t *testing.T) {
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
 
-	if err := c.StageFile(context.Background(), wt, conflictPath("cherry-pick")); err != nil {
+	if err := c.StageFile(t.Context(), wt, conflictPath("cherry-pick")); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.ContinueOperation(context.Background(), wt); err != nil {
+	if err := c.ContinueOperation(t.Context(), wt); err != nil {
 		t.Fatalf("ContinueOperation = %v, want nil", err)
 	}
 
@@ -402,21 +387,21 @@ func TestFR_CP_07_SkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheS
 
 	c, wt := openWorktree(t, dir)
 	// oldest-first: conflictSHA (older) is attempted before cleanSHA.
-	if err := c.CherryPick(context.Background(), wt, []string{cleanSHA, conflictSHA}); err == nil {
+	if err := c.CherryPick(t.Context(), wt, []string{cleanSHA, conflictSHA}, core.PickOptions{}); err == nil {
 		t.Fatal("CherryPick = nil, want a conflict on conflictSHA")
 	}
 	if !fileExists(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")) {
 		t.Fatal("fixture did not leave CHERRY_PICK_HEAD")
 	}
 
-	if err := c.SkipOperation(context.Background(), wt); err != nil {
+	if err := c.SkipOperation(t.Context(), wt); err != nil {
 		t.Fatalf("SkipOperation = %v, want nil", err)
 	}
 
 	if fileExists(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")) {
 		t.Error("CHERRY_PICK_HEAD present, want gone once the sequence completed")
 	}
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,11 +411,8 @@ func TestFR_CP_07_SkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheS
 	if _, statErr := os.Stat(filepath.Join(dir, "other.txt")); statErr != nil {
 		t.Errorf("other.txt missing after skip, want cleanSHA's own pick applied: %v", statErr)
 	}
-	content, readErr := os.ReadFile(filepath.Join(dir, "conflict.txt"))
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	if string(content) == "feature\n" {
+	content := readFile(t, dir, "conflict.txt")
+	if content == "feature\n" {
 		t.Error("conflict.txt carries the skipped commit's own change, want it absent")
 	}
 }
@@ -448,39 +430,33 @@ func TestFR_CP_07_SkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvi
 
 	c, wt := openWorktree(t, dir)
 	// newest-first: conflictSHA (newer) is attempted before cleanSHA.
-	if err := c.Revert(context.Background(), wt, []string{cleanSHA, conflictSHA}); err == nil {
+	if err := c.Revert(t.Context(), wt, []string{cleanSHA, conflictSHA}, core.PickOptions{}); err == nil {
 		t.Fatal("Revert = nil, want a conflict on conflictSHA")
 	}
 	if !fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
 		t.Fatal("fixture did not leave REVERT_HEAD")
 	}
 
-	if err := c.SkipOperation(context.Background(), wt); err != nil {
+	if err := c.SkipOperation(t.Context(), wt); err != nil {
 		t.Fatalf("SkipOperation = %v, want nil", err)
 	}
 
 	if fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
 		t.Error("REVERT_HEAD present, want gone once the sequence completed")
 	}
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if summary.Operation != "" {
 		t.Errorf("Operation = %q, want cleared", summary.Operation)
 	}
-	content, readErr := os.ReadFile(filepath.Join(dir, "other.txt"))
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	if string(content) != "obase\n" {
+	content := readFile(t, dir, "other.txt")
+	if content != "obase\n" {
 		t.Errorf("other.txt = %q, want reverted back to obase (cleanSHA's own revert)", content)
 	}
-	conflictContent, readErr := os.ReadFile(filepath.Join(dir, "conflict.txt"))
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	if string(conflictContent) != "applied2\n" {
+	conflictContent := readFile(t, dir, "conflict.txt")
+	if conflictContent != "applied2\n" {
 		t.Errorf("conflict.txt = %q, want unchanged (the skipped revert's own change is absent)", conflictContent)
 	}
 }
@@ -491,7 +467,7 @@ func TestFR_CP_07_SkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvi
 func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
 
-	if err := c.SkipOperation(context.Background(), wt); err != nil {
+	if err := c.SkipOperation(t.Context(), wt); err != nil {
 		t.Fatalf("SkipOperation = %v, want nil", err)
 	}
 
@@ -501,7 +477,7 @@ func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothi
 	if got := gittest.HeadSHA(t, dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s (the skipped commit was the whole sequence)", got, beforeHEAD)
 	}
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +490,7 @@ func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothi
 func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
 
-	if err := c.SkipOperation(context.Background(), wt); err != nil {
+	if err := c.SkipOperation(t.Context(), wt); err != nil {
 		t.Fatalf("SkipOperation = %v, want nil", err)
 	}
 
@@ -524,7 +500,7 @@ func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWit
 	if got := gittest.HeadSHA(t, dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s (the skipped commit was the whole sequence)", got, beforeHEAD)
 	}
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -535,21 +511,13 @@ func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWit
 
 func TestFR_CP_07_SkipOperationRefusesMidMergeIsAppBugBeforeAnyGitCall(t *testing.T) {
 	dir, c, wt, _ := stoppedRepo(t, "merge")
+	rec := recordCommands(t, c, wt)
 
-	before, err := c.CommandLog(context.Background(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = c.SkipOperation(context.Background(), wt)
+	err := c.SkipOperation(t.Context(), wt)
 
 	coretest.AssertCode(t, err, core.Internal)
-	after, aerr := c.CommandLog(context.Background(), wt)
-	if aerr != nil {
-		t.Fatal(aerr)
-	}
-	if len(after) != len(before) {
-		t.Errorf("CommandLog grew from %d to %d entries, want unchanged (no git call made)", len(before), len(after))
+	if got := len(rec.snapshot()); got != 0 {
+		t.Errorf("git calls = %d, want 0 (no git call made)", got)
 	}
 	if !fileExists(filepath.Join(dir, ".git", "MERGE_HEAD")) {
 		t.Error("MERGE_HEAD gone, want the merge left untouched")
@@ -559,10 +527,10 @@ func TestFR_CP_07_SkipOperationRefusesMidMergeIsAppBugBeforeAnyGitCall(t *testin
 func TestFR_RV_03_AStoppedRevertResolvesAndCompletesThroughContinueOperation(t *testing.T) {
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
 
-	if err := c.StageFile(context.Background(), wt, conflictPath("revert")); err != nil {
+	if err := c.StageFile(t.Context(), wt, conflictPath("revert")); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.ContinueOperation(context.Background(), wt); err != nil {
+	if err := c.ContinueOperation(t.Context(), wt); err != nil {
 		t.Fatalf("ContinueOperation = %v, want nil", err)
 	}
 

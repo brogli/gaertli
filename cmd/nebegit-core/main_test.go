@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -32,14 +33,7 @@ func TestMain(m *testing.M) {
 // child process's libc resolves first (under WSL, WSL_DISTRO_NAME is
 // already set).
 func envWithout(key string) []string {
-	prefix := key + "="
-	var out []string
-	for _, e := range os.Environ() {
-		if !strings.HasPrefix(e, prefix) {
-			out = append(out, e)
-		}
-	}
-	return out
+	return slices.DeleteFunc(os.Environ(), func(e string) bool { return strings.HasPrefix(e, key+"=") })
 }
 
 func TestTR_07_CoreBuildsWithoutCgo(t *testing.T) {
@@ -49,7 +43,7 @@ func TestTR_07_CoreBuildsWithoutCgo(t *testing.T) {
 }
 
 func TestADR_3_StdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
-	cmd := exec.Command(bin, "--stdio")
+	cmd := exec.CommandContext(t.Context(), bin, "--stdio")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +57,7 @@ func TestADR_3_StdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	v, err := remote.NewClient(stdout, stdin, nil).Version(ctx)
 	if err != nil {
@@ -88,7 +82,7 @@ func TestADR_3_StdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 }
 
 func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
-	out, err := exec.Command(bin, "--version").Output()
+	out, err := exec.CommandContext(t.Context(), bin, "--version").Output()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,14 +95,14 @@ func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
 // stamping mechanism: -ldflags -X into buildinfo.App, surfaced by --version.
 func TestQA_INST_03_LdflagsStampAppVersion(t *testing.T) {
 	stamped := filepath.Join(t.TempDir(), "nebegit-core-stamped")
-	build := exec.Command("go", "build",
+	build := exec.CommandContext(t.Context(), "go", "build",
 		"-ldflags", "-X github.com/brogli/nebegit/internal/buildinfo.App=v9.9.9",
 		"-o", stamped, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, output)
 	}
 
-	out, err := exec.Command(stamped, "--version").Output()
+	out, err := exec.CommandContext(t.Context(), stamped, "--version").Output()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,9 +115,8 @@ func TestQA_INST_03_LdflagsStampAppVersion(t *testing.T) {
 // word is a legitimate path (launch mode), so "bogus" alone would not reach
 // usage().
 func TestADR_3_UnknownArgumentExits2(t *testing.T) {
-	err := exec.Command(bin, "--bogus").Run()
-	var exit *exec.ExitError
-	if !errors.As(err, &exit) || exit.ExitCode() != 2 {
+	err := exec.CommandContext(t.Context(), bin, "--bogus").Run()
+	if exit, ok := errors.AsType[*exec.ExitError](err); !ok || exit.ExitCode() != 2 {
 		t.Errorf("err = %v, want exit 2", err)
 	}
 }
@@ -138,7 +131,7 @@ func TestFR_REPO_06_LaunchHandsOffToTheGUIWithoutWaiting(t *testing.T) {
 	cwd := t.TempDir()
 	argvFile := filepath.Join(cwd, "argv.txt")
 
-	cmd := exec.Command(bin)
+	cmd := exec.CommandContext(t.Context(), bin)
 	cmd.Env = append(envWithout("WSL_DISTRO_NAME"), "WSL_DISTRO_NAME=Ubuntu-22.04")
 	cmd.Dir = cwd
 	start := time.Now()

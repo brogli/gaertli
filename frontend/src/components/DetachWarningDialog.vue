@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Dialog from 'openvue/dialog'
 import Button from 'openvue/button'
+import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
@@ -11,6 +12,7 @@ const props = defineProps<{ wt: string; sha: string }>()
 const emit = defineEmits<{ close: [] }>()
 
 const { error, runAndClose } = useCoreCall()
+const { t } = useI18n()
 
 async function confirm(): Promise<void> {
   await runAndClose(
@@ -21,12 +23,21 @@ async function confirm(): Promise<void> {
 </script>
 
 <template>
-  <Dialog visible header="Check out commit" modal @update:visible="emit('close')">
+  <Dialog visible :header="t('dialogs.detachWarning.header')" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
-    <p>Checking out this commit detaches HEAD. Commits made in this state belong to no branch.</p>
+    <p>{{ t('dialogs.detachWarning.message') }}</p>
     <template #footer>
-      <Button label="Cancel" severity="secondary" data-test="detach-cancel" @click="emit('close')" />
-      <Button label="Check out" data-test="detach-confirm" @click="confirm" />
+      <Button
+        :label="t('common.cancel')"
+        severity="secondary"
+        data-test="detach-cancel"
+        @click="emit('close')"
+      />
+      <Button
+        :label="t('dialogs.detachWarning.checkOut')"
+        data-test="detach-confirm"
+        @click="confirm"
+      />
     </template>
   </Dialog>
 </template>

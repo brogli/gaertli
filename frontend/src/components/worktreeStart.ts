@@ -3,4 +3,5 @@
 // if local, a new branch's start point if remote). Its own module: a type
 // exported from a <script setup> block resolves to `any` under eslint's
 // type-aware linting.
-export type WorktreeStart = { newBranch: true; start: string } | { newBranch: false; branch: string }
+export type WorktreeStart =
+  { newBranch: true; start: string } | { newBranch: false; branch: string }

@@ -3,6 +3,8 @@ package remote
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,7 +53,7 @@ func TestQA_PORT_02_EnsureDeployedAsksOnceThenSkipsOnceDeployed(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: true}
 
-	if err := ensureDeployed(context.Background(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
+	if err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -67,7 +69,7 @@ func TestQA_PORT_02_EnsureDeployedAsksOnceThenSkipsOnceDeployed(t *testing.T) {
 		t.Errorf("deployed content = %q, want %q", got, embeddedCore)
 	}
 
-	if err := ensureDeployed(context.Background(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
+	if err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
 		t.Fatal(err)
 	}
 	if len(consent.calls) != 1 {
@@ -79,10 +81,16 @@ func TestQA_PORT_02_EnsureDeployedDeclinedConsentCopiesNothing(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: false}
 
-	err := ensureDeployed(context.Background(), localRunner, consent, "Ubuntu-22.04", "1.0.0")
+	err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0")
 
-	coretest.AssertCode(t, err, core.DeployRefused)
-	if _, statErr := os.Stat(deployedPath(t, "1.0.0")); !os.IsNotExist(statErr) {
+	ce := coretest.AsError(t, err, core.DeployRefused)
+	if ce.Args["distro"] != "Ubuntu-22.04" {
+		t.Errorf("Args[distro] = %q, want %q", ce.Args["distro"], "Ubuntu-22.04")
+	}
+	if ce.Key != "deployRefused" {
+		t.Errorf("Key = %q, want deployRefused", ce.Key)
+	}
+	if _, statErr := os.Stat(deployedPath(t, "1.0.0")); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Errorf("target exists after a declined consent")
 	}
 }
@@ -98,7 +106,7 @@ func TestADR_3_EnsureDeployedRecopiesOnSizeMismatch(t *testing.T) {
 	}
 	consent := &fakeConsent{accept: true}
 
-	if err := ensureDeployed(context.Background(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
+	if err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
 		t.Fatal(err)
 	}
 

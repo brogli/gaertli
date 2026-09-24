@@ -1,10 +1,10 @@
 package git
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,17 +14,12 @@ import (
 )
 
 func TestADR_5_StreamCallsOnRecordAsRecordsArrive(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "records")
-	if err := os.WriteFile(file, []byte("A\x00\nB\x00\nC\x00\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500")
+	streamSlowly(t, "A\x00\nB\x00\nC\x00\n")
 
 	start := time.Now()
 	var records []string
 	var firstAt time.Duration
-	_, err := (Runner{Git: fakegit}).Stream(context.Background(), Call{Args: []string{"log"}}, func(record []byte) error {
+	_, err := (Runner{Git: fakegit}).Stream(t.Context(), Call{Args: []string{"log"}}, func(record []byte) error {
 		if len(records) == 0 {
 			firstAt = time.Since(start)
 		}
@@ -38,27 +33,16 @@ func TestADR_5_StreamCallsOnRecordAsRecordsArrive(t *testing.T) {
 	if firstAt > 100*time.Millisecond {
 		t.Errorf("first record arrived after %s, want well under 100ms (proves streaming, not buffer-then-split)", firstAt)
 	}
-	want := []string{"A", "B", "C"}
-	if len(records) != len(want) {
-		t.Fatalf("records = %q, want %q", records, want)
-	}
-	for i, r := range records {
-		if r != want[i] {
-			t.Errorf("record %d = %q, want %q", i, r, want[i])
-		}
+	if want := []string{"A", "B", "C"}; !slices.Equal(records, want) {
+		t.Errorf("records = %q, want %q", records, want)
 	}
 }
 
 func TestADR_5_StreamOnRecordErrorKillsProcessAndReturnsIt(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "records")
-	if err := os.WriteFile(file, []byte("A\x00\nB\x00\nC\x00\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500")
+	streamSlowly(t, "A\x00\nB\x00\nC\x00\n")
 
 	calls := 0
-	_, err := (Runner{Git: fakegit}).Stream(context.Background(), Call{Args: []string{"log"}}, func([]byte) error {
+	_, err := (Runner{Git: fakegit}).Stream(t.Context(), Call{Args: []string{"log"}}, func([]byte) error {
 		calls++
 		return errors.New("stop here")
 	})
@@ -76,7 +60,7 @@ func TestADR_5_StreamCapturesStderrAndExitCode(t *testing.T) {
 	t.Setenv("FAKEGIT_STDERR", "warning: x")
 	t.Setenv("FAKEGIT_EXIT", "1")
 
-	result, err := (Runner{Git: fakegit}).Stream(context.Background(), Call{Args: []string{"log"}}, func([]byte) error { return nil })
+	result, err := (Runner{Git: fakegit}).Stream(t.Context(), Call{Args: []string{"log"}}, func([]byte) error { return nil })
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if string(result.Stderr) != "warning: x" {
@@ -85,4 +69,16 @@ func TestADR_5_StreamCapturesStderrAndExitCode(t *testing.T) {
 	if result.ExitCode != 1 {
 		t.Errorf("ExitCode = %d, want 1", result.ExitCode)
 	}
+}
+
+// streamSlowly makes fakegit's log call print the NUL-terminated records
+// 500ms apart.
+func streamSlowly(t *testing.T, records string) {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "records")
+	if err := os.WriteFile(file, []byte(records), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKEGIT_STREAM_FILE", file)
+	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500")
 }

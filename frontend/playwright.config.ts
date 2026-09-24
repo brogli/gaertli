@@ -1,8 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 // Playwright drives the real Vue app against `vite --mode e2e`
-// (e2e-mock-bindings.ts stands in for the Go core). webServer owns that
-// dev server's lifecycle, so no separate "start the app" step is needed.
+// (e2e-mock-bindings.ts stands in for the Go core).
 const baseURL = 'http://127.0.0.1:9245'
 
 export default defineConfig({

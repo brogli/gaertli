@@ -56,10 +56,9 @@ func (c *Core) SetLogFilter(ctx context.Context, id core.WorktreeID, filter core
 		wt.FilterClear()
 		return nil
 	}
-	flat := filter.Query != "" || filter.Author != "" // a search result has no graph
-	filterCtx, cancel := context.WithCancel(context.Background())
-	gen := wt.FilterBegin(flat, cancel)
-	go c.streamFilteredLog(filterCtx, wt, filter, gen, flat)
+	filterCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	gen := wt.FilterBegin(filter, cancel)
+	go c.streamFilteredLog(filterCtx, wt, filter, gen)
 	return nil
 }
 
@@ -68,13 +67,13 @@ func (c *Core) SetLogFilter(ctx context.Context, id core.WorktreeID, filter core
 // "log:progress" instead of the repo-wide one. A query that resolves as a
 // commit hash short-circuits every other field: a pasted hash is a more
 // specific request than any fuzzy filter.
-func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filter core.LogFilter, gen int, flat bool) {
+func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filter core.LogFilter, gen int) {
 	if sha, ok := resolveHash(ctx, wt.Runner, wt.Path, filter.Query); ok {
-		c.streamFilteredHashHit(wt, sha, gen)
+		c.streamFilteredHashHit(ctx, wt, sha, gen)
 		return
 	}
-	progress := func(loaded int, done bool) { c.emitFilterProgress(wt.ID, loaded, done) }
-	loaded, logErr := streamCommits(ctx, wt, LogArgs(filter), flat, false,
+	progress := func(loaded int, done bool) { c.emitFilterProgress(wt.ID, gen, loaded, done) }
+	loaded, logErr := streamCommits(ctx, wt, filter, false,
 		func(commit core.LogCommit) { wt.FilterAppend(gen, commit) }, progress)
 	wt.FilterFinish(gen, logErr)
 	progress(loaded, true)
@@ -82,22 +81,22 @@ func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filt
 
 // streamFilteredHashHit finishes a filtered load whose Query resolved to an
 // existing commit: a single-record result, not a walk.
-func (c *Core) streamFilteredHashHit(wt *session.Worktree, sha string, gen int) {
+func (c *Core) streamFilteredHashHit(ctx context.Context, wt *session.Worktree, sha string, gen int) {
 	var logErr *core.Error
-	if commit, err := loadSingleCommit(context.Background(), wt.Runner, wt.Path, sha); err != nil {
+	if commit, err := loadSingleCommit(ctx, wt.Runner, wt.Path, sha); err != nil {
 		logErr = core.ErrorOf(err)
 	} else {
-		if checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path, false); ckErr == nil {
+		if checkedOut, ckErr := worktreeCheckouts(ctx, wt.Runner, wt.Path, false); ckErr == nil {
 			commit.CheckedOutIn = checkedOut[commit.SHA]
 		}
 		wt.FilterAppend(gen, commit)
 	}
 	wt.FilterFinish(gen, logErr)
-	c.emitFilterProgress(wt.ID, 1, true)
+	c.emitFilterProgress(wt.ID, gen, 1, true)
 }
 
-func (c *Core) emitFilterProgress(wtID core.WorktreeID, loaded int, done bool) {
-	payload, _ := json.Marshal(core.LogProgress{Loaded: loaded, Done: done, Filtered: true})
+func (c *Core) emitFilterProgress(wtID core.WorktreeID, gen, loaded int, done bool) {
+	payload, _ := json.Marshal(core.LogProgress{Loaded: loaded, Done: done, Filtered: true, Generation: gen})
 	c.sink(core.Event{Name: "log:progress", Worktree: wtID, Payload: payload})
 }
 
@@ -117,8 +116,7 @@ func resolveHash(ctx context.Context, r git.Runner, dir, q string) (sha string, 
 	return strings.TrimSpace(string(result.Stdout)), true
 }
 
-// loadSingleCommit fetches one LogCommit by sha, reusing logFormat and
-// parseLogRecord instead of a second parser. -1 must come before
+// loadSingleCommit fetches one LogCommit by sha. -1 must come before
 // --end-of-options: git rejects a "-"-prefixed option after it as a bad
 // revision.
 func loadSingleCommit(ctx context.Context, r git.Runner, dir, sha string) (core.LogCommit, error) {

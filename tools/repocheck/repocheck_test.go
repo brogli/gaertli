@@ -47,6 +47,16 @@ func assertContainsAll(t *testing.T, name, text string, wants ...string) {
 	}
 }
 
+// assertNoLineMatches fails once per line of text that re matches.
+func assertNoLineMatches(t *testing.T, name, text string, re *regexp.Regexp, problem string) {
+	t.Helper()
+	for i, line := range strings.Split(text, "\n") {
+		if re.MatchString(line) {
+			t.Errorf("%s:%d %s: %s", name, i+1, problem, strings.TrimSpace(line))
+		}
+	}
+}
+
 var jsonLineComment = regexp.MustCompile(`(?m)//.*$`)
 
 // readJSONC reads rel (relative to root) and unmarshals it into v. oxlint's
@@ -78,7 +88,7 @@ type goMod struct {
 }
 
 func TestTR_25_GoModPinsToolchainAndTools(t *testing.T) {
-	cmd := exec.Command("go", "mod", "edit", "-json")
+	cmd := exec.CommandContext(t.Context(), "go", "mod", "edit", "-json")
 	cmd.Dir = repoRoot(t)
 	out, err := cmd.Output()
 	if err != nil {
@@ -127,11 +137,7 @@ var callsNpm = regexp.MustCompile(`(^|[\s"'])npm\s`)
 func TestTR_23_PnpmIsTheOnlyPackageManager(t *testing.T) {
 	root := repoRoot(t)
 
-	var pkg struct{ PackageManager string }
-	if err := json.Unmarshal([]byte(readFile(t, root, "frontend/package.json")), &pkg); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(pkg.PackageManager, "pnpm@") {
+	if pkg := readFrontendPackageJSON(t, root); !strings.HasPrefix(pkg.PackageManager, "pnpm@") {
 		t.Errorf("packageManager = %q, want pnpm@<version>", pkg.PackageManager)
 	}
 	assertFileExists(t, root, "frontend/pnpm-lock.yaml")
@@ -141,7 +147,7 @@ func TestTR_23_PnpmIsTheOnlyPackageManager(t *testing.T) {
 			return err
 		}
 		name := d.Name()
-		if d.IsDir() && (name == "node_modules" || name == ".git" || name == ".direnv") {
+		if d.IsDir() && (name == "node_modules" || strings.HasPrefix(name, ".")) {
 			return filepath.SkipDir
 		}
 		if name == "package-lock.json" || name == "yarn.lock" {
@@ -155,11 +161,7 @@ func TestTR_23_PnpmIsTheOnlyPackageManager(t *testing.T) {
 
 	assertContainsAll(t, "Taskfile.yml", readFile(t, root, "Taskfile.yml"), "PACKAGE_MANAGER: pnpm")
 	for _, tf := range taskfiles {
-		for i, line := range strings.Split(readFile(t, root, tf), "\n") {
-			if callsNpm.MatchString(line) {
-				t.Errorf("%s:%d calls npm: %s", tf, i+1, strings.TrimSpace(line))
-			}
-		}
+		assertNoLineMatches(t, tf, readFile(t, root, tf), callsNpm, "calls npm")
 	}
 }
 
@@ -190,12 +192,7 @@ func TestQA_MNT_03_TestTaskAndCIRunOffline(t *testing.T) {
 func TestTR_31_PerfBenchAndPlaywrightWiring(t *testing.T) {
 	root := repoRoot(t)
 
-	var pkg struct {
-		DevDependencies map[string]string `json:"devDependencies"`
-	}
-	if err := json.Unmarshal([]byte(readFile(t, root, "frontend/package.json")), &pkg); err != nil {
-		t.Fatal(err)
-	}
+	pkg := readFrontendPackageJSON(t, root)
 	if pin := pkg.DevDependencies["@playwright/test"]; pin == "" || strings.ContainsAny(pin, "^~") {
 		t.Errorf(`@playwright/test = %q, want an exact version (no "^"/"~")`, pin)
 	}
@@ -219,6 +216,7 @@ func TestTR_31_PerfBenchAndPlaywrightWiring(t *testing.T) {
 // create-vue scaffold generates.
 
 type packageJSON struct {
+	PackageManager  string            `json:"packageManager"`
 	DevDependencies map[string]string `json:"devDependencies"`
 	Scripts         map[string]string `json:"scripts"`
 }
@@ -255,9 +253,35 @@ func writeFrontendFixture(t *testing.T, root, rel, content string) {
 	t.Cleanup(func() { _ = os.Remove(path) })
 }
 
+// assertScriptCatchesFixture writes rel (relative to frontend/) with
+// content, a deliberate finding, runs `pnpm run <script>`, asserts it fails
+// and names the fixture and every one of wants, removes the fixture, then
+// asserts a clean run passes.
+func assertScriptCatchesFixture(t *testing.T, root, script, rel, content string, wants ...string) {
+	t.Helper()
+	if !frontendToolchainAvailable(root) {
+		t.Skip("pnpm not on PATH or frontend/node_modules missing")
+	}
+
+	writeFrontendFixture(t, root, rel, content)
+
+	out, err := runFrontendScript(t, root, script)
+	if err == nil {
+		t.Fatalf("pnpm run %s with %s: want non-zero exit, got 0\n%s", script, rel, out)
+	}
+	assertContainsAll(t, script+" output", out, append(wants, filepath.Base(rel))...)
+
+	if err := os.Remove(filepath.Join(root, "frontend", rel)); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runFrontendScript(t, root, script); err != nil {
+		t.Errorf("pnpm run %s on a clean tree: want exit 0, got error: %v\n%s", script, err, out)
+	}
+}
+
 func runFrontendScript(t *testing.T, root, script string) (string, error) {
 	t.Helper()
-	cmd := exec.Command("pnpm", "run", script)
+	cmd := exec.CommandContext(t.Context(), "pnpm", "run", script)
 	cmd.Dir = filepath.Join(root, "frontend")
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -305,31 +329,7 @@ func TestTR_33_OxlintConfigured(t *testing.T) {
 }
 
 func TestTR_33_OxlintCatchesRealFindings(t *testing.T) {
-	root := repoRoot(t)
-	if !frontendToolchainAvailable(root) {
-		t.Skip("pnpm not on PATH or frontend/node_modules missing")
-	}
-
-	const fixture = "src/__fixture_debugger.ts"
-	writeFrontendFixture(t, root, fixture, "export function fixture(): void {\n  debugger\n}\n")
-
-	out, err := runFrontendScript(t, root, "lint")
-	if err == nil {
-		t.Fatalf("pnpm run lint with a debugger statement: want non-zero exit, got 0\n%s", out)
-	}
-	if !strings.Contains(out, "__fixture_debugger.ts") {
-		t.Errorf("lint output doesn't name the fixture:\n%s", out)
-	}
-	if !strings.Contains(out, "debugger") {
-		t.Errorf("lint output doesn't name the correctness finding:\n%s", out)
-	}
-
-	if err := os.Remove(filepath.Join(root, "frontend", fixture)); err != nil {
-		t.Fatal(err)
-	}
-	if out, err := runFrontendScript(t, root, "lint"); err != nil {
-		t.Errorf("pnpm run lint on a clean tree: want exit 0, got error: %v\n%s", err, out)
-	}
+	assertScriptCatchesFixture(t, repoRoot(t), "lint", "src/__fixture_debugger.ts", "export function fixture(): void {\n  debugger\n}\n", "debugger")
 }
 
 func TestTR_33_EslintConfigPrettierReplacesVueWrapper(t *testing.T) {
@@ -350,23 +350,14 @@ func TestTR_33_EslintConfigPrettierReplacesVueWrapper(t *testing.T) {
 	}
 }
 
-// tsconfigCompilerOptions is the subset of a leaf tsconfig's compilerOptions
-// these checks read.
-type tsconfigCompilerOptions struct {
-	Composite       bool   `json:"composite"`
-	TsBuildInfoFile string `json:"tsBuildInfoFile"`
-}
-
-func readTsconfig(t *testing.T, root, rel string) (compilerOptions tsconfigCompilerOptions, include, exclude []string, extends string) {
-	t.Helper()
-	var cfg struct {
-		CompilerOptions tsconfigCompilerOptions `json:"compilerOptions"`
-		Include         []string                `json:"include"`
-		Exclude         []string                `json:"exclude"`
-		Extends         string                  `json:"extends"`
-	}
-	readJSONC(t, root, "frontend/"+rel, &cfg)
-	return cfg.CompilerOptions, cfg.Include, cfg.Exclude, cfg.Extends
+// leafTsconfig is the subset of a leaf tsconfig these checks read.
+type leafTsconfig struct {
+	CompilerOptions struct {
+		Composite       bool   `json:"composite"`
+		TsBuildInfoFile string `json:"tsBuildInfoFile"`
+	} `json:"compilerOptions"`
+	Include []string `json:"include"`
+	Exclude []string `json:"exclude"`
 }
 
 func TestTR_33_TsconfigSplitIntoProjects(t *testing.T) {
@@ -393,51 +384,25 @@ func TestTR_33_TsconfigSplitIntoProjects(t *testing.T) {
 	}
 
 	for _, leaf := range []string{"tsconfig.app.json", "tsconfig.node.json", "tsconfig.vitest.json"} {
-		compilerOptions, include, exclude, _ := readTsconfig(t, root, leaf)
-		if !compilerOptions.Composite {
+		var cfg leafTsconfig
+		readJSONC(t, root, "frontend/"+leaf, &cfg)
+		if !cfg.CompilerOptions.Composite {
 			t.Errorf("%s: compilerOptions.composite = false, want true", leaf)
 		}
-		if compilerOptions.TsBuildInfoFile == "" {
+		if cfg.CompilerOptions.TsBuildInfoFile == "" {
 			t.Errorf("%s: compilerOptions.tsBuildInfoFile missing", leaf)
 		}
-		if leaf == "tsconfig.app.json" && !slices.Contains(exclude, "src/**/*.test.ts") {
-			t.Errorf("%s: exclude = %v, want it to contain src/**/*.test.ts", leaf, exclude)
+		if leaf == "tsconfig.app.json" && !slices.Contains(cfg.Exclude, "src/**/*.test.ts") {
+			t.Errorf("%s: exclude = %v, want it to contain src/**/*.test.ts", leaf, cfg.Exclude)
 		}
-		if leaf == "tsconfig.vitest.json" && !slices.Contains(include, "src/**/*.test.ts") {
-			t.Errorf("%s: include = %v, want it to contain src/**/*.test.ts", leaf, include)
+		if leaf == "tsconfig.vitest.json" && !slices.Contains(cfg.Include, "src/**/*.test.ts") {
+			t.Errorf("%s: include = %v, want it to contain src/**/*.test.ts", leaf, cfg.Include)
 		}
-	}
-}
-
-// assertTypeCheckCatchesFixture writes rel with content (a deliberate type
-// error), runs `pnpm run type-check`, asserts it fails and names the
-// fixture, removes the fixture, then asserts a clean run passes.
-func assertTypeCheckCatchesFixture(t *testing.T, root, rel, content string) {
-	t.Helper()
-	if !frontendToolchainAvailable(root) {
-		t.Skip("pnpm not on PATH or frontend/node_modules missing")
-	}
-
-	writeFrontendFixture(t, root, rel, content)
-
-	out, err := runFrontendScript(t, root, "type-check")
-	if err == nil {
-		t.Fatalf("pnpm run type-check with a type error: want non-zero exit, got 0\n%s", out)
-	}
-	if !strings.Contains(out, filepath.Base(rel)) {
-		t.Errorf("type-check output doesn't name the fixture:\n%s", out)
-	}
-
-	if err := os.Remove(filepath.Join(root, "frontend", rel)); err != nil {
-		t.Fatal(err)
-	}
-	if out, err := runFrontendScript(t, root, "type-check"); err != nil {
-		t.Errorf("pnpm run type-check on a clean tree: want exit 0, got error: %v\n%s", err, out)
 	}
 }
 
 func TestTR_33_TypeCheckCatchesVueTemplateError(t *testing.T) {
-	assertTypeCheckCatchesFixture(t, repoRoot(t), "src/__fixture_type_error.vue", `<script setup lang="ts">
+	assertScriptCatchesFixture(t, repoRoot(t), "type-check", "src/__fixture_type_error.vue", `<script setup lang="ts">
 import { ref } from 'vue'
 const count = ref<number>()
 count.value = 'not a number'
@@ -450,7 +415,7 @@ count.value = 'not a number'
 }
 
 func TestTR_33_TypeCheckCatchesTestFileError(t *testing.T) {
-	assertTypeCheckCatchesFixture(t, repoRoot(t), "src/__fixture_type_error.test.ts", `import { ref } from 'vue'
+	assertScriptCatchesFixture(t, repoRoot(t), "type-check", "src/__fixture_type_error.test.ts", `import { ref } from 'vue'
 
 const count = ref<number>()
 count.value = 'not a number'
@@ -492,11 +457,7 @@ func TestTR_33_TaskfileCallersUseRenamedScripts(t *testing.T) {
 	assertContainsAll(t, "Taskfile.yml e2e task", e2eTask, "common:frontend:run", "SCRIPT: test:e2e")
 
 	for _, tf := range []string{"Taskfile.yml", "build/Taskfile.yml"} {
-		for i, line := range strings.Split(readFile(t, root, tf), "\n") {
-			if callsOldFrontendScript.MatchString(line) {
-				t.Errorf("%s:%d still references the old script name: %s", tf, i+1, strings.TrimSpace(line))
-			}
-		}
+		assertNoLineMatches(t, tf, readFile(t, root, tf), callsOldFrontendScript, "still references the old script name")
 	}
 }
 
@@ -690,7 +651,7 @@ func TestQA_OSS_04_NoOwnerSpecificDefaults(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		writeFixture("dirty.go", "package fixture\n\n// installed at /home/user/repos/nebegit\n")
+		writeFixture("dirty.go", "package fixture\n\n// installed at /home/someone/repos/app\n")
 		writeFixture("clean.go", "package fixture\n")
 
 		got := findOwnerSpecificDefaults(t, dir)
@@ -709,4 +670,26 @@ func TestQA_OSS_04_NoOwnerSpecificDefaults(t *testing.T) {
 			t.Errorf("owner-specific defaults found:\n%s", strings.Join(violations, "\n"))
 		}
 	})
+}
+
+// castsEventData matches an event handler casting its data rather than
+// relying on the type generated from the event's Go registration.
+var castsEventData = regexp.MustCompile(`\bev\.data as\b`)
+
+func TestTR_28_FrontendReadsEventDataWithoutCasts(t *testing.T) {
+	root := repoRoot(t)
+	err := filepath.WalkDir(filepath.Join(root, "frontend/src"), func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		assertNoLineMatches(t, path, string(content), castsEventData, "casts event data")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }

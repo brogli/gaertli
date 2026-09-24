@@ -48,6 +48,13 @@ const (
 type Error struct {
 	Code    Code   `json:"code"`
 	Message string `json:"message"`
+	// Key names Message's wording for the UI to translate; one Code can
+	// have several (GitFailed's "worktree exists" and "merge commit not
+	// pickable"). "" where Message is untranslatable (Internal, git's own
+	// text). ErrorKeys lists every Key.
+	Key string `json:"key,omitempty"`
+	// Args holds Message's variable parts by name, for Key's translation.
+	Args map[string]string `json:"args,omitempty"`
 	// GitStderr is git's own explanation of the failure: stderr, or stdout
 	// when stderr is empty.
 	GitStderr string `json:"gitStderr,omitempty"`
@@ -59,6 +66,23 @@ func (e *Error) Error() string { return fmt.Sprintf("%s: %s", e.Code, e.Message)
 // Errorf builds an Error without git context.
 func Errorf(code Code, format string, args ...any) *Error {
 	return &Error{Code: code, Message: fmt.Sprintf(format, args...)}
+}
+
+// ErrorfArgs is Errorf plus the Key and Args to translate the message by.
+// format still renders the English Message, for the app log and as the
+// UI's fallback.
+func ErrorfArgs(code Code, key string, args map[string]string, format string, a ...any) *Error {
+	e := Errorf(code, format, a...)
+	e.Key, e.Args = key, args
+	return e
+}
+
+// Retag reclassifies e in place, as ErrorfArgs builds a fresh Error, once
+// a remapper recognises git's stderr. GitStderr and Command stay for "show
+// details".
+func (e *Error) Retag(code Code, key string, args map[string]string, format string, a ...any) {
+	e.Code, e.Key, e.Args = code, key, args
+	e.Message = fmt.Sprintf(format, a...)
 }
 
 // ErrorOf returns the *Error in err's chain, or wraps a non-nil err of any

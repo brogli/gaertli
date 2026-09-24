@@ -35,11 +35,11 @@ func (c *Core) CommitDetails(ctx context.Context, id core.WorktreeID, sha string
 // second 0x00, then git appends its own '\n', as it does after every
 // custom --format.
 func parseCommitDetails(stdout []byte) (core.CommitDetails, error) {
-	i := bytes.IndexByte(stdout, 0)
-	if i < 0 {
+	before, after, ok := bytes.Cut(stdout, []byte{0})
+	if !ok {
 		return core.CommitDetails{}, core.Errorf(core.Internal, "commit details: no header terminator")
 	}
-	header := strings.Split(string(stdout[:i]), "\x1f")
+	header := strings.Split(string(before), "\x1f")
 	if len(header) != 9 {
 		return core.CommitDetails{}, core.Errorf(core.Internal, "commit details header has %d fields, want 9", len(header))
 	}
@@ -52,7 +52,7 @@ func parseCommitDetails(stdout []byte) (core.CommitDetails, error) {
 		return core.CommitDetails{}, core.Errorf(core.Internal, "commit details committerAt: %v", err)
 	}
 
-	files, err := parseNameStatus(bytes.TrimPrefix(stdout[i+1:], []byte{0, '\n'}))
+	files, err := parseNameStatus(bytes.TrimPrefix(after, []byte{0, '\n'}))
 	if err != nil {
 		return core.CommitDetails{}, err
 	}

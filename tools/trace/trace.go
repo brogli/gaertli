@@ -23,13 +23,16 @@ type Config struct {
 	PendingPath                              string
 }
 
+// idExpr matches one requirement ID, e.g. FR-LOG-01.
+const idExpr = `[A-Z]{2,6}-[A-Z]{2,6}-[0-9]{2,3}`
+
 var (
-	idPattern     = regexp.MustCompile(`^[A-Z]{2,6}-[A-Z]{2,6}-[0-9]{2,3}$`)
+	idPattern     = regexp.MustCompile(`^` + idExpr + `$`)
 	separatorCell = regexp.MustCompile(`^:?-+:?$`)
 	goTestFunc    = regexp.MustCompile(`(?m)^func (Test[A-Za-z0-9_]*)\(`)
 	goTestID      = regexp.MustCompile(`^Test([A-Z]+)_([A-Z]+)_([0-9]+)(?:_|$)`)
 	vitestCall    = regexp.MustCompile(`\b(?:it|test)\(\s*['"]([^'"]*)['"]`)
-	vitestID      = regexp.MustCompile(`^([A-Z]{2,6}-[A-Z]{2,6}-[0-9]{2,3})(?:\s|$)`)
+	vitestID      = regexp.MustCompile(`^(` + idExpr + `)(?:\s|$)`)
 )
 
 // run computes the required IDs and their coverage, and reports the
@@ -50,87 +53,86 @@ func run(cfg Config, out io.Writer) (int, error) {
 	return report(out, required, covered, pending, cfg.PendingPath), nil
 }
 
-// pendingIDs reads the allow-list of IDs whose tests are still owed. A
-// missing file is an empty list.
-func pendingIDs(path string) (map[string]bool, error) {
-	data, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return map[string]bool{}, nil
-	}
+// requiredIDs returns every MUST FR id from functionalPath and every QA id
+// from qualityPath.
+func requiredIDs(functionalPath, qualityPath string) (map[string]bool, error) {
+	required := map[string]bool{}
+
+	frRows, err := tableRows(functionalPath)
 	if err != nil {
 		return nil, err
 	}
-	pending := map[string]bool{}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "#") {
-			pending[line] = true
+	for _, cells := range frRows {
+		if len(cells) >= 2 && cells[1] == "MUST" && idPattern.MatchString(cells[0]) {
+			required[cells[0]] = true
 		}
 	}
-	return pending, nil
+
+	qaRows, err := tableRows(qualityPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, cells := range qaRows {
+		if idPattern.MatchString(cells[0]) {
+			required[cells[0]] = true
+		}
+	}
+
+	return required, nil
+}
+
+// tableRows returns each Markdown table row in path as trimmed cells,
+// dividers and non-table lines skipped. Every row has at least one cell.
+func tableRows(path string) ([][]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var rows [][]string
+	for line := range strings.SplitSeq(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "|") || !strings.HasSuffix(line, "|") {
+			continue
+		}
+		cells := strings.Split(strings.Trim(line, "|"), "|")
+		for i, c := range cells {
+			cells[i] = strings.TrimSpace(c)
+		}
+		if isDividerRow(cells) {
+			continue
+		}
+		rows = append(rows, cells)
+	}
+	return rows, nil
+}
+
+func isDividerRow(cells []string) bool {
+	for _, c := range cells {
+		if c != "" && !separatorCell.MatchString(c) {
+			return false
+		}
+	}
+	return true
 }
 
 // coverage unions the requirement IDs found by every coverage source.
 func coverage(cfg Config) (map[string]bool, error) {
-	covered := map[string]bool{}
-	for _, ids := range []func() (map[string]bool, error){
-		func() (map[string]bool, error) { return goCoverage(cfg.GoRoot) },
-		func() (map[string]bool, error) { return frontendCoverage(cfg.FrontendRoot) },
-		func() (map[string]bool, error) { return manualCoverage(cfg.TestingPath) },
-	} {
-		found, err := ids()
-		if err != nil {
-			return nil, err
-		}
-		maps.Copy(covered, found)
-	}
-	return covered, nil
-}
-
-// manualCoverage returns the requirement IDs listed in the first cell of a
-// docs/architecture/testing.md table row, split on comma.
-func manualCoverage(path string) (map[string]bool, error) {
-	rows, err := tableRows(path)
+	covered, err := goCoverage(cfg.GoRoot)
 	if err != nil {
 		return nil, err
 	}
-	covered := map[string]bool{}
-	for _, cells := range rows {
-		if len(cells) == 0 {
-			continue
-		}
-		for _, tok := range strings.Split(cells[0], ",") {
-			tok = strings.TrimSpace(tok)
-			if idPattern.MatchString(tok) {
-				covered[tok] = true
-			}
-		}
+	frontend, err := frontendCoverage(cfg.FrontendRoot)
+	if err != nil {
+		return nil, err
 	}
+	manual, err := manualCoverage(cfg.TestingPath)
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(covered, frontend)
+	maps.Copy(covered, manual)
 	return covered, nil
-}
-
-// report prints one sorted line per problem: a required id with no coverage
-// that is not pending, or a pending id that is no longer missing. Returns 1
-// if there was anything to print.
-func report(out io.Writer, required, covered, pending map[string]bool, pendingPath string) int {
-	problems := map[string]string{}
-	for id := range required {
-		if !covered[id] && !pending[id] {
-			problems[id] = "no test name and no manual checklist entry"
-		}
-	}
-	for id := range pending {
-		if covered[id] || !required[id] {
-			problems[id] = "no longer missing; remove it from " + pendingPath
-		}
-	}
-	for _, id := range slices.Sorted(maps.Keys(problems)) {
-		_, _ = fmt.Fprintf(out, "%s: %s\n", id, problems[id])
-	}
-	if len(problems) > 0 {
-		return 1
-	}
-	return 0
 }
 
 // goCoverage returns the requirement IDs named by Go test functions below
@@ -143,6 +145,14 @@ func goCoverage(root string) (map[string]bool, error) {
 			}
 		}
 	})
+}
+
+func idFromGoTestName(name string) (string, bool) {
+	m := goTestID.FindStringSubmatch(name)
+	if m == nil {
+		return "", false
+	}
+	return m[1] + "-" + m[2] + "-" + m[3], true
 }
 
 // frontendCoverage returns the requirement IDs named by the first string
@@ -185,77 +195,69 @@ func coverageInFiles(root string, suffixes []string, collect func(src string, co
 	return covered, err
 }
 
-func idFromGoTestName(name string) (string, bool) {
-	m := goTestID.FindStringSubmatch(name)
-	if m == nil {
-		return "", false
-	}
-	return m[1] + "-" + m[2] + "-" + m[3], true
-}
-
 func skipDir(name string) bool {
 	return name == "node_modules" || name == "bin" || strings.HasPrefix(name, ".")
 }
 
-// requiredIDs returns every MUST FR id from functionalPath and every QA id
-// from qualityPath.
-func requiredIDs(functionalPath, qualityPath string) (map[string]bool, error) {
-	required := map[string]bool{}
-
-	frRows, err := tableRows(functionalPath)
+// manualCoverage returns the requirement IDs listed in the first cell of a
+// docs/architecture/testing.md table row, split on comma.
+func manualCoverage(path string) (map[string]bool, error) {
+	rows, err := tableRows(path)
 	if err != nil {
 		return nil, err
 	}
-	for _, cells := range frRows {
-		if len(cells) >= 2 && cells[1] == "MUST" && idPattern.MatchString(cells[0]) {
-			required[cells[0]] = true
+	covered := map[string]bool{}
+	for _, cells := range rows {
+		for tok := range strings.SplitSeq(cells[0], ",") {
+			tok = strings.TrimSpace(tok)
+			if idPattern.MatchString(tok) {
+				covered[tok] = true
+			}
 		}
 	}
-
-	qaRows, err := tableRows(qualityPath)
-	if err != nil {
-		return nil, err
-	}
-	for _, cells := range qaRows {
-		if len(cells) >= 1 && idPattern.MatchString(cells[0]) {
-			required[cells[0]] = true
-		}
-	}
-
-	return required, nil
+	return covered, nil
 }
 
-// tableRows returns each Markdown table row in path as trimmed cells,
-// dividers and non-table lines skipped.
-func tableRows(path string) ([][]string, error) {
+// pendingIDs reads the allow-list of IDs whose tests are still owed. A
+// missing file is an empty list.
+func pendingIDs(path string) (map[string]bool, error) {
 	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return map[string]bool{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-
-	var rows [][]string
-	for _, line := range strings.Split(string(data), "\n") {
+	pending := map[string]bool{}
+	for line := range strings.SplitSeq(string(data), "\n") {
 		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") || !strings.HasSuffix(line, "|") {
-			continue
+		if line != "" && !strings.HasPrefix(line, "#") {
+			pending[line] = true
 		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i, c := range cells {
-			cells[i] = strings.TrimSpace(c)
-		}
-		if isDividerRow(cells) {
-			continue
-		}
-		rows = append(rows, cells)
 	}
-	return rows, nil
+	return pending, nil
 }
 
-func isDividerRow(cells []string) bool {
-	for _, c := range cells {
-		if c != "" && !separatorCell.MatchString(c) {
-			return false
+// report prints one sorted line per problem: a required id with no coverage
+// that is not pending, or a pending id that is no longer missing. Returns 1
+// if there was anything to print.
+func report(out io.Writer, required, covered, pending map[string]bool, pendingPath string) int {
+	problems := map[string]string{}
+	for id := range required {
+		if !covered[id] && !pending[id] {
+			problems[id] = "no test name and no manual checklist entry"
 		}
 	}
-	return true
+	for id := range pending {
+		if covered[id] || !required[id] {
+			problems[id] = "no longer missing; remove it from " + pendingPath
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(problems)) {
+		_, _ = fmt.Fprintf(out, "%s: %s\n", id, problems[id])
+	}
+	if len(problems) > 0 {
+		return 1
+	}
+	return 0
 }

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +28,7 @@ func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByte(t 
 
 	c, id := openWorktree(t, repo.Dir)
 	msg := "Subject\n\nBody 1\nBody 2"
-	if err := c.Commit(context.Background(), id, msg, false); err != nil {
+	if err := c.Commit(t.Context(), id, msg, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,7 +46,7 @@ func TestFR_CHG_05_CommitFailsWhenNothingIsStaged(t *testing.T) {
 	head := gittest.HeadSHA(t, repo.Dir)
 
 	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(context.Background(), id, "msg", false)
+	err := c.Commit(t.Context(), id, "msg", false)
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if got := gittest.HeadSHA(t, repo.Dir); got != head {
@@ -63,7 +62,7 @@ func TestFR_CHG_05_CommitFailsOnAWhitespaceOnlyMessage(t *testing.T) {
 	head := gittest.HeadSHA(t, repo.Dir)
 
 	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(context.Background(), id, "   \n  ", false)
+	err := c.Commit(t.Context(), id, "   \n  ", false)
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if got := gittest.HeadSHA(t, repo.Dir); got != head {
@@ -78,7 +77,7 @@ func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceWithTheFurtherStagedChange(t *t
 	gittest.Run(t, repo.Dir, "add", "--", "b.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.Commit(context.Background(), id, "new message", true); err != nil {
+	if err := c.Commit(t.Context(), id, "new message", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,7 +98,7 @@ func TestFR_CHG_06_CommitAmendSucceedsWithNothingStagedRewordingOnly(t *testing.
 	treeBefore := gittest.Out(t, repo.Dir, "rev-parse", "HEAD^{tree}")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.Commit(context.Background(), id, "reworded", true); err != nil {
+	if err := c.Commit(t.Context(), id, "reworded", true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +114,7 @@ func TestFR_CHG_06_CommitAmendOnAnUnbornHeadFailsCleanly(t *testing.T) {
 	repo := gittest.New(t)
 
 	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(context.Background(), id, "msg", true)
+	err := c.Commit(t.Context(), id, "msg", true)
 
 	coretest.AssertCode(t, err, core.GitFailed)
 }
@@ -132,7 +131,7 @@ func TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr
 	head := gittest.HeadSHA(t, repo.Dir)
 
 	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(context.Background(), id, "msg", false)
+	err := c.Commit(t.Context(), id, "msg", false)
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "hook stdout line") || !strings.Contains(ce.GitStderr, "hook stderr line") {
@@ -152,7 +151,7 @@ func TestFR_CHG_07_AFailingCommitMsgHooksStdoutReachesGitStderr(t *testing.T) {
 	head := gittest.HeadSHA(t, repo.Dir)
 
 	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(context.Background(), id, "msg", false)
+	err := c.Commit(t.Context(), id, "msg", false)
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "commit-msg stdout line") {
@@ -172,7 +171,7 @@ func TestFR_CHG_07_ASucceedingPreCommitHookRunsAsUsual(t *testing.T) {
 	writeHook(t, repo.Dir, "pre-commit", "touch "+marker+"\nexit 0\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.Commit(context.Background(), id, "msg", false); err != nil {
+	if err := c.Commit(t.Context(), id, "msg", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -185,11 +184,11 @@ func TestFR_CHG_08_SetMessageDraftIsReadBackFromSummary(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
 
-	if err := c.SetMessageDraft(context.Background(), id, "draft text"); err != nil {
+	if err := c.SetMessageDraft(t.Context(), id, "draft text"); err != nil {
 		t.Fatal(err)
 	}
 
-	summary, err := c.Summary(context.Background(), id)
+	summary, err := c.Summary(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,14 +204,14 @@ func TestFR_CHG_08_ASuccessfulCommitClearsTheDraft(t *testing.T) {
 	gittest.Run(t, repo.Dir, "add", "--", "b.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.SetMessageDraft(context.Background(), id, "draft"); err != nil {
+	if err := c.SetMessageDraft(t.Context(), id, "draft"); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.Commit(context.Background(), id, "final message", false); err != nil {
+	if err := c.Commit(t.Context(), id, "final message", false); err != nil {
 		t.Fatal(err)
 	}
 
-	summary, err := c.Summary(context.Background(), id)
+	summary, err := c.Summary(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,14 +225,14 @@ func TestFR_CHG_08_AFailedCommitLeavesTheDraftUntouched(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.SetMessageDraft(context.Background(), id, "draft"); err != nil {
+	if err := c.SetMessageDraft(t.Context(), id, "draft"); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.Commit(context.Background(), id, "msg", false); err == nil {
+	if err := c.Commit(t.Context(), id, "msg", false); err == nil {
 		t.Fatal("Commit() error = nil, want GitFailed (nothing staged)")
 	}
 
-	summary, err := c.Summary(context.Background(), id)
+	summary, err := c.Summary(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}

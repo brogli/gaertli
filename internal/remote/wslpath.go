@@ -7,7 +7,6 @@ import "strings"
 type Distro struct {
 	Name    string `json:"name"`
 	Version int    `json:"version"` // 1 or 2; WSL 1 is unsupported
-	Default bool   `json:"default"`
 }
 
 // wslPrefixes are the two UNC forms a WSL path is found under; neither is

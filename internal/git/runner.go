@@ -3,9 +3,9 @@ package git
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"slices"
@@ -24,7 +24,7 @@ type Call struct {
 
 	ReadOnly   bool // adds GIT_OPTIONAL_LOCKS=0: the call performs no writes
 	Continue   bool // adds GIT_EDITOR=true: a --continue/--abort/--skip call
-	Background bool // hidden by default in the command log
+	Background bool // logged at Debug, not Info, in the app log
 
 	// Timeout bounds this call when ctx has no deadline. Zero means 30s.
 	Timeout time.Duration
@@ -37,8 +37,8 @@ type Result struct {
 	ExitCode int
 }
 
-// Entry is one command-log row. Never carries environment variables; a URL
-// with embedded credentials in Command is masked.
+// Entry is one call, as Runner.Log gets it. Never carries environment
+// variables; a URL with embedded credentials in Command is masked.
 type Entry struct {
 	Command    string // "git " + args, masked
 	Dir        string
@@ -67,11 +67,12 @@ const defaultTimeout = 30 * time.Second
 //   - git started and exited non-zero: Code GitFailed
 //   - git could not be started (LookPath failure, bad Dir, ...): Code Internal
 func (r Runner) Run(ctx context.Context, call Call) (Result, error) {
-	cmd, effectiveCtx, cancel, command, err := r.prepare(ctx, call)
+	ctx, cancel := withTimeout(ctx, call.Timeout)
+	defer cancel()
+	cmd, command, err := r.prepare(ctx, call)
 	if err != nil {
 		return r.notStarted(call, command, err)
 	}
-	defer cancel()
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -82,27 +83,21 @@ func (r Runner) Run(ctx context.Context, call Call) (Result, error) {
 	duration := time.Since(start)
 
 	result := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), ExitCode: cmd.ProcessState.ExitCode()}
-	err = classify(effectiveCtx, cmd, runErr, result, command)
+	err = classify(ctx, cmd, runErr, result, command)
 	r.log(call, command, result, duration, err)
 	return result, err
 }
 
-// prepare builds the *exec.Cmd for call, shared by Run and Stream. cmd is
-// nil and err is the Cancelled error to return at once if ctx is already
-// done.
-func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, effectiveCtx context.Context, cancel context.CancelFunc, command string, err error) {
+// prepare builds the *exec.Cmd for call, shared by Run and Stream, and the
+// command line as logged. cmd is nil and err is the Cancelled error to
+// return at once if ctx is already done.
+func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, command string, err error) {
 	command = formatCommand(call.Args, call.Stdin != nil)
 	if ctx.Err() != nil {
-		return nil, ctx, func() {}, command, core.Errorf(core.Cancelled, "%s", ctx.Err())
+		return nil, command, core.Errorf(core.Cancelled, "%s", ctx.Err())
 	}
 
-	effectiveCtx, cancel = withTimeout(ctx, call.Timeout)
-
-	git := r.Git
-	if git == "" {
-		git = "git"
-	}
-	cmd = exec.CommandContext(effectiveCtx, git, call.Args...)
+	cmd = exec.CommandContext(ctx, cmp.Or(r.Git, "git"), call.Args...)
 	cmd.Dir = call.Dir
 	cmd.Env = buildEnv(call)
 	cmd.SysProcAttr = proc.HiddenConsole()
@@ -110,7 +105,7 @@ func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, effectiv
 	if call.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(call.Stdin)
 	}
-	return cmd, effectiveCtx, cancel, command, nil
+	return cmd, command, nil
 }
 
 // notStarted logs and returns a call that never ran.
@@ -220,13 +215,13 @@ func buildEnv(call Call) []string {
 	return env
 }
 
-// formatCommand renders args for the command log, with credentials masked
+// formatCommand renders args for the app log, with credentials masked
 // and a stdin marker if hasStdin. Display only: never re-parsed or
 // re-executed.
 func formatCommand(args []string, hasStdin bool) string {
 	quoted := make([]string, len(args))
 	for i, a := range args {
-		quoted[i] = quoteArg(maskCredential(a))
+		quoted[i] = quoteArg(MaskCredentials(a))
 	}
 	command := "git " + strings.Join(quoted, " ")
 	if hasStdin {
@@ -241,17 +236,4 @@ func quoteArg(a string) string {
 		return `"` + a + `"`
 	}
 	return a
-}
-
-// maskCredential replaces a's userinfo with "***" if a parses as an
-// absolute URL with a User.
-func maskCredential(a string) string {
-	u, err := url.Parse(a)
-	if err != nil || !u.IsAbs() || u.User == nil {
-		return a
-	}
-	// String manipulation, not u.String(): URL escapes "*" as "%2A".
-	scheme := len(u.Scheme) + len("://")
-	userinfo := strings.Index(a[scheme:], "@")
-	return a[:scheme] + "***" + a[scheme+userinfo:]
 }

@@ -1,21 +1,30 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { hunksText } from './helpers'
 
 // Repos is the scratch setup every test starts from: a bare remote, the
-// main clone "work", a second clone "other" and a linked worktree "work2"
-// of work on branch side.
+// main clone "work", a second clone "other", a linked worktree "work2" of
+// work on branch side, and "scratch", an unrelated repo with no remote.
 export interface Repos {
   remote: string
   work: string
   other: string
   work2: string
+  scratch: string
 }
 
 export type Git = (repo: string, ...args: string[]) => string
 
 export function gitWith(env: NodeJS.ProcessEnv): Git {
   return (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { env, encoding: 'utf8' })
+}
+
+// gitAfterHistory dates its commits two seconds past now, so they sort
+// first in --topo-order even when the history was built in the same second.
+export function gitAfterHistory(env: NodeJS.ProcessEnv): Git {
+  const later = `${Math.floor(Date.now() / 1000) + 2} +0000`
+  return gitWith({ ...env, GIT_AUTHOR_DATE: later, GIT_COMMITTER_DATE: later })
 }
 
 // createRepos builds work's history: main with a merge of side (by Bob),
@@ -29,6 +38,7 @@ export function createRepos(root: string, git: Git): Repos {
     work: path.join(root, 'work'),
     other: path.join(root, 'other'),
     work2: path.join(root, 'work2'),
+    scratch: path.join(root, 'scratch'),
   }
   const { work } = repos
   const write = (file: string, text: string | Buffer) => {
@@ -41,7 +51,7 @@ export function createRepos(root: string, git: Git): Repos {
   git(root, 'init', '-q', '-b', 'main', work)
   git(work, 'remote', 'add', 'origin', repos.remote)
 
-  write('hunks.txt', Array.from({ length: 30 }, (_, i) => `line ${i + 1}\n`).join(''))
+  write('hunks.txt', hunksText())
   write('conflict.txt', 'shared\n')
   write('crlf.txt', 'a\r\nb\r\nc\r\n')
   write('nonl.txt', 'no newline at end')
@@ -82,6 +92,13 @@ export function createRepos(root: string, git: Git): Repos {
   git(root, 'clone', '-q', repos.remote, repos.other)
   git(repos.other, 'checkout', '-q', 'B')
   git(work, 'worktree', 'add', '-q', repos.work2, 'side')
+
+  fs.mkdirSync(repos.scratch)
+  git(repos.scratch, 'init', '-q', '-b', 'main')
+  for (const subject of ['commit A', 'commit B', 'commit C']) {
+    fs.appendFileSync(path.join(repos.scratch, 'file.txt'), `${subject}\n`)
+    commitAll(git, repos.scratch, subject)
+  }
   return repos
 }
 

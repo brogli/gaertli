@@ -62,3 +62,15 @@ func TestQA_OSS_01_NoticesRendersOneParagraphPerDependency(t *testing.T) {
 		t.Errorf("Notices() has %d sections, want %d", sections, len(deps))
 	}
 }
+
+func TestQA_OSS_05_NoticesCreditCodeAdaptedFromLazygit(t *testing.T) {
+	if violations := Check(adaptedCode); len(violations) > 0 {
+		t.Errorf("adapted code with a licence outside the allow-list: %v", violations)
+	}
+	notices := Notices(adaptedCode)
+	for _, want := range []string{"github.com/jesseduffield/lazygit", "Copyright (c) 2018 Jesse Duffield", "Permission is hereby granted"} {
+		if !strings.Contains(notices, want) {
+			t.Errorf("notices lack %q:\n%s", want, notices)
+		}
+	}
+}

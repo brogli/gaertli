@@ -82,10 +82,14 @@ func Load(path string) (Settings, error) {
 }
 
 // Save writes s to path atomically: marshal indented JSON to a temp file in
-// the same directory, then rename over path.
+// the same directory, then rename over path. The directory and the file are
+// readable by their owner only, also when an older install made them wider.
 func Save(path string, s Settings) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(s, "", "  ")
@@ -93,7 +97,7 @@ func Save(path string, s Settings) error {
 		return err
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)
@@ -111,8 +115,5 @@ func (s *Settings) AddRecent(repo RecentRepo, now time.Time) {
 			entries = append(entries, r)
 		}
 	}
-	if len(entries) > maxRecent {
-		entries = entries[:maxRecent]
-	}
-	s.RecentRepos = entries
+	s.RecentRepos = entries[:min(len(entries), maxRecent)]
 }

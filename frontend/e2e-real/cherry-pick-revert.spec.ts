@@ -9,6 +9,8 @@ import {
   fileRow,
   logRow,
   pickFromContextMenu,
+  rev,
+  switchToChanges,
 } from './helpers'
 
 // Cherry-pick and revert from the log's context menu, with and without
@@ -29,11 +31,11 @@ test('FR-CP-01 cherry-picking a commit adds a commit with its message on top of 
   repos,
   git,
 }) => {
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
 
   await pickFromContextMenu(app, logRow(app, 'feature: add feature.txt'), 'Cherry-pick')
 
-  await expect.poll(() => git(repos.work, 'rev-parse', 'HEAD~1').trim()).toBe(head)
+  await expect.poll(() => rev(git, repos.work, 'HEAD~1')).toBe(head)
   expect(git(repos.work, 'log', '-1', '--format=%s').trim()).toBe('feature: add feature.txt')
 })
 
@@ -43,14 +45,14 @@ test("FR-CP-04 a pick git refuses to start shows git's message, applies nothing 
   git,
 }) => {
   fs.writeFileSync(path.join(repos.work, 'feature.txt'), 'untracked local\n')
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
   const row = logRow(app, 'feature: add feature.txt')
   await row.click()
 
   await pickFromContextMenu(app, row, 'Cherry-pick')
 
   await expect(logError(app)).toContainText(/untracked working tree files would be overwritten/)
-  expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
   await expect(row).toHaveClass(/\bselected\b/)
 })
 
@@ -59,7 +61,8 @@ test('FR-CP-03 a cherry-pick that stops on conflicts shows the operation and the
 }) => {
   await pickFromContextMenu(app, logRow(app, 'feature: change conflict.txt'), 'Cherry-pick')
 
-  await expect(app.locator('.branch-summary')).toContainText('main (cherry-pick)')
+  await expect(app.locator('[data-test=branch-picker]')).toContainText('main (cherry-pick)')
+  await switchToChanges(app)
   await expect(fileRow(app, 'Conflicted', 'conflict.txt')).toBeVisible()
 })
 
@@ -69,7 +72,7 @@ test('FR-CP-08 cherry-picking a merge commit asks for the parent and applies tha
   git,
 }) => {
   git(repos.work, 'checkout', '-q', 'B')
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
   const app = await openApp(repos.work)
 
   await pickFromContextMenu(app, logRow(app, "Merge branch 'side'"), 'Cherry-pick')
@@ -77,7 +80,7 @@ test('FR-CP-08 cherry-picking a merge commit asks for the parent and applies tha
   await dialog.getByLabel('Pick against parent').fill('1')
   await dialog.getByRole('button', { name: 'Confirm' }).click()
 
-  await expect.poll(() => git(repos.work, 'rev-parse', 'HEAD~1').trim()).toBe(head)
+  await expect.poll(() => rev(git, repos.work, 'HEAD~1')).toBe(head)
   expect(git(repos.work, 'diff', '--name-only', 'HEAD~1', 'HEAD').trim()).toBe('side.txt')
 })
 
@@ -103,7 +106,7 @@ test('FR-CP-06 "Cherry-pick…" can apply the change without committing', async 
   repos,
   git,
 }) => {
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
   await pickFromContextMenu(app, logRow(app, 'feature: add feature.txt'), 'Cherry-pick…')
   const dialog = app.getByRole('dialog')
   await dialog.getByLabel('Apply without committing').check()
@@ -112,7 +115,7 @@ test('FR-CP-06 "Cherry-pick…" can apply the change without committing', async 
   await expect
     .poll(() => git(repos.work, 'diff', '--cached', '--name-only').trim())
     .toBe('feature.txt')
-  expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 
 test('FR-RV-04 "Revert…" can apply the reverse change without committing', async ({
@@ -120,7 +123,7 @@ test('FR-RV-04 "Revert…" can apply the reverse change without committing', asy
   repos,
   git,
 }) => {
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
   await pickFromContextMenu(app, logRow(app, 'side: add side.txt'), 'Revert…')
   const dialog = app.getByRole('dialog')
   await dialog.getByLabel('Apply without committing').check()
@@ -129,7 +132,7 @@ test('FR-RV-04 "Revert…" can apply the reverse change without committing', asy
   await expect
     .poll(() => git(repos.work, 'diff', '--cached', '--name-status').trim())
     .toBe('D\tside.txt')
-  expect(git(repos.work, 'rev-parse', 'HEAD').trim()).toBe(head)
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 
 test.describe('with three new commits on main', () => {
@@ -158,7 +161,7 @@ test.describe('with three new commits on main', () => {
     repos,
     git,
   }) => {
-    const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+    const head = rev(git, repos.work, 'HEAD')
     const app = await openApp(repos.work)
 
     await selectRange(app, 'step one', 'step three')
@@ -180,7 +183,7 @@ test('FR-CP-07 Skip drops the conflicting commit of a stopped pick and applies t
   commitFiles(git, repos.work, 'pick two conflicts', { 'conflict.txt': 'pick side\n' })
   commitFiles(git, repos.work, 'pick three', { 'p3.txt': 'p3\n' })
   git(repos.work, 'checkout', '-q', 'main')
-  const head = git(repos.work, 'rev-parse', 'HEAD').trim()
+  const head = rev(git, repos.work, 'HEAD')
   const app = await openApp(repos.work)
 
   await selectRange(app, 'pick three', 'pick one')

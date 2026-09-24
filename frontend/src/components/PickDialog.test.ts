@@ -1,14 +1,9 @@
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCherryPickWith, mockRevertWith } = vi.hoisted(() => ({
-  mockCherryPickWith: vi.fn(),
-  mockRevertWith: vi.fn(),
-}))
+const { Facade } = vi.hoisted(() => ({ Facade: { CherryPick: vi.fn(), Revert: vi.fn() } }))
 
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { CherryPickWith: mockCherryPickWith, RevertWith: mockRevertWith },
-}))
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
 import PickDialog from './PickDialog.vue'
 import { mountInBody } from '../testing/mountInBody'
@@ -19,8 +14,8 @@ function mountDialog(verb: 'cherry-pick' | 'revert', shas: string[], singleMerge
 
 describe('PickDialog', () => {
   beforeEach(() => {
-    mockCherryPickWith.mockReset().mockResolvedValue(undefined)
-    mockRevertWith.mockReset().mockResolvedValue(undefined)
+    Facade.CherryPick.mockReset().mockResolvedValue(undefined)
+    Facade.Revert.mockReset().mockResolvedValue(undefined)
   })
 
   it('FR-CP-08 renders "Pick against parent" only for a single selected merge commit', async () => {
@@ -47,7 +42,7 @@ describe('PickDialog', () => {
     expect(body.text()).not.toContain('cherry picked from')
   })
 
-  it('FR-CP-06, FR-CP-08 Confirm calls CherryPickWith with the form\'s own options', async () => {
+  it("FR-CP-06, FR-CP-08 Confirm calls CherryPick with the form's own options", async () => {
     const { body } = await mountDialog('cherry-pick', ['m1'], true)
     const checkboxes = body.findAll('input[type=checkbox]')
     await checkboxes[0]!.setValue(true) // Apply without committing
@@ -57,31 +52,33 @@ describe('PickDialog', () => {
     await body.get('[data-test="pick-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockCherryPickWith).toHaveBeenCalledTimes(1)
-    expect(mockCherryPickWith).toHaveBeenCalledWith('/repo', ['m1'], {
+    expect(Facade.CherryPick).toHaveBeenCalledTimes(1)
+    expect(Facade.CherryPick).toHaveBeenCalledWith('/repo', ['m1'], {
       noCommit: true,
       recordOrigin: true,
       mainline: 2,
     })
   })
 
-  it('FR-RV-04 Confirm calls RevertWith, ignoring recordOrigin/mainline for a revert', async () => {
+  it('FR-RV-04 Confirm calls Revert, ignoring recordOrigin/mainline for a revert', async () => {
     const { body } = await mountDialog('revert', ['a1', 'a2'], false)
     await body.get('input[type=checkbox]').setValue(true) // Apply without committing
 
     await body.get('[data-test="pick-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockRevertWith).toHaveBeenCalledTimes(1)
-    expect(mockRevertWith).toHaveBeenCalledWith('/repo', ['a1', 'a2'], {
+    expect(Facade.Revert).toHaveBeenCalledTimes(1)
+    expect(Facade.Revert).toHaveBeenCalledWith('/repo', ['a1', 'a2'], {
       noCommit: true,
       recordOrigin: false,
       mainline: 0,
     })
   })
 
-  it('FR-CP-06 a rejection renders in this dialog\'s own ErrorBanner and keeps it open', async () => {
-    mockCherryPickWith.mockRejectedValueOnce(Object.assign(new Error('boom'), { cause: { message: 'conflict' } }))
+  it("FR-CP-06 a rejection renders in this dialog's own ErrorBanner and keeps it open", async () => {
+    Facade.CherryPick.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { cause: { message: 'conflict' } }),
+    )
     const { wrapper, body } = await mountDialog('cherry-pick', ['a1'], false)
 
     await body.get('[data-test="pick-submit"]').trigger('click')

@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
 import type { Settings } from '../bindings/github.com/brogli/nebegit/internal/settings/models'
+import { switchToChanges } from './helpers'
 import { createRepos, gitWith, type Git, type Repos } from './repos'
 import { createSandbox, editorCalls, type Sandbox } from './sandbox'
 
@@ -30,8 +31,13 @@ interface Fixtures {
   git: Git
   editorCalls: () => string[]
   server: Server
+  // newPage is a page whose errors fail the test.
+  newPage: () => Promise<Page>
   // openApp shows worktree (one of the opened ones) in a new page, loaded.
   openApp: (worktree: string) => Promise<Page>
+  // openDiff shows worktree's diff window on target (the URL's kind, sha,
+  // from, to, staged, file, oldFile) in a new page, its events connected.
+  openDiff: (worktree: string, target: Record<string, string>) => Promise<Page>
   // app is work, opened and loaded.
   app: Page
 }
@@ -81,19 +87,40 @@ export const test = base.extend<Options & Fixtures>({
     }
   },
 
-  openApp: async ({ server, context, git }, use) => {
+  newPage: async ({ context }, use) => {
     const pageErrors: string[] = []
-    await use(async (worktree) => {
+    await use(async () => {
       const page = await context.newPage()
       page.on('pageerror', (e) => pageErrors.push(e.message))
       page.on('console', (m) => {
         if (m.type() === 'error' && !isRefusedCall(m.text())) pageErrors.push(m.text())
       })
       await page.setViewportSize({ width: 1200, height: 800 })
-      await load(page, server.url, worktree, git)
       return page
     })
     expect(pageErrors, 'errors in the page').toEqual([])
+  },
+
+  openApp: async ({ server, newPage, git }, use) => {
+    await use(async (worktree) => {
+      const page = await newPage()
+      await load(page, server.url, worktree, git)
+      return page
+    })
+  },
+
+  // Server mode drops events emitted before the page's event websocket
+  // connects, so the page is ready once it has.
+  openDiff: async ({ server, newPage }, use) => {
+    await use(async (worktree, target) => {
+      const page = await newPage()
+      const connected = waitForEvents(page)
+      await page.goto(
+        `${server.url}/?${new URLSearchParams({ view: 'diff', wt: worktree, ...target })}`,
+      )
+      await connected
+      return page
+    })
   },
 
   app: async ({ openApp, repos }, use) => use(await openApp(repos.work)),
@@ -145,14 +172,23 @@ async function load(page: Page, url: string, worktree: string, git: Git): Promis
   page.on('websocket', (ws) =>
     ws.on('framereceived', ({ payload }) => events.push(JSON.parse(String(payload)))),
   )
-  const connected = page.waitForEvent('console', (m) =>
-    m.text().includes('Event WebSocket connected'),
-  )
+  const connected = waitForEvents(page)
   await page.goto(`${url}/?path=${encodeURIComponent(worktree)}`)
   await connected
   await changeRefsAndWaitForReload(events, () => git(worktree, 'tag', 'e2e-nudge'))
   await changeRefsAndWaitForReload(events, () => git(worktree, 'tag', '-d', 'e2e-nudge'))
   await expect(page.locator('.row').first()).toBeVisible()
+  // The fixture's 1200 x 800 viewport is the medium layout: the switch
+  // above the log's side panel defaults to Details. Most area specs work
+  // the changes view, so every opened page starts on Changes instead; a
+  // spec that wants Details switches to it itself (selecting a commit
+  // does too).
+  await switchToChanges(page)
+}
+
+// waitForEvents resolves once page's event websocket is up.
+async function waitForEvents(page: Page): Promise<void> {
+  await page.waitForEvent('console', (m) => m.text().includes('Event WebSocket connected'))
 }
 
 interface WailsEvent {

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -22,14 +21,14 @@ func TestQA_INST_01_GitPresent(t *testing.T) {
 }
 
 func TestQA_INST_01_Messages(t *testing.T) {
-	if !strings.Contains(missingGitMessage, "git") {
-		t.Errorf("missingGitMessage = %q, want it to mention git", missingGitMessage)
+	if msg := text(missingGit, nil); !strings.Contains(msg, "git") {
+		t.Errorf("missingGit = %q, want it to mention git", msg)
 	}
 
-	msg := startupFailedMessage(errors.New("x"))
+	msg := text(startupFailed, map[string]string{"error": "x"})
 	for _, want := range []string{"WebView2", "webkitgtk", "x"} {
 		if !strings.Contains(msg, want) {
-			t.Errorf("startupFailedMessage() = %q, want it to contain %q", msg, want)
+			t.Errorf("startupFailed = %q, want it to contain %q", msg, want)
 		}
 	}
 }

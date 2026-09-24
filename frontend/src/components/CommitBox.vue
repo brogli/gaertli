@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onKeyStroke, useDebounceFn } from '@vueuse/core'
+import { useI18n } from '../i18n'
 import Textarea from 'openvue/textarea'
 import Checkbox from 'openvue/checkbox'
 import Button from 'openvue/button'
@@ -11,14 +12,15 @@ import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
-// CommitBox is the message box at the top of the changes column: a
-// message, an Amend checkbox, and a Commit button gated by the staged
-// count — amend alone needs nothing staged.
+// CommitBox is the commit box, the changes view's fixed part below the
+// change list: the message, Amend, Push after commit, and a Commit button
+// gated by the staged count — amend alone needs nothing staged.
 const props = defineProps<{ wt: string }>()
 const changes = useChangesStore()
 const repo = useRepoStore()
 const refs = useRefsStore()
 const { error, run, runAndClose } = useCoreCall()
+const { t } = useI18n()
 
 const message = ref('')
 const amend = ref(false)
@@ -43,7 +45,6 @@ watch(
   { immediate: true },
 )
 
-// 300ms matches FilterBar's debounce.
 const saveDraft = useDebounceFn((text: string) => {
   lastSyncedDraft = text
   void Facade.SetMessageDraft(props.wt, text)
@@ -57,7 +58,13 @@ const stagedCount = computed(() => changes.files?.staged?.length ?? 0)
 const commitDisabled = computed(
   () => committing.value || !message.value.trim() || (!amend.value && stagedCount.value === 0),
 )
-const commitLabel = computed(() => (amend.value ? 'Amend' : `Commit${stagedCount.value ? ` (${stagedCount.value})` : ''}`))
+const commitLabel = computed(() =>
+  amend.value
+    ? t('changesView.commitBox.amendButton')
+    : stagedCount.value
+      ? t('changesView.commitBox.commitCount', { n: stagedCount.value })
+      : t('changesView.commitBox.commit'),
+)
 // git itself refuses to amend mid-merge/rebase/etc.
 const amendDisabled = computed(() => !repo.summary?.sha || !!repo.summary?.operation)
 
@@ -65,19 +72,16 @@ const amendDisabled = computed(() => !repo.summary?.sha || !!repo.summary?.opera
 // refs store's own ahead count instead of a fresh merge-base call: the
 // current branch is an ancestor-or-equal of its upstream exactly when
 // Ahead == 0.
-const currentBranch = computed(() => refs.refs?.branches?.find((b) => b.current))
 const pushedWarning = computed(() => {
   if (!amend.value) return false
-  const branch = currentBranch.value
+  const branch = refs.current
   return !!branch?.upstream && !branch.upstreamGone && branch.ahead === 0
 })
 
-// "Push after commit" is off while amending — an already-pushed commit
-// needs a force push, pushedWarning already tells the user so, and a
-// plain push right after would just be rejected — or with no upstream,
-// same gate buildBranchMenuItems' own "Update from upstream" item and
-// SyncControls' plain-Push button already apply.
-const pushAfterCommitDisabled = computed(() => amend.value || !currentBranch.value?.upstream)
+// "Push after commit" is off while amending (a plain push of an amended,
+// pushed commit is rejected; pushedWarning names the force push it needs)
+// and without an upstream, like SyncControls' Push.
+const pushAfterCommitDisabled = computed(() => amend.value || !refs.current?.upstream)
 
 async function onAmendChange(checked: boolean): Promise<void> {
   // Pre-fill from HEAD's own message only when the field is still empty:
@@ -103,9 +107,7 @@ async function onCommit(): Promise<void> {
         amend.value = false
       },
     )
-    // A second, sequential use of run's own error ref: a push failure
-    // after a successful commit shows through the same ErrorBanner the
-    // commit itself uses.
+    // A push failure after a successful commit shows in the same ErrorBanner.
     if (!error.value && pushAfter) {
       await run(() => Facade.Push(props.wt, ''))
     }
@@ -128,19 +130,40 @@ onKeyStroke(
 <template>
   <section class="commit-box">
     <ErrorBanner v-if="error" :error="error" />
-    <Textarea v-model="message" rows="4" auto-resize placeholder="Commit message" />
+    <Textarea
+      v-model="message"
+      rows="6"
+      fluid
+      auto-resize
+      :placeholder="t('changesView.commitBox.messagePlaceholder')"
+    />
     <label>
-      <Checkbox v-model="amend" binary :disabled="amendDisabled" @update:model-value="onAmendChange" />
-      Amend last commit
+      <Checkbox
+        v-model="amend"
+        binary
+        :disabled="amendDisabled"
+        @update:model-value="onAmendChange"
+      />
+      {{ t('changesView.commitBox.amend') }}
     </label>
     <p v-if="pushedWarning" class="warning">
-      This commit has already been pushed. Amending will require a force push.
+      {{ t('changesView.commitBox.pushedWarning') }}
     </p>
     <label>
-      <Checkbox v-model="pushAfterCommit" binary :disabled="pushAfterCommitDisabled" data-test="push-after-commit" />
-      Push after commit
+      <Checkbox
+        v-model="pushAfterCommit"
+        binary
+        :disabled="pushAfterCommitDisabled"
+        data-test="push-after-commit"
+      />
+      {{ t('changesView.commitBox.pushAfterCommit') }}
     </label>
-    <Button :label="commitLabel" :disabled="commitDisabled" data-test="commit-submit" @click="onCommit" />
+    <Button
+      :label="commitLabel"
+      :disabled="commitDisabled"
+      data-test="commit-submit"
+      @click="onCommit"
+    />
   </section>
 </template>
 

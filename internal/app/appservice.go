@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -41,16 +41,16 @@ func (c wailsConsent) Ask(distro, targetPath string) bool {
 	yes := (&application.Button{Label: "Copy"}).OnClick(func() { result <- true })
 	no := (&application.Button{Label: "Cancel", IsCancel: true}).OnClick(func() { result <- false })
 	c.app.Dialog.Question().
-		SetTitle("nebegit").
-		SetMessage(fmt.Sprintf("nebegit needs to place its helper program inside %s, at %s. Copy it there?", distro, targetPath)).
+		SetTitle(text(appName, nil)).
+		SetMessage(text(deployConsent, map[string]string{"distro": distro, "path": targetPath})).
 		AddButtons([]*application.Button{yes, no}).
 		SetDefaultButton(yes).SetCancelButton(no).
 		Show()
 	return <-result
 }
 
-// AppService is a shell-only Wails service: dialogs and recents are
-// window-manager concerns no core.API method needs.
+// AppService is the shell's own Wails service: windows, native dialogs,
+// recent repos and WSL setup, which no core.API method covers.
 type AppService struct {
 	shell
 	picker folderPicker
@@ -59,11 +59,9 @@ type AppService struct {
 // pickAndOpen shows the native folder picker seeded at dir ("" = the
 // platform default) and opens the choice; cancelling returns nil.
 func (s *AppService) pickAndOpen(ctx context.Context, dir string) error {
-	path, ok := s.PickFolder(ctx, dir)
-	if !ok {
-		return nil
+	if path, ok := s.PickFolder(ctx, dir); ok {
+		s.open(ctx, path)
 	}
-	s.open(ctx, path)
 	return nil
 }
 
@@ -91,14 +89,37 @@ func (s *AppService) SelectWorktree(ctx context.Context, path string) error {
 	return s.switchTo(ctx, w, path)
 }
 
-// UpdateWindowTitle sets the calling window's OS title. The frontend calls
-// it on every Summary change, so the title tracks branch changes.
-func (s *AppService) UpdateWindowTitle(ctx context.Context, name, branch string) error {
+// SelectRecentRepo switches the calling window to repo's remembered
+// worktree; if that worktree is gone (Code NotARepo) and repo names its
+// common git dir, it retries at the repo's main worktree, found there
+// directly with no worktree of its own needed. A second failure is
+// returned as-is; the repo picker shows it.
+func (s *AppService) SelectRecentRepo(ctx context.Context, repo settings.RecentRepo) error {
+	w, ok := callingWindowFrom(ctx)
+	if !ok {
+		return core.Errorf(core.Internal, "no calling window for this call")
+	}
+	err := s.switchTo(ctx, w, shellPath(repo.Path, repo.Distro))
+	ce, isCoreError := errors.AsType[*core.Error](err)
+	if !isCoreError || ce.Code != core.NotARepo || repo.RepoKey == "" {
+		return err
+	}
+	main, err := s.api.MainWorktree(ctx, core.RepoPath(shellPath(repo.RepoKey, repo.Distro)))
+	if err != nil {
+		return err
+	}
+	return s.switchTo(ctx, w, shellPath(main.Path, repo.Distro))
+}
+
+// UpdateWindowTitle sets the calling window's OS title from its worktree's
+// path and branch. The frontend calls it on every Summary change, so the
+// title tracks branch changes.
+func (s *AppService) UpdateWindowTitle(ctx context.Context, path, branch string) error {
 	w, ok := callingWindowFrom(ctx)
 	if !ok {
 		return nil // a windowless/background call: nothing to title, not an error
 	}
-	w.SetTitle(windowTitle(name, branch))
+	w.SetTitle(windowTitle(path, branch))
 	return nil
 }
 
@@ -108,37 +129,41 @@ func (s *AppService) PickAndOpen(ctx context.Context) error {
 	return s.pickAndOpen(ctx, "")
 }
 
-// OpenRecent opens or focuses path's window.
-func (s *AppService) OpenRecent(ctx context.Context, path string) error {
-	s.open(ctx, path)
-	return nil
-}
-
 // RecentRepos lists the remembered repos, most-recently-opened first.
 func (s *AppService) RecentRepos(ctx context.Context) ([]settings.RecentRepo, error) {
 	return s.store.Get().RecentRepos, nil
 }
 
 // ListWSLDistros lists installed distros for the "Open WSL folder" picker.
+// A host without WSL has none; that is an answer, not an error.
 func (s *AppService) ListWSLDistros(ctx context.Context) ([]remote.Distro, error) {
-	return remote.ListDistros(ctx)
+	distros, err := remote.ListDistros(ctx)
+	if ce, ok := errors.AsType[*core.Error](err); ok && ce.Code == core.WslNotFound {
+		return nil, nil
+	}
+	return distros, err
 }
 
 // PickAndOpenWSL is PickAndOpen seeded at distro's UNC root.
 func (s *AppService) PickAndOpenWSL(ctx context.Context, distro string) error {
-	return s.pickAndOpen(ctx, `\\wsl.localhost\`+distro)
+	return s.pickAndOpen(ctx, remote.BuildWSLPath(distro, ""))
 }
 
-// OpenPath opens path like OpenRecent, for "Open WSL folder"'s typed path.
+// OpenPath opens or focuses path's window.
 func (s *AppService) OpenPath(ctx context.Context, path string) error {
 	s.open(ctx, path)
 	return nil
 }
 
-// OpenCompareDiff opens or focuses the compare diff window for wt's a..b
-// comparison, starting on path/oldPath.
-func (s *AppService) OpenCompareDiff(ctx context.Context, wt core.WorktreeID, a, b, path, oldPath string) error {
-	s.reg.OpenOrFocusCompareDiff(wt, a, b, path, oldPath)
+// OpenDiff opens the calling window's diff window on wt's target, or
+// focuses it and shows the target there. A call from no window uses wt's
+// diff window.
+func (s *AppService) OpenDiff(ctx context.Context, wt core.WorktreeID, target DiffTarget) error {
+	key := diffWindowKey{wt: wt}
+	if w, ok := callingWindowFrom(ctx); ok {
+		key = diffWindowKey{mainWindow: w.ID()}
+	}
+	s.reg.OpenOrFocusDiff(key, wt, target)
 	return nil
 }
 
@@ -152,15 +177,14 @@ func (s *AppService) InstallWSLLauncher(ctx context.Context, distro string) erro
 	return s.reg.distroCore(distro).InstallLauncher(ctx, guiExe)
 }
 
-// TestEditorProfile tries profile on env's core: "" is the local core, else
-// a WSL distro's, connected (and deployed, with consent) on demand.
-func (s *AppService) TestEditorProfile(ctx context.Context, env string, profile core.EditorProfile) error {
-	if env == "" {
-		return s.reg.Local().TestEditorProfile(ctx, profile)
-	}
-	client, _, err := s.reg.distroCore(env).Ensure(ctx)
-	if err != nil {
-		return err
-	}
-	return client.TestEditorProfile(ctx, profile)
+// LogPathInfo is LogPath's result: where the app log is, or why it could
+// not be opened.
+type LogPathInfo struct {
+	Path  string `json:"path"`
+	Error string `json:"error"` // "" if the log opened
+}
+
+// LogPath is Settings' read-only "App log: <path>" line.
+func (s *AppService) LogPath(ctx context.Context) (LogPathInfo, error) {
+	return LogPathInfo{Path: s.logPath, Error: s.logErr}, nil
 }

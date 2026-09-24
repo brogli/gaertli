@@ -40,18 +40,14 @@ func Main(m *testing.M, bins ...Bin) {
 	os.Exit(code)
 }
 
-// binaryName is pkg's last path element, or the test's own directory name
-// when pkg is "." or "..".
+// binaryName is the last element of pkg's directory: the test's own
+// directory name when pkg is ".".
 func binaryName(pkg string) string {
-	name := filepath.Base(pkg)
-	if name != "." && name != ".." {
-		return name
-	}
-	wd, err := os.Getwd()
+	dir, err := filepath.Abs(pkg)
 	if err != nil {
 		return "testbin"
 	}
-	return filepath.Base(filepath.Join(wd, pkg))
+	return filepath.Base(dir)
 }
 
 func build(out, pkg string) error {

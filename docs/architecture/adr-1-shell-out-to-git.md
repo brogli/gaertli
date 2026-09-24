@@ -15,5 +15,5 @@ Every git operation runs the system `git` binary through `os/exec`. No git libra
 ## Consequences
 
 - Behaviour matches the user's terminal by construction, including hooks and credential helpers.
-- Output is parsed from machine-readable formats only (TR-08), with the argument rules in TR-09 and TR-10.
+- Output is parsed from machine-readable formats only (TR-08); the environment and arguments follow TR-09 and TR-10.
 - Each call costs a process start, which is noticeable on Windows. We keep calls few and large, stream the log, and read blobs through `cat-file --batch`.

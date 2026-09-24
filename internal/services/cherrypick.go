@@ -115,7 +115,7 @@ func pickArgs(verb string, opts core.PickOptions) []string {
 	return append(args, "--end-of-options")
 }
 
-// runSequence is CherryPickWith's and RevertWith's shared body: resolve
+// runSequence is CherryPick's and Revert's shared body: resolve
 // shas, refuse the whole call up front if any is a merge commit and no
 // mainline is set, then run verb under wt's write lock. A failure that
 // leaves headFile behind stopped mid-way: Code Conflicts.
@@ -133,7 +133,8 @@ func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb,
 	}
 	if opts.Mainline == 0 {
 		if merge, ok := firstMerge(candidates); ok {
-			return core.Errorf(core.GitFailed, "%s is a merge commit; %s does not support a merge commit", merge.ShortSHA, verb)
+			args := map[string]string{"sha": merge.ShortSHA, "verb": verb}
+			return core.ErrorfArgs(core.GitFailed, "mergeCommitNotPickable", args, "%s is a merge commit; %s does not support a merge commit", merge.ShortSHA, verb)
 		}
 	}
 
@@ -142,12 +143,7 @@ func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb,
 }
 
 // CherryPick implements core.API.
-func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []string) error {
-	return c.CherryPickWith(ctx, id, shas, core.PickOptions{})
-}
-
-// CherryPickWith implements core.API.
-func (c *Core) CherryPickWith(ctx context.Context, id core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []string, opts core.PickOptions) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return err
@@ -159,12 +155,7 @@ func (c *Core) CherryPickWith(ctx context.Context, id core.WorktreeID, shas []st
 }
 
 // Revert implements core.API.
-func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []string) error {
-	return c.RevertWith(ctx, id, shas, core.PickOptions{})
-}
-
-// RevertWith implements core.API.
-func (c *Core) RevertWith(ctx context.Context, id core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []string, opts core.PickOptions) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return err

@@ -3,9 +3,11 @@ package jobs
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -45,12 +47,7 @@ func (u *updateLog) snapshotTimed() []timedJob {
 }
 
 func (u *updateLog) terminalSeen() bool {
-	for _, j := range u.snapshot() {
-		if isTerminal(j.State) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(u.snapshot(), func(j Job) bool { return isTerminal(j.State) })
 }
 
 func (u *updateLog) terminalFor(id ID) (Job, bool) {
@@ -68,7 +65,7 @@ func TestQA_RESP_01_StartReturnsImmediatelyWithARunningJobRecorded(t *testing.T)
 	m := NewManager(log.record)
 
 	start := time.Now()
-	id := m.Start("test", func(ctx context.Context, progress Progress) (any, error) {
+	id := m.Start(t.Context(), "test", func(ctx context.Context, progress Progress) (any, error) {
 		<-release
 		return nil, nil
 	})
@@ -94,69 +91,71 @@ func TestQA_RESP_01_StartReturnsImmediatelyWithARunningJobRecorded(t *testing.T)
 }
 
 func TestFR_SYNC_07_ProgressEmitsImmediatelyThenThrottled(t *testing.T) {
-	var mu updateLog
-	m := NewManager(mu.record)
+	synctest.Test(t, func(t *testing.T) {
+		var log updateLog
+		m := NewManager(log.record)
 
-	start := time.Now()
-	m.Start("test", func(ctx context.Context, progress Progress) (any, error) {
-		for range 20 {
-			progress(50, "burst")
-		}
-		time.Sleep(150 * time.Millisecond)
-		progress(100, "final")
-		return nil, nil
-	})
-
-	waitFor(t, func() bool { return mu.terminalSeen() }, 2*time.Second)
-
-	timed := mu.snapshotTimed()
-	// timed[0] is the Running transition (always emitted); a progress
-	// update with Percent 50 must follow almost immediately (well under
-	// the 100ms throttle), proving the burst's first call was not held
-	// back.
-	var firstBurstAt time.Duration
-	progressUpdates := 0
-	for _, u := range timed {
-		if u.Percent == 50 {
-			if progressUpdates == 0 {
-				firstBurstAt = u.at.Sub(start)
+		start := time.Now()
+		m.Start(t.Context(), "test", func(ctx context.Context, progress Progress) (any, error) {
+			for range 20 {
+				progress(50, "burst")
 			}
-			progressUpdates++
-		}
-	}
-	if progressUpdates == 0 {
-		t.Fatal("no progress update carried Percent 50")
-	}
-	if firstBurstAt > 50*time.Millisecond {
-		t.Errorf("first burst update arrived after %s, want well under 100ms", firstBurstAt)
-	}
-	if progressUpdates > 2 {
-		t.Errorf("got %d updates with Percent 50 during a 50ms burst, want at most 2 (100ms throttle: immediate + at most one more)", progressUpdates)
-	}
+			time.Sleep(150 * time.Millisecond)
+			progress(100, "final")
+			return nil, nil
+		})
+		time.Sleep(150 * time.Millisecond)
+		synctest.Wait()
 
-	last := timed[len(timed)-1]
-	if last.State != Done || last.Percent != 100 {
-		t.Errorf("last update = %+v, want the terminal Done at 100 regardless of throttle", last.Job)
-	}
+		timed := log.snapshotTimed()
+		// timed[0] is the Running transition (always emitted); a progress
+		// update with Percent 50 must follow almost immediately (well under
+		// the 100ms throttle), proving the burst's first call was not held
+		// back.
+		var firstBurstAt time.Duration
+		progressUpdates := 0
+		for _, u := range timed {
+			if u.Percent == 50 {
+				if progressUpdates == 0 {
+					firstBurstAt = u.at.Sub(start)
+				}
+				progressUpdates++
+			}
+		}
+		if progressUpdates == 0 {
+			t.Fatal("no progress update carried Percent 50")
+		}
+		if firstBurstAt > 50*time.Millisecond {
+			t.Errorf("first burst update arrived after %s, want well under 100ms", firstBurstAt)
+		}
+		if progressUpdates > 2 {
+			t.Errorf("got %d updates with Percent 50 during a 50ms burst, want at most 2 (100ms throttle: immediate + at most one more)", progressUpdates)
+		}
+
+		last := timed[len(timed)-1]
+		if last.State != Done || last.Percent != 100 {
+			t.Errorf("last update = %+v, want the terminal Done at 100 regardless of throttle", last.Job)
+		}
+	})
 }
 
 func TestFR_SYNC_07_CancelledJobEndsInCancelledNotFailed(t *testing.T) {
-	var mu updateLog
-	m := NewManager(mu.record)
+	var log updateLog
+	m := NewManager(log.record)
 
-	id := m.Start("test", func(ctx context.Context, progress Progress) (any, error) {
+	id := m.Start(t.Context(), "test", func(ctx context.Context, progress Progress) (any, error) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	})
 
-	waitFor(t, func() bool { return len(mu.snapshot()) >= 1 }, time.Second)
+	waitFor(t, func() bool { return len(log.snapshot()) >= 1 }, time.Second)
 	if ok := m.Cancel(id); !ok {
 		t.Fatal("Cancel returned false for a running job")
 	}
 
-	waitFor(t, func() bool { return mu.terminalSeen() }, 2*time.Second)
+	waitFor(t, log.terminalSeen, 2*time.Second)
 
-	updates := mu.snapshot()
+	updates := log.snapshot()
 	terminals := 0
 	var last Job
 	for _, u := range updates {
@@ -170,9 +169,6 @@ func TestFR_SYNC_07_CancelledJobEndsInCancelledNotFailed(t *testing.T) {
 	}
 	if last.State != Cancelled {
 		t.Errorf("final State = %s, want %s", last.State, Cancelled)
-	}
-	if last.EndedAt.IsZero() {
-		t.Error("EndedAt is zero, want it set")
 	}
 }
 
@@ -189,25 +185,45 @@ func TestQA_RESP_02_CancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
 }
 
 func TestFR_SYNC_07_FnErrorEndsFailedFnNilEndsDone(t *testing.T) {
-	var mu updateLog
-	m := NewManager(mu.record)
+	var log updateLog
+	m := NewManager(log.record)
 
-	failID := m.Start("fail", func(ctx context.Context, progress Progress) (any, error) {
+	failID := m.Start(t.Context(), "fail", func(ctx context.Context, progress Progress) (any, error) {
 		return nil, errors.New("boom")
 	})
-	okID := m.Start("ok", func(ctx context.Context, progress Progress) (any, error) {
+	okID := m.Start(t.Context(), "ok", func(ctx context.Context, progress Progress) (any, error) {
 		return nil, nil
 	})
 
 	waitFor(t, func() bool {
-		f, fok := mu.terminalFor(failID)
-		o, ook := mu.terminalFor(okID)
+		f, fok := log.terminalFor(failID)
+		o, ook := log.terminalFor(okID)
 		return fok && f.State == Failed && ook && o.State == Done
 	}, 2*time.Second)
 
-	f, _ := mu.terminalFor(failID)
+	f, _ := log.terminalFor(failID)
 	if f.Err == nil || f.Err.Error() != "boom" {
 		t.Errorf("failed job Err = %v, want \"boom\"", f.Err)
+	}
+}
+
+func TestTR_29_AJobOutlivesItsRequestContextAndKeepsItsValues(t *testing.T) {
+	type requestKey struct{}
+	var log updateLog
+	m := NewManager(log.record)
+	request, cancelRequest := context.WithCancel(context.WithValue(t.Context(), requestKey{}, "request value"))
+	release := make(chan struct{})
+
+	id := m.Start(request, "test", func(ctx context.Context, progress Progress) (any, error) {
+		<-release
+		return ctx.Value(requestKey{}), ctx.Err()
+	})
+	cancelRequest()
+	close(release)
+
+	waitFor(t, func() bool { _, ok := log.terminalFor(id); return ok }, 2*time.Second)
+	if job, _ := log.terminalFor(id); job.State != Done || job.Result != "request value" {
+		t.Errorf("job = %+v, want State Done with Result \"request value\"", job)
 	}
 }
 
@@ -215,12 +231,12 @@ func TestQA_RESP_01_NoManagerImposedConcurrencyCap(t *testing.T) {
 	m := NewManager(func(Job) {})
 	block := make(chan struct{})
 
-	m.Start("first", func(ctx context.Context, progress Progress) (any, error) {
+	m.Start(t.Context(), "first", func(ctx context.Context, progress Progress) (any, error) {
 		<-block
 		return nil, nil
 	})
 	secondDone := make(chan struct{})
-	m.Start("second", func(ctx context.Context, progress Progress) (any, error) {
+	m.Start(t.Context(), "second", func(ctx context.Context, progress Progress) (any, error) {
 		close(secondDone)
 		return nil, nil
 	})
@@ -252,8 +268,8 @@ func TestFR_SYNC_07_StartDedupesAKindAlreadyQueuedOrRunning(t *testing.T) {
 		return nil, nil
 	}
 
-	first := m.Start("fetch", fn)
-	second := m.Start("fetch", fn)
+	first := m.Start(t.Context(), "fetch", fn)
+	second := m.Start(t.Context(), "fetch", fn)
 
 	if second != first {
 		t.Errorf("Start returned a new id %q for a kind already running (%q), want the running job's own id", second, first)
@@ -280,9 +296,9 @@ func TestFR_UPD_01_StartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
 		return nil, nil
 	}
 
-	a := m.StartForBranch("update-branch", "A", fn)
-	b := m.StartForBranch("update-branch", "B", fn)
-	again := m.StartForBranch("update-branch", "A", fn)
+	a := m.StartForBranch(t.Context(), "update-branch", "A", fn)
+	b := m.StartForBranch(t.Context(), "update-branch", "B", fn)
+	again := m.StartForBranch(t.Context(), "update-branch", "A", fn)
 
 	if a == b {
 		t.Errorf("branches A and B share job %q, want one job each", a)
@@ -302,7 +318,7 @@ func TestQA_RESP_02_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing
 
 	for range historyCap + 3 {
 		done := make(chan struct{})
-		id := m.Start("fast", func(ctx context.Context, progress Progress) (any, error) {
+		id := m.Start(t.Context(), "fast", func(ctx context.Context, progress Progress) (any, error) {
 			close(done)
 			return nil, nil
 		})
@@ -311,7 +327,7 @@ func TestQA_RESP_02_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing
 	}
 
 	block := make(chan struct{})
-	blockedID := m.Start("blocked", func(ctx context.Context, progress Progress) (any, error) {
+	blockedID := m.Start(t.Context(), "blocked", func(ctx context.Context, progress Progress) (any, error) {
 		<-block
 		return nil, nil
 	})

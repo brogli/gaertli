@@ -1,8 +1,7 @@
 import type { Settings } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
 
 // defaultSettingsFixture is a fully-populated Settings value, shared by
-// every test that mocks SettingsService.Get, so a Settings-shape change is
-// a one-place update.
+// every test that mocks SettingsService.Get.
 export function defaultSettingsFixture(overrides: Partial<Settings> = {}): Settings {
   return {
     recentRepos: [],

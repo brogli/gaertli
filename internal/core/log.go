@@ -7,7 +7,6 @@ type LogRowsResult struct {
 	Done       bool        `json:"done"`
 	Error      *Error      `json:"error,omitempty"`
 	Generation int         `json:"generation"` // bumps on ReloadLog; a store sees this change and drops its row cache
-	Flat       bool        `json:"flat"`       // a text/author query narrows this view: the UI hides the graph column
 }
 
 // LogCommit is one commit-log row.
@@ -87,11 +86,18 @@ func (f LogFilter) Empty() bool {
 	return f.Query == "" && f.Author == "" && len(f.Branches) == 0 && f.Path == ""
 }
 
+// Flat reports whether f's result has no graph: a text/author search walks
+// history out of topological order.
+func (f LogFilter) Flat() bool {
+	return f.Query != "" || f.Author != ""
+}
+
 // LogProgress is "log:progress"'s payload. Filtered tells the repo-wide
 // unfiltered log apart from a window's own filtered view: one window can
-// have both streams running at once. Generation is the repo-wide log's
-// LogRowsResult.Generation: a reload that keeps the commit count still
-// tells a window its cached rows are stale.
+// have both streams running at once. Generation is that stream's own
+// LogRowsResult.Generation (the repo-wide log's, or the window's own
+// filtered view's): a reload that keeps the commit count still tells a
+// window its cached rows are stale.
 type LogProgress struct {
 	Loaded     int  `json:"loaded"`
 	Done       bool `json:"done"`

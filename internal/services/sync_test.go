@@ -28,7 +28,7 @@ func bareRemote(t *testing.T, repo *gittest.Repo, name string) string {
 // refSHA resolves ref in dir; ok is false if it does not exist.
 func refSHA(t *testing.T, dir, ref string) (sha string, ok bool) {
 	t.Helper()
-	result, err := (git.Runner{}).Run(context.Background(), git.Call{
+	result, err := (git.Runner{}).Run(t.Context(), git.Call{
 		Dir: dir, ReadOnly: true, Args: []string{"rev-parse", "-q", "--verify", "--end-of-options", ref},
 	})
 	if err != nil {
@@ -41,6 +41,7 @@ func refSHA(t *testing.T, dir, ref string) (sha string, ok bool) {
 // throwaway clone, simulating a push from elsewhere without touching
 // repo's own history. Returns the new commit's SHA.
 func remoteAppendCommit(t *testing.T, remoteDir, file, content, msg string) string {
+	t.Helper()
 	return remoteAppendCommitOnBranch(t, remoteDir, "", file, content, msg)
 }
 
@@ -72,21 +73,18 @@ func remoteAppendCommitFiles(t *testing.T, remoteDir, branch string, files map[s
 	return gittest.HeadSHA(t, clone)
 }
 
-// lastCommand returns the most recent command-log entry for wt whose
-// Command starts with "git <verb>".
-func lastCommand(t *testing.T, c *Core, wt core.WorktreeID, verb string) core.CommandLogEntry {
+// lastCommand returns the most recent git call rec recorded whose Command
+// starts with "git <verb>".
+func lastCommand(t *testing.T, rec *commandRecorder, verb string) git.Entry {
 	t.Helper()
-	list, err := c.CommandLog(context.Background(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := len(list) - 1; i >= 0; i-- {
-		if strings.HasPrefix(list[i].Command, "git "+verb) {
-			return list[i]
+	list := rec.snapshot()
+	for _, l := range slices.Backward(list) {
+		if strings.HasPrefix(l.Command, "git "+verb) {
+			return l
 		}
 	}
 	t.Fatalf("no %q command logged", verb)
-	return core.CommandLogEntry{}
+	return git.Entry{}
 }
 
 func TestFR_SYNC_04_ClassifyPushRejectionClassifiesByReason(t *testing.T) {
@@ -95,24 +93,28 @@ func TestFR_SYNC_04_ClassifyPushRejectionClassifiesByReason(t *testing.T) {
 		stdout    string
 		want      core.Code
 		wantInMsg string // substring the message must name; "" skips the check
+		wantKey   string // "" for the passthrough case: no remap happened
 	}{
-		{"fetch first", "!\trefs/heads/main:refs/heads/main\t[rejected] (fetch first)\n", core.NotFastForward, "fetch first"},
-		{"non-fast-forward", "!\trefs/heads/main:refs/heads/main\t[rejected] (non-fast-forward)\n", core.NotFastForward, "non-fast-forward"},
-		{"stale info", "!\trefs/heads/main:refs/heads/main\t[rejected] (stale info)\n", core.NotFastForward, "stale info"},
-		{"remote ref updated since checkout", "!\trefs/heads/main:refs/heads/main\t[rejected] (remote ref updated since checkout)\n", core.NotFastForward, "remote ref updated since checkout"},
-		{"hook declined", "!\trefs/heads/main:refs/heads/main\t[rejected] (hook declined)\n", core.PushRejected, "hook declined"},
-		{"no rejected-ref line", "To origin\nDone\n", core.GitFailed, ""},
+		{"fetch first", "!\trefs/heads/main:refs/heads/main\t[rejected] (fetch first)\n", core.NotFastForward, "fetch first", "pushFetchFirst"},
+		{"non-fast-forward", "!\trefs/heads/main:refs/heads/main\t[rejected] (non-fast-forward)\n", core.NotFastForward, "non-fast-forward", "pushNotFastForward"},
+		{"stale info", "!\trefs/heads/main:refs/heads/main\t[rejected] (stale info)\n", core.NotFastForward, "stale info", "pushStaleInfo"},
+		{"remote ref updated since checkout", "!\trefs/heads/main:refs/heads/main\t[rejected] (remote ref updated since checkout)\n", core.NotFastForward, "remote ref updated since checkout", "pushRefUpdatedSinceCheckout"},
+		{"hook declined", "!\trefs/heads/main:refs/heads/main\t[rejected] (hook declined)\n", core.PushRejected, "hook declined", "pushRejected"},
+		{"no rejected-ref line", "To origin\nDone\n", core.GitFailed, "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := &core.Error{Code: core.GitFailed}
 			got := classifyPushRejection(err, git.Result{Stdout: []byte(tt.stdout)})
-			var ce *core.Error
-			if !errors.As(got, &ce) || ce.Code != tt.want {
-				t.Fatalf("code = %v, want %v", ce, tt.want)
-			}
+			ce := coretest.AsError(t, got, tt.want)
 			if tt.wantInMsg != "" && !strings.Contains(ce.Message, tt.wantInMsg) {
 				t.Errorf("message = %q, want it to name the reason %q", ce.Message, tt.wantInMsg)
+			}
+			if ce.Key != tt.wantKey {
+				t.Errorf("Key = %q, want %q", ce.Key, tt.wantKey)
+			}
+			if tt.want == core.PushRejected && ce.Args["reason"] != "hook declined" {
+				t.Errorf("Args[reason] = %q, want %q", ce.Args["reason"], "hook declined")
 			}
 		})
 	}
@@ -131,12 +133,16 @@ func TestFR_UPD_03_ClassifyDivergedFetchReclassifiesNonFastForward(t *testing.T)
 		t.Run(tt.name, func(t *testing.T) {
 			err := &core.Error{Code: core.GitFailed}
 			got := classifyDivergedFetch(err, git.Result{Stderr: []byte(tt.stderr)}, "B")
-			var ce *core.Error
-			if !errors.As(got, &ce) || ce.Code != tt.want {
-				t.Fatalf("code = %v, want %v", ce, tt.want)
-			}
-			if tt.want == core.NotFastForward && !strings.Contains(ce.Message, `"B"`) {
-				t.Errorf("message = %q, want it to name the branch", ce.Message)
+			ce := coretest.AsError(t, got, tt.want)
+			if tt.want == core.NotFastForward {
+				if !strings.Contains(ce.Message, `"B"`) {
+					t.Errorf("message = %q, want it to name the branch", ce.Message)
+				}
+				if ce.Key != "branchDiverged" || ce.Args["branch"] != "B" {
+					t.Errorf("Key/Args = %q/%+v, want branchDiverged/branch=B", ce.Key, ce.Args)
+				}
+			} else if ce.Key != "" {
+				t.Errorf("Key = %q, want empty (no remap happened)", ce.Key)
 			}
 		})
 	}
@@ -157,18 +163,23 @@ func TestFR_SYNC_08_QA_SEC_02_RemapAuthFailedClassifiesVerifiedPrefixes(t *testi
 		t.Run(tt.name, func(t *testing.T) {
 			err := &core.Error{Code: core.GitFailed}
 			got := remapAuthFailed(err, git.Result{Stderr: []byte(tt.stderr)})
-			var ce *core.Error
-			if !errors.As(got, &ce) || ce.Code != tt.want {
-				t.Fatalf("code = %v, want %v", ce, tt.want)
-			}
+			ce := coretest.AsError(t, got, tt.want)
 			if tt.want != core.AuthFailed {
+				if ce.Key != "" {
+					t.Errorf("Key = %q, want empty (no remap happened)", ce.Key)
+				}
 				return
 			}
 			if strings.Contains(ce.Message, url) || strings.Contains(ce.Message, "s3cret") {
 				t.Errorf("message leaks the URL or credential text: %q", ce.Message)
 			}
-			if !strings.Contains(ce.Message, "credential") {
-				t.Errorf("message does not mention credential setup: %q", ce.Message)
+			for _, hint := range []string{"from a terminal", "never asks for, stores or sees credentials"} {
+				if !strings.Contains(ce.Message, hint) {
+					t.Errorf("message lacks %q: %q", hint, ce.Message)
+				}
+			}
+			if ce.Key != "authFailed" {
+				t.Errorf("Key = %q, want authFailed", ce.Key)
 			}
 		})
 	}
@@ -194,8 +205,7 @@ func TestFR_SYNC_09_ClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals(t *
 		t.Run(tt.name, func(t *testing.T) {
 			err := &core.Error{Code: core.GitFailed}
 			got := classifyDirtyIntegrate(err, git.Result{Stderr: []byte(tt.stderr)})
-			var ce *core.Error
-			if !errors.As(got, &ce) || ce.Code != tt.want {
+			if ce, ok := errors.AsType[*core.Error](got); !ok || ce.Code != tt.want {
 				t.Errorf("code = %v, want %v", ce, tt.want)
 			}
 		})
@@ -212,17 +222,17 @@ func TestFR_SYNC_09_PullReclassifiesAFastForwardBlockedByLocalChangesAsDirtyWork
 	writeFile(t, repo.Dir, "seed.txt", "local uncommitted change\n") // unstaged, not committed: still a pure fast-forward
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Pull(context.Background(), wt, core.PullMerge)
+	jobID, err := c.Pull(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.DirtyWorktree {
 		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.DirtyWorktree)
 	}
-	if content, err := os.ReadFile(filepath.Join(repo.Dir, "seed.txt")); err != nil || string(content) != "local uncommitted change\n" {
-		t.Errorf("seed.txt = %q, %v, want the local change untouched", content, err)
+	if content := readFile(t, repo.Dir, "seed.txt"); content != "local uncommitted change\n" {
+		t.Errorf("seed.txt = %q, want the local change untouched", content)
 	}
 }
 
@@ -237,18 +247,17 @@ func TestFR_SYNC_09_PullWithStashStashesIntegratesAndPopsBackOnSuccess(t *testin
 	writeFile(t, repo.Dir, "other.txt", "local uncommitted change\n")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.PullWithStash(context.Background(), wt, core.PullMerge)
+	jobID, err := c.PullWithStash(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if got := gittest.HeadSHA(t, repo.Dir); got != upstreamTip {
 		t.Errorf("HEAD = %q, want fast-forwarded to upstream tip %q", got, upstreamTip)
 	}
-	content, err := os.ReadFile(filepath.Join(repo.Dir, "other.txt"))
-	if err != nil || string(content) != "local uncommitted change\n" {
-		t.Errorf("other.txt = %q, %v, want the local change restored, unchanged", content, err)
+	if content := readFile(t, repo.Dir, "other.txt"); content != "local uncommitted change\n" {
+		t.Errorf("other.txt = %q, want the local change restored, unchanged", content)
 	}
 	if list := gittest.Out(t, repo.Dir, "stash", "list"); list != "" {
 		t.Errorf("stash list = %q, want empty", list)
@@ -276,11 +285,11 @@ func TestFR_SYNC_09_PullWithStashSkipsThePopWhenThereIsNothingToStash(t *testing
 	// has nothing to save.
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.PullWithStash(context.Background(), wt, core.PullMerge)
+	jobID, err := c.PullWithStash(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if got := gittest.HeadSHA(t, repo.Dir); got != upstreamTip {
 		t.Errorf("HEAD = %q, want fast-forwarded to upstream tip %q", got, upstreamTip)
@@ -313,11 +322,11 @@ func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) 
 	repo, _ := pullWithStashConflictFixture(t)
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.PullWithStash(context.Background(), wt, core.PullMerge)
+	jobID, err := c.PullWithStash(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.Conflicts {
 		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicts)
@@ -335,7 +344,7 @@ func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) 
 	}
 
 	// Summary.PullStash names the kept entry, by its stable commit SHA.
-	summary, err := c.Summary(context.Background(), wt)
+	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,22 +354,21 @@ func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) 
 
 	// Resolving the conflict and committing, then PopStash brings the
 	// unrelated local change back and clears PullStash.
-	if err := c.StageFile(context.Background(), wt, "seed.txt"); err != nil {
+	if err := c.StageFile(t.Context(), wt, "seed.txt"); err != nil {
 		t.Fatal(err)
 	}
 	gittest.CommitAll(t, repo.Dir, "resolve conflict")
 
-	if err := c.PopStash(context.Background(), wt, stashSHA); err != nil {
+	if err := c.PopStash(t.Context(), wt, stashSHA); err != nil {
 		t.Fatal(err)
 	}
-	content, err := os.ReadFile(filepath.Join(repo.Dir, "other.txt"))
-	if err != nil || string(content) != "unrelated local change\n" {
-		t.Errorf("other.txt = %q, %v, want the stashed change restored", content, err)
+	if content := readFile(t, repo.Dir, "other.txt"); content != "unrelated local change\n" {
+		t.Errorf("other.txt = %q, want the stashed change restored", content)
 	}
 	if list := gittest.Out(t, repo.Dir, "stash", "list"); list != "" {
 		t.Errorf("stash list = %q, want empty after popping", list)
 	}
-	summary, err = c.Summary(context.Background(), wt)
+	summary, err = c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,13 +393,13 @@ func TestFR_SYNC_09_PopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.PopStash(context.Background(), wt, stashSHA)
+	err := c.PopStash(t.Context(), wt, stashSHA)
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if list := gittest.Out(t, repo.Dir, "stash", "list"); list == "" {
 		t.Error("stash list empty, want the conflicting entry kept")
 	}
-	status, err := c.Status(context.Background(), wt)
+	status, err := c.Status(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +426,7 @@ func TestFR_SYNC_09_DropStashDeletesTheEntry(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.DropStash(context.Background(), wt, stashSHA); err != nil {
+	if err := c.DropStash(t.Context(), wt, stashSHA); err != nil {
 		t.Fatal(err)
 	}
 
@@ -451,7 +459,7 @@ func TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *tes
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.DropStash(context.Background(), wt, markerSHA); err != nil {
+	if err := c.DropStash(t.Context(), wt, markerSHA); err != nil {
 		t.Fatal(err)
 	}
 
@@ -487,13 +495,12 @@ func TestFR_SYNC_09_PopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *t
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.PopStash(context.Background(), wt, markerSHA); err != nil {
+	if err := c.PopStash(t.Context(), wt, markerSHA); err != nil {
 		t.Fatal(err)
 	}
 
-	content, err := os.ReadFile(filepath.Join(repo.Dir, "f.txt"))
-	if err != nil || string(content) != "marker change\n" {
-		t.Errorf("f.txt = %q, %v, want the marker stash's change restored", content, err)
+	if content := readFile(t, repo.Dir, "f.txt"); content != "marker change\n" {
+		t.Errorf("f.txt = %q, want the marker stash's change restored", content)
 	}
 	list := gittest.Out(t, repo.Dir, "stash", "list")
 	if n := strings.Count(list, "\n") + 1; list == "" || n != 1 {
@@ -513,21 +520,157 @@ func TestFR_SYNC_09_PopStashWithAnUnknownSHAReturnsAClearError(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.PopStash(context.Background(), wt, strings.Repeat("a", 40))
+	err := c.PopStash(t.Context(), wt, strings.Repeat("a", 40))
 
 	coretest.AssertCode(t, err, core.Internal)
 }
 
-func TestFR_SYNC_02_PullIntegrateArgsMapsModeToGitArgs(t *testing.T) {
-	if args, err := pullIntegrateArgs(core.PullMerge); err != nil || !slices.Equal(args, []string{"merge", "--no-edit", "@{upstream}"}) {
-		t.Errorf("merge args = %v, %v", args, err)
+func TestFR_SYNC_02_QA_COMP_01_PullIntegrateArgsMapsModeAndPullFFToGitArgs(t *testing.T) {
+	tests := []struct {
+		name   string
+		mode   core.PullMode
+		pullFF string // "" leaves pull.ff unset
+		want   []string
+	}{
+		{"merge, pull.ff unset", core.PullMerge, "", []string{"merge", "--no-edit", "@{upstream}"}},
+		{"merge, pull.ff=false", core.PullMerge, "false", []string{"merge", "--no-edit", "--no-ff", "@{upstream}"}},
+		{"merge, pull.ff=off", core.PullMerge, "off", []string{"merge", "--no-edit", "--no-ff", "@{upstream}"}},
+		{"merge, pull.ff=true", core.PullMerge, "true", []string{"merge", "--no-edit", "--ff", "@{upstream}"}},
+		{"merge, pull.ff=only", core.PullMerge, "only", []string{"merge", "--no-edit", "@{upstream}"}},
+		{"rebase", core.PullRebase, "false", []string{"rebase", "--fork-point", "@{upstream}"}},
 	}
-	if args, err := pullIntegrateArgs(core.PullRebase); err != nil || !slices.Equal(args, []string{"rebase", "@{upstream}"}) {
-		t.Errorf("rebase args = %v, %v", args, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := gittest.New(t)
+			if tt.pullFF != "" {
+				gittest.Run(t, repo.Dir, "config", "pull.ff", tt.pullFF)
+			}
+			args, err := pullIntegrateArgs(t.Context(), git.Runner{}, repo.Dir, tt.mode)
+			if err != nil || !slices.Equal(args, tt.want) {
+				t.Errorf("args = %v, %v, want %v", args, err, tt.want)
+			}
+		})
 	}
 
-	_, err := pullIntegrateArgs(core.PullMode("bogus"))
+	_, err := pullIntegrateArgs(t.Context(), git.Runner{}, t.TempDir(), core.PullMode("bogus"))
 	coretest.AssertCode(t, err, core.Internal)
+}
+
+func TestQA_COMP_01_PullIntegrateArgsFailsOnAConfigReadErrorOtherThanUnset(t *testing.T) {
+	t.Setenv("FAKEGIT_EXIT", "128")
+	t.Setenv("FAKEGIT_STDERR", "fatal: bad config line 1 in file .git/config")
+
+	_, err := pullIntegrateArgs(t.Context(), git.Runner{Git: fakegit}, t.TempDir(), core.PullMerge)
+
+	coretest.AssertCode(t, err, core.GitFailed)
+}
+
+func TestFR_SYNC_02_ConfiguredPullModeReadsBranchRebaseBeforePullRebase(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "switch", "-c", "main")
+	c, wt := openWorktree(t, repo.Dir)
+	assertMode := func(step string, want core.PullMode) {
+		t.Helper()
+		if got, err := c.ConfiguredPullMode(t.Context(), wt); err != nil || got != want {
+			t.Errorf("%s: mode = %q, %v, want %q", step, got, err, want)
+		}
+	}
+
+	gittest.Run(t, repo.Dir, "config", "branch.main.rebase", "true")
+	gittest.Run(t, repo.Dir, "config", "pull.rebase", "false")
+	assertMode("branch.main.rebase=true, pull.rebase=false", core.PullRebase)
+
+	gittest.Run(t, repo.Dir, "config", "--unset", "branch.main.rebase")
+	gittest.Run(t, repo.Dir, "config", "pull.rebase", "merges")
+	assertMode("pull.rebase=merges", core.PullRebase)
+
+	gittest.Run(t, repo.Dir, "config", "pull.rebase", "no")
+	assertMode("pull.rebase=no", core.PullMerge)
+
+	gittest.Run(t, repo.Dir, "config", "--unset", "pull.rebase")
+	assertMode("neither", "")
+
+	gittest.Run(t, repo.Dir, "config", "pull.rebase", "true")
+	gittest.Run(t, repo.Dir, "switch", "--detach")
+	assertMode("detached", "")
+}
+
+// pullToDone runs pull in mode on dir's worktree and fails the test unless
+// its job ends done.
+func pullToDone(t *testing.T, dir string, mode core.PullMode, pull func(*Core, context.Context, core.WorktreeID, core.PullMode) (string, error)) {
+	t.Helper()
+	c, wt := openWorktree(t, dir)
+	jobID, err := pull(c, t.Context(), wt, mode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && (j.State == "done" || j.State == "failed") })
+	if job.State != "done" {
+		t.Fatalf("job = %+v, want done", job.Error)
+	}
+}
+
+// headParents are HEAD's parent SHAs, first parent first.
+func headParents(t *testing.T, dir string) []string {
+	t.Helper()
+	return strings.Fields(gittest.Out(t, dir, "log", "-1", "--format=%P", "HEAD"))
+}
+
+func TestQA_COMP_01_PullMergeWithPullFFFalseMakesAMergeCommitWhenBehind(t *testing.T) {
+	repo, origin := pullMergeFixture(t)
+	gittest.Run(t, repo.Dir, "config", "pull.ff", "false")
+	upstreamTip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
+
+	pullToDone(t, repo.Dir, core.PullMerge, (*Core).Pull)
+
+	if parents := headParents(t, repo.Dir); len(parents) != 2 || parents[1] != upstreamTip {
+		t.Errorf("HEAD parents = %v, want a merge commit with %s second", parents, upstreamTip)
+	}
+}
+
+func TestQA_COMP_01_PullMergeWithPullFFTrueFastForwardsDespiteMergeFFFalse(t *testing.T) {
+	repo, origin := pullMergeFixture(t)
+	gittest.Run(t, repo.Dir, "config", "pull.ff", "true")
+	gittest.Run(t, repo.Dir, "config", "merge.ff", "false")
+	upstreamTip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
+
+	pullToDone(t, repo.Dir, core.PullMerge, (*Core).Pull)
+
+	if got := gittest.HeadSHA(t, repo.Dir); got != upstreamTip {
+		t.Errorf("HEAD = %q, want fast-forwarded to upstream tip %q", got, upstreamTip)
+	}
+}
+
+func TestQA_COMP_01_PullMergeWithPullFFOnlyStillMergesADivergedBranch(t *testing.T) {
+	repo, origin := pullMergeFixture(t)
+	gittest.Run(t, repo.Dir, "config", "pull.ff", "only")
+	upstreamTip := remoteAppendCommit(t, origin, "upstream-only.txt", "u", "upstream commit")
+	gittest.Commit(t, repo.Dir, "local-only.txt", "l", "local commit")
+
+	pullToDone(t, repo.Dir, core.PullMerge, (*Core).Pull)
+
+	if parents := headParents(t, repo.Dir); len(parents) != 2 || parents[1] != upstreamTip {
+		t.Errorf("HEAD parents = %v, want a merge commit with %s second", parents, upstreamTip)
+	}
+}
+
+func TestQA_COMP_01_PullWithStashMergeWithPullFFFalseMakesAMergeCommitAndRestoresTheChange(t *testing.T) {
+	repo, origin := pullMergeFixture(t)
+	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")
+	gittest.Run(t, repo.Dir, "push", "origin", "master")
+	gittest.Run(t, repo.Dir, "config", "pull.ff", "false")
+	upstreamTip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
+	writeFile(t, repo.Dir, "other.txt", "local uncommitted change\n")
+
+	pullToDone(t, repo.Dir, core.PullMerge, (*Core).PullWithStash)
+
+	if parents := headParents(t, repo.Dir); len(parents) != 2 || parents[1] != upstreamTip {
+		t.Errorf("HEAD parents = %v, want a merge commit with %s second", parents, upstreamTip)
+	}
+	if content := readFile(t, repo.Dir, "other.txt"); content != "local uncommitted change\n" {
+		t.Errorf("other.txt = %q, want the local change restored", content)
+	}
 }
 
 func TestFR_SYNC_01_FetchOneRemotePrunesGoneBranchesLeavesOthersUntouched(t *testing.T) {
@@ -550,11 +693,11 @@ func TestFR_SYNC_01_FetchOneRemotePrunesGoneBranchesLeavesOthersUntouched(t *tes
 	}
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Fetch(context.Background(), wt, "a")
+	jobID, err := c.Fetch(t.Context(), wt, "a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if _, ok := refSHA(t, repo.Dir, "refs/remotes/a/feature"); ok {
 		t.Error("refs/remotes/a/feature still exists, want pruned")
@@ -581,11 +724,11 @@ func TestFR_SYNC_01_FetchAllUpdatesEveryRemote(t *testing.T) {
 	bTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Fetch(context.Background(), wt, "")
+	jobID, err := c.Fetch(t.Context(), wt, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if got, _ := refSHA(t, repo.Dir, "refs/remotes/a/master"); got != aTip {
 		t.Errorf("refs/remotes/a/master = %q, want %q", got, aTip)
@@ -612,11 +755,11 @@ func TestFR_SYNC_02_PullMergeFastForwardsWhenUpstreamIsAhead(t *testing.T) {
 	upstreamTip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Pull(context.Background(), wt, core.PullMerge)
+	jobID, err := c.Pull(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if got := gittest.HeadSHA(t, repo.Dir); got != upstreamTip {
 		t.Errorf("HEAD = %q, want fast-forwarded to upstream tip %q", got, upstreamTip)
@@ -629,11 +772,11 @@ func TestFR_SYNC_02_PullMergeCreatesMergeCommitForNonConflictingDivergence(t *te
 	gittest.Commit(t, repo.Dir, "local-only.txt", "l", "local commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Pull(context.Background(), wt, core.PullMerge)
+	jobID, err := c.Pull(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	parents := strings.Fields(gittest.Out(t, repo.Dir, "log", "-1", "--format=%P", "HEAD"))
 	if len(parents) != 2 {
@@ -653,11 +796,11 @@ func TestFR_SYNC_02_PullMergeLeavesMergeHeadOnConflict(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "seed.txt", "local change\n", "local commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Pull(context.Background(), wt, core.PullMerge)
+	jobID, err := c.Pull(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.Conflicts {
 		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicts)
@@ -672,15 +815,15 @@ func TestFR_SYNC_02_PullMergeRefusesWhileDetached(t *testing.T) {
 	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	if err := c.CheckoutCommit(context.Background(), wt, sha); err != nil {
+	if err := c.CheckoutCommit(t.Context(), wt, sha); err != nil {
 		t.Fatal(err)
 	}
 
-	jobID, err := c.Pull(context.Background(), wt, core.PullMerge)
+	jobID, err := c.Pull(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.GitFailed {
 		t.Errorf("job.Error = %+v, want Code %s, no crash", job.Error, core.GitFailed)
@@ -693,11 +836,11 @@ func TestFR_SYNC_02_PullMergeRefusesWithNoUpstreamConfigured(t *testing.T) {
 	bareRemote(t, repo, "origin") // added, never pushed — no upstream tracking
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Pull(context.Background(), wt, core.PullMerge)
+	jobID, err := c.Pull(t.Context(), wt, core.PullMerge)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.GitFailed {
 		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.GitFailed)
@@ -710,11 +853,11 @@ func TestFR_SYNC_02_PullRebaseLinearisesNonConflictingDivergence(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "local-only.txt", "l", "local commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Pull(context.Background(), wt, core.PullRebase)
+	jobID, err := c.Pull(t.Context(), wt, core.PullRebase)
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	parents := strings.Fields(gittest.Out(t, repo.Dir, "log", "-1", "--format=%P", "HEAD"))
 	if len(parents) != 1 {
@@ -736,11 +879,11 @@ func TestFR_SYNC_02_PullRebaseLeavesRebaseDirOnConflict(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "seed.txt", "local change\n", "local commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Pull(context.Background(), wt, core.PullRebase)
+	jobID, err := c.Pull(t.Context(), wt, core.PullRebase)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.Conflicts {
 		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicts)
@@ -750,22 +893,54 @@ func TestFR_SYNC_02_PullRebaseLeavesRebaseDirOnConflict(t *testing.T) {
 	}
 }
 
+// remoteAmendTip amends remoteDir's default-branch tip with file set to
+// content, through a throwaway clone, and force-pushes it. Returns the new
+// tip's SHA.
+func remoteAmendTip(t *testing.T, remoteDir, file, content string) string {
+	t.Helper()
+	clone := filepath.Join(t.TempDir(), "clone")
+	gittest.Run(t, filepath.Dir(clone), "clone", remoteDir, clone)
+	writeFile(t, clone, file, content)
+	gittest.Run(t, clone, "add", "--", file)
+	gittest.Run(t, clone, "commit", "--amend", "--no-edit")
+	gittest.Run(t, clone, "push", "--force", "origin", "HEAD")
+	return gittest.HeadSHA(t, clone)
+}
+
+func TestQA_COMP_01_PullRebaseAfterAnUpstreamRewriteReplaysOnlyTheLocalCommit(t *testing.T) {
+	repo, origin := pullMergeFixture(t)
+	remoteAppendCommit(t, origin, "upstream.txt", "first version\n", "upstream commit")
+	gittest.Run(t, repo.Dir, "pull", "--ff-only")
+	gittest.Commit(t, repo.Dir, "local.txt", "l", "local commit")
+	rewrittenTip := remoteAmendTip(t, origin, "upstream.txt", "rewritten version\n")
+
+	pullToDone(t, repo.Dir, core.PullRebase, (*Core).Pull)
+
+	if parents := headParents(t, repo.Dir); len(parents) != 1 || parents[0] != rewrittenTip {
+		t.Errorf("HEAD parents = %v, want the rewritten upstream tip %s", parents, rewrittenTip)
+	}
+	if subject := gittest.Out(t, repo.Dir, "log", "-1", "--format=%s", "HEAD"); subject != "local commit" {
+		t.Errorf("HEAD subject = %q, want the local commit", subject)
+	}
+}
+
 func TestFR_SYNC_03_PushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
 	repo, origin := pullMergeFixture(t)
 	gittest.Commit(t, repo.Dir, "local.txt", "x", "local commit")
 	localTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Push(context.Background(), wt, "")
+	rec := recordCommands(t, c, wt)
+	jobID, err := c.Push(t.Context(), wt, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if got := gittest.Out(t, origin, "rev-parse", "master"); got != localTip {
 		t.Errorf("origin's master = %q, want %q", got, localTip)
 	}
-	if cmd := lastCommand(t, c, wt, "push"); strings.Contains(cmd.Command, "--set-upstream") {
+	if cmd := lastCommand(t, rec, "push"); strings.Contains(cmd.Command, "--set-upstream") {
 		t.Errorf("push command = %q, want no --set-upstream", cmd.Command)
 	}
 }
@@ -778,11 +953,11 @@ func TestFR_SYNC_03_PushSetUpstreamCreatesRemoteBranchAndTracks(t *testing.T) {
 	localTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Push(context.Background(), wt, "origin")
+	jobID, err := c.Push(t.Context(), wt, "origin")
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if got := gittest.Out(t, origin, "rev-parse", "feature"); got != localTip {
 		t.Errorf("origin's feature = %q, want %q", got, localTip)
@@ -798,11 +973,11 @@ func TestFR_SYNC_04_PushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "local.txt", "y", "local commit")                // diverges, unaware
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Push(context.Background(), wt, "")
+	jobID, err := c.Push(t.Context(), wt, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.NotFastForward {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.NotFastForward)
@@ -827,11 +1002,11 @@ func TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "local.txt", "x", "local commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.Push(context.Background(), wt, "")
+	jobID, err := c.Push(t.Context(), wt, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.PushRejected {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.PushRejected)
@@ -864,11 +1039,11 @@ func TestFR_SYNC_05_ForcePushSucceedsAfterProperlyIncorporatingUpstream(t *testi
 	rewrittenTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.ForcePush(context.Background(), wt)
+	jobID, err := c.ForcePush(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	waitForJobState(t, c, wt, jobID, "done")
 
 	if got := gittest.Out(t, origin, "rev-parse", "master"); got != rewrittenTip {
 		t.Errorf("origin's master = %q, want the rewritten local tip %q", got, rewrittenTip)
@@ -881,11 +1056,11 @@ func TestFR_SYNC_05_ForcePushRefusedWhenRemoteGainedAnUnfetchedCommit(t *testing
 	remoteTip := gittest.Out(t, origin, "rev-parse", "master")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.ForcePush(context.Background(), wt)
+	jobID, err := c.ForcePush(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.NotFastForward {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.NotFastForward)
@@ -912,11 +1087,11 @@ func TestQA_SEC_02_FR_SYNC_08_FetchJobClassifiesAFailedSignIn(t *testing.T) {
 	}
 	sess.Runner.Git = fakegit
 
-	jobID, err := c.Fetch(context.Background(), wt, "")
+	jobID, err := c.Fetch(t.Context(), wt, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.AuthFailed {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.AuthFailed)
@@ -959,11 +1134,11 @@ func TestFR_UPD_01_02_03_05_UpdateBranchFastForwardsABranchNotCheckedOutAnywhere
 	mainBefore := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.UpdateBranch(context.Background(), wt, "B")
+	jobID, err := c.UpdateBranch(t.Context(), wt, "B")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	job := waitForJobState(t, c, wt, jobID, "done")
 
 	if job.Kind != "update-branch" || job.Branch != "B" {
 		t.Errorf("job Kind, Branch = %q, %q, want update-branch, B", job.Kind, job.Branch)
@@ -991,7 +1166,7 @@ func TestFR_UPD_01_UpdateBranchFastForwardsABranchTrackingALocalBranch(t *testin
 	masterTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.UpdateBranch(context.Background(), wt, "B")
+	jobID, err := c.UpdateBranch(t.Context(), wt, "B")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1009,11 +1184,11 @@ func TestFR_UPD_05_UpdateBranchAlreadyAtUpstreamTipReportsUpToDate(t *testing.T)
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.UpdateBranch(context.Background(), wt, "B")
+	jobID, err := c.UpdateBranch(t.Context(), wt, "B")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	job := waitForJobState(t, c, wt, jobID, "done")
 
 	result := updateBranchResult(t, job)
 	if result.Outcome != "upToDate" || result.From != beforeSHA || result.To != beforeSHA || result.Commits != 0 {
@@ -1030,11 +1205,11 @@ func TestFR_UPD_03_UpdateBranchDivergedFromUpstreamFailsNotFastForward(t *testin
 	gittest.Run(t, repo.Dir, "checkout", "master")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.UpdateBranch(context.Background(), wt, "B")
+	jobID, err := c.UpdateBranch(t.Context(), wt, "B")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.NotFastForward {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.NotFastForward)
@@ -1054,10 +1229,28 @@ func TestFR_UPD_05_UpdateBranchWithNoUpstreamFailsBeforeAnyGitCall(t *testing.T)
 
 	// Refused before any job starts (a precondition, not a git failure):
 	// UpdateBranch itself returns the error, with no job to poll.
-	_, err := c.UpdateBranch(context.Background(), wt, "B")
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
 	coretest.AssertCode(t, err, core.NoUpstream)
 	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
 		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
+	}
+}
+
+func TestFR_UX_11_UpdateBranchWithNoUpstreamNamesTheBranchInArgs(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "branch", "B")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.NoUpstream)
+	if ce.Args["branch"] != "B" {
+		t.Errorf("Args[branch] = %q, want %q", ce.Args["branch"], "B")
+	}
+	if ce.Key != "noUpstream" {
+		t.Errorf("Key = %q, want noUpstream", ce.Key)
 	}
 }
 
@@ -1076,19 +1269,18 @@ func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereFastForwardsItsFilesToo(t *tes
 	remoteAppendCommitOnBranch(t, origin, "B", "upstream.txt", "u", "upstream commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.UpdateBranch(context.Background(), wt, "B")
+	jobID, err := c.UpdateBranch(t.Context(), wt, "B")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "done" })
+	job := waitForJobState(t, c, wt, jobID, "done")
 
 	result := updateBranchResult(t, job)
 	if result.Outcome != "updated" || result.Commits <= 0 {
 		t.Errorf("Result = %+v, want Outcome updated, Commits > 0", result)
 	}
-	content, err := os.ReadFile(filepath.Join(otherDir, "upstream.txt"))
-	if err != nil || string(content) != "u" {
-		t.Errorf("other worktree's upstream.txt = %q, %v, want \"u\" (files followed the update)", content, err)
+	if content := readFile(t, otherDir, "upstream.txt"); content != "u" {
+		t.Errorf("other worktree's upstream.txt = %q, want \"u\" (files followed the update)", content)
 	}
 }
 
@@ -1096,25 +1288,28 @@ func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesWhenThatWorktreeIsDirty
 	repo, origin, otherDir := updateBranchElsewhereFixture(t)
 	remoteAppendCommitOnBranch(t, origin, "B", "upstream.txt", "u", "upstream commit")
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
-	if err := os.WriteFile(filepath.Join(otherDir, "seed.txt"), []byte("dirty"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, otherDir, "seed.txt", "dirty")
 
 	c, wt := openWorktree(t, repo.Dir)
-	jobID, err := c.UpdateBranch(context.Background(), wt, "B")
+	jobID, err := c.UpdateBranch(t.Context(), wt, "B")
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == jobID && j.State == "failed" })
+	job := waitForJobState(t, c, wt, jobID, "failed")
 
 	if job.Error == nil || job.Error.Code != core.DirtyWorktree {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.DirtyWorktree)
 	}
+	if job.Error.Args["branch"] != "B" || job.Error.Args["path"] != otherDir {
+		t.Errorf("Args = %+v, want branch=B path=%s", job.Error.Args, otherDir)
+	}
+	if job.Error.Key != "branchCheckedOutDirty" {
+		t.Errorf("Key = %q, want branchCheckedOutDirty", job.Error.Key)
+	}
 	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
 		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
 	}
-	content, err := os.ReadFile(filepath.Join(otherDir, "seed.txt"))
-	if err != nil || string(content) != "dirty" {
-		t.Errorf("other worktree's seed.txt = %q, %v, want unchanged \"dirty\"", content, err)
+	if content := readFile(t, otherDir, "seed.txt"); content != "dirty" {
+		t.Errorf("other worktree's seed.txt = %q, want unchanged \"dirty\"", content)
 	}
 }

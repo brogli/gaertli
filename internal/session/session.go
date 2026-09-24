@@ -8,7 +8,6 @@ import (
 	"errors"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
@@ -16,11 +15,7 @@ import (
 	"github.com/brogli/nebegit/internal/watch"
 )
 
-// logCap bounds Worktree's command-log ring buffer.
-const logCap = 500
-
-// repoWatcher is the part of *watch.RepoWatcher session needs (testability,
-// same pattern as app.shellWindow).
+// repoWatcher is the part of *watch.RepoWatcher session uses; tests fake it.
 type repoWatcher interface {
 	CheckNow()
 	Close() error
@@ -34,14 +29,14 @@ type worktreePoller interface {
 	Close()
 }
 
-// Worktree is a per-window session: identity, a git.Runner scoped to it,
-// and the per-window log state below.
+// Worktree is one worktree's session, shared by every window selecting it:
+// identity, a git.Runner scoped to it, and the filtered log state below.
 type Worktree struct {
 	ID     core.WorktreeID
 	Path   string
 	GitDir string
 	Repo   *Repo
-	Runner git.Runner // Log emits a "command" event scoped to ID and appends to log
+	Runner git.Runner // Log emits a "command" event scoped to ID
 
 	poller worktreePoller // the working-file half of outside-change detection, focused while the window is
 
@@ -49,9 +44,6 @@ type Worktree struct {
 	// files: stage, commit, reset, checkout, cherry-pick, revert,
 	// merge/rebase steps, discard.
 	writeMu sync.Mutex
-
-	mu  sync.Mutex
-	log []core.CommandLogEntry // ring buffer, capped at logCap
 
 	// messageMu guards messageDraft apart from writeMu, so the draft never
 	// waits on a running git write.
@@ -61,12 +53,9 @@ type Worktree struct {
 	// The window's own filtered log view, apart from the repo's shared log.
 	filterMu     sync.Mutex
 	filterActive bool
-	filterFlat   bool
+	filter       core.LogFilter
 	filterCancel context.CancelFunc
-	filterGen    int
-	filterRows   []core.LogCommit
-	filterDone   bool
-	filterErr    *core.Error
+	filtered     logState
 }
 
 // Poller is the worktree's status poller (internal/services.Refresh/SetFocused).
@@ -92,22 +81,6 @@ func (w *Worktree) MessageDraft() string {
 	return w.messageDraft
 }
 
-// CommandLog returns a copy of the buffered entries, oldest first.
-func (w *Worktree) CommandLog() []core.CommandLogEntry {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return append([]core.CommandLogEntry(nil), w.log...)
-}
-
-func (w *Worktree) append(e core.CommandLogEntry) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.log = append(w.log, e)
-	if len(w.log) > logCap {
-		w.log = w.log[len(w.log)-logCap:]
-	}
-}
-
 // Repo is a per-repo session, shared by every Worktree with the same Key.
 type Repo struct {
 	Key string
@@ -121,12 +94,9 @@ type Repo struct {
 	writeMu sync.Mutex
 
 	mu       sync.Mutex
-	log      []core.LogCommit
-	logDone  bool
-	logErr   *core.Error
+	log      logState
 	loading  bool
 	tips     map[string]string // ref-tip snapshot recorded when the log last finished
-	gen      int               // bumped by LogBeginLoad/LogBeginReload
 	refcount int               // open worktrees sharing this repo
 }
 
@@ -164,18 +134,16 @@ func (r *Repo) release() bool {
 func (r *Repo) LogBeginLoad() (gen int, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.loading || r.logDone {
-		return r.gen, false
+	if r.loading || r.log.done {
+		return r.log.gen, false
 	}
 	r.loading = true
-	return r.gen, true
+	return r.log.gen, true
 }
 
-// LogBeginReload starts a load that replaces whatever is cached: ok is
-// false only if a load is currently running (never "already finished" —
-// that is the case this method exists for). Resets log/logDone/logErr and
-// bumps gen, so a still-running superseded stream's late
-// LogAppend/LogFinish calls (carrying the old gen) are dropped.
+// LogBeginReload starts a load that replaces whatever is cached; ok is
+// false if a load is running. It bumps gen, so a superseded stream's late
+// LogAppend/LogFinish calls are dropped.
 func (r *Repo) LogBeginReload() (gen int, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -183,11 +151,7 @@ func (r *Repo) LogBeginReload() (gen int, ok bool) {
 		return 0, false
 	}
 	r.loading = true
-	r.log = nil
-	r.logDone = false
-	r.logErr = nil
-	r.gen++
-	return r.gen, true
+	return r.log.restart(), true
 }
 
 // LogAppend adds rows as they stream in; a no-op if gen is stale (a
@@ -195,10 +159,7 @@ func (r *Repo) LogBeginReload() (gen int, ok bool) {
 func (r *Repo) LogAppend(gen int, rows ...core.LogCommit) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if gen != r.gen {
-		return
-	}
-	r.log = append(r.log, rows...)
+	r.log.add(gen, rows)
 }
 
 // LogFinish marks the load complete; err is non-nil on failure. tips is the
@@ -207,13 +168,9 @@ func (r *Repo) LogAppend(gen int, rows ...core.LogCommit) {
 func (r *Repo) LogFinish(gen int, err *core.Error, tips map[string]string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if gen != r.gen {
-		return
+	if r.log.finish(gen, err) {
+		r.loading, r.tips = false, tips
 	}
-	r.loading = false
-	r.logDone = true
-	r.logErr = err
-	r.tips = tips
 }
 
 // LogTips is the ref-tip snapshot recorded when the log last finished
@@ -229,18 +186,17 @@ func (r *Repo) LogTips() map[string]string {
 func (r *Repo) LogReady() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.logDone && !r.loading
+	return r.log.done && !r.loading
 }
 
 // LogView is one snapshot of a log's rows: Repo's own shared cache
 // (Repo.LogSnapshot) or a window's filtered view (Worktree.FilterSnapshot).
 // Generation bumps whenever that view restarts from row 0 (a reload, a new
-// filter); Flat is true only for a text/author search.
+// filter).
 type LogView struct {
 	Rows       []core.LogCommit
 	Loaded     int
 	Done       bool
-	Flat       bool
 	Generation int
 	Err        *core.Error
 }
@@ -251,30 +207,16 @@ type LogView struct {
 func (r *Repo) LogSnapshot(from, to int) LogView {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return LogView{
-		Rows:       window(r.log, from, to),
-		Loaded:     len(r.log),
-		Done:       r.logDone,
-		Generation: r.gen,
-		Err:        r.logErr,
-	}
+	return r.log.view(from, to)
 }
 
-// window copies rows [from, to), clamped to [0, len(rows)).
-func window(rows []core.LogCommit, from, to int) []core.LogCommit {
-	from = min(max(from, 0), len(rows))
-	to = min(max(to, from), len(rows))
-	return append([]core.LogCommit(nil), rows[from:to]...)
-}
-
-// LogIndexOf returns sha's row index in the currently loaded log and
-// whether it was found: a linear scan, regardless of r.gen. A racing reload
-// can make the result momentarily stale; the frontend's next LogRows call
+// LogIndexOf returns sha's row index in the currently loaded log. A racing
+// reload can make it momentarily stale; the frontend's next LogRows call
 // corrects it.
 func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for i, c := range r.log {
+	for i, c := range r.log.rows {
 		if c.SHA == sha {
 			return i, true
 		}
@@ -282,20 +224,38 @@ func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
 	return 0, false
 }
 
-// FilterBegin starts a new filtered load, cancelling whatever filtered load
-// is running. The returned generation stamps this load's
+// FilterBegin starts a new filtered load for filter, cancelling whatever
+// filtered load is running. The returned generation stamps this load's
 // FilterAppend/FilterFinish calls, so a late call from the cancelled load is
 // dropped even before its cancel takes effect.
-func (w *Worktree) FilterBegin(flat bool, cancel context.CancelFunc) (gen int) {
+func (w *Worktree) FilterBegin(filter core.LogFilter, cancel context.CancelFunc) (gen int) {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
+	w.filterActive, w.filter = true, filter
+	return w.restartLocked(cancel)
+}
+
+// FilterRestart restarts the active filtered load in place, with its own
+// filter, under the same lock that reads whether one is active, so a
+// concurrent SetLogFilter cannot revive a cleared filter or overwrite a
+// newer one. ok is false, filter and gen zero, while no filter is active.
+func (w *Worktree) FilterRestart(cancel context.CancelFunc) (filter core.LogFilter, gen int, ok bool) {
+	w.filterMu.Lock()
+	defer w.filterMu.Unlock()
+	if !w.filterActive {
+		return core.LogFilter{}, 0, false
+	}
+	return w.filter, w.restartLocked(cancel), true
+}
+
+// restartLocked cancels whatever filtered load is running, bumps the
+// generation and clears the accumulated rows. filterMu must be held.
+func (w *Worktree) restartLocked(cancel context.CancelFunc) (gen int) {
 	if w.filterCancel != nil {
 		w.filterCancel()
 	}
-	w.filterGen++
-	w.filterActive, w.filterFlat, w.filterCancel = true, flat, cancel
-	w.filterRows, w.filterDone, w.filterErr = nil, false, nil
-	return w.filterGen
+	w.filterCancel = cancel
+	return w.filtered.restart()
 }
 
 // FilterAppend adds rows as a filtered load streams in; a no-op if gen is
@@ -303,10 +263,7 @@ func (w *Worktree) FilterBegin(flat bool, cancel context.CancelFunc) (gen int) {
 func (w *Worktree) FilterAppend(gen int, rows ...core.LogCommit) {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
-	if gen != w.filterGen {
-		return
-	}
-	w.filterRows = append(w.filterRows, rows...)
+	w.filtered.add(gen, rows)
 }
 
 // FilterFinish marks a filtered load complete; err is non-nil on failure. A
@@ -314,10 +271,7 @@ func (w *Worktree) FilterAppend(gen int, rows ...core.LogCommit) {
 func (w *Worktree) FilterFinish(gen int, err *core.Error) {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
-	if gen != w.filterGen {
-		return
-	}
-	w.filterDone, w.filterErr = true, err
+	w.filtered.finish(gen, err)
 }
 
 // LogSnapshot is what this window shows: its own filtered view while a
@@ -337,26 +291,65 @@ func (w *Worktree) FilterSnapshot(from, to int) (view LogView, ok bool) {
 	if !w.filterActive {
 		return LogView{}, false
 	}
-	return LogView{
-		Rows:       window(w.filterRows, from, to),
-		Loaded:     len(w.filterRows),
-		Done:       w.filterDone,
-		Flat:       w.filterFlat,
-		Generation: w.filterGen,
-		Err:        w.filterErr,
-	}, true
+	return w.filtered.view(from, to), true
 }
 
 // FilterClear cancels any running filtered stream and reverts LogRows to
-// wt.Repo's shared cache — instant, no git call.
+// the repo's shared cache.
 func (w *Worktree) FilterClear() {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
 	if w.filterCancel != nil {
 		w.filterCancel()
 	}
-	w.filterActive, w.filterCancel = false, nil
-	w.filterRows, w.filterDone, w.filterErr = nil, false, nil
+	w.filterActive, w.filter, w.filterCancel = false, core.LogFilter{}, nil
+	w.filtered = logState{gen: w.filtered.gen}
+}
+
+// logState is one streamed log: its rows so far, whether the stream has
+// finished and how, and the generation stamping the current stream. Its
+// owner's mutex guards it.
+type logState struct {
+	rows []core.LogCommit
+	done bool
+	err  *core.Error
+	gen  int
+}
+
+// restart drops the rows and bumps the generation, so a superseded
+// stream's late add and finish calls are dropped.
+func (s *logState) restart() (gen int) {
+	*s = logState{gen: s.gen + 1}
+	return s.gen
+}
+
+func (s *logState) add(gen int, rows []core.LogCommit) {
+	if gen == s.gen {
+		s.rows = append(s.rows, rows...)
+	}
+}
+
+// finish marks the stream done, reporting false if gen is stale.
+func (s *logState) finish(gen int, err *core.Error) bool {
+	if gen != s.gen {
+		return false
+	}
+	s.done, s.err = true, err
+	return true
+}
+
+// view is the stream's state with a copy of rows [from, to), clamped to
+// [0, len(rows)).
+func (s *logState) view(from, to int) LogView {
+	from = min(max(from, 0), len(s.rows))
+	to = min(max(to, from), len(s.rows))
+	return LogView{
+		Rows:       append([]core.LogCommit(nil), s.rows[from:to]...),
+		Loaded:     len(s.rows),
+		Done:       s.done,
+		Generation: s.gen,
+		Err:        s.err,
+	}
 }
 
 // Manager mints and reuses sessions: opening the same worktree twice (by
@@ -392,7 +385,7 @@ func NewManager(sink core.EventSink) *Manager {
 // Resolve validates path and returns its worktree's identity (toplevel, git
 // dir, repo key) without minting or reusing any session: Open's stateless
 // half, so listing a repo's worktrees or branches never starts a poller or
-// watcher for a repo the panel has only expanded, not selected. Errors are
+// watcher for a repo no window has selected. Errors are
 // exactly Open's own:
 //   - Code GitTooOld: from Runner.CheckVersion (git absent, unparsable, or
 //     older than MinVersion)
@@ -429,7 +422,7 @@ func (m *Manager) Open(ctx context.Context, path core.RepoPath) (*Worktree, erro
 }
 
 // Get returns an already-open session. core.Errorf(core.Internal, ...) for
-// an unknown id — same convention as app.Router.CoreOf.
+// an unknown id.
 func (m *Manager) Get(wt core.WorktreeID) (*Worktree, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -465,9 +458,8 @@ func (m *Manager) session(toplevel, gitDir, repoKey string) *Worktree {
 	return wt
 }
 
-// newRepo mints repo's session and starts its watcher: a start failure is
-// not fatal (watch.NewRepoWatcher's own doc) — the repo still opens,
-// running on the fallback poll alone.
+// newRepo mints repo's session and starts its watcher. A watcher that
+// fails to start still runs on its fallback poll.
 func (m *Manager) newRepo(key string) *Repo {
 	repo := &Repo{Key: key}
 	repo.watcher, _ = m.newWatcher(key, func(scope watch.Scope) {
@@ -479,15 +471,12 @@ func (m *Manager) newRepo(key string) *Repo {
 	return repo
 }
 
-// newWorktree mints wt's session and focuses its status poller immediately:
-// simpler and more robust than waiting for a first WindowFocus event, whose
-// timing on window creation is not guaranteed.
+// newWorktree mints wt's session and focuses its status poller at once: a
+// new window's first focus event is not guaranteed.
 func (m *Manager) newWorktree(id core.WorktreeID, toplevel, gitDir string, repo *Repo) *Worktree {
 	wt := &Worktree{ID: id, Path: toplevel, GitDir: gitDir, Repo: repo}
 	wt.Runner = git.Runner{Log: func(e git.Entry) {
-		entry := toCommandLogEntry(e)
-		wt.append(entry)
-		m.sink(core.Event{Name: "command", Worktree: id, Payload: payload(entry)})
+		m.sink(core.Event{Name: "command", Worktree: id, Payload: payload(toCommandRecord(e))})
 	}}
 	wt.poller = m.newPoller(wt.Runner, toplevel, func(scope watch.Scope) {
 		m.sink(core.Event{Name: "repo:changed", Worktree: id, Payload: changedPayload(scope)})
@@ -513,9 +502,7 @@ func payload(v any) json.RawMessage {
 func (m *Manager) Close(id core.WorktreeID) {
 	m.mu.Lock()
 	wt, ok := m.worktrees[id]
-	if ok {
-		delete(m.worktrees, id)
-	}
+	delete(m.worktrees, id)
 	m.mu.Unlock()
 	if !ok {
 		return
@@ -535,22 +522,20 @@ func (m *Manager) Close(id core.WorktreeID) {
 // notARepo's own message, keeping GitStderr/Command for the details.
 func remapNotARepo(err error, path core.RepoPath) error {
 	if src, ok := errors.AsType[*core.Error](err); ok {
-		src.Code, src.Message = core.NotARepo, notARepo(path).Message
+		want := notARepo(path)
+		src.Retag(want.Code, want.Key, want.Args, "%s", want.Message)
 		return src
 	}
 	return notARepo(path)
 }
 
-// notARepo builds the message: the folder, and that it is not a repo.
 func notARepo(path core.RepoPath) *core.Error {
-	return core.Errorf(core.NotARepo, "%s is not a git repository", path)
+	return core.ErrorfArgs(core.NotARepo, "notARepo", map[string]string{"path": string(path)}, "%s is not a git repository", path)
 }
 
-// toCommandLogEntry converts a git.Entry into the JSON DTO buffered and
-// emitted for it.
-func toCommandLogEntry(e git.Entry) core.CommandLogEntry {
-	entry := core.CommandLogEntry{
-		At:         time.Now().Format(time.RFC3339Nano),
+// toCommandRecord converts a git.Entry into the "command" event's payload.
+func toCommandRecord(e git.Entry) core.CommandRecord {
+	entry := core.CommandRecord{
 		Command:    e.Command,
 		Dir:        e.Dir,
 		Background: e.Background,
@@ -559,7 +544,7 @@ func toCommandLogEntry(e git.Entry) core.CommandLogEntry {
 		Stderr:     string(e.Result.Stderr),
 	}
 	if ce, ok := errors.AsType[*core.Error](e.Err); ok {
-		entry.ErrorCode = string(ce.Code)
+		entry.ErrorCode = ce.Code
 	}
 	return entry
 }

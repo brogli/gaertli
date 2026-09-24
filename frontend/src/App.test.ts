@@ -2,34 +2,34 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCompareCommits, mockDiffRange, mockSettingsGet } = vi.hoisted(() => ({
-  mockCompareCommits: vi.fn().mockResolvedValue([]),
-  mockDiffRange: vi.fn(),
-  mockSettingsGet: vi.fn(),
-}))
-
-vi.mock('../bindings/github.com/brogli/nebegit/internal/app', () => ({
+const { AppService, Facade, SettingsService } = vi.hoisted(() => ({
   AppService: {
     PickAndOpen: vi.fn(),
     RecentRepos: vi.fn().mockResolvedValue([]),
-    OpenRecent: vi.fn(),
+    OpenPath: vi.fn(),
   },
-  Facade: { CompareCommits: mockCompareCommits, DiffRange: mockDiffRange },
-  SettingsService: { Get: mockSettingsGet, Set: vi.fn() },
+  Facade: {
+    CompareCommits: vi.fn().mockResolvedValue([]),
+    DiffRange: vi.fn().mockResolvedValue(null),
+  },
+  SettingsService: { Get: vi.fn(), Set: vi.fn() },
 }))
 
-vi.mock('@wailsio/runtime', () => ({
-  Events: { On: vi.fn(() => () => {}) },
-  Window: { Close: vi.fn() },
+vi.mock('../bindings/github.com/brogli/nebegit/internal/app', () => ({
+  AppService,
+  Facade,
+  SettingsService,
 }))
+
+vi.mock('@wailsio/runtime', () => import('./testing/runtime'))
 
 import App from './App.vue'
-import CompareDiffView from './views/CompareDiffView.vue'
+import DiffWindowView from './views/DiffWindowView.vue'
 import MainView from './views/MainView.vue'
 import { useSettingsStore } from './stores/settings'
 import { defaultSettingsFixture } from './testing/fixtures/settings'
 
-mockSettingsGet.mockResolvedValue(defaultSettingsFixture())
+SettingsService.Get.mockResolvedValue(defaultSettingsFixture())
 
 describe('App', () => {
   beforeEach(() => {
@@ -45,17 +45,28 @@ describe('App', () => {
     expect(mount(App).text()).toContain('nebegit')
   })
 
-  it('FR-CMP-02 routes ?view=compare-diff to CompareDiffView, not MainView', async () => {
+  it('FR-DIFF-07 routes ?view=diff to DiffWindowView with its worktree and target, not MainView', async () => {
     window.history.pushState(
       {},
       '',
-      '?view=compare-diff&wt=/repo&from=sha-a&to=sha-b&file=a.txt&oldFile=old.txt',
+      '?view=diff&wt=/repo&kind=range&from=sha-a&to=sha-b&file=a.txt&oldFile=old.txt',
     )
 
     const wrapper = mount(App)
     await flushPromises()
 
-    expect(wrapper.findComponent(CompareDiffView).exists()).toBe(true)
+    expect(wrapper.findComponent(DiffWindowView).props()).toEqual({
+      wt: '/repo',
+      target: {
+        kind: 'range',
+        sha: '',
+        from: 'sha-a',
+        to: 'sha-b',
+        staged: false,
+        path: 'a.txt',
+        oldPath: 'old.txt',
+      },
+    })
     expect(wrapper.findComponent(MainView).exists()).toBe(false)
   })
 
@@ -69,7 +80,7 @@ describe('App', () => {
           removeEventListener: vi.fn(),
         }) as unknown as MediaQueryList,
     )
-    mockSettingsGet.mockResolvedValueOnce(defaultSettingsFixture({ theme: '' }))
+    SettingsService.Get.mockResolvedValueOnce(defaultSettingsFixture({ theme: '' }))
 
     const wrapper = mount(App)
     await flushPromises()

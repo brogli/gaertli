@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,14 +30,14 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 	wt.Runner.Git = fakegit
 
 	start := time.Now()
-	if err := c.LoadLog(context.Background(), id); err != nil {
+	if err := c.LoadLog(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
 
 	var elapsed time.Duration
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		res, err := c.LogRows(context.Background(), id, 0, 1)
+		res, err := c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,7 +81,7 @@ func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	runtime.GC()
 	runtime.ReadMemStats(&before)
 
-	if err := c.LoadLog(context.Background(), id); err != nil {
+	if err := c.LoadLog(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
 	loaded := waitForLogDone(t, c, id)
@@ -105,7 +104,7 @@ func waitForLogDone(t *testing.T, c *Core, id core.WorktreeID) int {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		res, err := c.LogRows(context.Background(), id, 0, 0)
+		res, err := c.LogRows(t.Context(), id, 0, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

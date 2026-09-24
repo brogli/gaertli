@@ -1,72 +1,62 @@
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockSummary, mockEventsOn, mockUpdateWindowTitle } = vi.hoisted(() => ({
-  mockSummary: vi.fn(),
-  mockEventsOn: vi.fn(),
-  mockUpdateWindowTitle: vi.fn(),
+const { Facade, AppService } = vi.hoisted(() => ({
+  Facade: { Summary: vi.fn() },
+  AppService: { UpdateWindowTitle: vi.fn() },
 }))
 
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { Summary: mockSummary },
-  AppService: { UpdateWindowTitle: mockUpdateWindowTitle },
-}))
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
 
-vi.mock('@wailsio/runtime', () => ({
-  Events: { On: mockEventsOn },
-}))
+vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
+import { Events, emit } from '../testing/runtime'
 
 import { useRepoStore } from './repo'
-import { registeredHandler } from '../testing/events'
 import { summaryFixture } from '../testing/fixtures/summary'
 
 describe('repo store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    mockSummary.mockReset()
-    mockSummary.mockResolvedValue(summaryFixture())
-    mockEventsOn.mockReset()
-    mockEventsOn.mockReturnValue(() => {})
-    mockUpdateWindowTitle.mockReset().mockResolvedValue(undefined)
+    Facade.Summary.mockReset().mockResolvedValue(summaryFixture())
+    Events.On.mockReset()
+    AppService.UpdateWindowTitle.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-WT-09 calls UpdateWindowTitle with the worktree\'s display name and branch after loading Summary', async () => {
+  it("FR-WT-09 calls UpdateWindowTitle with the worktree's path and branch after loading Summary", async () => {
     const repo = useRepoStore()
 
     await repo.loadSummary('/home/user/project')
 
-    expect(mockUpdateWindowTitle).toHaveBeenCalledTimes(1)
-    expect(mockUpdateWindowTitle).toHaveBeenCalledWith('project', 'main')
+    expect(AppService.UpdateWindowTitle).toHaveBeenCalledTimes(1)
+    expect(AppService.UpdateWindowTitle).toHaveBeenCalledWith('/home/user/project', 'main')
   })
 
   it('FR-REPO-04 reloads Summary on a state or refs repo:changed event, not on index', async () => {
     const repo = useRepoStore()
     await repo.loadSummary('/repo')
-    mockSummary.mockClear()
+    Facade.Summary.mockClear()
 
-    const handler = registeredHandler(mockEventsOn, 'repo:changed')
-    handler?.({ data: { scope: 'state' } })
-    await Promise.resolve()
-    handler?.({ data: { scope: 'refs' } })
-    await Promise.resolve()
+    emit('repo:changed', { data: { scope: 'state' } })
+    emit('repo:changed', { data: { scope: 'refs' } })
+    await flushPromises()
 
-    expect(mockSummary).toHaveBeenCalledTimes(2)
+    expect(Facade.Summary).toHaveBeenCalledTimes(2)
 
-    handler?.({ data: { scope: 'index' } })
-    await Promise.resolve()
+    emit('repo:changed', { data: { scope: 'index' } })
+    await flushPromises()
 
-    expect(mockSummary).toHaveBeenCalledTimes(2)
+    expect(Facade.Summary).toHaveBeenCalledTimes(2)
   })
 
   it('ADR-4 reloads Summary on a core:reconnected event', async () => {
     const repo = useRepoStore()
     await repo.loadSummary('/repo')
-    mockSummary.mockClear()
+    Facade.Summary.mockClear()
 
-    const handler = registeredHandler(mockEventsOn, 'core:reconnected')
-    handler?.({})
-    await Promise.resolve()
+    emit('core:reconnected')
+    await flushPromises()
 
-    expect(mockSummary).toHaveBeenCalledTimes(1)
+    expect(Facade.Summary).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,26 +1,36 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, Request } from '@playwright/test'
 import { test, expect } from './fixtures'
-import { contextMenuItems, logRow, pickFromContextMenu } from './helpers'
+import { contextMenuItems, hunksText, logRow, pickFromContextMenu, rev, shortRev } from './helpers'
 
 // Comparing two commits, or a commit with the working tree, in the main
-// window's side column. The compare-diff window is a native window and is
-// not covered here.
+// window's side column. A double-click's diff window is a native window:
+// the call that opens it is observed, and its URL opened in a page.
 
 const compareView = (page: Page) => page.locator('.compare-view')
 
-// listedFiles is a file list's rows as "<status> <path>", sorted.
+// listedFiles is a file list's rows as "<status label> <path>", sorted.
 async function listedFiles(view: Locator): Promise<string[]> {
   const rows = await view
     .locator('.files li')
     .evaluateAll((lis) =>
       lis.map(
         (li) =>
-          `${li.querySelector('.status')?.textContent} ${li.querySelector('.path')?.textContent}`,
+          `${li.querySelector('.status')?.getAttribute('title')} ${li.querySelector('.path')?.textContent}`,
       ),
     )
   return rows.map((row) => row.replace(/\s+/g, ' ').trim()).sort()
+}
+
+// boundCallEndingWith resolves on the page's next bound-method call whose
+// arguments end with args.
+function boundCallEndingWith(page: Page, args: unknown[]): Promise<Request> {
+  return page.waitForRequest((req) => {
+    if (!req.url().endsWith('/wails/runtime')) return false
+    const sent: unknown[] = JSON.parse(req.postData() ?? '{}').args?.args ?? []
+    return JSON.stringify(sent.slice(-args.length)) === JSON.stringify(args)
+  })
 }
 
 async function ctrlClickCompare(page: Page, from: string, to: string): Promise<void> {
@@ -35,15 +45,17 @@ test('FR-CMP-01 a click, then a Ctrl-click on another commit, compares them and 
 }) => {
   await ctrlClickCompare(app, 'initial: add base files', 'feature: add feature.txt')
   const view = compareView(app)
-  await expect(view.locator('.from')).toHaveText(
-    git(repos.work, 'rev-parse', '--short', 'v1~2').trim(),
-  )
-  await expect(view.locator('.to')).toHaveText(
-    git(repos.work, 'rev-parse', '--short', 'feature').trim(),
-  )
+  await expect(view.locator('.from')).toHaveText(shortRev(git, repos.work, 'v1~2'))
+  await expect(view.locator('.to')).toHaveText(shortRev(git, repos.work, 'feature'))
   await expect
     .poll(() => listedFiles(view))
-    .toEqual(['A feature.txt', 'A logo.png', 'M conflict.txt', 'M docs/readme.md', 'M src/main.go'])
+    .toEqual([
+      'Added feature.txt',
+      'Added logo.png',
+      'Modified conflict.txt',
+      'Modified docs/readme.md',
+      'Modified src/main.go',
+    ])
 })
 
 test('FR-CMP-01 the compared files mark a deletion, and a rename with its old path', async ({
@@ -58,25 +70,26 @@ test('FR-CMP-01 the compared files mark a deletion, and a rename with its old pa
   await ctrlClickCompare(app, "Merge branch 'side'", 'move and delete')
   await expect
     .poll(() => listedFiles(compareView(app)))
-    .toEqual(['D crlf.txt', 'R nonl.txt → moved.txt'])
+    .toEqual(['Deleted crlf.txt', 'Renamed nonl.txt → moved.txt'])
 })
 
-test('FR-CMP-01 "Compare with selected" on another commit compares it with the selected one', async ({
+test('FR-CMP-01 "Compare with <hash>" on another commit compares it with the selected one', async ({
   app,
   git,
   repos,
 }) => {
+  const from = shortRev(git, repos.work, 'v1~1')
   await logRow(app, 'add logo and func a').click()
-  await pickFromContextMenu(app, logRow(app, 'docs and func b'), 'Compare with selected')
+  await pickFromContextMenu(app, logRow(app, 'docs and func b'), `Compare with ${from}`)
   const view = compareView(app)
-  await expect(view.locator('.from')).toHaveText(
-    git(repos.work, 'rev-parse', '--short', 'v1~1').trim(),
-  )
-  await expect(view.locator('.to')).toHaveText(git(repos.work, 'rev-parse', '--short', 'v1').trim())
-  await expect.poll(() => listedFiles(view)).toEqual(['M docs/readme.md', 'M src/main.go'])
+  await expect(view.locator('.from')).toHaveText(from)
+  await expect(view.locator('.to')).toHaveText(shortRev(git, repos.work, 'v1'))
+  await expect
+    .poll(() => listedFiles(view))
+    .toEqual(['Modified docs/readme.md', 'Modified src/main.go'])
 })
 
-test('FR-CMP-01 "Compare with selected" is offered neither with nothing selected nor on the selected commit itself', async ({
+test('FR-CMP-01 "Compare with <hash>" is offered neither with nothing selected nor on the selected commit itself', async ({
   app,
 }) => {
   const row = logRow(app, 'add logo and func a')
@@ -84,60 +97,92 @@ test('FR-CMP-01 "Compare with selected" is offered neither with nothing selected
   await app.keyboard.press('Escape')
   await expect(row).toHaveClass(/selected/)
   const onTheSelectedCommit = await contextMenuItems(app, row)
+  const comparesWithAnother = (items: string[]) =>
+    items.some((i) => i !== 'Compare with working tree' && i.startsWith('Compare with '))
 
   expect(withNothingSelected).toContain('Copy hash')
-  expect(withNothingSelected).not.toContain('Compare with selected')
-  expect(onTheSelectedCommit).not.toContain('Compare with selected')
+  expect(comparesWithAnother(withNothingSelected)).toBe(false)
+  expect(comparesWithAnother(onTheSelectedCommit)).toBe(false)
 })
 
-test('FR-CMP-02 a click on a compared file previews its diff between the two commits; Escape leaves the compare view', async ({
+test('FR-CMP-02 a click on a compared file shows no diff; a double-click opens its diff window; Escape leaves the comparison', async ({
   app,
+  git,
+  repos,
 }) => {
   await ctrlClickCompare(app, 'initial: add base files', 'feature: add feature.txt')
-  await compareView(app).locator('.files li', { hasText: 'feature.txt' }).click()
-  await expect(app.locator('.side-column .cm-content')).toContainText('feature only')
+  const file = compareView(app).locator('.files li', { hasText: 'feature.txt' })
+  await file.click()
+  await expect(file).toHaveClass(/selected/)
+  await expect(app.locator('.side-column .diff-view')).toHaveCount(0)
+
+  const [from, to] = ['v1~2', 'feature'].map((ref) => rev(git, repos.work, ref))
+  const openDiffWindow = boundCallEndingWith(app, [
+    { kind: 'range', from, to, path: 'feature.txt', oldPath: '' },
+  ])
+  await file.dblclick()
+  await openDiffWindow
+  await expect(app.locator('.side-column .diff-view')).toHaveCount(0)
 
   await app.keyboard.press('Escape')
   await expect(compareView(app)).toBeHidden()
   await expect(app.locator('.commit-details')).toBeVisible()
 })
 
-test('FR-CMP-03 the compare view shows from → to; Swap reverses the direction', async ({
+test('FR-CMP-03 the comparison shows from → to; Swap reverses the direction', async ({
   app,
   git,
   repos,
 }) => {
   await ctrlClickCompare(app, 'initial: add base files', 'feature: add feature.txt')
   const view = compareView(app)
-  const initial = git(repos.work, 'rev-parse', '--short', 'v1~2').trim()
-  const feature = git(repos.work, 'rev-parse', '--short', 'feature').trim()
-  await expect(view.locator('header')).toContainText(`${initial} → ${feature}`)
-  await expect.poll(() => listedFiles(view)).toContain('A feature.txt')
+  const initial = shortRev(git, repos.work, 'v1~2')
+  const feature = shortRev(git, repos.work, 'feature')
+  await expect(view.locator('header')).toContainText(`older ${initial} → newer ${feature}`)
+  await expect.poll(() => listedFiles(view)).toContain('Added feature.txt')
 
   await view.locator('[data-test=swap]').click()
-  await expect(view.locator('header')).toContainText(`${feature} → ${initial}`)
-  await expect.poll(() => listedFiles(view)).toContain('D feature.txt')
+  await expect(view.locator('header')).toContainText(`newer ${feature} → older ${initial}`)
+  await expect.poll(() => listedFiles(view)).toContain('Deleted feature.txt')
 })
 
 test('FR-CMP-04 compare with working tree lists committed and uncommitted differences, leaves out untracked files and says so', async ({
   app,
+  openDiff,
   git,
   repos,
 }) => {
-  const hunks = path.join(repos.work, 'hunks.txt')
-  fs.writeFileSync(hunks, fs.readFileSync(hunks, 'utf8').replace('line 7\n', 'line 7 changed\n'))
+  fs.writeFileSync(path.join(repos.work, 'hunks.txt'), hunksText({ 7: 'line 7 changed' }))
   fs.writeFileSync(path.join(repos.work, 'untracked.txt'), 'untracked\n')
 
   await pickFromContextMenu(app, logRow(app, 'add logo and func a'), 'Compare with working tree')
   const view = app.locator('.compare-working-view')
   await expect(view.locator('header')).toContainText(
-    `${git(repos.work, 'rev-parse', '--short', 'v1~1').trim()} add logo and func a → working tree`,
+    `${shortRev(git, repos.work, 'v1~1')} add logo and func a → working tree`,
   )
   await expect
     .poll(() => listedFiles(view))
-    .toEqual(['A side.txt', 'M conflict.txt', 'M docs/readme.md', 'M hunks.txt', 'M src/main.go'])
+    .toEqual([
+      'Added side.txt',
+      'Modified conflict.txt',
+      'Modified docs/readme.md',
+      'Modified hunks.txt',
+      'Modified src/main.go',
+    ])
   await expect(view).toContainText('New, untracked files are not part of this comparison.')
 
-  await view.locator('.files li', { hasText: 'hunks.txt' }).click()
-  await expect(app.locator('.side-column .cm-content')).toContainText('line 7 changed')
+  const file = view.locator('.files li', { hasText: 'hunks.txt' })
+  await file.click()
+  await expect(file).toHaveClass(/selected/)
+  await expect(app.locator('.diff-view')).toHaveCount(0)
+  const sha = rev(git, repos.work, 'v1~1')
+  const openDiffWindow = boundCallEndingWith(app, [
+    { kind: 'againstWorking', sha, path: 'hunks.txt', oldPath: '' },
+  ])
+  await file.dblclick()
+  await openDiffWindow
+
+  const diff = await openDiff(repos.work, { kind: 'againstWorking', sha, file: 'hunks.txt' })
+  await expect(diff.locator('.file-list li')).toHaveCount(5)
+  await expect(diff.locator('.diff-view .cm-content')).toContainText('line 7 changed')
 })

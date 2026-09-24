@@ -18,8 +18,7 @@ func (c *Core) AbortOperation(ctx context.Context, id core.WorktreeID) error {
 	return c.runOperationVerb(ctx, id, "--abort")
 }
 
-// SkipOperation implements core.API. Merge has no --skip, and rebase's is
-// not supported.
+// SkipOperation implements core.API.
 func (c *Core) SkipOperation(ctx context.Context, id core.WorktreeID) error {
 	return c.runOperationVerb(ctx, id, "--skip", "cherry-pick", "revert")
 }

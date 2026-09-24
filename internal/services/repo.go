@@ -40,7 +40,7 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 		return core.Summary{}, err
 	}
 	return core.Summary{
-		Path: wt.Path, Branch: branch, Detached: detached, Operation: operation(wt.GitDir), SHA: sha,
+		Branch: branch, Detached: detached, Operation: operation(wt.GitDir), SHA: sha,
 		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(), PullStash: stash,
 	}, nil
 }
@@ -91,8 +91,9 @@ func gitExited(err error, result git.Result, code int) bool {
 	return gitFailure(err) != nil && result.ExitCode == code
 }
 
-// operation checks the state files git-mapping.md names, in the worktree's
-// own git dir. File checks only, no subprocess.
+// operation names the operation in progress in the worktree whose own git
+// dir is gitDir, from git's state files: "merge", "cherry-pick", "revert",
+// "rebase", or "" for none. File checks only, no subprocess.
 func operation(gitDir string) string {
 	for _, f := range []struct{ name, op string }{
 		{"MERGE_HEAD", "merge"}, {"CHERRY_PICK_HEAD", "cherry-pick"}, {"REVERT_HEAD", "revert"},

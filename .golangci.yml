@@ -5,6 +5,23 @@ run:
 
 linters:
   default: standard
+  enable:
+    - contextcheck
+    - errorlint
+    - gocritic
+    - intrange
+    - modernize
+    - nilerr
+    - perfsprint
+    - revive
+    - thelper
+    - usetesting
+  settings:
+    revive:
+      rules:
+        - name: context-as-argument
+        - name: package-comments
+        - name: redefines-builtin-id
 
 formatters:
   enable:

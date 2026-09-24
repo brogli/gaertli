@@ -1,6 +1,6 @@
 package core
 
-// Refs is the repo's branches, remotes, and tags for the sidebar.
+// Refs is the repo's branches, remotes, and tags.
 type Refs struct {
 	Branches []Branch `json:"branches"`
 	Remotes  []Remote `json:"remotes"`

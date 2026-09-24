@@ -6,18 +6,128 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"net/url"
 	"path/filepath"
 	"time"
 
+	"github.com/brogli/nebegit/internal/applog"
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/services"
 	"github.com/brogli/nebegit/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	wailslog "github.com/wailsapp/wails/v3/pkg/services/log"
 )
 
 const singleInstanceID = "nebegit" // stable per machine; no reverse-domain owner to use
+
+// Run starts the shell. args is os.Args (argv[0] included, see pathArg).
+func Run(assets fs.FS, args []string) error {
+	if !gitPresent() {
+		showFatal(text(appName, nil), text(missingGit, nil))
+		return errors.New("git not found on PATH")
+	}
+
+	path, ok := pathArg(args)
+	if !ok {
+		showFatal(text(appName, nil), text(usage, nil))
+		return errors.New("bad arguments")
+	}
+
+	store, err := openSettings()
+	if err != nil {
+		return err
+	}
+
+	logger, logPath, logCloser, logErr := applog.Open()
+	slog.SetDefault(logger)
+	if logCloser != nil {
+		defer func() { _ = logCloser.Close() }()
+	}
+
+	reg := NewRegistry()
+	reg.SetStore(store)
+	reg.SetLocal(services.New(reg.Dispatch))
+	reg.PushEditorProfiles(context.Background())
+
+	var sh shell
+	onPath := func(path string) { sh.launch(context.Background(), path) }
+	a := application.New(options(assets, reg, onPath, logger))
+	reg.Bind(a)
+	reg.SetConsent(wailsConsent{app: a})
+	sh = shell{api: NewFacade(reg), reg: reg, store: store, notify: wailsNotifier{app: a}, logPath: logPath, logErr: errString(logErr)}
+	a.RegisterService(application.NewService(&AppService{shell: sh, picker: wailsPicker{app: a}}))
+	a.RegisterService(application.NewService(NewSettingsService(store, reg, a.Event)))
+	// The frontend's uncaught errors reach the same app log, at Error, via
+	// Wails' own bound log service.
+	a.RegisterService(application.NewService(wailslog.NewWithConfig(&wailslog.Config{Logger: logger})))
+	startup := sh
+	startup.notify = startupNotifier{}
+	if !startup.launch(context.Background(), path) {
+		return errors.New("could not open " + path)
+	}
+
+	if err := a.Run(); err != nil {
+		showFatal(text(appName, nil), text(startupFailed, map[string]string{"error": err.Error()}))
+		return err
+	}
+	return nil
+}
+
+// errString is err.Error(), "" for a nil err.
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// openSettings opens the settings file, showing why it could not.
+func openSettings() (*settings.Store, error) {
+	path, err := settings.Path()
+	if err != nil {
+		showFatal(text(appName, nil), text(settingsPathErr, map[string]string{"error": err.Error()}))
+		return nil, err
+	}
+	store, err := settings.Open(path)
+	if err != nil {
+		showFatal(text(appName, nil), text(settingsLoadErr, map[string]string{"error": err.Error()}))
+		return nil, err
+	}
+	return store, nil
+}
+
+// options builds the Wails application options: the Facade service, single
+// instance relaying its path through onSecondInstance, and logger for
+// Wails' own system messages, so they land in the app log too.
+// Builds no window and starts nothing, so it is testable without a display.
+func options(assets fs.FS, reg *Registry, onSecondInstance func(path string), logger *slog.Logger) application.Options {
+	return application.Options{
+		Name:        "nebegit",
+		Description: "The git tool that sits beside your editor",
+		Logger:      logger,
+		Assets: application.AssetOptions{
+			Handler:    application.AssetFileServerFS(assets),
+			Middleware: pageMiddleware,
+		},
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+		Services: []application.Service{
+			application.NewService(NewFacade(reg)),
+		},
+		OnShutdown: reg.Quitting,
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: singleInstanceID,
+			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
+				if path, ok := pathArg(data.Args); ok {
+					onSecondInstance(resolveFrom(data.WorkingDir, path))
+				}
+			},
+		},
+	}
+}
 
 // pathArg reads the optional repo path from an argv (os.Args and
 // SecondInstanceData.Args both start with the program name): none opens
@@ -63,10 +173,23 @@ func (n wailsNotifier) Show(title, msg string) {
 // shell is what every "open this worktree" trigger shares: CLI launch,
 // second-instance relay, folder picker, recent-repo click.
 type shell struct {
-	api    core.API // the Facade: routing happens in Router.CoreFor
+	api    core.API // the Facade, which routes each call through the Router
 	reg    *Registry
 	store  *settings.Store
 	notify errorNotifier
+
+	logPath string // the app log's path, "" if it could not be opened
+	logErr  string // why it could not be opened, "" on success
+}
+
+// launch handles a launch's resolved path argument, first or relayed. It
+// reports false when a given path failed to open.
+func (sh shell) launch(ctx context.Context, path string) bool {
+	if path == "" {
+		sh.restore(ctx)
+		return true
+	}
+	return sh.open(ctx, path)
 }
 
 // open validates path, opens or focuses its window, and records it in
@@ -75,17 +198,23 @@ type shell struct {
 func (sh shell) open(ctx context.Context, path string) bool {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {
-		sh.notify.Show("nebegit", openFailedMessage(err))
+		sh.notify.Show(text(appName, nil), openFailedMessage(err))
 		return false
 	}
 	distro, _, _ := remote.ClassifyWSLPath(path)
 	sh.reg.OpenOrFocus(wt.ID, wt.Path, distro)
 	sh.reg.SetRepo(wt.ID, wt.RepoKey)
+	sh.remember(wt, distro)
+	return true
+}
+
+// remember records wt as its repo's recent entry and the open windows for
+// the next launch's restore.
+func (sh shell) remember(wt core.WorktreeInfo, distro string) {
 	_ = sh.store.Update(func(s *settings.Settings) {
 		s.AddRecent(settings.RecentRepo{Path: wt.Path, Distro: distro, RepoKey: wt.RepoKey}, time.Now())
 		s.OpenWorktrees = sh.reg.OpenWorktreePaths()
 	})
-	return true
 }
 
 // restore is the no-path launch: a window per worktree selected at last
@@ -100,16 +229,6 @@ func (sh shell) restore(ctx context.Context) {
 	}
 }
 
-// launch handles a launch's resolved path argument, first or relayed. It
-// reports false when a given path failed to open.
-func (sh shell) launch(ctx context.Context, path string) bool {
-	if path == "" {
-		sh.restore(ctx)
-		return true
-	}
-	return sh.open(ctx, path)
-}
-
 // callingWindow is the part of the ctx-carried calling window
 // (application.WindowKey) this package needs. application.Window itself
 // has unexported methods, so no test fake could implement it.
@@ -122,19 +241,28 @@ type callingWindow interface {
 // switchTo moves w's selection to path: validates it like open, navigates
 // the window (SetURL reloads it), records settings, and releases the
 // worktree just left. Unlike open, a failure is returned rather than shown:
-// the panel that asked has an ErrorBanner.
+// the picker that asked has an ErrorBanner.
 func (sh shell) switchTo(ctx context.Context, w callingWindow, path string) error {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {
 		return err
 	}
 	distro, _, _ := remote.ClassifyWSLPath(path)
-	previous, previousDistro, _ := sh.reg.SelectInWindow(w.ID(), wt.ID, wt.Path, distro)
+	previous, _ := sh.reg.SelectInWindow(w.ID(), wt.ID, wt.Path, distro)
 	sh.reg.SetRepo(wt.ID, wt.RepoKey)
 	w.SetURL(selectionURL(wt.Path, distro))
-	sh.reg.Release(previous, previousDistro)
-	_ = sh.store.Update(func(s *settings.Settings) { s.OpenWorktrees = sh.reg.OpenWorktreePaths() })
+	sh.reg.Release(previous)
+	sh.remember(wt, distro)
 	return nil
+}
+
+// shellPath is path in the shell's id form: UNC for a WSL repo (distro
+// set), unchanged otherwise.
+func shellPath(path, distro string) string {
+	if distro == "" {
+		return path
+	}
+	return remote.BuildWSLPath(distro, path)
 }
 
 // selectionURL builds a worktree window's URL; "" (the empty selection)
@@ -157,82 +285,4 @@ func openFailedMessage(err error) string {
 		return ce.Message
 	}
 	return err.Error()
-}
-
-// options builds the Wails application options: the Facade as the one
-// service, single instance relaying its path through onSecondInstance.
-// Builds no window and starts nothing, so it is testable without a display.
-func options(assets fs.FS, reg *Registry, onSecondInstance func(path string)) application.Options {
-	return application.Options{
-		Name:        "nebegit",
-		Description: "The git tool that sits beside your editor",
-		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(assets),
-		},
-		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
-		},
-		Services: []application.Service{
-			application.NewService(NewFacade(reg)),
-		},
-		OnShutdown: reg.Quitting,
-		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: singleInstanceID,
-			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
-				if path, ok := pathArg(data.Args); ok {
-					onSecondInstance(resolveFrom(data.WorkingDir, path))
-				}
-			},
-		},
-	}
-}
-
-// Run starts the shell. args is os.Args (argv[0] included, see pathArg).
-func Run(assets fs.FS, args []string) error {
-	if !gitPresent() {
-		showFatal("nebegit", missingGitMessage)
-		return errors.New("git not found on PATH")
-	}
-
-	path, ok := pathArg(args)
-	if !ok {
-		showFatal("nebegit", "usage: nebegit [path]")
-		return errors.New("bad arguments")
-	}
-
-	settingsPath, err := settings.Path()
-	if err != nil {
-		showFatal("nebegit", "could not determine the settings location: "+err.Error())
-		return err
-	}
-	store, err := settings.Open(settingsPath)
-	if err != nil {
-		showFatal("nebegit", "could not load settings: "+err.Error())
-		return err
-	}
-
-	reg := NewRegistry()
-	reg.SetStore(store)
-	reg.SetLocal(services.New(reg.Dispatch))
-	reg.PushEditorProfiles(context.Background())
-
-	var sh shell
-	onPath := func(path string) { sh.launch(context.Background(), path) }
-	a := application.New(options(assets, reg, onPath))
-	reg.Bind(a)
-	reg.SetConsent(wailsConsent{app: a})
-	sh = shell{api: NewFacade(reg), reg: reg, store: store, notify: wailsNotifier{app: a}}
-	a.RegisterService(application.NewService(&AppService{shell: sh, picker: wailsPicker{app: a}}))
-	a.RegisterService(application.NewService(NewSettingsService(store, reg)))
-	startup := sh
-	startup.notify = startupNotifier{}
-	if !startup.launch(context.Background(), path) {
-		return errors.New("could not open " + path)
-	}
-
-	if err := a.Run(); err != nil {
-		showFatal("nebegit", startupFailedMessage(err))
-		return err
-	}
-	return nil
 }

@@ -1,7 +1,7 @@
 package session
 
 import (
-	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,18 +22,23 @@ func TestManagerOpenReusesSessionForSameToplevel(t *testing.T) {
 	}
 	m := NewManager(func(core.Event) {})
 
-	first, err := m.Open(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := m.Open(context.Background(), core.RepoPath(sub))
-	if err != nil {
-		t.Fatal(err)
-	}
+	first := openSession(t, m, repo.Dir)
+	second := openSession(t, m, sub)
 
 	if first != second {
 		t.Errorf("Open on a subdirectory minted a new session, want the same *Worktree")
 	}
+}
+
+// openSession opens path's session on m and closes it when the test ends.
+func openSession(t *testing.T, m *Manager, path string) *Worktree {
+	t.Helper()
+	wt, err := m.Open(t.Context(), core.RepoPath(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { m.Close(wt.ID) })
+	return wt
 }
 
 func TestManagerOpenSharesRepoAcrossLinkedWorktrees(t *testing.T) {
@@ -42,14 +47,8 @@ func TestManagerOpenSharesRepoAcrossLinkedWorktrees(t *testing.T) {
 	gittest.Run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)
 	m := NewManager(func(core.Event) {})
 
-	main, err := m.Open(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	other, err := m.Open(context.Background(), core.RepoPath(linked))
-	if err != nil {
-		t.Fatal(err)
-	}
+	main := openSession(t, m, repo.Dir)
+	other := openSession(t, m, linked)
 
 	if main.ID == other.ID {
 		t.Errorf("linked worktrees got the same ID %q", main.ID)
@@ -63,20 +62,33 @@ func TestFR_REPO_05_ManagerOpenRejectsNonRepoPathSayingSo(t *testing.T) {
 	m := NewManager(func(core.Event) {})
 	dir := t.TempDir()
 
-	_, err := m.Open(context.Background(), core.RepoPath(dir))
+	_, err := m.Open(t.Context(), core.RepoPath(dir))
 
 	ce := coretest.AsError(t, err, core.NotARepo)
 	if want := dir + " is not a git repository"; ce.Message != want {
 		t.Errorf("Message = %q, want %q", ce.Message, want)
 	}
+	if ce.Args["path"] != dir {
+		t.Errorf("Args[path] = %q, want %q", ce.Args["path"], dir)
+	}
+	if ce.Key != "notARepo" {
+		t.Errorf("Key = %q, want notARepo", ce.Key)
+	}
 }
 
 func TestManagerOpenRejectsMissingPath(t *testing.T) {
 	m := NewManager(func(core.Event) {})
+	missing := filepath.Join(t.TempDir(), "missing")
 
-	_, err := m.Open(context.Background(), core.RepoPath(filepath.Join(t.TempDir(), "missing")))
+	_, err := m.Open(t.Context(), core.RepoPath(missing))
 
-	coretest.AssertCode(t, err, core.NotARepo)
+	ce := coretest.AsError(t, err, core.NotARepo)
+	if ce.Args["path"] != missing {
+		t.Errorf("Args[path] = %q, want %q", ce.Args["path"], missing)
+	}
+	if ce.Key != "notARepo" {
+		t.Errorf("Key = %q, want notARepo", ce.Key)
+	}
 }
 
 func TestManagerGetReturnsInternalErrorForUnknownID(t *testing.T) {
@@ -87,56 +99,32 @@ func TestManagerGetReturnsInternalErrorForUnknownID(t *testing.T) {
 	coretest.AssertCode(t, err, core.Internal)
 }
 
-func TestWorktreeRunnerAppendsToCommandLogAndEmitsSink(t *testing.T) {
+func TestWorktreeRunnerEmitsACommandSinkEvent(t *testing.T) {
 	repo := gittest.New(t)
 	events := make(chan core.Event, 8)
 	m := NewManager(func(e core.Event) { events <- e })
 
-	wt, err := m.Open(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	drainEvents(events) // the poller's own baseline status check
+	wt := openSession(t, m, repo.Dir)
+	coretest.DrainEvents(events) // the poller's own baseline status check
 
-	if _, err := wt.Runner.Run(context.Background(), git.Call{Dir: wt.Path, ReadOnly: true, Args: []string{"status"}}); err != nil {
+	if _, err := wt.Runner.Run(t.Context(), git.Call{Dir: wt.Path, ReadOnly: true, Args: []string{"status"}}); err != nil {
 		t.Fatal(err)
-	}
-
-	got := wt.CommandLog()
-	if last := got[len(got)-1]; last.Command != "git status" {
-		t.Fatalf("last CommandLog entry = %q, want %q", last.Command, "git status")
 	}
 
 	select {
 	case e := <-events:
 		if e.Name != "command" || e.Worktree != wt.ID {
-			t.Errorf("event = %+v, want Name \"command\", Worktree %q", e, wt.ID)
+			t.Fatalf("event = %+v, want Name \"command\", Worktree %q", e, wt.ID)
+		}
+		var entry core.CommandRecord
+		if err := json.Unmarshal(e.Payload, &entry); err != nil {
+			t.Fatal(err)
+		}
+		if entry.Command != "git status" {
+			t.Errorf("entry.Command = %q, want %q", entry.Command, "git status")
 		}
 	default:
 		t.Error("sink received no event")
-	}
-}
-
-// drainEvents discards whatever is already buffered, without waiting.
-func drainEvents(events chan core.Event) {
-	for {
-		select {
-		case <-events:
-		default:
-			return
-		}
-	}
-}
-
-func TestWorktreeCommandLogCapsAtLogCap(t *testing.T) {
-	wt := &Worktree{}
-	for i := range logCap + 1 {
-		wt.append(core.CommandLogEntry{Command: string(rune('a' + i%26))})
-	}
-
-	got := wt.CommandLog()
-	if len(got) != logCap {
-		t.Fatalf("CommandLog() = %d entries, want %d", len(got), logCap)
 	}
 }
 
@@ -191,21 +179,54 @@ func TestFR_REPO_04_LogBeginReloadFailsWhileALoadIsInFlight(t *testing.T) {
 	r.LogFinish(gen, nil, nil)
 }
 
+// FilterRestart reads and acts on "is a filter active" under one lock, so a
+// SetLogFilter landing between a separate read and restart cannot revive a
+// filter FilterClear just cleared.
+func TestFR_REPO_04_FilterRestartFindsNothingActiveAfterFilterClear(t *testing.T) {
+	w := &Worktree{}
+	w.FilterBegin(core.LogFilter{Path: "a"}, func() {})
+
+	w.FilterClear()
+
+	if _, _, ok := w.FilterRestart(func() {}); ok {
+		t.Error("FilterRestart() after FilterClear ok = true, want false")
+	}
+}
+
+// Nor can it restart a filter SetLogFilter already replaced.
+func TestFR_REPO_04_FilterRestartRestartsTheCurrentFilterNotAnEarlierOne(t *testing.T) {
+	w := &Worktree{}
+	w.FilterBegin(core.LogFilter{Path: "a"}, func() {})
+	second := core.LogFilter{Path: "b"}
+	gen2 := w.FilterBegin(second, func() {})
+
+	filter, gen, ok := w.FilterRestart(func() {})
+
+	if !ok {
+		t.Fatal("FilterRestart() ok = false, want true")
+	}
+	if filter.Path != second.Path {
+		t.Errorf("FilterRestart() filter = %+v, want the current one %+v", filter, second)
+	}
+	if gen <= gen2 {
+		t.Errorf("FilterRestart() gen = %d, want greater than the current load's %d", gen, gen2)
+	}
+}
+
 func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	events := make(chan core.Event, 16)
 	m := NewManager(func(e core.Event) { events <- e })
-	wt, err := m.Open(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	drainEvents(events)
+	wt := openSession(t, m, repo.Dir)
+	coretest.DrainEvents(events)
 
 	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
 
-	deadline := time.After(2 * time.Second)
+	// above FallbackPollInterval: still passes when fsnotify cannot start and
+	// only the fallback poll reports.
+	deadline := time.After(watch.FallbackPollInterval + 2*time.Second)
 	for {
 		select {
 		case e := <-events:
@@ -214,7 +235,7 @@ func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
 				return
 			}
 		case <-deadline:
-			t.Fatal("no repo:changed(refs) event within 2s")
+			t.Fatal("no repo:changed(refs) event within the deadline")
 		}
 	}
 }
@@ -222,19 +243,15 @@ func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
 func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
 	orig := watch.PollInterval
 	watch.PollInterval = 30 * time.Millisecond
-	defer func() { watch.PollInterval = orig }()
+	t.Cleanup(func() { watch.PollInterval = orig })
 
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	events := make(chan core.Event, 16)
 	m := NewManager(func(e core.Event) { events <- e })
-	wt, err := m.Open(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer m.Close(wt.ID) // stops the poller before PollInterval is restored above
-	drainEvents(events)
+	wt := openSession(t, m, repo.Dir) // its cleanup stops the poller before PollInterval is restored above
+	coretest.DrainEvents(events)
 
 	if err := os.WriteFile(filepath.Join(repo.Dir, "seed.txt"), []byte("changed"), 0o644); err != nil {
 		t.Fatal(err)
@@ -286,14 +303,8 @@ func TestQA_PERF_06_ManagerCloseTearsDownThePollerAndTheLastWorktreesWatcher(t *
 		return p
 	}
 
-	main, err := m.Open(context.Background(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	other, err := m.Open(context.Background(), core.RepoPath(linked))
-	if err != nil {
-		t.Fatal(err)
-	}
+	main := openSession(t, m, repo.Dir)
+	other := openSession(t, m, linked)
 
 	m.Close(main.ID)
 	if repoWatcherFake.closeCount != 0 {

@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -9,7 +8,7 @@ import (
 )
 
 func TestTR_04_CheckVersionAcceptsInstalledGit(t *testing.T) {
-	v, err := (Runner{}).CheckVersion(context.Background())
+	v, err := (Runner{}).CheckVersion(t.Context())
 	if err != nil {
 		t.Fatalf("CheckVersion() err = %v, want nil", err)
 	}
@@ -20,11 +19,17 @@ func TestTR_04_CheckVersionAcceptsInstalledGit(t *testing.T) {
 
 func TestTR_04_CheckVersionRejectsTooOldGit(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "git version 2.30.0\n")
-	_, err := (Runner{Git: fakegit}).CheckVersion(context.Background())
-	coretest.AssertCode(t, err, core.GitTooOld)
+	_, err := (Runner{Git: fakegit}).CheckVersion(t.Context())
+	ce := coretest.AsError(t, err, core.GitTooOld)
+	if ce.Args["version"] != "2.30.0" || ce.Args["minVersion"] != MinVersion.String() {
+		t.Errorf("Args = %+v, want version=2.30.0 minVersion=%s", ce.Args, MinVersion)
+	}
+	if ce.Key != "gitTooOld" {
+		t.Errorf("Key = %q, want gitTooOld", ce.Key)
+	}
 }
 
 func TestTR_04_CheckVersionRejectsMissingGit(t *testing.T) {
-	_, err := (Runner{Git: "/does/not/exist"}).CheckVersion(context.Background())
+	_, err := (Runner{Git: "/does/not/exist"}).CheckVersion(t.Context())
 	coretest.AssertCode(t, err, core.GitTooOld)
 }

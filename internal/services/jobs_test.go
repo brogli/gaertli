@@ -34,7 +34,7 @@ func TestFR_SYNC_07_QA_RESP_02_JobsPollsGrowingProgressThenCancelKillsProcess(t 
 	t.Setenv("FAKEGIT_STDERR_DELAY_MS", "200")
 	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
 
-	sess.Repo.Jobs().Start("fetch", func(ctx context.Context, progress jobs.Progress) (any, error) {
+	sess.Repo.Jobs().Start(t.Context(), "fetch", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		_, err := (git.Runner{Git: fakegit}).StreamErr(ctx, git.Call{Args: []string{"fetch"}}, func(line []byte) error {
 			if percent, message, ok := git.ParseProgressLine(line); ok {
 				progress(percent, message)
@@ -46,7 +46,7 @@ func TestFR_SYNC_07_QA_RESP_02_JobsPollsGrowingProgressThenCancelKillsProcess(t 
 
 	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.Progress > 0 })
 
-	if err := c.CancelJob(context.Background(), wt, job.ID); err != nil {
+	if err := c.CancelJob(t.Context(), wt, job.ID); err != nil {
 		t.Fatal(err)
 	}
 	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.State == "cancelled" })
@@ -64,7 +64,7 @@ func waitForJob(t *testing.T, c *Core, id core.WorktreeID, want func(core.JobInf
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		list, err := c.Jobs(context.Background(), id)
+		list, err := c.Jobs(t.Context(), id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,6 +77,12 @@ func waitForJob(t *testing.T, c *Core, id core.WorktreeID, want func(core.JobInf
 	}
 	t.Fatal("timed out waiting for a matching job")
 	return core.JobInfo{}
+}
+
+// waitForJobState waits for job id to reach state.
+func waitForJobState(t *testing.T, c *Core, wt core.WorktreeID, id, state string) core.JobInfo {
+	t.Helper()
+	return waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == id && j.State == state })
 }
 
 func mtime(t *testing.T, path string) time.Time {

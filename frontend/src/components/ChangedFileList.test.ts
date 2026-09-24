@@ -32,6 +32,17 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('open')?.[0]).toEqual([files[1]])
   })
 
+  it('FR-DIFF-07 Enter on a focused row emits open with that file; Enter on its button does not', async () => {
+    const wrapper = mount(ChangedFileList, { props: { files } })
+    const row = wrapper.findAll('li')[1]!
+
+    expect(row.attributes('tabindex')).toBe('0')
+    await row.trigger('keydown', { key: 'Enter' })
+    await row.get('[data-test="open-editor"]').trigger('keydown', { key: 'Enter' })
+
+    expect(wrapper.emitted('open')).toEqual([[files[1]]])
+  })
+
   it('FR-ED-02 clicking a file row\'s "Open in editor" control emits open-editor with that file, not select', async () => {
     const wrapper = mount(ChangedFileList, { props: { files } })
 
@@ -41,14 +52,14 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
   })
 
-  it('FR-CHG-02 renders no action button without actionLabel', () => {
+  it('FR-CHG-02 renders no action button without an action kind', () => {
     const wrapper = mount(ChangedFileList, { props: { files } })
 
     expect(wrapper.find('[data-test="action"]').exists()).toBe(false)
   })
 
-  it('FR-CHG-02 clicking a row\'s action button emits action with that file, not select', async () => {
-    const wrapper = mount(ChangedFileList, { props: { files, actionLabel: 'Stage' } })
+  it("FR-CHG-02 clicking a row's action button emits action with that file, not select", async () => {
+    const wrapper = mount(ChangedFileList, { props: { files, action: 'stage' } })
 
     const button = wrapper.findAll('[data-test="action"]')[1]!
     expect(button.attributes('aria-label')).toBe('Stage')
@@ -58,15 +69,15 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
   })
 
-  it('FR-CHG-10 renders no second action button without secondActionLabel', () => {
-    const wrapper = mount(ChangedFileList, { props: { files, actionLabel: 'Stage' } })
+  it('FR-CHG-10 renders no second action button without a second action kind', () => {
+    const wrapper = mount(ChangedFileList, { props: { files, action: 'stage' } })
 
     expect(wrapper.find('[data-test="second-action"]').exists()).toBe(false)
   })
 
-  it('FR-CHG-10 clicking a row\'s second action button emits second-action with that file, not select or action', async () => {
+  it("FR-CHG-10 clicking a row's second action button emits second-action with that file, not select or action", async () => {
     const wrapper = mount(ChangedFileList, {
-      props: { files, actionLabel: 'Stage', secondActionLabel: 'Discard' },
+      props: { files, action: 'stage', secondAction: 'discard' },
     })
 
     const button = wrapper.findAll('[data-test="second-action"]')[1]!
@@ -78,9 +89,9 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('action')).toBeUndefined()
   })
 
-  it('FR-UX-09 every action button has a title and aria-label naming it, and the name\'s title is the full path', () => {
+  it("FR-UX-09 every action button has a title and aria-label naming it, and the name's title is the full path", () => {
     const wrapper = mount(ChangedFileList, {
-      props: { files, actionLabel: 'Stage', secondActionLabel: 'Discard' },
+      props: { files, action: 'stage', secondAction: 'discard' },
     })
 
     const row = wrapper.findAll('li')[1]!
@@ -94,5 +105,31 @@ describe('ChangedFileList', () => {
       expect(button.attributes('aria-label')).toBe(label)
     }
     expect(row.get('.path').attributes('title')).toBe('b.txt')
+  })
+
+  it('FR-UX-11 the action button icon and label come from the action kind, not the caller’s own text', () => {
+    const stage = mount(ChangedFileList, { props: { files, action: 'stage' } })
+    const markResolved = mount(ChangedFileList, { props: { files, action: 'markResolved' } })
+
+    const stageButton = stage.findAll('[data-test="action"]')[0]!
+    const resolveButton = markResolved.findAll('[data-test="action"]')[0]!
+    expect(stageButton.get('i').classes()).toContain('oi-plus')
+    expect(stageButton.attributes('aria-label')).toBe('Stage')
+    expect(resolveButton.get('i').classes()).toContain('oi-check')
+    expect(resolveButton.attributes('aria-label')).toBe('Mark resolved')
+  })
+
+  it('FR-UX-13 each row shows its status as an icon with the label as its tooltip, not the status letter', () => {
+    const wrapper = mount(ChangedFileList, {
+      props: { files: [{ path: 'a.txt', status: 'M' }, files[1]!] },
+    })
+
+    const statuses = wrapper.findAll('.status')
+    expect(statuses.map((s) => s.get('i').classes())).toEqual([
+      ['oi', 'oi-file-edit'],
+      ['oi', 'oi-file-export'],
+    ])
+    expect(statuses.map((s) => s.attributes('title'))).toEqual(['Modified', 'Renamed'])
+    expect(statuses[0]!.text()).toBe('')
   })
 })

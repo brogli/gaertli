@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/settings"
@@ -20,12 +22,62 @@ import (
 type fakeAPI struct {
 	core.API
 	openWorktree   func(context.Context, core.RepoPath) (core.WorktreeInfo, error)
+	mainWorktree   func(context.Context, core.RepoPath) (core.Worktree, error)
 	closed         *[]core.WorktreeID
 	editorProfiles *[]core.EditorProfile // records every SetEditorProfile call, if set
+	calls          chan<- routedCall     // receives every Summary, CompareCommits and SetFocused call, if set
+}
+
+// routedCall is one worktree-routed call a fake core received.
+type routedCall struct {
+	method string
+	wt     core.WorktreeID
+}
+
+func (f fakeAPI) record(method string, wt core.WorktreeID) {
+	if f.calls != nil {
+		f.calls <- routedCall{method, wt}
+	}
+}
+
+// nextCall waits for the next call a fake core records on calls.
+func nextCall(t *testing.T, calls <-chan routedCall) routedCall {
+	t.Helper()
+	select {
+	case c := <-calls:
+		return c
+	case <-time.After(5 * time.Second):
+		t.Fatal("no core call arrived")
+		return routedCall{}
+	}
+}
+
+// openAsIs opens path as a worktree whose id and path are path itself.
+func openAsIs(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+	return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path)}, nil
+}
+
+// notARepo fails to open any path.
+func notARepo(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
+	return core.WorktreeInfo{}, &core.Error{Code: core.NotARepo, Message: "not a git repository"}
 }
 
 func (f fakeAPI) OpenWorktree(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 	return f.openWorktree(ctx, path)
+}
+
+func (f fakeAPI) MainWorktree(ctx context.Context, gitDir core.RepoPath) (core.Worktree, error) {
+	return f.mainWorktree(ctx, gitDir)
+}
+
+func (f fakeAPI) Summary(_ context.Context, wt core.WorktreeID) (core.Summary, error) {
+	f.record("Summary", wt)
+	return core.Summary{}, nil
+}
+
+func (f fakeAPI) CompareCommits(_ context.Context, wt core.WorktreeID, _, _ string) ([]core.ChangedFile, error) {
+	f.record("CompareCommits", wt)
+	return nil, nil
 }
 
 func (f fakeAPI) CloseWorktree(_ context.Context, id core.WorktreeID) error {
@@ -44,7 +96,10 @@ func (f fakeAPI) SetEditorProfile(_ context.Context, profile core.EditorProfile)
 
 // SetFocused is reached from a window focus callback's own goroutine, where
 // a panic would take the test binary down with it.
-func (f fakeAPI) SetFocused(context.Context, core.WorktreeID, bool) error { return nil }
+func (f fakeAPI) SetFocused(_ context.Context, wt core.WorktreeID, focused bool) error {
+	f.record(fmt.Sprintf("SetFocused(%t)", focused), wt)
+	return nil
+}
 
 func (f fakeAPI) Jobs(context.Context, core.WorktreeID) ([]core.JobInfo, error) { return nil, nil }
 
@@ -98,7 +153,7 @@ func TestFR_REPO_06_PathArgThenOpenOrFocusOpensAWindow(t *testing.T) {
 
 func TestADR_9_OptionsRegistersTheFacadeAndSingleInstance(t *testing.T) {
 	reg := NewRegistry()
-	opts := options(fstest.MapFS{}, reg, func(string) {})
+	opts := options(fstest.MapFS{}, reg, func(string) {}, nil)
 
 	if opts.Name != "nebegit" {
 		t.Errorf("Name = %q, want %q", opts.Name, "nebegit")
@@ -123,7 +178,7 @@ func TestFR_REPO_06_ASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testi
 	}
 	for _, c := range cases {
 		var got string
-		opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path })
+		opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path }, nil)
 
 		opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"nebegit", c.arg}, WorkingDir: launchDir})
 
@@ -135,7 +190,7 @@ func TestFR_REPO_06_ASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testi
 
 func TestFR_REPO_02_ASecondInstanceWithoutAPathRelaysNone(t *testing.T) {
 	got := "unset"
-	opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path })
+	opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path }, nil)
 
 	opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"nebegit"}, WorkingDir: t.TempDir()})
 
@@ -158,7 +213,7 @@ func TestFR_REPO_02_RestoreOpensAWindowForEachRememberedSelection(t *testing.T) 
 		return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path)}, nil
 	}}
 
-	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restore(context.Background())
+	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restore(t.Context())
 
 	if len(opener.windows) != 2 {
 		t.Fatalf("windows opened = %d, want 2", len(opener.windows))
@@ -181,7 +236,7 @@ func TestFR_REPO_02_RestoreOpensOneEmptySelectionWindowWhenNothingWasOpen(t *tes
 		return core.WorktreeInfo{}, nil
 	}}
 
-	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restore(context.Background())
+	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restore(t.Context())
 
 	if len(opener.windows) != 1 {
 		t.Fatalf("windows opened = %d, want 1", len(opener.windows))
@@ -197,12 +252,10 @@ func TestFR_REPO_02_RestoreFallsBackToTheEmptySelectionWindowWhenNoRememberedWor
 	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/gone1", "/gone2"} }); err != nil {
 		t.Fatal(err)
 	}
-	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
-		return core.WorktreeInfo{}, &core.Error{Code: core.NotARepo, Message: "not a git repository"}
-	}}
+	api := fakeAPI{openWorktree: notARepo}
 	notify := &fakeNotifier{}
 
-	shell{api: api, reg: reg, store: store, notify: notify}.restore(context.Background())
+	shell{api: api, reg: reg, store: store, notify: notify}.restore(t.Context())
 
 	if notify.calls != 2 {
 		t.Errorf("notify.Show calls = %d, want 2", notify.calls)
@@ -215,18 +268,18 @@ func TestFR_REPO_02_RestoreFallsBackToTheEmptySelectionWindowWhenNoRememberedWor
 func TestFR_REPO_05_OpenReportsWhetherTheWindowOpened(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
-	api := fakeAPI{openWorktree: func(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+	api := fakeAPI{openWorktree: func(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 		if path == "/bad" {
-			return core.WorktreeInfo{}, &core.Error{Code: core.NotARepo, Message: "not a git repository"}
+			return notARepo(ctx, path)
 		}
-		return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path)}, nil
+		return openAsIs(ctx, path)
 	}}
 	sh := shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}
 
-	if sh.open(context.Background(), "/bad") {
+	if sh.open(t.Context(), "/bad") {
 		t.Error("open(/bad) = true, want false")
 	}
-	if !sh.open(context.Background(), "/good") {
+	if !sh.open(t.Context(), "/good") {
 		t.Error("open(/good) = false, want true")
 	}
 }
@@ -265,22 +318,60 @@ func TestFR_WT_05_FR_WT_08_SwitchToMovesTheWindowsSelection(t *testing.T) {
 	sh := shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
 	fw := &fakeCallingWindow{id: windowID}
 
-	if err := sh.switchTo(context.Background(), fw, "/b"); err != nil {
+	if err := sh.switchTo(t.Context(), fw, "/b"); err != nil {
 		t.Fatal(err)
 	}
 
 	if want := []core.RepoPath{"/b"}; !slices.Equal(opened, want) {
 		t.Errorf("OpenWorktree calls = %v, want %v", opened, want)
 	}
-	if reg.StillSelected("A") {
+	if reg.inUse("A") {
 		t.Error("the window's own selection still names A, want it moved to the new id")
 	}
-	if _, err := reg.CoreOf("/b"); err != nil {
-		t.Errorf("CoreOf(/b) = %v, want the window's entry to now select it", err)
+	if !reg.inUse("/b") {
+		t.Error("the window's entry does not select /b")
 	}
 	if want := []string{"/?path=%2Fb"}; !slices.Equal(fw.setURLs, want) {
 		t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
 	}
+}
+
+// switchTo records the new worktree as the repo's recent entry, replacing
+// the one the repo picker's fallback would otherwise still see for an old,
+// since-removed worktree.
+func TestFR_WT_13_SwitchToUpdatesTheRepoRecentEntry(t *testing.T) {
+	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("A", "/a", "")
+	windowID := opener.windows[0].ID()
+
+	api := fakeAPI{openWorktree: func(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+		return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path), RepoKey: "repo-b"}, nil
+	}}
+	store := newTestStore(t)
+	if err := store.Update(func(s *settings.Settings) {
+		s.RecentRepos = []settings.RecentRepo{{Path: "/b-old", RepoKey: "repo-b"}}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sh := shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}
+	fw := &fakeCallingWindow{id: windowID}
+
+	if err := sh.switchTo(t.Context(), fw, "/b"); err != nil {
+		t.Fatal(err)
+	}
+
+	recent := store.Get().RecentRepos
+	if want := []string{"/b"}; !slices.Equal(recentPaths(recent), want) {
+		t.Errorf("RecentRepos paths = %v, want %v", recentPaths(recent), want)
+	}
+}
+
+func recentPaths(recent []settings.RecentRepo) []string {
+	paths := make([]string, len(recent))
+	for i, r := range recent {
+		paths[i] = r.Path
+	}
+	return paths
 }
 
 // A WSL window's URL carries the distro the path arrived from, so a later
@@ -296,7 +387,7 @@ func TestFR_REPO_02_SwitchToCarriesTheDistroInTheURL(t *testing.T) {
 	sh := shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
 	fw := &fakeCallingWindow{id: windowID}
 
-	if err := sh.switchTo(context.Background(), fw, `\\wsl.localhost\Ubuntu\home\u\r`); err != nil {
+	if err := sh.switchTo(t.Context(), fw, `\\wsl.localhost\Ubuntu\home\u\r`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -321,12 +412,10 @@ func TestFR_REPO_02_SelectionURLCarriesTheDistro(t *testing.T) {
 func TestFR_REPO_05_OpenWorktreePathNotifiesAndOpensNoWindowOnFailure(t *testing.T) {
 	reg, opener := newTestRegistry()
 	store := newTestStore(t)
-	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
-		return core.WorktreeInfo{}, &core.Error{Code: core.NotARepo, Message: "not a git repository"}
-	}}
+	api := fakeAPI{openWorktree: notARepo}
 	notify := &fakeNotifier{}
 
-	shell{api: api, reg: reg, store: store, notify: notify}.open(context.Background(), "/bad")
+	shell{api: api, reg: reg, store: store, notify: notify}.open(t.Context(), "/bad")
 
 	if notify.calls != 1 {
 		t.Errorf("notify.Show calls = %d, want 1", notify.calls)

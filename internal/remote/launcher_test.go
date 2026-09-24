@@ -1,7 +1,9 @@
 package remote
 
 import (
-	"context"
+	"errors"
+	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,9 +15,9 @@ import (
 func TestFR_REPO_06_InstallLauncherWritesGuiPathAndSymlinksNebegit(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: true}
-	dc := NewDistroCore("Ubuntu-22.04", "1.0.0", localRunner, consent, nil)
+	dc := NewDistroCore("Ubuntu-22.04", "1.0.0", localRunner, consent, nil, slog.Default())
 
-	if err := dc.InstallLauncher(context.Background(), `C:\nebegit.exe`); err != nil {
+	if err := dc.InstallLauncher(t.Context(), `C:\nebegit.exe`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -45,17 +47,17 @@ func TestFR_REPO_06_InstallLauncherWritesGuiPathAndSymlinksNebegit(t *testing.T)
 func TestFR_REPO_06_InstallLauncherDeclinedConsentWritesNothing(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: false}
-	dc := NewDistroCore("Ubuntu-22.04", "1.0.0", localRunner, consent, nil)
+	dc := NewDistroCore("Ubuntu-22.04", "1.0.0", localRunner, consent, nil, slog.Default())
 
-	err := dc.InstallLauncher(context.Background(), `C:\nebegit.exe`)
+	err := dc.InstallLauncher(t.Context(), `C:\nebegit.exe`)
 
 	coretest.AssertCode(t, err, core.DeployRefused)
 
 	target := deployedPath(t, "1.0.0")
-	if _, statErr := os.Stat(filepath.Join(filepath.Dir(target), "gui-path")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(filepath.Dir(target), "gui-path")); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("gui-path file exists after a declined consent")
 	}
-	if _, statErr := os.Stat(filepath.Join(os.Getenv("HOME"), ".local/bin/nebegit")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(os.Getenv("HOME"), ".local/bin/nebegit")); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("~/.local/bin/nebegit exists after a declined consent")
 	}
 }

@@ -2,9 +2,12 @@ package settings_test
 
 import (
 	"encoding/json"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -39,6 +42,7 @@ func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
 		DiffMode:                 "side-by-side",
 		AutoFetchIntervalMinutes: 5,
 		Theme:                    "dark",
+		IgnoreWhitespace:         true,
 	}
 
 	if err := settings.Save(path, want); err != nil {
@@ -48,8 +52,46 @@ func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !equalSettings(got, want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load() = %+v, want %+v", got, want)
+	}
+}
+
+// An install from before the modes were set has a 0755 directory and a
+// 0644 file; its next save tightens both.
+func TestTR_29_ASavedStoreHasAFileAndDirectoryOnlyItsOwnerCanRead(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX file modes")
+	}
+	for _, existing := range []bool{false, true} {
+		dir := filepath.Join(t.TempDir(), "nebegit")
+		path := filepath.Join(dir, "settings.json")
+		if existing {
+			if err := os.Mkdir(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		store, err := settings.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := store.Update(func(s *settings.Settings) { s.Theme = "dark" }); err != nil {
+			t.Fatal(err)
+		}
+
+		for p, want := range map[string]fs.FileMode{path: 0o600, dir: 0o700} {
+			info, err := os.Stat(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := info.Mode().Perm(); got != want {
+				t.Errorf("existing=%v: %s mode = %v, want %v", existing, p, got, want)
+			}
+		}
 	}
 }
 
@@ -61,7 +103,7 @@ func TestFR_UX_04_LoadOnMissingFileReturnsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !equalSettings(got, settings.Default()) {
+	if !reflect.DeepEqual(got, settings.Default()) {
 		t.Errorf("Load() = %+v, want Default() %+v", got, settings.Default())
 	}
 }
@@ -265,15 +307,4 @@ func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
 	if len(got.EditorProfiles) != 0 {
 		t.Errorf("EditorProfiles = %+v, want empty", got.EditorProfiles)
 	}
-}
-
-func equalSettings(a, b settings.Settings) bool {
-	return slices.Equal(a.RecentRepos, b.RecentRepos) &&
-		slices.Equal(a.OpenWorktrees, b.OpenWorktrees) &&
-		maps.Equal(a.EditorProfiles, b.EditorProfiles) &&
-		slices.Equal(a.ProtectedBranches, b.ProtectedBranches) &&
-		a.DefaultPullMode == b.DefaultPullMode &&
-		a.DiffMode == b.DiffMode &&
-		a.AutoFetchIntervalMinutes == b.AutoFetchIntervalMinutes &&
-		a.Theme == b.Theme
 }

@@ -3,26 +3,57 @@ package remote_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os/exec"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/core/coretest"
+	"github.com/brogli/nebegit/internal/git/gittest"
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// coreBin is the real nebegit-core; badBin reports a wrong protocol version.
-var coreBin, badBin string
+// coreBin is the real nebegit-core; badBin reports a wrong protocol version;
+// stderrBin also writes to stderr, including a line with a credential.
+var coreBin, badBin, stderrBin string
 
 func TestMain(m *testing.M) {
 	testbin.Main(m,
 		testbin.Bin{Path: &coreBin, Pkg: "../../cmd/nebegit-core"},
 		testbin.Bin{Path: &badBin, Pkg: "./testdata/badcore"},
+		testbin.Bin{Path: &stderrBin, Pkg: "./testdata/stderrcore"},
 	)
+}
+
+// syncBuffer is a strings.Builder safe for a background goroutine's writes
+// (the stderr reader) racing a test's own reads.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// bufLogger is a *slog.Logger writing plain text to a syncBuffer, for a
+// test to inspect what DistroCore logged.
+func bufLogger() (logger *slog.Logger, text func() string) {
+	buf := &syncBuffer{}
+	return slog.New(slog.NewTextHandler(buf, nil)), buf.String
 }
 
 // acceptConsent always accepts; deploy_test.go covers consent behaviour.
@@ -30,39 +61,49 @@ type acceptConsent struct{}
 
 func (acceptConsent) Ask(string, string) bool { return true }
 
-// fakeWSLRunner intercepts the "sh -c '<target> --stdio'" spawn call to run
-// bin locally instead of a real wsl.exe child; every other call (deploy's
+// fakeWSL intercepts the "sh -c '<target> --stdio'" spawn call to run bin
+// locally instead of a real wsl.exe child; every other call (deploy's
 // stat/cat dance) runs the given shell command for real against a
-// test-sandboxed $HOME. Every call increments *calls, and each spawn cmd is
-// appended to *spawns so a test can kill the live process without
-// DistroCore exposing it.
-func fakeWSLRunner(bin string, calls *int, spawns *[]*exec.Cmd) func(context.Context, string, ...string) (*exec.Cmd, error) {
-	return func(ctx context.Context, distro string, args ...string) (*exec.Cmd, error) {
-		*calls++
-		if len(args) == 3 && strings.HasSuffix(args[2], "--stdio") {
-			cmd := exec.CommandContext(ctx, bin, "--stdio")
-			*spawns = append(*spawns, cmd)
-			return cmd, nil
-		}
-		return exec.CommandContext(ctx, args[0], args[1:]...), nil
+// test-sandboxed $HOME. It counts every call, and keeps each spawn cmd so a
+// test can kill the live process without DistroCore exposing it.
+type fakeWSL struct {
+	bin    string
+	calls  int
+	spawns []*exec.Cmd
+}
+
+func (f *fakeWSL) run(ctx context.Context, distro string, args ...string) (*exec.Cmd, error) {
+	f.calls++
+	if len(args) == 3 && strings.HasSuffix(args[2], "--stdio") {
+		cmd := exec.CommandContext(ctx, f.bin, "--stdio")
+		f.spawns = append(f.spawns, cmd)
+		return cmd, nil
 	}
+	return exec.CommandContext(ctx, args[0], args[1:]...), nil
+}
+
+// newDistroCore sandboxes $HOME and builds Ubuntu-22.04's DistroCore, whose
+// core process is bin.
+func newDistroCore(t *testing.T, bin string, log *slog.Logger) (*remote.DistroCore, *fakeWSL) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	wsl := &fakeWSL{bin: bin}
+	return remote.NewDistroCore("Ubuntu-22.04", "1.0.0", wsl.run, acceptConsent{}, nil, log), wsl
 }
 
 func TestADR_3_EnsureSpawnsOnceThenReusesTheLiveClient(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	var calls int
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", fakeWSLRunner(coreBin, &calls, new([]*exec.Cmd)), acceptConsent{}, nil)
+	dc, wsl := newDistroCore(t, coreBin, slog.Default())
 
-	client1, respawned1, err := dc.Ensure(context.Background())
+	client1, respawned1, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !respawned1 {
 		t.Error("first Ensure: respawned = false, want true")
 	}
-	callsAfterFirst := calls
+	callsAfterFirst := wsl.calls
 
-	client2, respawned2, err := dc.Ensure(context.Background())
+	client2, respawned2, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,65 +113,59 @@ func TestADR_3_EnsureSpawnsOnceThenReusesTheLiveClient(t *testing.T) {
 	if client2 != client1 {
 		t.Error("second Ensure returned a different client instance")
 	}
-	if calls != callsAfterFirst {
-		t.Errorf("wslRunner called %d more times on the second Ensure, want 0", calls-callsAfterFirst)
+	if wsl.calls != callsAfterFirst {
+		t.Errorf("wslRunner called %d more times on the second Ensure, want 0", wsl.calls-callsAfterFirst)
 	}
 }
 
 func TestADR_3_EnsureForcesARedeployOnAProtocolMismatch(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	var calls int
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", fakeWSLRunner(badBin, &calls, new([]*exec.Cmd)), acceptConsent{}, nil)
+	dc, _ := newDistroCore(t, badBin, slog.Default())
 
-	_, _, err := dc.Ensure(context.Background())
+	_, _, err := dc.Ensure(t.Context())
 
 	coretest.AssertCode(t, err, core.Internal)
 }
 
 func TestADR_3_OpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
-	repo := t.TempDir()
-	if err := exec.Command("git", "init", repo).Run(); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("HOME", t.TempDir())
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", fakeWSLRunner(coreBin, new(int), new([]*exec.Cmd)), acceptConsent{}, nil)
-	client, _, err := dc.Ensure(context.Background())
+	repo := gittest.New(t).Dir
+	dc, _ := newDistroCore(t, coreBin, slog.Default())
+	client, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	uncPath := `\\wsl.localhost\Ubuntu-22.04\` + strings.ReplaceAll(strings.TrimPrefix(repo, "/"), "/", `\`)
-	info, err := remote.NewDistroPathClient(client, "Ubuntu-22.04").OpenWorktree(context.Background(), core.RepoPath(uncPath))
+	uncPath := remote.BuildWSLPath("Ubuntu-22.04", repo)
+	info, err := remote.NewDistroPathClient(client, "Ubuntu-22.04").OpenWorktree(t.Context(), core.RepoPath(uncPath))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Path != repo {
 		t.Errorf("OpenWorktree translated path = %q, want %q (not the UNC string)", info.Path, repo)
 	}
+	if info.ID != core.WorktreeID(uncPath) {
+		t.Errorf("ID = %q, want the UNC form %q", info.ID, uncPath)
+	}
+	if want := repo + "/.git"; info.RepoKey != want {
+		t.Errorf("RepoKey = %q, want the POSIX %q", info.RepoKey, want)
+	}
 }
 
 func TestADR_4_EnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
-	repo := t.TempDir()
-	if err := exec.Command("git", "init", repo).Run(); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("HOME", t.TempDir())
-	var calls int
-	var spawns []*exec.Cmd
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", fakeWSLRunner(coreBin, &calls, &spawns), acceptConsent{}, nil)
+	repo := gittest.New(t).Dir
+	dc, wsl := newDistroCore(t, coreBin, slog.Default())
 
-	client1, _, err := dc.Ensure(context.Background())
+	client1, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	uncPath := `\\wsl.localhost\Ubuntu-22.04\` + strings.ReplaceAll(strings.TrimPrefix(repo, "/"), "/", `\`)
-	info, err := remote.NewDistroPathClient(client1, "Ubuntu-22.04").OpenWorktree(context.Background(), core.RepoPath(uncPath))
+	uncPath := remote.BuildWSLPath("Ubuntu-22.04", repo)
+	info, err := remote.NewDistroPathClient(client1, "Ubuntu-22.04").OpenWorktree(t.Context(), core.RepoPath(uncPath))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// kill the underlying process, as `wsl --shutdown` would
-	if err := spawns[len(spawns)-1].Process.Kill(); err != nil {
+	if err := wsl.spawns[len(wsl.spawns)-1].Process.Kill(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -139,20 +174,18 @@ func TestADR_4_EnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
 		t.Fatal("Ensure after the kill returned the same client instance")
 	}
 
-	_, err = client2.Summary(context.Background(), info.ID)
-	var ce *core.Error
-	if !errors.As(err, &ce) {
+	_, err = client2.Summary(t.Context(), core.WorktreeID(info.Path))
+	if _, ok := errors.AsType[*core.Error](err); !ok {
 		t.Fatalf("bare call on the fresh client err = %v, want a *core.Error (unknown worktree)", err)
 	}
 }
 
 func TestTR_13_OnConnectFiresOnceForAFreshConnectNotOnAReusedClient(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", fakeWSLRunner(coreBin, new(int), new([]*exec.Cmd)), acceptConsent{}, nil)
+	dc, _ := newDistroCore(t, coreBin, slog.Default())
 	var got []*remote.Client
 	dc.OnConnect(func(_ context.Context, c *remote.Client) { got = append(got, c) })
 
-	client1, _, err := dc.Ensure(context.Background())
+	client1, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +193,7 @@ func TestTR_13_OnConnectFiresOnceForAFreshConnectNotOnAReusedClient(t *testing.T
 		t.Fatalf("onConnect calls = %d, want 1 with the fresh client", len(got))
 	}
 
-	client2, _, err := dc.Ensure(context.Background())
+	client2, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,14 +206,13 @@ func TestTR_13_OnConnectFiresOnceForAFreshConnectNotOnAReusedClient(t *testing.T
 }
 
 func TestADR_4_LiveClientReportsTheCurrentConnectionState(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", fakeWSLRunner(coreBin, new(int), new([]*exec.Cmd)), acceptConsent{}, nil)
+	dc, _ := newDistroCore(t, coreBin, slog.Default())
 
 	if _, ok := dc.LiveClient(); ok {
 		t.Fatal("LiveClient before any Ensure reports true")
 	}
 
-	client, _, err := dc.Ensure(context.Background())
+	client, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,16 +227,14 @@ func TestADR_4_LiveClientReportsTheCurrentConnectionState(t *testing.T) {
 // parameter by reflection, so a method added to the interface without a
 // matching case in distroPathClient fails the tests below instead of going
 // unnoticed.
-func repoPathMethods(t *testing.T) []reflect.Method {
-	t.Helper()
-	apiType := reflect.TypeOf((*core.API)(nil)).Elem()
-	repoPathType := reflect.TypeOf(core.RepoPath(""))
+func repoPathMethods() []reflect.Method {
+	apiType := reflect.TypeFor[core.API]()
+	repoPathType := reflect.TypeFor[core.RepoPath]()
 
 	var methods []reflect.Method
-	for i := range apiType.NumMethod() {
-		m := apiType.Method(i)
-		for j := range m.Type.NumIn() {
-			if m.Type.In(j) == repoPathType {
+	for m := range apiType.Methods() {
+		for in := range m.Type.Ins() {
+			if in == repoPathType {
 				methods = append(methods, m)
 				break
 			}
@@ -217,13 +247,13 @@ func repoPathMethods(t *testing.T) []reflect.Method {
 // path for the RepoPath parameter, and, for AddWorktree/RemoveWorktree
 // only, target at its fixed position (both take it third); every other
 // parameter is left zero.
-func callArgs(fnType reflect.Type, m string, path, target string) []reflect.Value {
+func callArgs(ctx context.Context, fnType reflect.Type, m string, path, target string) []reflect.Value {
 	args := make([]reflect.Value, fnType.NumIn())
 	for i := range args {
 		switch paramType := fnType.In(i); {
-		case paramType == reflect.TypeOf((*context.Context)(nil)).Elem():
-			args[i] = reflect.ValueOf(context.Background())
-		case paramType == reflect.TypeOf(core.RepoPath("")):
+		case paramType == reflect.TypeFor[context.Context]():
+			args[i] = reflect.ValueOf(ctx)
+		case paramType == reflect.TypeFor[core.RepoPath]():
 			args[i] = reflect.ValueOf(core.RepoPath(path))
 		case (m == "AddWorktree" || m == "RemoveWorktree") && i == 2:
 			args[i] = reflect.ValueOf(target)
@@ -248,14 +278,14 @@ func TestFR_REPO_07_TranslatesEveryRepoPathMethod(t *testing.T) {
 	const uncPath = `\\wsl.localhost\Ubuntu-22.04\home\u\r`
 	const uncTarget = `\\wsl.localhost\Ubuntu-22.04\home\u\r\wt`
 
-	f := &fake{version: func() (core.Version, error) { return core.Version{}, nil }}
+	f := &fake{}
 	client := pipeClient(t, f, nil)
 	wrapped := reflect.ValueOf(remote.NewDistroPathClient(client, "Ubuntu-22.04"))
 
-	for _, m := range repoPathMethods(t) {
+	for _, m := range repoPathMethods() {
 		t.Run(m.Name, func(t *testing.T) {
 			method := wrapped.MethodByName(m.Name)
-			if err := lastError(method.Call(callArgs(method.Type(), m.Name, uncPath, uncTarget))); err != nil {
+			if err := lastError(method.Call(callArgs(t.Context(), method.Type(), m.Name, uncPath, uncTarget))); err != nil {
 				t.Fatalf("%s(%s) = %v, want success", m.Name, uncPath, err)
 			}
 
@@ -277,15 +307,15 @@ func TestFR_REPO_07_RejectsAPathForAnotherDistroOrLocal(t *testing.T) {
 		{"local path", `C:\Users\u\r`},
 	}
 
-	f := &fake{version: func() (core.Version, error) { return core.Version{}, nil }}
+	f := &fake{}
 	client := pipeClient(t, f, nil)
 	wrapped := reflect.ValueOf(remote.NewDistroPathClient(client, "Ubuntu-22.04"))
 
-	for _, m := range repoPathMethods(t) {
+	for _, m := range repoPathMethods() {
 		for _, c := range cases {
 			t.Run(m.Name+"/"+c.name, func(t *testing.T) {
 				method := wrapped.MethodByName(m.Name)
-				err := lastError(method.Call(callArgs(method.Type(), m.Name, c.path, c.path)))
+				err := lastError(method.Call(callArgs(t.Context(), method.Type(), m.Name, c.path, c.path)))
 				coretest.AssertCode(t, err, core.Internal)
 
 				if _, called := f.paths[m.Name]; called {
@@ -302,7 +332,7 @@ func waitForRespawn(t *testing.T, dc *remote.DistroCore) *remote.Client {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		client, respawned, err := dc.Ensure(context.Background())
+		client, respawned, err := dc.Ensure(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -313,4 +343,58 @@ func waitForRespawn(t *testing.T, dc *remote.DistroCore) *remote.Client {
 	}
 	t.Fatal("Ensure did not respawn within 5s of the process being killed")
 	return nil
+}
+
+func TestFR_UX_02_EnsureLogsAFailedCoreStartAtWarn(t *testing.T) {
+	logger, text := bufLogger()
+	dc, _ := newDistroCore(t, badBin, logger)
+
+	_, _, err := dc.Ensure(t.Context())
+
+	coretest.AssertCode(t, err, core.Internal)
+	if got := text(); !strings.Contains(got, "level=WARN") || !strings.Contains(got, "distro=Ubuntu-22.04") {
+		t.Errorf("log = %q, want a Warn record naming the distro", got)
+	}
+}
+
+func TestFR_UX_02_EnsureLogsAReconnectAtWarn(t *testing.T) {
+	logger, text := bufLogger()
+	dc, wsl := newDistroCore(t, coreBin, logger)
+	if _, _, err := dc.Ensure(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := wsl.spawns[len(wsl.spawns)-1].Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	waitForRespawn(t, dc)
+
+	if got := text(); !strings.Contains(got, "level=WARN") || !strings.Contains(got, "distro=Ubuntu-22.04") {
+		t.Errorf("log = %q, want a Warn record for the reconnect naming the distro", got)
+	}
+}
+
+func TestFR_UX_02_TheCoresStderrReachesTheLogAtWarnMasked(t *testing.T) {
+	logger, text := bufLogger()
+	dc, _ := newDistroCore(t, stderrBin, logger)
+
+	if _, _, err := dc.Ensure(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	var got string
+	for time.Now().Before(deadline) {
+		got = text()
+		if strings.Contains(got, "https://***@host/repo") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !strings.Contains(got, "level=WARN") || !strings.Contains(got, "https://***@host/repo") {
+		t.Errorf("log = %q, want the masked stderr line at Warn", got)
+	}
+	if strings.Contains(got, "secret") {
+		t.Errorf("log = %q, want no credential", got)
+	}
 }

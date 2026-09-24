@@ -13,7 +13,7 @@ import (
 )
 
 // RepoWatcher watches one repo's common git dir. fsnotify is the primary
-// signal (near-zero idle cost); a low-frequency directory-mtime poll backs
+// signal (near-zero idle cost); a low-frequency file-mtime poll backs
 // it up for what fsnotify can miss: a dropped event, an exhausted watch
 // count, or an unsupported filesystem.
 //
@@ -32,10 +32,8 @@ type RepoWatcher struct {
 	snapshots sync.Mutex
 	mtimes    map[string]time.Time
 
-	fallback   *time.Ticker
-	fallbackFn func() // CheckNow; a test seam for the ticker (repowatcher_test.go)
-	done       chan struct{}
-	closed     atomic.Bool
+	done   chan struct{}
+	closed atomic.Bool
 }
 
 // NewRepoWatcher starts watching commonDir. If fsnotify itself fails to
@@ -62,9 +60,7 @@ func NewRepoWatcher(commonDir string, onChange func(Scope)) (*RepoWatcher, error
 		}
 	}
 
-	w.fallback = time.NewTicker(FallbackPollInterval)
-	w.fallbackFn = w.CheckNow
-	go w.fallbackLoop()
+	go w.fallbackLoop(FallbackPollInterval, w.CheckNow)
 	return w, err
 }
 
@@ -82,7 +78,7 @@ func (w *RepoWatcher) addWatches() error {
 func (w *RepoWatcher) addTree(root string) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || !d.IsDir() {
-			return nil
+			return nil //nolint:nilerr // an unreadable directory is skipped, not fatal: the rest of the tree still gets watched
 		}
 		return w.watcher.Add(path)
 	})
@@ -143,11 +139,14 @@ func (w *RepoWatcher) watchIfNewDir(path string) {
 	}
 }
 
-func (w *RepoWatcher) fallbackLoop() {
+// fallbackLoop calls check every interval until Close.
+func (w *RepoWatcher) fallbackLoop(interval time.Duration, check func()) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-w.fallback.C:
-			w.fallbackFn()
+		case <-ticker.C:
+			check()
 		case <-w.done:
 			return
 		}
@@ -252,7 +251,6 @@ func (w *RepoWatcher) Close() error {
 		return nil
 	}
 	close(w.done)
-	w.fallback.Stop()
 	if w.watcher != nil {
 		return w.watcher.Close()
 	}

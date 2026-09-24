@@ -15,7 +15,7 @@ cd nebegit
 direnv allow          # enters the Nix shell; first time downloads GTK and WebKitGTK
 task setup            # go mod download + pnpm install (the only step that needs the network)
 task test             # Go and Vitest tests, offline
-task lint             # golangci-lint, oxlint, eslint, vue-tsc
+task lint             # golangci-lint, oxlint, eslint, prettier, vue-tsc
 task build            # -> bin/nebegit
 task dev              # hot reload: Vite dev server + app window
 ```

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -44,11 +45,9 @@ func usage() int {
 	return 2
 }
 
-// launch is nebegit-core's "given a path instead of --stdio" mode: it
-// resolves path, reads $WSL_DISTRO_NAME and the gui-path marker
-// InstallLauncher wrote next to this binary's own symlink-resolved
-// location, and hands the UNC path to the single Windows instance exactly
-// like a native `nebegit.exe <path>` launch.
+// launch hands path, in UNC form, to the Windows app named in the gui-path
+// file InstallLauncher wrote next to this binary, as `nebegit.exe <path>`
+// would.
 func launch(path string) int {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -56,7 +55,7 @@ func launch(path string) int {
 	}
 	distro := os.Getenv("WSL_DISTRO_NAME")
 	if distro == "" {
-		return fail(fmt.Errorf("not running inside a WSL distro shell (WSL_DISTRO_NAME is unset)"))
+		return fail(errors.New("not running inside a WSL distro shell (WSL_DISTRO_NAME is unset)"))
 	}
 	self, err := os.Executable()
 	if err == nil {
@@ -78,9 +77,7 @@ func launch(path string) int {
 	return 0
 }
 
-// fail prints err to stderr, prefixed like every other nebegit-core
-// user-facing failure, and returns launch's own "something went wrong"
-// exit code.
+// fail prints err to stderr and returns launch's failure exit code.
 func fail(err error) int {
 	fmt.Fprintln(os.Stderr, "nebegit:", err)
 	return 1

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,16 +98,16 @@ func TestFR_LOG_05_SetLogFilterByTextNarrowsAndIsFlat(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "c.txt", "c", "third commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	if err := c.SetLogFilter(context.Background(), wt, core.LogFilter{Query: "urgent"}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: "urgent"}); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForFilterRows(t, c, wt)
+	res := waitForLogRows(t, c, wt)
 
 	if len(res.Rows) != 1 || res.Rows[0].Subject != "urgent fix" {
 		t.Fatalf("Rows = %+v, want exactly the matching commit", res.Rows)
 	}
-	if !res.Flat {
-		t.Error("Flat = false, want true for a text query")
+	if edges := res.Rows[0].Graph.Edges; len(edges) != 0 {
+		t.Errorf("Graph.Edges = %+v, want no graph for a text query", edges)
 	}
 }
 
@@ -120,10 +119,10 @@ func TestFR_LOG_05_SetLogFilterCombinesQueryAndAuthorWithAND(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.SetLogFilter(context.Background(), wt, core.LogFilter{Query: "urgent", Author: "Alice"}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: "urgent", Author: "Alice"}); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForFilterRows(t, c, wt)
+	res := waitForLogRows(t, c, wt)
 	if len(res.Rows) != 1 || res.Rows[0].Subject != "alpha urgent" {
 		t.Fatalf("Rows = %+v, want exactly Alice's matching commit (AND, not OR)", res.Rows)
 	}
@@ -131,10 +130,10 @@ func TestFR_LOG_05_SetLogFilterCombinesQueryAndAuthorWithAND(t *testing.T) {
 	// Control: Author alone returns every one of Bob's commits regardless
 	// of message, proving the narrowing above came from the AND, not from
 	// Author alone happening to match one commit.
-	if err := c.SetLogFilter(context.Background(), wt, core.LogFilter{Author: "Bob"}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Author: "Bob"}); err != nil {
 		t.Fatal(err)
 	}
-	res = waitForFilterRows(t, c, wt)
+	res = waitForLogRows(t, c, wt)
 	if len(res.Rows) != 2 {
 		t.Fatalf("Author-only Rows = %+v, want Bob's 2 commits regardless of message", res.Rows)
 	}
@@ -152,10 +151,10 @@ func TestFR_LOG_05_SetLogFilterByHashResolvesAndPopulatesCheckedOutIn(t *testing
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.SetLogFilter(context.Background(), wt, core.LogFilter{Query: sha[:4]}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: sha[:4]}); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForFilterRows(t, c, wt)
+	res := waitForLogRows(t, c, wt)
 	if len(res.Rows) != 1 || res.Rows[0].SHA != sha {
 		t.Fatalf("Rows = %+v, want exactly sha %s", res.Rows, sha)
 	}
@@ -165,10 +164,10 @@ func TestFR_LOG_05_SetLogFilterByHashResolvesAndPopulatesCheckedOutIn(t *testing
 
 	// A hex-shaped but non-existent query falls through to an ordinary
 	// (zero-result) --grep search, not an error.
-	if err := c.SetLogFilter(context.Background(), wt, core.LogFilter{Query: "deadbeef"}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: "deadbeef"}); err != nil {
 		t.Fatal(err)
 	}
-	res = waitForFilterRows(t, c, wt)
+	res = waitForLogRows(t, c, wt)
 	if res.Error != nil {
 		t.Fatalf("Error = %v, want nil (zero-result search, not an error)", res.Error)
 	}
@@ -188,13 +187,13 @@ func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.SetLogFilter(context.Background(), wt, core.LogFilter{Branches: []string{"feature"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"feature"}}); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForFilterRows(t, c, wt)
+	res := waitForLogRows(t, c, wt)
 
-	if res.Flat {
-		t.Error("Flat = true, want false for a branch-only filter")
+	if len(res.Rows) == 0 || len(res.Rows[0].Graph.Edges) == 0 {
+		t.Error("no graph row, want one for a branch-only filter")
 	}
 	subjects := map[string]bool{}
 	for _, r := range res.Rows {
@@ -216,10 +215,10 @@ func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *test
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.SetLogFilter(context.Background(), wt, core.LogFilter{Path: "path.txt"}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Path: "path.txt"}); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForFilterRows(t, c, wt)
+	res := waitForLogRows(t, c, wt)
 
 	if len(res.Rows) != 2 {
 		t.Fatalf("Rows = %+v, want exactly A and C (not B)", res.Rows)
@@ -250,10 +249,10 @@ func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) 
 	c, wt := openWorktree(t, repo.Dir)
 
 	filter := core.LogFilter{Author: "Alice", Branches: []string{"feature"}, Path: "target.txt"}
-	if err := c.SetLogFilter(context.Background(), wt, filter); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, filter); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForFilterRows(t, c, wt)
+	res := waitForLogRows(t, c, wt)
 
 	if len(res.Rows) != 1 || res.Rows[0].Subject != "on feature by alice matches all" {
 		t.Fatalf("Rows = %+v, want exactly the one commit matching Author, Branches, and Path together", res.Rows)
@@ -266,34 +265,35 @@ func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "second")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.LoadLog(context.Background(), id); err != nil {
+	rec := recordCommands(t, c, id)
+	if err := c.LoadLog(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
 	waitForLog(t, c, id)
 
-	if err := c.SetLogFilter(context.Background(), id, core.LogFilter{Query: "second"}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Query: "second"}); err != nil {
 		t.Fatal(err)
 	}
-	waitForFilterRows(t, c, id)
+	waitForLogRows(t, c, id)
 
-	beforeLog := countCommands(t, c, id, "git log ")
-	beforeRevParse := countCommands(t, c, id, "git rev-parse")
+	beforeLog := countCommands(rec, "git log ")
+	beforeRevParse := countCommands(rec, "git rev-parse")
 
-	if err := c.SetLogFilter(context.Background(), id, core.LogFilter{}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{}); err != nil {
 		t.Fatal(err)
 	}
 
-	res, err := c.LogRows(context.Background(), id, 0, 10)
+	res, err := c.LogRows(t.Context(), id, 0, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(res.Rows) != 2 {
 		t.Fatalf("Rows = %+v, want the unfiltered cache's 2 rows immediately", res.Rows)
 	}
-	if got := countCommands(t, c, id, "git log "); got != beforeLog {
+	if got := countCommands(rec, "git log "); got != beforeLog {
 		t.Errorf("git log calls = %d, want unchanged from %d (clearing is instant, no new process)", got, beforeLog)
 	}
-	if got := countCommands(t, c, id, "git rev-parse"); got != beforeRevParse {
+	if got := countCommands(rec, "git rev-parse"); got != beforeRevParse {
 		t.Errorf("git rev-parse calls = %d, want unchanged from %d", got, beforeRevParse)
 	}
 }
@@ -314,13 +314,13 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "300")
 	wt.Runner.Git = fakegit
 
-	if err := c.SetLogFilter(context.Background(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {
 		t.Fatal(err)
 	}
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		res, err := c.LogRows(context.Background(), id, 0, 1)
+		res, err := c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -339,10 +339,10 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	t.Setenv("FAKEGIT_STREAM_FILE", file2)
 	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "0")
 
-	if err := c.SetLogFilter(context.Background(), id, core.LogFilter{Branches: []string{"other"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"other"}}); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForFilterRows(t, c, id)
+	res := waitForLogRows(t, c, id)
 
 	if len(res.Rows) != 2 {
 		t.Fatalf("Rows = %d, want exactly the 2nd load's 2 records; none of the 1st load's records leaked in", len(res.Rows))
@@ -369,14 +369,14 @@ func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *tes
 	wt.Runner.Git = fakegit
 
 	start := time.Now()
-	if err := c.SetLogFilter(context.Background(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {
 		t.Fatal(err)
 	}
 
 	var elapsed time.Duration
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		res, err := c.LogRows(context.Background(), id, 0, 1)
+		res, err := c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -394,33 +394,13 @@ func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *tes
 		t.Errorf("first filtered row observable after %s, want well under 1s (the full 2.5s unstreamed load)", elapsed)
 	}
 
-	waitForFilterRows(t, c, id) // drain the background stream so it doesn't leak noise into later tests
-}
-
-// waitForFilterRows polls LogRows until a filtered load finishes.
-func waitForFilterRows(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsResult {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		res, err := c.LogRows(context.Background(), id, 0, 1000)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if res.Done {
-			return res
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("filtered log did not finish loading in time")
-	return core.LogRowsResult{}
+	waitForLogRows(t, c, id) // drain the background stream so it doesn't leak noise into later tests
 }
 
 // commitAs commits content to file with an explicit author.
 func commitAs(t *testing.T, dir, file, content, msg, authorName, authorEmail string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, dir, file, content)
 	gittest.Run(t, dir, "add", "--", file)
 	gittest.Run(t, dir, "commit", fmt.Sprintf("--author=%s <%s>", authorName, authorEmail), "-m", msg)
 }

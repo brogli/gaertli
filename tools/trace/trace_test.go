@@ -55,6 +55,19 @@ func runFixture(t *testing.T, cfg Config) (string, int) {
 	return out.String(), code
 }
 
+// assertReport runs trace on cfg and wants exactly the output want: exit
+// code 0 when want is empty, else 1.
+func assertReport(t *testing.T, cfg Config, want string) {
+	t.Helper()
+	wantCode := 0
+	if want != "" {
+		wantCode = 1
+	}
+	if out, code := runFixture(t, cfg); code != wantCode || out != want {
+		t.Errorf("code = %d, output = %q; want %d and %q", code, out, wantCode, want)
+	}
+}
+
 const functionalFixture = `# Functional requirements (FR)
 
 | ID | Prio | Requirement |
@@ -110,13 +123,7 @@ func TestQA_MNT_02_GoTestCoversRequiredID(t *testing.T) {
 	writeFile(t, filepath.Join(cfg.GoRoot, "foo_test.go"),
 		"package foo_test\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n")
 
-	out, code := runFixture(t, cfg)
-	if code != 0 {
-		t.Errorf("code = %d, want 0; output:\n%s", code, out)
-	}
-	if out != "" {
-		t.Errorf("output = %q, want empty", out)
-	}
+	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_GoTestNameDigitBoundaryDoesNotFalseMatch(t *testing.T) {
@@ -138,13 +145,7 @@ func TestQA_MNT_02_VitestCoversRequiredID(t *testing.T) {
 	writeFile(t, filepath.Join(cfg.FrontendRoot, "foo.test.ts"),
 		"import { it } from 'vitest'\n\nit('FR-AB-01 does a thing', () => {})\n")
 
-	out, code := runFixture(t, cfg)
-	if code != 0 {
-		t.Errorf("code = %d, want 0; output:\n%s", code, out)
-	}
-	if out != "" {
-		t.Errorf("output = %q, want empty", out)
-	}
+	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_PlaywrightSpecCoversRequiredID(t *testing.T) {
@@ -152,65 +153,33 @@ func TestQA_MNT_02_PlaywrightSpecCoversRequiredID(t *testing.T) {
 	writeFile(t, filepath.Join(cfg.FrontendRoot, "e2e-real", "foo.spec.ts"),
 		"import { test } from './fixtures'\n\ntest('FR-AB-01 does a thing', async () => {})\n")
 
-	out, code := runFixture(t, cfg)
-	if code != 0 {
-		t.Errorf("code = %d, want 0; output:\n%s", code, out)
-	}
-	if out != "" {
-		t.Errorf("output = %q, want empty", out)
-	}
+	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_ManualChecklistCoversRequiredID(t *testing.T) {
 	checklist := "| FR-AB-01 | some manual check | all |\n"
 	cfg := newConfig(t, oneMustFR, noRows, checklist)
 
-	out, code := runFixture(t, cfg)
-	if code != 0 {
-		t.Errorf("code = %d, want 0; output:\n%s", code, out)
-	}
-	if out != "" {
-		t.Errorf("output = %q, want empty", out)
-	}
+	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_ManualChecklistRowCoversMultipleIDs(t *testing.T) {
 	checklist := "| FR-AB-01, QA-EF-01 | some manual check | all |\n"
 	cfg := newConfig(t, oneMustFR, qualityFixture, checklist)
 
-	out, code := runFixture(t, cfg)
-	if code != 0 {
-		t.Errorf("code = %d, want 0; output:\n%s", code, out)
-	}
-	if out != "" {
-		t.Errorf("output = %q, want empty", out)
-	}
+	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_UncoveredMustFRIsReportedMissing(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows)
 
-	out, code := runFixture(t, cfg)
-	if code != 1 {
-		t.Errorf("code = %d, want 1", code)
-	}
-	want := "FR-AB-01: no test name and no manual checklist entry\n"
-	if out != want {
-		t.Errorf("output = %q, want %q", out, want)
-	}
+	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n")
 }
 
 func TestQA_MNT_02_UncoveredQAIsReportedMissing(t *testing.T) {
 	cfg := newConfig(t, noRows, qualityFixture, noRows)
 
-	out, code := runFixture(t, cfg)
-	if code != 1 {
-		t.Errorf("code = %d, want 1", code)
-	}
-	want := "QA-EF-01: no test name and no manual checklist entry\n"
-	if out != want {
-		t.Errorf("output = %q, want %q", out, want)
-	}
+	assertReport(t, cfg, "QA-EF-01: no test name and no manual checklist entry\n")
 }
 
 const oneShouldFR = `| ID | Prio | Requirement |
@@ -221,13 +190,7 @@ const oneShouldFR = `| ID | Prio | Requirement |
 func TestQA_MNT_02_UncoveredShouldFRIsNotReported(t *testing.T) {
 	cfg := newConfig(t, oneShouldFR, noRows, noRows)
 
-	out, code := runFixture(t, cfg)
-	if code != 0 {
-		t.Errorf("code = %d, want 0; output:\n%s", code, out)
-	}
-	if out != "" {
-		t.Errorf("output = %q, want empty", out)
-	}
+	assertReport(t, cfg, "")
 }
 
 const twoMustFR = `| ID | Prio | Requirement |
@@ -239,35 +202,22 @@ const twoMustFR = `| ID | Prio | Requirement |
 func TestQA_MNT_02_EachUncoveredIDGetsExactlyOneSortedLine(t *testing.T) {
 	cfg := newConfig(t, twoMustFR, noRows, noRows)
 
-	out, code := runFixture(t, cfg)
-	if code != 1 {
-		t.Errorf("code = %d, want 1", code)
-	}
-	want := "FR-AB-01: no test name and no manual checklist entry\n" +
-		"FR-CD-01: no test name and no manual checklist entry\n"
-	if out != want {
-		t.Errorf("output = %q, want %q", out, want)
-	}
+	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n"+
+		"FR-CD-01: no test name and no manual checklist entry\n")
 }
 
 func TestTR_30_PendingEntrySuppressesMissingID(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows)
 	writeFile(t, cfg.PendingPath, "FR-AB-01\n")
 
-	out, code := runFixture(t, cfg)
-	if code != 0 || out != "" {
-		t.Errorf("code = %d, output = %q; want 0 and empty", code, out)
-	}
+	assertReport(t, cfg, "")
 }
 
 func TestTR_30_PendingIgnoresBlankAndCommentLines(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows)
 	writeFile(t, cfg.PendingPath, "# header\n\nFR-AB-01\n\n# trailer\n")
 
-	out, code := runFixture(t, cfg)
-	if code != 0 || out != "" {
-		t.Errorf("code = %d, output = %q; want 0 and empty", code, out)
-	}
+	assertReport(t, cfg, "")
 }
 
 func TestTR_30_MissingPendingFileIsAnEmptyList(t *testing.T) {
@@ -284,12 +234,5 @@ func TestTR_30_StalePendingEntryIsReported(t *testing.T) {
 	writeFile(t, filepath.Join(cfg.GoRoot, "a_test.go"), "package a\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n")
 	writeFile(t, cfg.PendingPath, "FR-AB-01\n")
 
-	out, code := runFixture(t, cfg)
-	if code != 1 {
-		t.Errorf("code = %d, want 1", code)
-	}
-	want := "FR-AB-01: no longer missing; remove it from " + cfg.PendingPath + "\n"
-	if out != want {
-		t.Errorf("output = %q, want %q", out, want)
-	}
+	assertReport(t, cfg, "FR-AB-01: no longer missing; remove it from "+cfg.PendingPath+"\n")
 }

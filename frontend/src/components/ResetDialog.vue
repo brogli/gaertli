@@ -3,25 +3,52 @@ import { computed, onMounted, ref } from 'vue'
 import Dialog from 'openvue/dialog'
 import RadioButton from 'openvue/radiobutton'
 import Button from 'openvue/button'
+import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ResetMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { shortSha } from '../lib/format'
+import { useNotices } from '../lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
 
 // ResetDialog is the reset mode picker (soft/mixed/hard/keep). Every mode
 // but hard runs immediately; hard asks for confirmation, naming how many
-// uncommitted changes would be lost. After a successful reset the dialog
-// stays open and shows the previous HEAD, which the user might want to
-// copy or reset back to.
+// uncommitted changes would be lost. A successful reset closes the dialog
+// and leaves a notice naming the previous commit, so the user
+// can still copy its hash or reset back to it.
 const props = defineProps<{ wt: string; branch: string; sha: string; subject: string }>()
 const emit = defineEmits<{ close: [] }>()
+const { t } = useI18n()
+
+const modes = computed(() => [
+  {
+    value: ResetMode.ResetSoft,
+    label: t('dialogs.reset.soft'),
+    text: t('dialogs.reset.softText'),
+  },
+  {
+    value: ResetMode.ResetMixed,
+    label: t('dialogs.reset.mixed'),
+    text: t('dialogs.reset.mixedText'),
+  },
+  {
+    value: ResetMode.ResetHard,
+    label: t('dialogs.reset.hard'),
+    text: t('dialogs.reset.hardText'),
+  },
+  {
+    value: ResetMode.ResetKeep,
+    label: t('dialogs.reset.keep'),
+    text: t('dialogs.reset.keepText'),
+  },
+])
 
 const mode = ref<ResetMode>(ResetMode.ResetMixed) // git's own default
 const uncommittedCount = ref<number | null>(null) // null while loading
-const previousHead = ref<string | null>(null) // set once a reset has succeeded
 const { error, run } = useCoreCall()
 const { confirmAction } = useConfirmAction()
+const notices = useNotices()
 
 const branchLabel = computed(() => props.branch || 'HEAD')
 
@@ -31,7 +58,17 @@ onMounted(async () => {
 
 async function doReset(target: ResetMode): Promise<void> {
   const result = await run(() => Facade.Reset(props.wt, props.sha, target))
-  if (result) previousHead.value = result.previousHead
+  if (!result) return
+  notices.show('reset', {
+    severity: 'success',
+    summary: t('dialogs.reset.resetNotice', {
+      branch: branchLabel.value,
+      sha: shortSha(props.sha),
+      previousSha: shortSha(result.previousHead),
+    }),
+    data: { copyText: result.previousHead },
+  })
+  emit('close')
 }
 
 function onResetClick(): void {
@@ -41,50 +78,41 @@ function onResetClick(): void {
   }
   const count = uncommittedCount.value ?? 0
   confirmAction(
-    'Hard reset',
-    `Discard ${count} uncommitted change${count === 1 ? '' : 's'} and reset ${branchLabel.value} to ${props.subject}? This cannot be undone.`,
+    t('dialogs.reset.hardConfirmTitle'),
+    t(
+      'dialogs.reset.hardConfirm',
+      { n: count, branch: branchLabel.value, subject: props.subject },
+      count,
+    ),
     () => void doReset(ResetMode.ResetHard),
   )
-}
-
-function close(): void {
-  previousHead.value = null
-  emit('close')
 }
 </script>
 
 <template>
-  <Dialog visible header="Reset" modal @update:visible="emit('close')">
+  <Dialog visible :header="t('dialogs.reset.header')" modal @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
-    <template v-if="previousHead !== null">
-      <p>Reset done. Previous HEAD: {{ previousHead }}</p>
-    </template>
-    <template v-else>
-      <p>Reset {{ branchLabel }} to {{ subject }}</p>
-      <div class="reset-modes">
-        <label>
-          <RadioButton v-model="mode" :value="ResetMode.ResetSoft" name="reset-mode" input-id="reset-mode-soft" />
-          Soft — moves the branch pointer. Index and working files are unchanged.
-        </label>
-        <label>
-          <RadioButton v-model="mode" :value="ResetMode.ResetMixed" name="reset-mode" input-id="reset-mode-mixed" />
-          Mixed — moves the branch pointer and resets the index. Working files are unchanged.
-        </label>
-        <label>
-          <RadioButton v-model="mode" :value="ResetMode.ResetHard" name="reset-mode" input-id="reset-mode-hard" />
-          Hard — moves the branch pointer, resets the index, and overwrites working files. Uncommitted changes are lost.
-        </label>
-        <label>
-          <RadioButton v-model="mode" :value="ResetMode.ResetKeep" name="reset-mode" input-id="reset-mode-keep" />
-          Keep — moves the branch pointer, resets the index and working files, but refuses if any local change would be lost.
-        </label>
-      </div>
-    </template>
+    <p>
+      {{ t('dialogs.reset.resetTo', { branch: branchLabel }) }}
+      <span class="hash">{{ shortSha(sha) }}</span
+      >{{ ' ' }}<span class="ellipsis" :title="subject">{{ subject }}</span>
+    </p>
+    <div class="reset-modes">
+      <label v-for="m in modes" :key="m.value" class="reset-mode">
+        <RadioButton
+          v-model="mode"
+          :value="m.value"
+          name="reset-mode"
+          :input-id="`reset-mode-${m.value}`"
+        />
+        <span
+          ><strong>{{ m.label }}</strong> {{ m.text }}</span
+        >
+      </label>
+    </div>
     <template #footer>
-      <Button v-if="previousHead !== null" label="Close" data-test="reset-close" @click="close" />
       <Button
-        v-else
-        label="Reset"
+        :label="t('dialogs.reset.reset')"
         data-test="reset-submit"
         :disabled="mode === ResetMode.ResetHard && uncommittedCount === null"
         @click="onResetClick"
@@ -92,3 +120,19 @@ function close(): void {
     </template>
   </Dialog>
 </template>
+
+<style scoped>
+.hash {
+  font-family: monospace;
+}
+.reset-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.reset-mode {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+}
+</style>

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/brogli/nebegit/internal/git"
@@ -26,10 +27,11 @@ type WorktreePoller struct {
 	dir      string
 	onChange func(Scope)
 
+	inFlight atomic.Bool
+
 	mu       sync.Mutex
 	focused  bool
 	interval time.Duration
-	inFlight bool
 	baseline []byte
 	haveBase bool
 	timer    *time.Timer
@@ -54,8 +56,7 @@ func (p *WorktreePoller) Focus() {
 	p.interval = PollInterval
 	p.mu.Unlock()
 
-	p.pollAndAdjust()
-	p.scheduleNext()
+	p.tick()
 }
 
 // Blur stops the timer: a backgrounded window's poller makes no git calls
@@ -64,53 +65,37 @@ func (p *WorktreePoller) Blur() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.focused = false
-	p.stopTimer()
-}
-
-func (p *WorktreePoller) stopTimer() {
 	if p.timer != nil {
 		p.timer.Stop()
-		p.timer = nil
 	}
 }
 
-func (p *WorktreePoller) scheduleNext() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if !p.focused {
-		return
-	}
-	p.timer = time.AfterFunc(p.interval, p.tick)
-}
-
-// tick runs a poll and backs off while status is slow.
+// tick runs a poll, backs off while status is slow, and schedules the next
+// poll while focused.
 func (p *WorktreePoller) tick() {
-	p.pollAndAdjust()
-	p.scheduleNext()
-}
-
-func (p *WorktreePoller) pollAndAdjust() {
 	start := time.Now()
 	p.CheckNow()
 	elapsed := time.Since(start)
 
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	if elapsed > p.interval {
 		p.interval = min(p.interval*2, MaxPollInterval)
 	} else {
 		p.interval = PollInterval
 	}
-	p.mu.Unlock()
+	if p.focused {
+		p.timer = time.AfterFunc(p.interval, p.tick)
+	}
 }
 
-// CheckNow runs one immediate status poll outside the timer schedule. Used
-// by Focus and by Refresh (services.go). Never runs two polls concurrently
-// (a poll already in flight makes this a no-op).
+// CheckNow runs one status poll now, outside the timer schedule; a no-op
+// while a poll is in flight.
 func (p *WorktreePoller) CheckNow() {
-	if !p.startPoll() {
+	if !p.inFlight.CompareAndSwap(false, true) {
 		return
 	}
-	defer p.endPoll()
+	defer p.inFlight.Store(false)
 
 	result, err := p.runner.Run(context.Background(), git.Call{
 		Dir: p.dir, ReadOnly: true, Background: true, Args: StatusArgs,
@@ -129,22 +114,6 @@ func (p *WorktreePoller) CheckNow() {
 	if changed {
 		p.onChange(Index)
 	}
-}
-
-func (p *WorktreePoller) startPoll() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.inFlight {
-		return false
-	}
-	p.inFlight = true
-	return true
-}
-
-func (p *WorktreePoller) endPoll() {
-	p.mu.Lock()
-	p.inFlight = false
-	p.mu.Unlock()
 }
 
 // Close stops the poller.

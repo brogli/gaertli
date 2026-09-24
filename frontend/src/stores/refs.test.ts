@@ -1,54 +1,45 @@
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockRefs, mockEventsOn } = vi.hoisted(() => ({
-  mockRefs: vi.fn(),
-  mockEventsOn: vi.fn(),
+const { Facade } = vi.hoisted(() => ({
+  Facade: { Refs: vi.fn() },
 }))
 
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { Refs: mockRefs },
-}))
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
-vi.mock('@wailsio/runtime', () => ({
-  Events: { On: mockEventsOn },
-}))
+vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
+import { Events, emit } from '../testing/runtime'
 
 import { useRefsStore } from './refs'
-import { registeredHandler } from '../testing/events'
 
 describe('refs store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    mockRefs.mockReset()
-    mockRefs.mockResolvedValue({ branches: [], remotes: [], tags: [] })
-    mockEventsOn.mockReset()
-    mockEventsOn.mockReturnValue(() => {})
+    Facade.Refs.mockReset().mockResolvedValue({ branches: [], remotes: [], tags: [] })
+    Events.On.mockReset()
   })
 
   it('FR-LOG-01 reloads Refs on a refs repo:changed event, not on state', async () => {
     const refs = useRefsStore()
     await refs.load('/repo')
-    expect(mockRefs).toHaveBeenCalledTimes(1)
+    expect(Facade.Refs).toHaveBeenCalledTimes(1)
 
-    const handler = registeredHandler(mockEventsOn, 'repo:changed')
-    handler?.({ data: { scope: 'refs' } })
-    await Promise.resolve()
-    handler?.({ data: { scope: 'state' } })
-    await Promise.resolve()
+    emit('repo:changed', { data: { scope: 'refs' } })
+    emit('repo:changed', { data: { scope: 'state' } })
+    await flushPromises()
 
-    expect(mockRefs).toHaveBeenCalledTimes(2)
+    expect(Facade.Refs).toHaveBeenCalledTimes(2)
   })
 
   it('ADR-4 reloads Refs on a core:reconnected event', async () => {
     const refs = useRefsStore()
     await refs.load('/repo')
-    expect(mockRefs).toHaveBeenCalledTimes(1)
+    expect(Facade.Refs).toHaveBeenCalledTimes(1)
 
-    const handler = registeredHandler(mockEventsOn, 'core:reconnected')
-    handler?.({})
-    await Promise.resolve()
+    emit('core:reconnected')
+    await flushPromises()
 
-    expect(mockRefs).toHaveBeenCalledTimes(2)
+    expect(Facade.Refs).toHaveBeenCalledTimes(2)
   })
 })

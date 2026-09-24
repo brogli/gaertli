@@ -1,25 +1,28 @@
 import { ref } from 'vue'
+import type { Error as GoError } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// CoreError is the shape core.Error serialises to, read off a rejected
-// bound-method call's .cause.
-export interface CoreError {
-  message: string
-  gitStderr?: string
-  command?: string
-  code?: string
-}
+// CoreError is core.Error as a rejected bound-method call carries it in
+// .cause. Only message is sure: a rejection that is no core error has
+// nothing else.
+export type CoreError = Partial<GoError> & Pick<GoError, 'message'>
 
 // useCoreCall wraps a bound-method call: run(call) awaits it,
 // catching a rejection and exposing it as a CoreError for ErrorBanner.
+// onError, when given, sees the error first; returning true means it
+// handled it (e.g. as a notice), so run leaves error unset.
 export function useCoreCall() {
   const error = ref<CoreError | null>(null)
 
-  async function run<T>(call: () => Promise<T>): Promise<T | undefined> {
+  async function run<T>(
+    call: () => Promise<T>,
+    onError?: (error: CoreError) => boolean,
+  ): Promise<T | undefined> {
     error.value = null
     try {
       return await call()
     } catch (e) {
-      error.value = toCoreError(e)
+      const err = toCoreError(e)
+      if (!onError?.(err)) error.value = err
       return undefined
     }
   }
@@ -35,6 +38,8 @@ export function useCoreCall() {
   return { error, run, runAndClose }
 }
 
+// toCoreError reads a rejected bound-method call's core.Error, or wraps any
+// other rejection's text.
 function toCoreError(e: unknown): CoreError {
   const cause = e && typeof e === 'object' ? (e as { cause?: unknown }).cause : undefined
   if (cause && typeof cause === 'object' && 'message' in cause) {

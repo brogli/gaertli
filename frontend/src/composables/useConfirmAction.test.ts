@@ -1,23 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 
-const { mockRequire } = vi.hoisted(() => ({ mockRequire: vi.fn() }))
-
-vi.mock('openvue/useconfirm', () => ({
-  useConfirm: () => ({ require: mockRequire, close: vi.fn() }),
-}))
+vi.mock('openvue/useconfirm', () => import('../testing/confirm'))
+import { confirmOptions, confirmRequire } from '../testing/confirm'
 
 import { useConfirmAction } from './useConfirmAction'
 
 describe('useConfirmAction', () => {
   it('QA-SAFE-01 requires header and message, calling onAccept only once accept fires', () => {
-    mockRequire.mockReset()
+    confirmRequire.mockReset()
     const { confirmAction } = useConfirmAction()
     const onAccept = vi.fn()
 
     confirmAction('H', 'M', onAccept)
 
-    expect(mockRequire).toHaveBeenCalledTimes(1)
-    const options = mockRequire.mock.calls[0]![0] as { header: string; message: string; accept: () => void }
+    expect(confirmRequire).toHaveBeenCalledTimes(1)
+    const options = confirmOptions()
     expect(options.header).toBe('H')
     expect(options.message).toBe('M')
     expect(onAccept).not.toHaveBeenCalled()

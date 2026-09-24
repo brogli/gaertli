@@ -1,20 +1,42 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { flushPromises } from '@vue/test-utils'
 
-const { mockListWSLDistros } = vi.hoisted(() => ({ mockListWSLDistros: vi.fn() }))
-
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  AppService: { ListWSLDistros: mockListWSLDistros },
+const { AppService, SettingsService } = vi.hoisted(() => ({
+  AppService: { ListWSLDistros: vi.fn() },
   SettingsService: { Get: vi.fn(), Set: vi.fn() },
 }))
 
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+  AppService,
+  SettingsService,
+}))
+
+vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
+import { Events, emit } from '../testing/runtime'
+
 import { useSettingsStore } from './settings'
+import { defaultSettingsFixture } from '../testing/fixtures/settings'
 
 describe('settings store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    mockListWSLDistros.mockReset()
-    mockListWSLDistros.mockResolvedValue([{ name: 'Ubuntu-22.04', version: 2, running: true }])
+    AppService.ListWSLDistros.mockReset().mockResolvedValue([{ name: 'Ubuntu-22.04', version: 2 }])
+    SettingsService.Get.mockReset()
+    Events.On.mockReset()
+  })
+
+  it('FR-UX-06 a settings change saved in any window reloads the settings here and applies its theme', async () => {
+    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: 'light' }))
+    const store = useSettingsStore()
+    await store.load()
+    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(false)
+
+    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: 'dark' }))
+    emit('settings:changed')
+    await flushPromises()
+
+    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
   })
 
   it('FR-REPO-07 lists the WSL distros once and reuses the answer', async () => {
@@ -23,7 +45,7 @@ describe('settings store', () => {
     const first = await store.loadDistros()
     const second = await store.loadDistros()
 
-    expect(mockListWSLDistros).toHaveBeenCalledTimes(1)
+    expect(AppService.ListWSLDistros).toHaveBeenCalledTimes(1)
     expect(second).toBe(first)
     expect(first.map((d) => d.name)).toEqual(['Ubuntu-22.04'])
   })

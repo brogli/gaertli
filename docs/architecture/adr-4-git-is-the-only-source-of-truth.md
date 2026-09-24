@@ -10,7 +10,7 @@ nebegit runs beside a terminal and an editor that change the repo at any time. A
 
 - No index, database or on-disk cache of repo data.
 - In memory only: the commit list, graph rows, ref map and last status. All of it can be dropped and rebuilt.
-- On disk, only settings: recent repos, preferences, the last pull mode.
+- On disk, only the settings (recent repos, the windows open at last quit, the Settings dialog's choices) and the UI's remembered choices in the WebView's local storage (the last pull mode, panel widths).
 - The core binary copied into a WSL distro is program code, not repo data.
 
 One exception: git's own rebuildable maintenance files do not count as app state. On the first open of a large repo, nebegit may run `git commit-graph write --reachable`. The file lives in `.git/objects/info/`, git maintains it itself, and its absence changes nothing but speed. On a 100k-commit repo it cut time to the first log row from 280 ms to 63 ms and peak memory by 35 %.

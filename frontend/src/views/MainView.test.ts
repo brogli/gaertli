@@ -3,41 +3,37 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '../testing/mountInBody'
 
-const { mockSummary, mockLoadLog, mockRefs, mockRecentRepos, mockCommandLog, mockStatus, mockSettingsGet } =
-  vi.hoisted(() => ({
-    mockSummary: vi.fn(),
-    mockLoadLog: vi.fn(),
-    mockRefs: vi.fn(),
-    mockRecentRepos: vi.fn(),
-    mockCommandLog: vi.fn(),
-    mockStatus: vi.fn(),
-    mockSettingsGet: vi.fn(),
-  }))
-
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+const { AppService, Facade, SettingsService } = vi.hoisted(() => ({
   AppService: {
-    RecentRepos: mockRecentRepos,
+    RecentRepos: vi.fn(),
     UpdateWindowTitle: vi.fn().mockResolvedValue(undefined),
     ListWSLDistros: vi.fn().mockResolvedValue([]),
+    LogPath: vi.fn().mockResolvedValue({ path: '/mock/nebegit.log', error: '' }),
   },
   Facade: {
-    Summary: mockSummary,
-    LoadLog: mockLoadLog,
+    Summary: vi.fn(),
+    LoadLog: vi.fn(),
     LogRows: vi.fn(),
-    Refs: mockRefs,
-    CommandLog: mockCommandLog,
+    Refs: vi.fn(),
     UncommittedCount: vi.fn(),
     Jobs: vi.fn().mockResolvedValue([]),
     CancelJob: vi.fn(),
-    Status: mockStatus,
+    Status: vi.fn(),
     SetMessageDraft: vi.fn().mockResolvedValue(undefined),
     Version: vi.fn().mockResolvedValue({ app: 'dev', protocol: 1 }),
+    ListWorktrees: vi.fn().mockResolvedValue([]),
   },
-  SettingsService: { Get: mockSettingsGet, Set: vi.fn().mockResolvedValue(undefined) },
+  SettingsService: { Get: vi.fn(), Set: vi.fn().mockResolvedValue(undefined) },
+}))
+
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+  AppService,
+  Facade,
+  SettingsService,
 }))
 
 import MainView from './MainView.vue'
-import SelectorPanel from '../components/SelectorPanel.vue'
+import RepoPicker from '../components/RepoPicker.vue'
 import WorktreeContent from './WorktreeContent.vue'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
@@ -46,30 +42,42 @@ import { summaryFixture } from '../testing/fixtures/summary'
 describe('MainView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    mockSummary.mockReset().mockResolvedValue(summaryFixture({ path: '/repo' }))
-    mockLoadLog.mockReset().mockResolvedValue(undefined)
-    mockRefs.mockReset().mockResolvedValue({ branches: [], remotes: [], tags: [] })
-    mockRecentRepos.mockReset().mockResolvedValue([])
-    mockCommandLog.mockReset().mockResolvedValue([])
-    mockStatus.mockReset().mockResolvedValue(changedFilesFixture())
-    mockSettingsGet.mockReset().mockResolvedValue(defaultSettingsFixture())
+    Facade.Summary.mockReset().mockResolvedValue(summaryFixture())
+    Facade.LoadLog.mockReset().mockResolvedValue(undefined)
+    Facade.Refs.mockReset().mockResolvedValue({ branches: [], remotes: [], tags: [] })
+    AppService.RecentRepos.mockReset().mockResolvedValue([])
+    Facade.Status.mockReset().mockResolvedValue(changedFilesFixture())
+    SettingsService.Get.mockReset().mockResolvedValue(defaultSettingsFixture())
   })
 
-  it('FR-WT-13 with no path, renders the panel and the empty state, not WorktreeContent', async () => {
+  it('FR-WT-13 with no path, the repo list is the page, not WorktreeContent', async () => {
+    AppService.RecentRepos.mockResolvedValue([
+      { path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' },
+    ])
     const wrapper = mount(MainView, { props: { path: '' } })
     await flushPromises()
 
-    expect(wrapper.findComponent(SelectorPanel).exists()).toBe(true)
+    expect(wrapper.findComponent(RepoPicker).props('asPage')).toBe(true)
+    expect(wrapper.find('[data-test="repo-row"]').attributes('title')).toBe('/repoA')
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(false)
-    expect(wrapper.text()).toContain('Select a worktree from the panel, or open a folder to get started.')
   })
 
-  it('FR-WT-13 with a path, renders both the panel and WorktreeContent', async () => {
+  it('FR-UX-04 with no path, the gear opens the Settings dialog', async () => {
+    const { wrapper, body } = await mountInBody(MainView, { props: { path: '' } })
+
+    await wrapper.get('[data-test="open-settings"]').trigger('click')
+    await flushPromises()
+
+    expect(body.get('[role="dialog"] .p-dialog-title').text()).toBe('Settings')
+    wrapper.unmount()
+  })
+
+  it('FR-WT-13 with a path, renders WorktreeContent, the repo picker in its toolbar', async () => {
     const wrapper = mount(MainView, { props: { path: '/repo' } })
     await flushPromises()
 
-    expect(wrapper.findComponent(SelectorPanel).exists()).toBe(true)
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(true)
+    expect(wrapper.get('.toolbar').findComponent(RepoPicker).props('asPage')).toBe(false)
   })
 
   it('FR-REPO-07 forwards distro to WorktreeContent', async () => {
@@ -79,7 +87,7 @@ describe('MainView', () => {
     expect(wrapper.findComponent(WorktreeContent).props('distro')).toBe('Ubuntu')
   })
 
-  it('FR-UX-04 clicking Settings opens a dialog titled Settings with SettingsPanel inside, WorktreeContent still rendered', async () => {
+  it("FR-UX-04 the toolbar's gear opens a dialog titled Settings with SettingsPanel inside, WorktreeContent still rendered", async () => {
     const { wrapper, body } = await mountInBody(MainView, { props: { path: '/repo' } })
 
     await wrapper.get('[data-test="open-settings"]').trigger('click')

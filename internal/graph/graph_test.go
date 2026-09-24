@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"slices"
 	"strconv"
 	"testing"
 )
@@ -39,7 +40,7 @@ func TestFR_LOG_02_ForkClosesBothLanesAtSharedRoot(t *testing.T) {
 	if ends := countKind(r.Edges, End); ends != 2 {
 		t.Fatalf("R ends = %d, want 2 (%+v)", ends, r.Edges)
 	}
-	if !hasEdge(r.Edges, r.Lane, End) {
+	if !slices.Contains(r.Edges, Edge{Lane: r.Lane, Kind: End}) {
 		t.Errorf("R's own lane %d has no End edge (%+v)", r.Lane, r.Edges)
 	}
 }
@@ -51,8 +52,8 @@ func TestFR_LOG_02_WideForkOverflowsPastCap(t *testing.T) {
 
 	const branches = 40
 	var rows []Row
-	for i := 0; i < branches; i++ {
-		rows = append(rows, l.Next(Commit{SHA: sha(i), Parents: []string{"R"}}))
+	for i := range branches {
+		rows = append(rows, l.Next(Commit{SHA: "b" + strconv.Itoa(i), Parents: []string{"R"}}))
 	}
 	root := l.Next(Commit{SHA: "R"})
 	rows = append(rows, root)
@@ -67,10 +68,6 @@ func TestFR_LOG_02_WideForkOverflowsPastCap(t *testing.T) {
 	}
 }
 
-func sha(i int) string {
-	return "b" + strconv.Itoa(i)
-}
-
 func countKind(edges []Edge, kind EdgeKind) int {
 	n := 0
 	for _, e := range edges {
@@ -79,13 +76,4 @@ func countKind(edges []Edge, kind EdgeKind) int {
 		}
 	}
 	return n
-}
-
-func hasEdge(edges []Edge, lane int, kind EdgeKind) bool {
-	for _, e := range edges {
-		if e.Lane == lane && e.Kind == kind {
-			return true
-		}
-	}
-	return false
 }

@@ -2,13 +2,11 @@ package services
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/editor"
-	"github.com/brogli/nebegit/internal/git"
 )
 
 // SetEditorProfile implements core.API.
@@ -22,15 +20,6 @@ func (c *Core) SetEditorProfile(ctx context.Context, profile core.EditorProfile)
 func (c *Core) currentProfile() core.EditorProfile {
 	p, _ := c.editorProfile.Load().(core.EditorProfile)
 	return editor.OrDefault(p)
-}
-
-// TestEditorProfile implements core.API.
-func (c *Core) TestEditorProfile(ctx context.Context, profile core.EditorProfile) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return core.Errorf(core.Internal, "could not determine the home directory: %v", err)
-	}
-	return editor.OpenFolder(profile, home)
 }
 
 // OpenFolder implements core.API.
@@ -84,59 +73,8 @@ func existingWorktreeFile(dir, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if _, err := os.Stat(full); err != nil {
-		return "", core.Errorf(core.FileNotFound, "%s no longer exists in this worktree", path)
+	if !fileExists(full) {
+		return "", core.ErrorfArgs(core.FileNotFound, "fileNotFound", map[string]string{"path": path}, "%s no longer exists in this worktree", path)
 	}
 	return full, nil
-}
-
-// gitEditorProfile wraps dir's git editor (`git var GIT_EDITOR`: GIT_EDITOR,
-// VISUAL, EDITOR, core.editor, or git's default) in a profile that appends
-// {path}, the way git invokes it.
-func gitEditorProfile(ctx context.Context, r git.Runner, dir string) (core.EditorProfile, error) {
-	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: []string{"var", "GIT_EDITOR"}})
-	if err != nil {
-		return core.EditorProfile{}, err
-	}
-	cmd := strings.TrimSpace(string(result.Stdout)) + " {path}"
-	return core.EditorProfile{Name: "git editor", FolderCmd: cmd, FileCmd: cmd}, nil
-}
-
-// fallbackProfile resolves kind to a profile: the OS default opener, or
-// dir's git-configured editor.
-func fallbackProfile(ctx context.Context, r git.Runner, dir string, kind core.EditorFallbackKind) (core.EditorProfile, error) {
-	if kind == core.FallbackSystem {
-		return editor.SystemProfile(), nil
-	}
-	return gitEditorProfile(ctx, r, dir)
-}
-
-// OpenFolderFallback implements core.API.
-func (c *Core) OpenFolderFallback(ctx context.Context, id core.WorktreeID, kind core.EditorFallbackKind) error {
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		return err
-	}
-	profile, err := fallbackProfile(ctx, wt.Runner, wt.Path, kind)
-	if err != nil {
-		return err
-	}
-	return editor.OpenFolder(profile, wt.Path)
-}
-
-// OpenFileFallback implements core.API.
-func (c *Core) OpenFileFallback(ctx context.Context, id core.WorktreeID, path string, line int, kind core.EditorFallbackKind) error {
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		return err
-	}
-	full, err := existingWorktreeFile(wt.Path, path)
-	if err != nil {
-		return err
-	}
-	profile, err := fallbackProfile(ctx, wt.Runner, wt.Path, kind)
-	if err != nil {
-		return err
-	}
-	return editor.OpenFile(profile, full, 0)
 }

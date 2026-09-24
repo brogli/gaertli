@@ -17,14 +17,10 @@ func (c *Core) ListWorktrees(ctx context.Context, path core.RepoPath) ([]core.Wo
 	if err != nil {
 		return nil, err
 	}
-	result, err := c.discover.Run(ctx, git.Call{
-		Dir: toplevel, ReadOnly: true, Args: []string{"worktree", "list", "--porcelain", "-z"},
-	})
+	worktrees, err := worktreeList(ctx, c.discover, toplevel, false)
 	if err != nil {
 		return nil, err
 	}
-
-	worktrees := parseWorktreeRecords(result.Stdout)
 	for i := range worktrees {
 		if !worktrees[i].Missing {
 			worktrees[i].Dirty = c.isDirty(ctx, worktrees[i].Path)
@@ -41,6 +37,20 @@ func (c *Core) isDirty(ctx context.Context, dir string) bool {
 		Dir: dir, ReadOnly: true, Args: []string{"status", "--porcelain=v2", "-z", "--untracked-files=all"},
 	})
 	return err == nil && len(result.Stdout) > 0
+}
+
+// MainWorktree implements core.API.
+func (c *Core) MainWorktree(ctx context.Context, gitDir core.RepoPath) (core.Worktree, error) {
+	worktrees, err := worktreeList(ctx, c.discover, string(gitDir), false)
+	if err != nil {
+		return core.Worktree{}, core.ErrorfArgs(core.NotARepo, "notARepo", map[string]string{"path": string(gitDir)}, "%s is not a git repository", gitDir)
+	}
+	for _, wt := range worktrees {
+		if !wt.Bare && !wt.Missing {
+			return wt, nil
+		}
+	}
+	return core.Worktree{}, core.ErrorfArgs(core.NotARepo, "noWorktreeLeft", map[string]string{"path": string(gitDir)}, "%s has no worktree left", gitDir)
 }
 
 // ListBranches implements core.API.
@@ -76,7 +86,7 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 		// git creates -b's branch before it finds target taken, and leaves
 		// the branch behind; refuse first, in git's own words.
 		if entries, err := os.ReadDir(target); err == nil && len(entries) > 0 {
-			return core.Worktree{}, core.Errorf(core.GitFailed, "'%s' already exists", target)
+			return core.Worktree{}, core.ErrorfArgs(core.GitFailed, "worktreeExists", map[string]string{"path": target}, "'%s' already exists", target)
 		}
 		args = []string{"worktree", "add", "-b", branch, "--", target}
 		if start != "" { // none: git branches from HEAD
@@ -86,18 +96,16 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args}); err != nil {
 		return core.Worktree{}, err
 	}
-	return c.describeWorktree(ctx, wt, target)
+	return describeWorktree(ctx, wt, target)
 }
 
 // describeWorktree returns target's row from wt's repo's worktree list.
-func (c *Core) describeWorktree(ctx context.Context, wt *session.Worktree, target string) (core.Worktree, error) {
-	result, err := wt.Runner.Run(ctx, git.Call{
-		Dir: wt.Path, ReadOnly: true, Args: []string{"worktree", "list", "--porcelain", "-z"},
-	})
+func describeWorktree(ctx context.Context, wt *session.Worktree, target string) (core.Worktree, error) {
+	worktrees, err := worktreeList(ctx, wt.Runner, wt.Path, false)
 	if err != nil {
 		return core.Worktree{}, err
 	}
-	for _, row := range parseWorktreeRecords(result.Stdout) {
+	for _, row := range worktrees {
 		if row.Path == target {
 			return row, nil // just created: clean by construction
 		}
@@ -147,13 +155,24 @@ func (c *Core) PruneWorktrees(ctx context.Context, path core.RepoPath) error {
 	return err
 }
 
+// worktreeList runs git worktree list in dir and parses it.
+func worktreeList(ctx context.Context, r git.Runner, dir string, background bool) ([]core.Worktree, error) {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true, Background: background, Args: []string{"worktree", "list", "--porcelain", "-z"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return parseWorktreeRecords(result.Stdout), nil
+}
+
 // parseWorktreeRecords parses "git worktree list --porcelain -z" output
 // (each field is its own NUL-terminated "key[ value]"; an empty field ends
 // a record). git lists the main worktree first and porcelain has no marker
 // for it, so Main is set from position alone. Dirty is left to the caller.
 func parseWorktreeRecords(out []byte) []core.Worktree {
 	var worktrees []core.Worktree
-	for _, block := range bytes.Split(out, []byte{0, 0}) {
+	for block := range bytes.SplitSeq(out, []byte{0, 0}) {
 		if len(block) == 0 {
 			continue
 		}
@@ -164,7 +183,7 @@ func parseWorktreeRecords(out []byte) []core.Worktree {
 
 func parseWorktreeRecord(block []byte, main bool) core.Worktree {
 	wt := core.Worktree{Main: main}
-	for _, line := range bytes.Split(block, []byte{0}) {
+	for line := range bytes.SplitSeq(block, []byte{0}) {
 		key, value, _ := strings.Cut(string(line), " ")
 		switch key {
 		case "worktree":
@@ -179,6 +198,8 @@ func parseWorktreeRecord(block []byte, main bool) core.Worktree {
 			wt.Locked = true
 		case "prunable":
 			wt.Missing = true
+		case "bare":
+			wt.Bare = true
 		}
 	}
 	return wt

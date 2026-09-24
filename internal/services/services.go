@@ -1,5 +1,5 @@
 // Package services implements core.API in-process: it validates input, runs
-// git, and returns DTOs. One service per feature area.
+// git, and returns DTOs. One file per feature area.
 package services
 
 import (

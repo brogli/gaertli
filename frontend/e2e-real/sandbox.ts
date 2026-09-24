@@ -22,7 +22,6 @@ export function createSandbox(): Sandbox {
   }
   const editorLog = path.join(dir, 'editor.log')
   const editor = writeStandIn(bin, 'stand-in-editor', editorLog)
-  writeStandIn(bin, 'xdg-open', editorLog)
   fs.writeFileSync(path.join(dir, 'gitconfig'), gitConfig(editor))
   return {
     dir,

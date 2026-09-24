@@ -2,8 +2,9 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"slices"
-	"sort"
 	"sync"
 	"testing"
 	"testing/fstest"
@@ -23,45 +24,59 @@ type emittedEvent struct {
 	payload any
 }
 
+func newEmittedEvent(name string, data []any) emittedEvent {
+	ev := emittedEvent{name: name}
+	if len(data) > 0 {
+		ev.payload = data[0]
+	}
+	return ev
+}
+
 // fakeWindow is a shellWindow that records what was called on it, and lets
-// a test simulate the OS closing it.
+// a test simulate the OS focusing or closing it.
 type fakeWindow struct {
 	id         uint
 	title      string
 	url        string
+	minWidth   int
 	focusCount int
-	emitCount  int
 	emitted    []emittedEvent
-	closing    func(*application.WindowEvent)
+	handlers   map[events.WindowEventType]func(*application.WindowEvent)
 }
 
 func (w *fakeWindow) ID() uint { return w.id }
 
 func (w *fakeWindow) Focus() { w.focusCount++ }
 
+func (w *fakeWindow) SetTitle(title string) application.Window {
+	w.title = title
+	return nil
+}
+
 func (w *fakeWindow) EmitEvent(name string, data ...any) bool {
-	w.emitCount++
-	var payload any
-	if len(data) > 0 {
-		payload = data[0]
-	}
-	w.emitted = append(w.emitted, emittedEvent{name: name, payload: payload})
+	w.emitted = append(w.emitted, newEmittedEvent(name, data))
 	return true
 }
 
+func (w *fakeWindow) emitCount() int { return len(w.emitted) }
+
 func (w *fakeWindow) OnWindowEvent(eventType events.WindowEventType, callback func(*application.WindowEvent)) func() {
-	if eventType == events.Common.WindowClosing {
-		w.closing = callback
+	if w.handlers == nil {
+		w.handlers = map[events.WindowEventType]func(*application.WindowEvent){}
 	}
+	w.handlers[eventType] = callback
 	return func() {}
 }
 
-// close simulates the OS destroying the window.
-func (w *fakeWindow) close() {
-	if w.closing != nil {
-		w.closing(&application.WindowEvent{})
+// fire simulates the OS sending the window eventType.
+func (w *fakeWindow) fire(eventType events.WindowEventType) {
+	if handler := w.handlers[eventType]; handler != nil {
+		handler(&application.WindowEvent{})
 	}
 }
+
+// close simulates the OS destroying the window.
+func (w *fakeWindow) close() { w.fire(events.Common.WindowClosing) }
 
 // fakeOpener is a windowOpener that hands out fakeWindows and records them
 // in creation order.
@@ -70,9 +85,20 @@ type fakeOpener struct {
 }
 
 func (o *fakeOpener) NewWithOptions(opts application.WebviewWindowOptions) shellWindow {
-	w := &fakeWindow{id: uint(len(o.windows)) + 1, title: opts.Title, url: opts.URL}
+	w := &fakeWindow{id: uint(len(o.windows)) + 1, title: opts.Title, url: opts.URL, minWidth: opts.MinWidth}
 	o.windows = append(o.windows, w)
 	return w
+}
+
+// worktreeEvent and repoEvent are registered events for the windows of a
+// worktree and of a repo. "command" is not used here: it never reaches a
+// window, so a routing test needs an event that does.
+func worktreeEvent(wt core.WorktreeID) core.Event {
+	return core.Event{Name: "log:progress", Worktree: wt, Payload: json.RawMessage(`{}`)}
+}
+
+func repoEvent(repo string) core.Event {
+	return core.Event{Name: "job:update", Repo: repo, Payload: json.RawMessage(`{}`)}
 }
 
 func newTestRegistry() (*Registry, *fakeOpener) {
@@ -81,6 +107,23 @@ func newTestRegistry() (*Registry, *fakeOpener) {
 	r.opener = opener
 	r.SetLocal(fakeAPI{})
 	return r, opener
+}
+
+func TestFR_UX_08_MainWindowGetsTheMinimumWidthADiffWindowDoesNot(t *testing.T) {
+	r, opener := newTestRegistry()
+
+	r.OpenOrFocus("wt", "/wt", "")
+	r.OpenOrFocusDiff(diffWindowKey{wt: "wt"}, "wt", DiffTarget{Kind: CommitDiff, Sha: "a", Path: "f1"})
+
+	if len(opener.windows) != 2 {
+		t.Fatalf("opened %d windows, want 2", len(opener.windows))
+	}
+	if got := opener.windows[0].minWidth; got != mainWindowMinWidth {
+		t.Errorf("main window MinWidth = %d, want %d", got, mainWindowMinWidth)
+	}
+	if got := opener.windows[1].minWidth; got != 0 {
+		t.Errorf("diff window MinWidth = %d, want 0 (unset)", got)
+	}
 }
 
 func TestFR_WT_05_OpenOrFocusOpensADistinctWindowPerPath(t *testing.T) {
@@ -122,22 +165,22 @@ func TestADR_9_DispatchTargetsTheWindowsAnEventConcerns(t *testing.T) {
 	r.SetRepo("wtC", "S")
 	wtA, wtB, wtC := opener.windows[0], opener.windows[1], opener.windows[2]
 
-	r.Dispatch(core.Event{Worktree: "wtA"})
+	r.Dispatch(worktreeEvent("wtA"))
 
-	if wtA.emitCount != 1 {
-		t.Errorf("wtA emitCount = %d, want 1", wtA.emitCount)
+	if wtA.emitCount() != 1 {
+		t.Errorf("wtA emitCount = %d, want 1", wtA.emitCount())
 	}
-	if wtB.emitCount != 0 || wtC.emitCount != 0 {
-		t.Errorf("wtB, wtC emitCount = %d, %d, want 0, 0", wtB.emitCount, wtC.emitCount)
+	if wtB.emitCount() != 0 || wtC.emitCount() != 0 {
+		t.Errorf("wtB, wtC emitCount = %d, %d, want 0, 0", wtB.emitCount(), wtC.emitCount())
 	}
 
-	r.Dispatch(core.Event{Repo: "R"})
+	r.Dispatch(repoEvent("R"))
 
-	if wtA.emitCount != 2 || wtB.emitCount != 1 {
-		t.Errorf("wtA, wtB emitCount = %d, %d, want 2, 1", wtA.emitCount, wtB.emitCount)
+	if wtA.emitCount() != 2 || wtB.emitCount() != 1 {
+		t.Errorf("wtA, wtB emitCount = %d, %d, want 2, 1", wtA.emitCount(), wtB.emitCount())
 	}
-	if wtC.emitCount != 0 {
-		t.Errorf("wtC emitCount = %d, want 0", wtC.emitCount)
+	if wtC.emitCount() != 0 {
+		t.Errorf("wtC emitCount = %d, want 0", wtC.emitCount())
 	}
 }
 
@@ -151,13 +194,63 @@ func TestFR_WT_11_DispatchByRepoReachesOnlyTheWindowSelectingThatRepo(t *testing
 	r.SetRepo("A", "R1")
 	r.SetRepo("B", "R2")
 
-	r.Dispatch(core.Event{Repo: "R1"})
+	r.Dispatch(repoEvent("R1"))
 
-	if opener.windows[0].emitCount != 1 {
-		t.Errorf("window selecting R1's worktree emitCount = %d, want 1", opener.windows[0].emitCount)
+	if opener.windows[0].emitCount() != 1 {
+		t.Errorf("window selecting R1's worktree emitCount = %d, want 1", opener.windows[0].emitCount())
 	}
-	if opener.windows[1].emitCount != 0 {
-		t.Errorf("window selecting R2's worktree emitCount = %d, want 0", opener.windows[1].emitCount)
+	if opener.windows[1].emitCount() != 0 {
+		t.Errorf("window selecting R2's worktree emitCount = %d, want 0", opener.windows[1].emitCount())
+	}
+}
+
+// Wails hands every event to every window: only the window an event is
+// emitted through is named as its sender, so it goes out through its own
+// window alone.
+func TestFR_SYNC_07_AJobGoesOutOnlyThroughItsWorktreesWindow(t *testing.T) {
+	r, opener := newTestRegistry()
+	r.OpenOrFocus("/a", "/a", "")
+	r.OpenOrFocus("/b", "/b", "")
+	r.SetRepo("/a", "/a/.git")
+	r.SetRepo("/b", "/b/.git")
+	first, second := opener.windows[0], opener.windows[1]
+
+	r.Dispatch(core.Event{Name: "job:update", Repo: "/a/.git", Payload: json.RawMessage(`{"id":"j1"}`)})
+
+	if got, want := eventNames(first), []string{"job:update"}; !slices.Equal(got, want) {
+		t.Errorf("first window emitted %v, want %v", got, want)
+	}
+	if len(second.emitted) != 0 {
+		t.Errorf("second window emitted %v, want nothing", eventNames(second))
+	}
+}
+
+// A server-mode page is no window of the registry's: its calls name it,
+// and from its first call on it gets the events of the worktree it asked
+// for, and of that worktree's repo, through itself.
+func TestFR_REPO_04_APageGetsTheEventsOfTheWorktreeItCallsFor(t *testing.T) {
+	r, opener := newTestRegistry()
+	r.OpenOrFocus("/a", "/a", "")
+	r.OpenOrFocus("/b", "/b", "")
+	r.SetRepo("/a", "/a/.git")
+	page := &fakeWindow{}
+	ctx := context.WithValue(t.Context(), pageKey{}, shellWindow(page))
+
+	if _, _, err := r.CoreOf(ctx, "/a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := r.CoreOf(ctx, "/b"); err != nil {
+		t.Fatal(err)
+	}
+	r.Dispatch(worktreeEvent("/a"))
+	r.Dispatch(repoEvent("/a/.git"))
+	r.Dispatch(worktreeEvent("/b"))
+
+	if got, want := eventNames(page), []string{"log:progress", "job:update"}; !slices.Equal(got, want) {
+		t.Errorf("page emitted %v, want %v", got, want)
+	}
+	if got := eventNames(opener.windows[0]); len(got) != 2 {
+		t.Errorf("/a's window emitted %v, want both of /a's events", got)
 	}
 }
 
@@ -211,7 +304,7 @@ func TestOpenWorktreePathsListsOpenWindows(t *testing.T) {
 	r.OpenOrFocus("b", "/b", "")
 
 	got := r.OpenWorktreePaths()
-	sort.Strings(got)
+	slices.Sort(got)
 	if want := []string{"/a", "/b"}; !slices.Equal(got, want) {
 		t.Errorf("OpenWorktreePaths() = %v, want %v", got, want)
 	}
@@ -308,7 +401,7 @@ func TestFR_REPO_02_QuittingKeepsEveryOpenWindowForTheNextLaunch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	options(fstest.MapFS{}, r, func(string) {}).OnShutdown()
+	options(fstest.MapFS{}, r, func(string) {}, nil).OnShutdown()
 	opener.windows[0].close()
 	opener.windows[1].close()
 
@@ -358,7 +451,7 @@ func (f *fakeDistroCore) LiveClient() (*remote.Client, bool) {
 func TestADR_3_CoreForRoutesAWSLPathToItsDistro(t *testing.T) {
 	r, _ := newTestRegistry()
 	distroClient := pipeAPIClient(t, fakeAPI{})
-	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
 
 	got, err := r.CoreFor(core.RepoPath(`\\wsl.localhost\Ubuntu-22.04\home\user\project`))
 	if err != nil {
@@ -377,20 +470,119 @@ func TestADR_3_CoreForRoutesAWSLPathToItsDistro(t *testing.T) {
 	}
 }
 
-func TestADR_3_CoreOfRoutesThroughTheWindowsDistro(t *testing.T) {
+func TestADR_3_CoreOfRoutesByTheIDAlone(t *testing.T) {
 	r, _ := newTestRegistry()
 	distroClient := pipeAPIClient(t, fakeAPI{})
-	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
 
-	r.OpenOrFocus("wt1", "/home/user/project", "Ubuntu-22.04")
-
-	got, err := r.CoreOf("wt1")
+	local, localID, err := r.CoreOf(t.Context(), "/local/r")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != core.API(distroClient) {
-		t.Error("CoreOf did not resolve through the window's distro core")
+	if _, isLocal := local.(fakeAPI); !isLocal || localID != "/local/r" {
+		t.Errorf("CoreOf(/local/r) = (%T, %q), want (the local core, /local/r)", local, localID)
 	}
+
+	wsl, wslID, err := r.CoreOf(t.Context(), `\\wsl.localhost\A\home\u\r`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wsl != core.API(distroClient) || wslID != "/home/u/r" {
+		t.Errorf(`CoreOf(\\wsl.localhost\A\home\u\r) = (%T, %q), want (A's core, /home/u/r)`, wsl, wslID)
+	}
+}
+
+// newTwoDistroShell is a shell over a fresh registry with distros A and B,
+// each with a repo at /home/u/r. calls receives each distro core's calls;
+// sinks holds the event sink the registry gave each distro core.
+func newTwoDistroShell(t *testing.T) (sh shell, opener *fakeOpener, calls map[string]chan routedCall, sinks map[string]core.EventSink) {
+	t.Helper()
+	r, opener := newTestRegistry()
+	calls = map[string]chan routedCall{}
+	clients := map[string]*remote.Client{}
+	for _, distro := range []string{"A", "B"} {
+		calls[distro] = make(chan routedCall, 1)
+		clients[distro] = pipeAPIClient(t, fakeAPI{calls: calls[distro], openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
+			return core.WorktreeInfo{ID: "/home/u/r", Path: "/home/u/r", RepoKey: "/home/u/r/.git"}, nil
+		}})
+	}
+	sinks = map[string]core.EventSink{}
+	r.newDistroCore = func(distro string, sink core.EventSink) distroCorer {
+		sinks[distro] = sink
+		return &fakeDistroCore{client: clients[distro]}
+	}
+	sh = shell{api: NewFacade(r), reg: r, store: newTestStore(t), notify: &fakeNotifier{}}
+	ctx := t.Context()
+	sh.open(ctx, `\\wsl.localhost\A\home\u\r`)
+	sh.open(ctx, `\\wsl.localhost\B\home\u\r`)
+	return sh, opener, calls, sinks
+}
+
+func TestFR_WT_11_SamePathInTwoDistrosOpensTwoWindowsEachOnItsOwnCore(t *testing.T) {
+	sh, opener, calls, _ := newTwoDistroShell(t)
+
+	if len(opener.windows) != 2 {
+		t.Fatalf("windows created = %d, want 2", len(opener.windows))
+	}
+	for _, distro := range []string{"A", "B"} {
+		id := core.WorktreeID(`\\wsl.localhost\` + distro + `\home\u\r`)
+		if _, err := sh.api.Summary(t.Context(), id); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := nextCall(t, calls[distro]), (routedCall{"Summary", "/home/u/r"}); got != want {
+			t.Errorf("Summary(%s): %s's core got %+v, want %+v", id, distro, got, want)
+		}
+	}
+}
+
+func TestFR_WT_11_ADistroCoresEventsReachOnlyItsOwnWindow(t *testing.T) {
+	_, opener, _, sinks := newTwoDistroShell(t)
+	windowA, windowB := opener.windows[0], opener.windows[1]
+
+	sinks["A"](worktreeEvent("/home/u/r"))
+	sinks["A"](repoEvent("/home/u/r/.git"))
+
+	if got := eventNames(windowA); !slices.Equal(got, []string{"log:progress", "job:update"}) {
+		t.Errorf("A's window received %v, want both events", got)
+	}
+	if got := eventNames(windowB); len(got) != 0 {
+		t.Errorf("B's window received %v, want none", got)
+	}
+}
+
+func TestFR_REPO_04_FocusReachesTheWindowsCurrentSelection(t *testing.T) {
+	calls := make(chan routedCall, 1)
+	sh, opener := newLocalShell(t, nil, calls)
+	ctx := t.Context()
+	sh.open(ctx, "/wt")
+	window := opener.windows[0]
+	if err := sh.switchTo(ctx, &fakeCallingWindow{id: window.ID()}, "/wt2"); err != nil {
+		t.Fatal(err)
+	}
+
+	window.fire(events.Common.WindowFocus)
+
+	if got, want := nextCall(t, calls), (routedCall{"SetFocused(true)", "/wt2"}); got != want {
+		t.Errorf("local core got %+v, want %+v", got, want)
+	}
+}
+
+func TestFR_REPO_04_AWSLWindowsFocusReachesItsDistroCore(t *testing.T) {
+	_, opener, calls, _ := newTwoDistroShell(t)
+
+	opener.windows[0].fire(events.Common.WindowFocus)
+
+	if got, want := nextCall(t, calls["A"]), (routedCall{"SetFocused(true)", "/home/u/r"}); got != want {
+		t.Errorf("A's core got %+v, want %+v", got, want)
+	}
+}
+
+func eventNames(w *fakeWindow) []string {
+	var names []string
+	for _, ev := range w.emitted {
+		names = append(names, ev.name)
+	}
+	return names
 }
 
 func TestADR_4_CoreOfReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
@@ -405,86 +597,62 @@ func TestADR_4_CoreOfReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
 		return core.WorktreeInfo{Path: string(path)}, nil
 	}})
 	fdc := &fakeDistroCore{client: distroClient}
-	r.newDistroCore = func(string) distroCorer { return fdc }
+	r.newDistroCore = func(string, core.EventSink) distroCorer { return fdc }
 
-	r.OpenOrFocus("wtA", "/a", "Ubuntu-22.04")
-	r.OpenOrFocus("wtB", "/b", "Ubuntu-22.04")
-	r.OpenOrFocus("wtC", "/c", "Debian") // different distro; must stay untouched
+	r.OpenOrFocus(`\\wsl.localhost\Ubuntu-22.04\a`, "/a", "Ubuntu-22.04")
+	r.OpenOrFocus(`\\wsl.localhost\Ubuntu-22.04\b`, "/b", "Ubuntu-22.04")
+	r.OpenOrFocus(`\\wsl.localhost\Debian\c`, "/c", "Debian") // different distro; must stay untouched
 
-	if _, err := r.CoreOf("wtA"); err != nil {
+	if _, _, err := r.CoreOf(t.Context(), `\\wsl.localhost\Ubuntu-22.04\a`); err != nil {
 		t.Fatal(err)
 	}
 
 	mu.Lock()
-	got := append([]string(nil), opened...)
+	got := slices.Clone(opened)
 	mu.Unlock()
-	sort.Strings(got)
+	slices.Sort(got)
 	if want := []string{"/a", "/b"}; !slices.Equal(got, want) {
 		t.Errorf("reopened paths = %v, want %v", got, want)
 	}
 
 	wtA, wtB, wtC := opener.windows[0], opener.windows[1], opener.windows[2]
-	if wtA.emitCount != 1 || wtB.emitCount != 1 {
-		t.Errorf("emitCount wtA=%d wtB=%d, want 1, 1", wtA.emitCount, wtB.emitCount)
+	if wtA.emitCount() != 1 || wtB.emitCount() != 1 {
+		t.Errorf("emitCount wtA=%d wtB=%d, want 1, 1", wtA.emitCount(), wtB.emitCount())
 	}
-	if wtC.emitCount != 0 {
-		t.Errorf("wtC (different distro) emitCount = %d, want 0", wtC.emitCount)
+	if wtC.emitCount() != 0 {
+		t.Errorf("wtC (different distro) emitCount = %d, want 0", wtC.emitCount())
 	}
 }
 
-// SelectInWindow moves a window's selection and reports the one it
-// replaced; a subsequent CoreOf resolves through the window's new
-// selection, not its old one.
 func TestADR_9_SelectInWindowMovesTheWindowsSelection(t *testing.T) {
 	r, opener := newTestRegistry()
-	distroClient := pipeAPIClient(t, fakeAPI{})
-	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
 
 	r.OpenOrFocus("A", "/a", "")
-	windowID := opener.windows[0].ID()
 
-	previous, _, ok := r.SelectInWindow(windowID, "B", "/b", "Ubuntu-22.04")
+	previous, ok := r.SelectInWindow(opener.windows[0].ID(), "B", "/b", "")
 	if previous != "A" || !ok {
 		t.Fatalf("SelectInWindow(...) = (%q, %v), want (\"A\", true)", previous, ok)
 	}
-
-	got, err := r.CoreOf("B")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != core.API(distroClient) {
-		t.Error("CoreOf(B) did not resolve through the window's new selection")
+	if r.inUse("A") || !r.inUse("B") {
+		t.Errorf("inUse(A), inUse(B) = %v, %v, want false, true", r.inUse("A"), r.inUse("B"))
 	}
 }
 
-// Releasing the selection a switch leaves behind routes through its own
-// real core (a distro's), not the local one: CoreOf can no longer find it
-// once SelectInWindow has moved the only window that selected it.
-func TestADR_9_SwitchingReleasesThePreviousSelectionThroughItsRealCore(t *testing.T) {
+func TestADR_9_SwitchingReleasesThePreviousSelectionThroughItsOwnCore(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
 	distroClient := pipeAPIClient(t, fakeAPI{closed: &closed})
-	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
 
-	r.OpenOrFocus("A", "/a", "Ubuntu-22.04")
-	windowID := opener.windows[0].ID()
-
-	previous, previousDistro, ok := r.SelectInWindow(windowID, "B", "/b", "")
+	r.OpenOrFocus(`\\wsl.localhost\Ubuntu-22.04\a`, "/a", "Ubuntu-22.04")
+	previous, ok := r.SelectInWindow(opener.windows[0].ID(), "B", "/b", "")
 	if !ok {
 		t.Fatal("SelectInWindow ok = false")
 	}
-	if r.StillSelected(previous) {
-		t.Fatal("StillSelected(A) = true, want false")
-	}
+	r.Release(previous)
 
-	prevCore, err := r.coreForDistro(previousDistro)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = prevCore.CloseWorktree(context.Background(), previous)
-
-	if len(closed) != 1 || closed[0] != "A" {
-		t.Errorf("CloseWorktree calls = %v, want [\"A\"], routed through the distro core, not r.local", closed)
+	if want := []core.WorktreeID{"/a"}; !slices.Equal(closed, want) {
+		t.Errorf("distro core's CloseWorktree calls = %v, want %v", closed, want)
 	}
 }
 
@@ -494,33 +662,33 @@ func TestADR_9_DispatchReachesEveryWindowSharingASelection(t *testing.T) {
 
 	r.OpenOrFocus("A", "/a", "")
 	r.OpenOrFocus("other", "/other", "")
-	if _, _, ok := r.SelectInWindow(opener.windows[1].ID(), "A", "/a", ""); !ok {
+	if _, ok := r.SelectInWindow(opener.windows[1].ID(), "A", "/a", ""); !ok {
 		t.Fatal("SelectInWindow ok = false")
 	}
 
-	r.Dispatch(core.Event{Worktree: "A"})
+	r.Dispatch(worktreeEvent("A"))
 
-	if opener.windows[0].emitCount != 1 || opener.windows[1].emitCount != 1 {
-		t.Errorf("emitCount = %d, %d, want 1, 1", opener.windows[0].emitCount, opener.windows[1].emitCount)
+	if opener.windows[0].emitCount() != 1 || opener.windows[1].emitCount() != 1 {
+		t.Errorf("emitCount = %d, %d, want 1, 1", opener.windows[0].emitCount(), opener.windows[1].emitCount())
 	}
 }
 
-// StillSelected is the safety check a switch relies on before
+// inUse is the safety check a switch relies on before
 // releasing a worktree — true here since a second window still selects it.
-func TestADR_9_StillSelectedIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
+func TestADR_9_InUseIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("A", "/a", "")
 	r.OpenOrFocus("other", "/other", "")
 	r.SelectInWindow(opener.windows[1].ID(), "A", "/a", "")
 
-	previous, _, ok := r.SelectInWindow(opener.windows[0].ID(), "B", "/b", "")
+	previous, ok := r.SelectInWindow(opener.windows[0].ID(), "B", "/b", "")
 	if !ok || previous != "A" {
 		t.Fatalf("SelectInWindow(...) = (%q, %v), want (\"A\", true)", previous, ok)
 	}
 
-	if !r.StillSelected(previous) {
-		t.Error("StillSelected(A) = false, want true — another window still selects it")
+	if !r.inUse(previous) {
+		t.Error("inUse(A) = false, want true — another window still selects it")
 	}
 }
 
@@ -530,13 +698,13 @@ func TestADR_9_ClosingAWindowClosesItsSelectionThroughTheRealCore(t *testing.T) 
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
 	distroClient := pipeAPIClient(t, fakeAPI{closed: &closed})
-	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
 
-	r.OpenOrFocus("A", "/a", "Ubuntu-22.04")
+	r.OpenOrFocus(`\\wsl.localhost\Ubuntu-22.04\a`, "/a", "Ubuntu-22.04")
 	opener.windows[0].close()
 
-	if len(closed) != 1 || closed[0] != "A" {
-		t.Errorf("CloseWorktree calls = %v, want [\"A\"], routed through the distro core, not r.local", closed)
+	if want := []core.WorktreeID{"/a"}; !slices.Equal(closed, want) {
+		t.Errorf("distro core's CloseWorktree calls = %v, want %v", closed, want)
 	}
 }
 
@@ -557,60 +725,117 @@ func TestADR_9_ClosingAWindowDoesNotCloseASelectionStillHeldElsewhere(t *testing
 	if len(closed) != 0 {
 		t.Errorf("CloseWorktree calls = %v, want none (window 1 still selects A)", closed)
 	}
-	r.Dispatch(core.Event{Worktree: "A"})
-	if opener.windows[1].emitCount != 1 {
-		t.Errorf("window 1 (still selecting A) emitCount = %d, want 1 — its own entry must be untouched", opener.windows[1].emitCount)
+	r.Dispatch(worktreeEvent("A"))
+	if opener.windows[1].emitCount() != 1 {
+		t.Errorf("window 1 (still selecting A) emitCount = %d, want 1 — its own entry must be untouched", opener.windows[1].emitCount())
 	}
 }
 
-func TestFR_CMP_02_OpenOrFocusCompareDiffReusesWindowByComparisonKey(t *testing.T) {
+// newLocalShell is a shell over a fresh registry whose local core opens
+// every path as is, records CloseWorktree calls in closed and its
+// recorded calls on calls.
+func newLocalShell(t *testing.T, closed *[]core.WorktreeID, calls chan<- routedCall) (shell, *fakeOpener) {
+	t.Helper()
 	r, opener := newTestRegistry()
+	r.SetLocal(fakeAPI{openWorktree: openAsIs, closed: closed, calls: calls})
+	return shell{api: NewFacade(r), reg: r, store: newTestStore(t), notify: &fakeNotifier{}}, opener
+}
 
-	r.OpenOrFocusCompareDiff("wt", "a", "b", "f1", "")
-	r.OpenOrFocusCompareDiff("wt", "a", "c", "f1", "")
-	r.OpenOrFocusCompareDiff("wt", "a", "b", "f2", "")
-
-	if len(opener.windows) != 2 {
-		t.Fatalf("windows created = %d, want 2", len(opener.windows))
+// openDiffFrom opens mainWindow's diff window on wt's working-tree changes.
+func openDiffFrom(t *testing.T, sh shell, mainWindow *fakeWindow, wt core.WorktreeID) {
+	t.Helper()
+	s := &AppService{shell: sh}
+	if err := s.OpenDiff(callFrom(mainWindow.ID()), wt, DiffTarget{Kind: WorkingDiff, Path: "f"}); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func TestFR_CMP_02_OpenOrFocusCompareDiffRetargetsTheReusedWindow(t *testing.T) {
-	r, opener := newTestRegistry()
+func TestFR_DIFF_07_ADiffWindowOutlivesItsMainWindowAndGetsItsWorktreesEvents(t *testing.T) {
+	var closed []core.WorktreeID
+	sh, opener := newLocalShell(t, &closed, nil)
+	sh.open(t.Context(), "/wt")
+	sh.reg.SetRepo("/wt", "/wt/.git")
+	mainWindow := opener.windows[0]
+	openDiffFrom(t, sh, mainWindow, "/wt")
+	diffWindow := opener.windows[1]
 
-	r.OpenOrFocusCompareDiff("wt", "a", "b", "f1", "")
-	r.OpenOrFocusCompareDiff("wt", "a", "c", "f1", "")
-	r.OpenOrFocusCompareDiff("wt", "a", "b", "f2", "")
+	mainWindow.close()
+	index := json.RawMessage(`{"scope":"index"}`)
+	sh.reg.Dispatch(core.Event{Name: "repo:changed", Repo: "/wt/.git", Payload: index})
+	sh.reg.Dispatch(core.Event{Name: "repo:changed", Worktree: "/wt", Payload: index})
 
-	reused := opener.windows[0]
-	if reused.focusCount != 1 {
-		t.Errorf("reused window focusCount = %d, want 1", reused.focusCount)
+	want := []emittedEvent{
+		{"repo:changed", core.RepoChanged{Scope: "index"}},
+		{"repo:changed", core.RepoChanged{Scope: "index"}},
 	}
-	if len(reused.emitted) != 1 {
-		t.Fatalf("reused window emitted %d events, want 1", len(reused.emitted))
+	if !slices.Equal(diffWindow.emitted, want) {
+		t.Errorf("diff window received %+v, want %+v", diffWindow.emitted, want)
 	}
-	got := reused.emitted[0]
-	if got.name != "compare:show-file" {
-		t.Errorf("emitted event name = %q, want %q", got.name, "compare:show-file")
+	if len(closed) != 0 {
+		t.Errorf("CloseWorktree calls = %v, want none while the diff window is open", closed)
 	}
-	if got.payload != (compareShowFilePayload{Path: "f2", OldPath: ""}) {
-		t.Errorf("emitted event payload = %+v, want {Path: f2, OldPath: \"\"}", got.payload)
+
+	diffWindow.close()
+
+	if want := []core.WorktreeID{"/wt"}; !slices.Equal(closed, want) {
+		t.Errorf("CloseWorktree calls = %v, want %v", closed, want)
 	}
 }
 
-func TestFR_CMP_02_OpenOrFocusCompareDiffDoesNotFocusOrEmitOnAFreshWindow(t *testing.T) {
-	r, opener := newTestRegistry()
+func TestFR_DIFF_07_RetargetingTheDiffWindowToAnotherWorktreeReleasesTheOneLeft(t *testing.T) {
+	var closed []core.WorktreeID
+	sh, opener := newLocalShell(t, &closed, nil)
+	ctx := t.Context()
+	sh.open(ctx, "/wt")
+	mainWindow := opener.windows[0]
+	openDiffFrom(t, sh, mainWindow, "/wt")
 
-	r.OpenOrFocusCompareDiff("wt", "a", "b", "f1", "")
+	if err := sh.switchTo(ctx, &fakeCallingWindow{id: mainWindow.ID()}, "/wt2"); err != nil {
+		t.Fatal(err)
+	}
+	if len(closed) != 0 {
+		t.Errorf("CloseWorktree calls = %v, want none while the diff window shows /wt", closed)
+	}
 
-	if len(opener.windows) != 1 {
-		t.Fatalf("windows created = %d, want 1", len(opener.windows))
+	openDiffFrom(t, sh, mainWindow, "/wt2")
+
+	if want := []core.WorktreeID{"/wt"}; !slices.Equal(closed, want) {
+		t.Errorf("CloseWorktree calls = %v, want %v", closed, want)
 	}
-	if opener.windows[0].focusCount != 0 {
-		t.Errorf("fresh window focusCount = %d, want 0", opener.windows[0].focusCount)
+	diffWindow := opener.windows[1]
+	if got := diffWindow.emitted[0].payload.(DiffShow).Wt; got != "/wt2" {
+		t.Errorf("diff:show wt = %q, want /wt2", got)
 	}
-	if len(opener.windows[0].emitted) != 0 {
-		t.Errorf("fresh window emitted %d events, want 0", len(opener.windows[0].emitted))
+}
+
+// A main window and its diff window hand focus to each other in either
+// order; the worktree's status poller runs while either has focus.
+func TestFR_REPO_04_FocusingTheDiffWindowKeepsItsWorktreePolled(t *testing.T) {
+	calls := make(chan routedCall, 1)
+	sh, opener := newLocalShell(t, nil, calls)
+	sh.open(t.Context(), "/wt")
+	mainWindow := opener.windows[0]
+	openDiffFrom(t, sh, mainWindow, "/wt")
+	diffWindow := opener.windows[1]
+
+	steps := []struct {
+		window    *fakeWindow
+		event     events.WindowEventType
+		wantFocus bool
+	}{
+		{mainWindow, events.Common.WindowFocus, true},
+		{diffWindow, events.Common.WindowFocus, true},
+		{mainWindow, events.Common.WindowLostFocus, true},
+		{mainWindow, events.Common.WindowFocus, true},
+		{diffWindow, events.Common.WindowLostFocus, true},
+		{mainWindow, events.Common.WindowLostFocus, false},
+	}
+	for i, step := range steps {
+		step.window.fire(step.event)
+		want := routedCall{fmt.Sprintf("SetFocused(%t)", step.wantFocus), "/wt"}
+		if got := nextCall(t, calls); got != want {
+			t.Errorf("step %d: local core got %+v, want %+v", i, got, want)
+		}
 	}
 }
 
@@ -631,7 +856,7 @@ func TestTR_13_PushEditorProfilesPushesTheLocalCoresProfile(t *testing.T) {
 	setEditorProfiles(t, store, map[string]core.EditorProfile{"": {Name: "another editor", FolderCmd: "other {path}"}})
 	r.SetStore(store)
 
-	r.PushEditorProfiles(context.Background())
+	r.PushEditorProfiles(t.Context())
 
 	if len(pushed) != 1 || pushed[0].Name != "another editor" {
 		t.Errorf("local core received %+v, want exactly one push of another editor", pushed)
@@ -642,7 +867,7 @@ func TestFR_ED_11_CoreForPushesTheDistrosOwnProfileOnFirstConnect(t *testing.T) 
 	r, _ := newTestRegistry()
 	var pushed []core.EditorProfile
 	distroClient := pipeAPIClient(t, fakeAPI{editorProfiles: &pushed})
-	r.newDistroCore = func(string) distroCorer { return &fakeDistroCore{client: distroClient} }
+	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
 	store := newTestStore(t)
 	setEditorProfiles(t, store, map[string]core.EditorProfile{
 		"":             {Name: "the editor", FolderCmd: "editor {path}"},
@@ -678,7 +903,7 @@ func TestFR_ED_11_PushEditorProfilesOnlyPushesToAlreadyConnectedDistros(t *testi
 	})
 	r.SetStore(store)
 
-	r.PushEditorProfiles(context.Background())
+	r.PushEditorProfiles(t.Context())
 
 	if len(pushedConnected) != 1 || pushedConnected[0].Name != "another editor" {
 		t.Errorf("connected distro received %+v, want exactly one push of another editor", pushedConnected)

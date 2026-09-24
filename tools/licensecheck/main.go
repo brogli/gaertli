@@ -32,8 +32,9 @@ func main() {
 	}
 }
 
-// collect lists the Go packages linked into both binaries and the frontend's
-// production dependencies (the ones bundled into the app).
+// collect lists the Go packages linked into both binaries, the frontend's
+// production dependencies (the ones bundled into the app), and the code
+// adapted from other projects.
 func collect() ([]Dependency, error) {
 	dir, err := os.MkdirTemp("", "licensecheck")
 	if err != nil {
@@ -61,7 +62,11 @@ func collect() ([]Dependency, error) {
 	if err != nil {
 		return nil, err
 	}
-	return loadTexts(append(goDeps, jsDeps...))
+	deps, err := loadTexts(append(goDeps, jsDeps...))
+	if err != nil {
+		return nil, err
+	}
+	return append(deps, adaptedCode...), nil
 }
 
 // output runs a command and returns its stdout; its stderr (go-licenses

@@ -16,11 +16,10 @@ func main() {
 	force := flag.Bool("force", false, "rebuild even if the fingerprint matches")
 	flag.Parse()
 
-	cfg := mkrepo.Params
 	if *force {
 		_ = os.RemoveAll(*out) // Build's own cache check would no-op otherwise
 	}
-	if err := mkrepo.Build(context.Background(), *out, cfg); err != nil {
+	if err := mkrepo.Build(context.Background(), *out, mkrepo.Params); err != nil {
 		fmt.Fprintln(os.Stderr, "mkrepo:", err)
 		os.Exit(1)
 	}

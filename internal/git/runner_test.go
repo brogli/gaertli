@@ -49,12 +49,9 @@ func TestTR_09_ContinueAddsGitEditor(t *testing.T) {
 // clean baseline to prove what buildEnv itself adds.
 func unsetenvForTest(t *testing.T, key string) {
 	t.Helper()
-	orig, had := os.LookupEnv(key)
+	t.Setenv(key, "") // restores the original value at cleanup
 	if err := os.Unsetenv(key); err != nil {
 		t.Fatal(err)
-	}
-	if had {
-		t.Cleanup(func() { _ = os.Setenv(key, orig) })
 	}
 }
 
@@ -62,7 +59,7 @@ func runEnvDump(t *testing.T, call Call) map[string]string {
 	t.Helper()
 	call.Dir = t.TempDir()
 	call.Args = []string{"env"}
-	result, err := (Runner{Git: fakegit}).Run(context.Background(), call)
+	result, err := (Runner{Git: fakegit}).Run(t.Context(), call)
 	if err != nil {
 		t.Fatalf("Run() err = %v", err)
 	}
@@ -71,7 +68,7 @@ func runEnvDump(t *testing.T, call Call) map[string]string {
 
 func parseEnvDump(out []byte) map[string]string {
 	env := map[string]string{}
-	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimRight(string(out), "\n"), "\n") {
 		if k, v, ok := strings.Cut(line, "="); ok {
 			env[k] = v
 		}
@@ -96,7 +93,7 @@ func assertEnvAbsent(t *testing.T, env map[string]string, key string) {
 func TestTR_10_ArgvPassedVerbatimNoShell(t *testing.T) {
 	dangerous := []string{"; touch marker;", "`id`", "with spaces"}
 	dir := t.TempDir()
-	result, err := (Runner{Git: fakegit}).Run(context.Background(), Call{
+	result, err := (Runner{Git: fakegit}).Run(t.Context(), Call{
 		Dir:  dir,
 		Args: append([]string{"argv"}, dangerous...),
 	})
@@ -115,7 +112,7 @@ func TestTR_10_ArgvPassedVerbatimNoShell(t *testing.T) {
 
 func TestTR_08_ExitZeroSucceedsDespiteStderr(t *testing.T) {
 	t.Setenv("FAKEGIT_STDERR", "fatal: looks bad")
-	result, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+	result, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
 	if err != nil {
 		t.Fatalf("Run() err = %v, want nil", err)
 	}
@@ -127,17 +124,14 @@ func TestTR_08_ExitZeroSucceedsDespiteStderr(t *testing.T) {
 func TestTR_08_ExitNonZeroFailsDespiteBenignStdout(t *testing.T) {
 	t.Setenv("FAKEGIT_EXIT", "1")
 	t.Setenv("FAKEGIT_STDOUT", "all fine")
-	_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+	_, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
 func TestTR_11_CancelKillsAndReturnsQuickly(t *testing.T) {
 	t.Setenv("FAKEGIT_SLEEP_MS", "5000")
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
-	}()
+	ctx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()
 	_, err := (Runner{Git: fakegit}).Run(ctx, Call{Args: []string{"whatever"}})
@@ -152,7 +146,7 @@ func TestTR_11_CancelKillsAndReturnsQuickly(t *testing.T) {
 func TestFR_UX_01_GitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "conflict.txt: needs merge\n")
 	t.Setenv("FAKEGIT_EXIT", "1")
-	_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+	_, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
 	gitErr := coretest.AsError(t, err, core.GitFailed)
 	if gitErr.GitStderr != "conflict.txt: needs merge\n" {
 		t.Errorf("GitStderr = %q, want the stdout fallback", gitErr.GitStderr)
@@ -173,7 +167,7 @@ func TestFR_UX_01_AGitFailuresMessageIsGitsOwn(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv("FAKEGIT_STDERR", c.stderr)
 			t.Setenv("FAKEGIT_EXIT", "3")
-			_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+			_, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
 			if got := coretest.AsError(t, err, core.GitFailed).Message; got != c.want {
 				t.Errorf("Message = %q, want %q", got, c.want)
 			}
@@ -185,7 +179,7 @@ func TestFR_UX_01_GitStderrPrefersStderrOverStdoutWhenBothArePresent(t *testing.
 	t.Setenv("FAKEGIT_STDOUT", "on stdout")
 	t.Setenv("FAKEGIT_STDERR", "on stderr")
 	t.Setenv("FAKEGIT_EXIT", "1")
-	_, err := (Runner{Git: fakegit}).Run(context.Background(), Call{Args: []string{"whatever"}})
+	_, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
 	gitErr := coretest.AsError(t, err, core.GitFailed)
 	if gitErr.GitStderr != "on stderr" {
 		t.Errorf("GitStderr = %q, want stderr, not the stdout fallback", gitErr.GitStderr)
@@ -193,7 +187,7 @@ func TestFR_UX_01_GitStderrPrefersStderrOverStdoutWhenBothArePresent(t *testing.
 }
 
 func TestQA_REL_01_NeverPanics(t *testing.T) {
-	cancelled, cancel := context.WithCancel(context.Background())
+	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	tests := map[string]struct {
@@ -202,8 +196,8 @@ func TestQA_REL_01_NeverPanics(t *testing.T) {
 		call   Call
 		want   core.Code
 	}{
-		"nonexistent dir": {Runner{Git: fakegit}, context.Background(), Call{Dir: filepath.Join(t.TempDir(), "missing")}, core.Internal},
-		"nonexistent git": {Runner{Git: "/does/not/exist"}, context.Background(), Call{}, core.Internal},
+		"nonexistent dir": {Runner{Git: fakegit}, t.Context(), Call{Dir: filepath.Join(t.TempDir(), "missing")}, core.Internal},
+		"nonexistent git": {Runner{Git: "/does/not/exist"}, t.Context(), Call{}, core.Internal},
 		"cancelled ctx":   {Runner{Git: fakegit}, cancelled, Call{}, core.Cancelled},
 	}
 	for name, tt := range tests {
@@ -218,16 +212,16 @@ func TestFR_UX_02_LogsEveryCall(t *testing.T) {
 	var entries []Entry
 	r := Runner{Git: fakegit, Log: func(e Entry) { entries = append(entries, e) }}
 
-	if _, err := r.Run(context.Background(), Call{Args: []string{"whatever"}}); err != nil {
+	if _, err := r.Run(t.Context(), Call{Args: []string{"whatever"}}); err != nil {
 		t.Fatal(err)
 	}
 
 	t.Setenv("FAKEGIT_EXIT", "1")
-	_, _ = r.Run(context.Background(), Call{Args: []string{"whatever"}})
+	_, _ = r.Run(t.Context(), Call{Args: []string{"whatever"}})
 
 	t.Setenv("FAKEGIT_EXIT", "0")
-	_, _ = r.Run(context.Background(), Call{Args: []string{"whatever"}, Background: true})
-	_, _ = r.Run(context.Background(), Call{Args: []string{"clone", "https://alice:s3cr3t@example.com/x.git"}})
+	_, _ = r.Run(t.Context(), Call{Args: []string{"whatever"}, Background: true})
+	_, _ = r.Run(t.Context(), Call{Args: []string{"clone", "https://alice:s3cr3t@example.com/x.git"}})
 
 	if len(entries) != 4 {
 		t.Fatalf("got %d entries, want 4", len(entries))
@@ -250,17 +244,29 @@ func TestFR_UX_02_LogsEveryCall(t *testing.T) {
 }
 
 func TestQA_SAFE_02_CancelActuallyKillsProcess(t *testing.T) {
-	t.Setenv("FAKEGIT_SLEEP_MS", "5000")
-	heartbeat := filepath.Join(t.TempDir(), "heartbeat")
-	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
+	heartbeat := sleepWithHeartbeat(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(50*time.Millisecond, cancel)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
-	}()
 	_, _ = (Runner{Git: fakegit}).Run(ctx, Call{Args: []string{"whatever"}})
 
+	assertStopped(t, heartbeat)
+}
+
+// sleepWithHeartbeat makes fakegit sleep 5s while touching the returned
+// file every 50ms.
+func sleepWithHeartbeat(t *testing.T) (heartbeat string) {
+	t.Helper()
+	heartbeat = filepath.Join(t.TempDir(), "heartbeat")
+	t.Setenv("FAKEGIT_SLEEP_MS", "5000")
+	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
+	return heartbeat
+}
+
+// assertStopped fails if heartbeat is still being touched, i.e. fakegit
+// was not killed.
+func assertStopped(t *testing.T, heartbeat string) {
+	t.Helper()
 	stopped := mtime(t, heartbeat)
 	time.Sleep(300 * time.Millisecond)
 	if got := mtime(t, heartbeat); !got.Equal(stopped) {

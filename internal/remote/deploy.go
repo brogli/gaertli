@@ -51,7 +51,7 @@ func ensureDeployed(ctx context.Context, run wslRunner, consent Consent, distro,
 // binary whose size happened to match.
 func deployCore(ctx context.Context, run wslRunner, consent Consent, distro, target string) error {
 	if !consent.Ask(distro, target) {
-		return core.Errorf(core.DeployRefused, "copying nebegit's helper into %s was declined", distro)
+		return core.ErrorfArgs(core.DeployRefused, "deployRefused", map[string]string{"distro": distro}, "copying nebegit's helper into %s was declined", distro)
 	}
 	return copyCore(ctx, run, distro, target, embeddedCore)
 }
@@ -71,10 +71,9 @@ func remoteSize(ctx context.Context, run wslRunner, distro, target string) (int6
 	return strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
 }
 
-// copyCore pipes payload into target inside distro: wsl.exe -d <distro> --
-// sh -c 'mkdir -p $(dirname <target>) && cat > <target> && chmod +x
-// <target>', stdin = payload — never writing through the \\wsl.localhost
-// UNC path, which is slow to open.
+// copyCore pipes payload into an executable target inside distro, through
+// the distro's own sh rather than the \\wsl.localhost UNC path, which is
+// slow to open.
 func copyCore(ctx context.Context, run wslRunner, distro, target string, payload []byte) error {
 	script := fmt.Sprintf("mkdir -p $(dirname %s) && cat > %s && chmod +x %s", target, target, target)
 	cmd, err := run(ctx, distro, "sh", "-c", script)

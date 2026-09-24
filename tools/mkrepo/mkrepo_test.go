@@ -1,9 +1,7 @@
 package mkrepo
 
 import (
-	"context"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,10 +20,10 @@ func TestBuildIsDeterministicGivenTheSameConfig(t *testing.T) {
 	dirA := filepath.Join(t.TempDir(), "a")
 	dirB := filepath.Join(t.TempDir(), "b")
 
-	if err := Build(context.Background(), dirA, cfg); err != nil {
+	if err := Build(t.Context(), dirA, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := Build(context.Background(), dirB, cfg); err != nil {
+	if err := Build(t.Context(), dirB, cfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,17 +41,17 @@ func TestBuildIsDeterministicGivenTheSameConfig(t *testing.T) {
 func TestBuildProducesAWellFormedRepoMatchingConfig(t *testing.T) {
 	cfg := smallConfig(11)
 	dir := filepath.Join(t.TempDir(), "repo")
-	if err := Build(context.Background(), dir, cfg); err != nil {
+	if err := Build(t.Context(), dir, cfg); err != nil {
 		t.Fatal(err)
 	}
 
 	if got := commitCount(t, dir); got != cfg.Commits {
 		t.Errorf("rev-list --all --count = %d, want %d", got, cfg.Commits)
 	}
-	if got := len(heads(t, dir)); got != cfg.FeatureBranches+1 { // +1 for main
+	if got := len(refNames(t, dir, "refs/heads")); got != cfg.FeatureBranches+1 { // +1 for main
 		t.Errorf("branches = %d, want %d feature branches + main", got, cfg.FeatureBranches)
 	}
-	if got := len(tags(t, dir)); got != cfg.TagCount {
+	if got := len(refNames(t, dir, "refs/tags")); got != cfg.TagCount {
 		t.Errorf("tags = %d, want %d", got, cfg.TagCount)
 	}
 	if got := len(worktrees(t, dir)); got != cfg.Worktrees+1 { // +1 for the primary worktree
@@ -66,7 +64,7 @@ func TestBuildProducesAWellFormedRepoMatchingConfig(t *testing.T) {
 func TestBuildIsACacheHitWhenTheConfigIsUnchanged(t *testing.T) {
 	cfg := smallConfig(3)
 	dir := filepath.Join(t.TempDir(), "repo")
-	if err := Build(context.Background(), dir, cfg); err != nil {
+	if err := Build(t.Context(), dir, cfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,7 +77,7 @@ func TestBuildIsACacheHitWhenTheConfigIsUnchanged(t *testing.T) {
 	}
 	t.Cleanup(func() { runner = prev })
 
-	if err := Build(context.Background(), dir, cfg); err != nil {
+	if err := Build(t.Context(), dir, cfg); err != nil {
 		t.Fatal(err)
 	}
 	if calls != 0 {
@@ -90,12 +88,12 @@ func TestBuildIsACacheHitWhenTheConfigIsUnchanged(t *testing.T) {
 func TestBuildRebuildsWhenTheConfigChanges(t *testing.T) {
 	cfg := smallConfig(5)
 	dir := filepath.Join(t.TempDir(), "repo")
-	if err := Build(context.Background(), dir, cfg); err != nil {
+	if err := Build(t.Context(), dir, cfg); err != nil {
 		t.Fatal(err)
 	}
 
 	cfg.Commits = 210
-	if err := Build(context.Background(), dir, cfg); err != nil {
+	if err := Build(t.Context(), dir, cfg); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,12 +107,10 @@ func headSHA(t *testing.T, dir string) string {
 	return strings.TrimSpace(runOut(t, dir, "rev-parse", "HEAD"))
 }
 
+// refSHAs lists every ref with its object, sorted by refname.
 func refSHAs(t *testing.T, dir string) string {
 	t.Helper()
-	out := runOut(t, dir, "for-each-ref", "--format=%(refname) %(objectname)")
-	lines := strings.Split(strings.TrimSpace(out), "\n")
-	sort.Strings(lines)
-	return strings.Join(lines, "\n")
+	return runOut(t, dir, "for-each-ref", "--format=%(refname) %(objectname)")
 }
 
 func commitCount(t *testing.T, dir string) int {
@@ -126,14 +122,9 @@ func commitCount(t *testing.T, dir string) int {
 	return n
 }
 
-func heads(t *testing.T, dir string) []string {
+func refNames(t *testing.T, dir, prefix string) []string {
 	t.Helper()
-	return nonEmptyLines(runOut(t, dir, "for-each-ref", "--format=%(refname)", "refs/heads"))
-}
-
-func tags(t *testing.T, dir string) []string {
-	t.Helper()
-	return nonEmptyLines(runOut(t, dir, "for-each-ref", "--format=%(refname)", "refs/tags"))
+	return nonEmptyLines(runOut(t, dir, "for-each-ref", "--format=%(refname)", prefix))
 }
 
 func worktrees(t *testing.T, dir string) []string {
@@ -149,7 +140,7 @@ func worktrees(t *testing.T, dir string) []string {
 
 func nonEmptyLines(s string) []string {
 	var lines []string
-	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(s), "\n") {
 		if l != "" {
 			lines = append(lines, l)
 		}
@@ -159,7 +150,7 @@ func nonEmptyLines(s string) []string {
 
 func runOut(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	result, err := runner.Run(context.Background(), git.Call{Dir: dir, ReadOnly: true, Args: args})
+	result, err := runner.Run(t.Context(), git.Call{Dir: dir, ReadOnly: true, Args: args})
 	if err != nil {
 		t.Fatalf("git %s: %v", strings.Join(args, " "), err)
 	}
@@ -168,7 +159,7 @@ func runOut(t *testing.T, dir string, args ...string) string {
 
 func run(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	if _, err := runner.Run(context.Background(), git.Call{Dir: dir, Args: args}); err != nil {
+	if _, err := runner.Run(t.Context(), git.Call{Dir: dir, Args: args}); err != nil {
 		t.Fatalf("git %s: %v", strings.Join(args, " "), err)
 	}
 }

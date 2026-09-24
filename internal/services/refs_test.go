@@ -1,8 +1,8 @@
 package services
 
 import (
-	"context"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -54,7 +54,7 @@ func TestFR_LOG_01_ParseRefRecordsThenToRefsBucketsAndDereferencesTags(t *testin
 	}
 	out := buildForEachRefFixture(records)
 
-	refs := toRefs(parseRefRecords(out))
+	refs := toRefs(parseRefRecords(out), nil)
 
 	if len(refs.Branches) != 2 {
 		t.Fatalf("Branches = %+v, want 2 entries", refs.Branches)
@@ -110,7 +110,7 @@ func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt)
+	refs, err := c.Refs(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt)
+	refs, err := c.Refs(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
 	repo := gittest.New(t)
 	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt)
+	refs, err := c.Refs(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt)
+	refs, err := c.Refs(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	refs, err := c.Refs(context.Background(), wt)
+	refs, err := c.Refs(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,4 +223,32 @@ func findBranch(branches []core.Branch, name string) *core.Branch {
 		}
 	}
 	return nil
+}
+
+func TestFR_LOG_01_RefsGroupsARemoteWhoseNameHasASlashUnderItsWholeName(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	sha := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "remote", "add", "team", "https://example.invalid/team.git")
+	gittest.Run(t, repo.Dir, "remote", "add", "team/x", "https://example.invalid/x.git")
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/main", sha)
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/x/master", sha)
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/gone/topic", sha) // a remote no longer configured
+
+	c, wt := openWorktree(t, repo.Dir)
+	refs, err := c.Refs(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string][]string{}
+	for _, r := range refs.Remotes {
+		for _, b := range r.Branches {
+			got[r.Name] = append(got[r.Name], b.Name)
+		}
+	}
+	want := map[string][]string{"gone": {"topic"}, "team": {"main"}, "team/x": {"master"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("remote branches = %v, want %v", got, want)
+	}
 }

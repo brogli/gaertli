@@ -16,8 +16,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "gencore:", err)
 		os.Exit(1)
 	}
-	for name, rel := range outputs {
-		if err := os.WriteFile(filepath.Join(*root, rel), files[name], 0o644); err != nil {
+	for _, out := range outputs {
+		if err := os.WriteFile(filepath.Join(*root, out.path), files[out.name], 0o644); err != nil {
 			fmt.Fprintln(os.Stderr, "gencore:", err)
 			os.Exit(1)
 		}

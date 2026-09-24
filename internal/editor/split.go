@@ -1,6 +1,9 @@
 package editor
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // splitCommand splits template into argv using POSIX-style shell word
 // splitting (quotes, backslash escapes); no shell is invoked. Errors on an
@@ -46,7 +49,7 @@ func splitCommand(template string) ([]string, error) {
 		argv = append(argv, string(cur))
 	}
 	if len(argv) == 0 {
-		return nil, fmt.Errorf("editor: empty command")
+		return nil, errors.New("editor: empty command")
 	}
 	return argv, nil
 }

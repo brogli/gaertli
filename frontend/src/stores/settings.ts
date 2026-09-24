@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { usePreferredDark } from '@vueuse/core'
+import { Events } from '@wailsio/runtime'
 import { AppService, SettingsService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { Settings } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import type { Distro } from '../../bindings/github.com/brogli/nebegit/internal/remote'
@@ -8,13 +9,12 @@ import type { Distro } from '../../bindings/github.com/brogli/nebegit/internal/r
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<Settings | null>(null)
   // The installed distros do not change while the app runs; listing them
-  // spawns wsl.exe, so the first successful answer is kept for every later
-  // mount of the settings panel.
-  const distros = ref<Distro[] | null>(null)
+  // spawns wsl.exe, so the first successful answer is kept. A host without
+  // WSL has none.
+  let distros: Distro[] | undefined
 
-  // Settings.theme applies live, from wherever it changes (a save here, or
-  // another window's own settings reload): "dark"/"light" force it, "" (the
-  // default, System) follows the OS.
+  // Settings.theme applies live, whichever window saved it: "dark"/"light"
+  // force it, "" (the default, System) follows the OS.
   const prefersDark = usePreferredDark()
   watch(
     [() => settings.value?.theme, prefersDark],
@@ -29,9 +29,12 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value = await SettingsService.Get()
   }
 
+  // A save in any window, this one included, reaches every window.
+  Events.On('settings:changed', () => void load())
+
   async function loadDistros(): Promise<Distro[]> {
-    distros.value ??= (await AppService.ListWSLDistros()) ?? []
-    return distros.value
+    distros ??= (await AppService.ListWSLDistros()) ?? []
+    return distros
   }
 
   async function save(next: Settings): Promise<void> {
@@ -39,5 +42,5 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value = next
   }
 
-  return { settings, distros, load, loadDistros, save }
+  return { settings, load, loadDistros, save }
 })

@@ -59,7 +59,7 @@ func buildCommand(template, path string, line int) ([]string, error) {
 	}
 	argv, err := splitCommand(template)
 	if err != nil {
-		return nil, core.Errorf(core.EditorNotFound, "editor command %q: %v", template, err)
+		return nil, core.ErrorfArgs(core.EditorNotFound, "editorCommandInvalid", map[string]string{"command": template}, "editor command %q: %v", template, err)
 	}
 	return fillPlaceholders(argv, path, line), nil
 }

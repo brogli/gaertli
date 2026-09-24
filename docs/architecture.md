@@ -33,11 +33,9 @@ flowchart LR
   ED -->|exec| EXT[External editor<br/>configurable, default the editor]
 ```
 
-Development is spec-driven and test-driven (TR-29 to TR-32).
-
 ## Documents
 
-- [technical-requirements.md](architecture/technical-requirements.md): TR-01 to TR-33: platforms, tooling, git usage rules, process.
+- [technical-requirements.md](architecture/technical-requirements.md): TR-01 to TR-35: platforms, tooling, git usage rules, process.
 - Decisions:
   - [ADR-1: Shell out to git](architecture/adr-1-shell-out-to-git.md)
   - [ADR-2: Wails v3](architecture/adr-2-wails-v3.md)
@@ -45,7 +43,7 @@ Development is spec-driven and test-driven (TR-29 to TR-32).
   - [ADR-4: Git is the only source of truth](architecture/adr-4-git-is-the-only-source-of-truth.md)
   - [ADR-5: Log and graph are built in Go, the UI renders a window](architecture/adr-5-log-and-graph-in-go.md)
   - [ADR-6: Write queues by what they lock](architecture/adr-6-write-queues-by-what-they-lock.md)
-  - [ADR-7: Diff UI with CodeMirror 6 merge](architecture/adr-7-diff-ui-with-codemirror-6-merge.md)
+  - [ADR-7: Git computes the diff, CodeMirror 6 merge draws it](architecture/adr-7-diff-ui-with-codemirror-6-merge.md)
   - [ADR-8: Reuse before build](architecture/adr-8-reuse-before-build.md)
   - [ADR-9: One process, one selection per window](architecture/adr-9-one-process-selection-per-window.md)
 - [components.md](architecture/components.md): Go packages, frontend structure, main layout, how the parts talk.

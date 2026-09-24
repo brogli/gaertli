@@ -2,6 +2,8 @@
 // graph. Standard library only.
 package graph
 
+import "cmp"
+
 // Commit is the minimal input one layout step needs.
 type Commit struct {
 	SHA     string
@@ -25,7 +27,7 @@ type Edge struct {
 // Row is one commit's lane data.
 type Row struct {
 	Lane     int    // the lane this row's own commit sits in
-	Colour   int    // 0-based palette index, stable for Lane's lifetime
+	Colour   int    // 0-based colour number, stable for Lane's lifetime, never reused
 	Edges    []Edge // every lane active on this row, including Lane's own
 	Overflow int    // lanes beyond Layout's cap collapsed into a "+k" marker at this row; 0 = none
 }
@@ -41,8 +43,9 @@ type openLane struct {
 }
 
 // Layout assigns lanes to a streamed commit sequence, ported from
-// lazygit's getNextPipes. Stateful, one per repo load, not for concurrent
-// use.
+// lazygit's getNextPipes (MIT; its notice is in
+// tools/licensecheck/adapted/lazygit.LICENSE). Stateful, one per repo load,
+// not for concurrent use.
 type Layout struct {
 	Cap int // lane cap before overflow; 0 uses DefaultCap
 
@@ -59,17 +62,16 @@ func NewLayout() *Layout {
 // Next consumes only l's own state from previous calls and c — never the
 // whole history. For c's SHA: if an open lane is waiting for it, that lane
 // closes (Edge Kind End) and c takes that lane (or, if two lanes were both
-// waiting for the same SHA — a fork — both close and c takes one of them,
-// freeing the other's colour). If no lane was waiting, c opens a new lane
-// at the lowest free index (Edge Kind Start), real if one remains under
-// Cap, otherwise a cosmetic-only slot folded into Row.Overflow at the row
-// where its target is eventually reached. c's first parent re-arms c's own
+// waiting for the same SHA — a fork — both close and c takes the first of
+// them). If no lane was waiting, c opens a new lane at the lowest free
+// index (Edge Kind Start), real if one remains under Cap, otherwise a
+// cosmetic-only slot folded into Row.Overflow at the row where its target
+// is eventually reached. c's first parent re-arms c's own
 // lane to wait for it next; each further parent (a merge) opens a fresh
 // lane waiting for that parent (Edge Kind Start on this row), subject to
 // the same cap. Every other open lane not touched by c gets Edge Kind
-// Continue. A colour is assigned when its lane opens and freed only when
-// that lane closes — never reused by row index. Lane indices are not
-// compacted once assigned.
+// Continue. A colour is assigned when its lane opens and never reused.
+// Lane indices are not compacted once assigned.
 func (l *Layout) Next(c Commit) Row {
 	if l.overflow == nil {
 		l.overflow = map[string]int{}
@@ -82,17 +84,17 @@ func (l *Layout) Next(c Commit) Row {
 		row.Edges = append(row.Edges, Edge{Lane: i, Kind: End})
 	}
 
-	own, colour, real := l.ownLane(closing)
+	own, colour, ownReal := l.ownLane(closing)
 	row.Lane, row.Colour = own, colour
-	if real && len(closing) == 0 {
+	if ownReal && len(closing) == 0 {
 		row.Edges = append(row.Edges, Edge{Lane: own, Kind: Start})
 	}
 
 	touched := toSet(closing)
-	if real {
+	if ownReal {
 		touched[own] = true
 	}
-	for _, i := range l.armParents(own, colour, real, c.Parents, &row) {
+	for _, i := range l.armParents(own, colour, ownReal, c.Parents, &row) {
 		touched[i] = true
 	}
 
@@ -119,7 +121,7 @@ func (l *Layout) closingLanes(sha string) []int {
 // ownLane returns the lane index c's own dot sits in: the first closing
 // lane (freeing the rest), or a freshly opened one — real if a slot
 // remains under Cap, cosmetic-only otherwise.
-func (l *Layout) ownLane(closing []int) (idx, colour int, real bool) {
+func (l *Layout) ownLane(closing []int) (idx, colour int, ownReal bool) {
 	if len(closing) > 0 {
 		idx = closing[0]
 		colour = l.lanes[idx].colour
@@ -192,12 +194,7 @@ func (l *Layout) newColour() int {
 	return c
 }
 
-func (l *Layout) cap() int {
-	if l.Cap == 0 {
-		return DefaultCap
-	}
-	return l.Cap
-}
+func (l *Layout) cap() int { return cmp.Or(l.Cap, DefaultCap) }
 
 func toSet(idx []int) map[int]bool {
 	set := make(map[int]bool, len(idx))

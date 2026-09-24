@@ -9,18 +9,11 @@ export const useJobsStore = defineStore('jobs', () => {
   const items = ref<JobInfo[]>([])
   let wt = ''
 
-  // active is what the strip shows: a job's terminal "job:update" drops it.
-  const active = computed(() => items.value.filter((j) => j.state === 'queued' || j.state === 'running'))
-
-  // latest is the most recently started job whose kind matches.
-  function latest(matches: (kind: string) => boolean): JobInfo | undefined {
-    return items.value
-      .filter((j) => matches(j.kind))
-      .reduce<JobInfo | undefined>(
-        (newest, j) => (!newest || j.startedAt > newest.startedAt ? j : newest),
-        undefined,
-      )
-  }
+  // active is what the jobs menu shows: a job's terminal "job:update" drops
+  // it.
+  const active = computed(() =>
+    items.value.filter((j) => j.state === 'queued' || j.state === 'running'),
+  )
 
   async function load(id: string): Promise<void> {
     wt = id
@@ -33,10 +26,10 @@ export const useJobsStore = defineStore('jobs', () => {
     else items.value.push(job)
   }
 
-  // cancel throws: JobsStrip.vue reports the error.
+  // cancel throws: JobsMenu.vue reports the error.
   async function cancel(id: string): Promise<void> {
     await Facade.CancelJob(wt, id)
   }
 
-  return { items, active, latest, load, upsert, cancel }
+  return { items, active, load, upsert, cancel }
 })

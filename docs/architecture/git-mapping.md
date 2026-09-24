@@ -1,10 +1,9 @@
 # How features map to git
 
-Every feature is a small number of git calls in machine-readable formats (TR-08). A few rules apply to all of them:
+Every feature is a small number of git calls, made by the rules of TR-08 to TR-10: machine-readable formats, a fixed environment, arguments as a list. Failures are classified as `errors-security.md` describes. Beyond that:
 
-- Arguments are passed as a list, never through a shell. `--` goes before paths and `--end-of-options` before revisions, so repo text never becomes an option (TR-10).
-- Read-only calls run with `GIT_OPTIONAL_LOCKS=0`, so polling never takes the index lock away from the user's own commands (TR-09).
-- Known failures are classified by exit code and repo state, not by message text, wherever git allows it (`errors-security.md`).
+- Read-only calls run with `GIT_OPTIONAL_LOCKS=0`, so polling never takes the index lock away from the user's own commands.
+- Every patch the app parses overrides the config that only changes its framing: `--no-color --no-ext-diff --no-textconv`, fixed `a/`/`b/` prefixes, `--no-relative`, `diff.suppressBlankEmpty=false`. Config that changes the edit itself, such as `diff.algorithm`, attributes and filters, stays in effect (ADR-7).
 - Nothing is reimplemented that git already does: checkout of a remote branch uses git's own DWIM, branch names are validated by `git check-ref-format`, and pull is git's own fetch and merge/rebase.
 
 | Feature | Git |
@@ -14,13 +13,13 @@ Every feature is a small number of git calls in machine-readable formats (TR-08)
 | Refs | `for-each-ref` over heads, remotes and tags, with upstream and ahead/behind |
 | Log | `log --topo-order --parents --decorate=full --all`, streamed (below) |
 | Search and filters | the same `log` with `--grep`, `--author`, branches and `-- <path>` |
-| Commit details | `show --name-status -z -M --first-parent` |
-| Diff content | `cat-file --batch` for both sides; binary detection via `--numstat`, which respects `.gitattributes` |
+| A commit's details | `show --name-status -z -M --first-parent` |
+| Diff content | both sides from a full-context `diff` (`show --first-parent --root` for a commit), in the form git diffed them; git's hunks from the same diff with `-U0 --inter-hunk-context=0`, `-w` when whitespace is ignored; binary from git's own marker (attributes) |
 | Compare commits | `diff --name-status -z -M <a> <b>`, the two-revision form, so swapping mirrors the result |
 | Compare with working tree | `diff --name-status -z -M <sha>` |
 | Status | `status --porcelain=v2 -z --branch --untracked-files=all` |
 | Stage, unstage | `add`, `restore --staged` |
-| Stage lines | re-diff the path, build a partial patch, `apply --cached --recount` (ADR-7) |
+| Stage lines | re-diff the path at full context, refuse if its sides differ from those shown, build a partial patch of the selected lines, `apply --cached --recount` (ADR-7) |
 | Discard | `restore --worktree`, `clean -f` for untracked files, `apply --reverse` for lines |
 | Commit, amend | `commit [--amend] -F -`, the message on stdin; hooks run as usual |
 | Create branch | `branch`, or `switch -c` when it is checked out at once |
@@ -31,7 +30,7 @@ Every feature is a small number of git calls in machine-readable formats (TR-08)
 | Continue, abort, skip | `<operation> --continue/--abort/--skip` |
 | Worktrees | `worktree list --porcelain -z`, `worktree add/remove/prune` |
 | Fetch | `fetch --prune --progress` |
-| Pull | `fetch`, then `merge @{upstream}` or `rebase @{upstream}` in the worktree queue (ADR-6) |
+| Pull | `fetch`, then `merge [--ff/--no-ff from pull.ff] @{upstream}` or `rebase --fork-point @{upstream}` in the worktree queue (ADR-6), as `git pull --no-rebase`/`--rebase` would |
 | Stash and pull | `stash push`, pull, `stash pop` of exactly that entry, only after a clean integrate |
 | Push | `push --progress --porcelain`; the porcelain summary classifies rejections |
 | Force push | `push --force-with-lease --force-if-includes`, never plain `--force` |
@@ -50,18 +49,12 @@ Each update is its own job, so several branches can update at once. The result c
 ## Log loading and graph
 
 1. One `git log` process; records are read as they stream.
-2. Lane assignment follows lazygit's streaming model, ported into `internal/graph`. It needs only the previous row's lanes and the current commit:
-   - open lanes each wait for a sha; a commit takes the lane waiting for it, or a new one;
-   - the first parent inherits the lane; other parents open new lanes;
-   - a row stores its lane, the lanes passing through, and per edge whether it starts, continues or ends;
-   - a parent not yet seen opens a fresh lane;
-   - a colour is reused only after its lane ended, so colours stay stable while streaming;
-   - lanes are capped (default 32); rows beyond the cap show a "+k" marker.
+2. Lane assignment follows lazygit's streaming model, ported into `internal/graph`. It needs only the previous row's lanes and the current commit. Lanes are capped; rows beyond the cap show a "+k" marker.
 3. Rows are appended to an in-memory list and the UI is told through `log:progress`. The first rows show at once (FR-LOG-09, QA-PERF-02).
 4. The UI requests row windows by index.
 5. A path filter keeps the graph valid, because `--parents` rewrites parents across filtered-out commits. Text and author search show a flat list without graph lines.
 6. A new filter kills the running filtered `git log` and starts a new one.
-7. The log reloads only if ref tips changed (below).
+7. A `refs` change (below) re-reads the ref tips (one `for-each-ref`) and restarts the log only if they differ from the snapshot taken when the log last finished.
 
 ## Noticing outside changes (FR-REPO-04)
 
@@ -74,11 +67,9 @@ The common git dir is watched with file-system notifications: `HEAD`, `refs/`, `
 | operation state files | `state` |
 | `worktrees/` or a direct child | `worktrees` |
 
-Working files are not watched recursively. Instead, status runs on window focus, after every own action, and on a timer while the window is focused. The timer starts at 1 s, so an outside edit shows within 3 s, and backs off when status gets slow. Polls are marked as background in the command log (FR-UX-02).
+Working files are not watched recursively. Instead, status runs on window focus, after every own action, and on a timer while the window is focused. The timer starts at 1 s, so an outside edit shows within 3 s, and backs off when status gets slow. A poll compares the status output plus the size and modification time of every changed file, because a further edit to a file already listed leaves the status output unchanged; a difference is reported as scope `index`. Polls are logged at debug level (FR-UX-02).
 
 The app's own writes also trigger the watcher. Debounce plus reload-after-write makes that harmless.
-
-A `refs` change re-reads the ref tips (one `for-each-ref`) and restarts the log only if they differ from the snapshot taken when the log last finished.
 
 ## Jobs, progress, cancel
 
@@ -94,20 +85,8 @@ A `refs` change re-reads the ref tips (one `for-each-ref`) and restarts the log 
 
 ## External editor (FR-ED)
 
-- Every "open in editor" action goes through the core, so for a WSL repo the editor starts inside WSL. Profiles are therefore stored per environment: Windows and each WSL distro (FR-ED-11). The default everywhere is the editor.
-- A profile is `{name, folderCmd, fileCmd, fileAtLineCmd?}` with the placeholders `{path}`, `{line}` and `{column}`. Without `fileAtLineCmd`, `fileCmd` is used.
+- Every "open in editor" action runs in the core (ADR-3), so profiles are stored per environment (FR-ED-11, TR-13).
+- A profile is `{name, folderCmd, fileCmd, fileAtLineCmd?}` with the placeholders `{path}` and `{line}`. Without `fileAtLineCmd`, `fileCmd` is used.
 - The template is split into arguments first, then the placeholders are filled in. No shell (TR-10).
-- The editor starts detached (TR-12); only start errors are reported, as `EDITOR_NOT_FOUND` with a link to the setting.
-- Presets are data in the settings panel:
-
-| Preset | Folder / file | File at line |
-|---|---|---|
-| the editor (default) | `editor {path}` | `editor {path}:{line}` |
-| another editor | `other {path}` | `other -g {path}:{line}` |
-| an IDE | `ide {path}` | none, falls back to `ide {path}` |
-| a third editor | `myed {path}` | `myed {path}:{line}` |
-| a terminal editor (terminal) | `x-terminal-emulator -e myed {path}` | `x-terminal-emulator -e myed +{line} {path}` |
-| Custom | user input | user input |
-
-- "Test" (FR-ED-08) runs the profile's folder command on the home directory, in the environment the profile belongs to.
-- Fallbacks (FR-ED-10), offered after `EDITOR_NOT_FOUND`: git's own editor (`git var GIT_EDITOR`), or the system opener (`explorer` on Windows, `xdg-open` on Linux and inside WSL).
+- The editor starts detached (TR-12); only start errors are reported, as `EDITOR_NOT_FOUND` naming the command.
+- Presets (FR-ED-07) are data in the settings panel.

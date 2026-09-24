@@ -2,17 +2,290 @@ package services
 
 import (
 	"bytes"
-	"context"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
+func hunk(oldStart, oldLines, newStart, newLines int) core.DiffHunk {
+	return core.DiffHunk{OldStart: oldStart, OldLines: oldLines, NewStart: newStart, NewLines: newLines}
+}
+
+// assertDiff checks that a Diff* call returned a text diff with these
+// contents and hunks.
+func assertDiff(t *testing.T, got core.DiffFile, err error, oldContent, newContent string, hunks ...core.DiffHunk) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Binary || got.TooLarge || got.OldContent != oldContent || got.NewContent != newContent || !slices.Equal(got.Hunks, hunks) {
+		t.Errorf("diff = %+v\nwant OldContent %q NewContent %q Hunks %v", got, oldContent, newContent, hunks)
+	}
+}
+
+// diffWorking is DiffWorking of path's unstaged diff on a fresh core.
+func diffWorking(t *testing.T, dir, path string, opts core.DiffOptions) (core.DiffFile, error) {
+	t.Helper()
+	c, id := openWorktree(t, dir)
+	return c.DiffWorking(t.Context(), id, path, "", false, opts)
+}
+
+// movedLineFixture commits m.txt "A B C A B C D", one per line, and moves
+// the D up in the working tree: myers and histogram read the move
+// differently.
+func movedLineFixture(t *testing.T, dir string) {
+	t.Helper()
+	gittest.Commit(t, dir, "m.txt", "A\nB\nC\nA\nB\nC\nD\n", "base")
+	writeFile(t, dir, "m.txt", "A\nB\nC\nD\nA\nB\nC\n")
+}
+
+func TestQA_COMP_01_DiffWorkingHunksFollowTheConfiguredDiffAlgorithm(t *testing.T) {
+	tests := []struct {
+		algorithm string
+		want      []core.DiffHunk
+	}{
+		{"myers", []core.DiffHunk{hunk(3, 0, 4, 1), hunk(7, 1, 7, 0)}},
+		{"histogram", []core.DiffHunk{hunk(4, 3, 3, 0), hunk(7, 0, 5, 3)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.algorithm, func(t *testing.T) {
+			repo := gittest.New(t)
+			movedLineFixture(t, repo.Dir)
+			gittest.Run(t, repo.Dir, "config", "diff.algorithm", tt.algorithm)
+
+			got, err := diffWorking(t, repo.Dir, "m.txt", core.DiffOptions{})
+
+			assertDiff(t, got, err, "A\nB\nC\nA\nB\nC\nD\n", "A\nB\nC\nD\nA\nB\nC\n", tt.want...)
+		})
+	}
+}
+
+// autocrlfFixture commits a 3-line f.txt under core.autocrlf=true (stored
+// with LF) and leaves the working file CRLF with line 2 changed.
+func autocrlfFixture(t *testing.T, dir string) {
+	t.Helper()
+	gittest.Run(t, dir, "config", "core.autocrlf", "true")
+	gittest.Commit(t, dir, "f.txt", "l1\r\nl2\r\nl3\r\n", "base")
+	writeFile(t, dir, "f.txt", "l1\r\nCHANGED\r\nl3\r\n")
+}
+
+func TestQA_COMP_01_DiffWorkingShowsACRLFWorkingFileInTheCleanForm(t *testing.T) {
+	repo := gittest.New(t)
+	autocrlfFixture(t, repo.Dir)
+
+	got, err := diffWorking(t, repo.Dir, "f.txt", core.DiffOptions{})
+
+	assertDiff(t, got, err, "l1\nl2\nl3\n", "l1\nCHANGED\nl3\n", hunk(2, 1, 2, 1))
+}
+
+// filterFixture commits f through a clean filter that upper-cases it and
+// leaves the working file lower-case with line 2 changed.
+func filterFixture(t *testing.T, dir string) {
+	t.Helper()
+	gittest.Run(t, dir, "config", "filter.up.clean", "tr a-z A-Z")
+	gittest.Run(t, dir, "config", "filter.up.smudge", "cat")
+	gittest.Commit(t, dir, ".gitattributes", "f filter=up\n", "attributes")
+	gittest.Commit(t, dir, "f", "HELLO\nWORLD\n", "base")
+	writeFile(t, dir, "f", "hello\nthere\n")
+}
+
+func TestQA_COMP_01_DiffWorkingShowsAFilteredWorkingFileInTheCleanForm(t *testing.T) {
+	repo := gittest.New(t)
+	filterFixture(t, repo.Dir)
+
+	got, err := diffWorking(t, repo.Dir, "f", core.DiffOptions{})
+
+	assertDiff(t, got, err, "HELLO\nWORLD\n", "HELLO\nTHERE\n", hunk(2, 1, 2, 1))
+}
+
+// whitespaceFixture commits f.txt and edits line 2 by whitespace only and
+// line 3 for real.
+func whitespaceFixture(t *testing.T, dir string) {
+	t.Helper()
+	gittest.Commit(t, dir, "f.txt", "one\ntwo\nthree\n", "base")
+	writeFile(t, dir, "f.txt", "one\ntwo  \nTHREE\n")
+}
+
+func TestFR_DIFF_06_DiffWorkingIgnoringWhitespaceKeepsOnlyRealChangesInTheHunks(t *testing.T) {
+	repo := gittest.New(t)
+	whitespaceFixture(t, repo.Dir)
+
+	full, fullErr := diffWorking(t, repo.Dir, "f.txt", core.DiffOptions{})
+	ignoring, ignoringErr := diffWorking(t, repo.Dir, "f.txt", core.DiffOptions{IgnoreWhitespace: true})
+
+	assertDiff(t, full, fullErr, "one\ntwo\nthree\n", "one\ntwo  \nTHREE\n", hunk(2, 2, 2, 2))
+	assertDiff(t, ignoring, ignoringErr, "one\ntwo\nthree\n", "one\ntwo  \nTHREE\n", hunk(3, 1, 3, 1))
+}
+
+func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *testing.T) {
+	none := core.DiffOptions{}
+	body := strings.Repeat("line unchanged\n", 20)
+
+	t.Run("root commit", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "a.txt", "root\n", "root")
+
+		got, err := c.DiffFile(t.Context(), id, gittest.HeadSHA(t, repo.Dir), "a.txt", "", none)
+
+		assertDiff(t, got, err, "", "root\n", hunk(0, 0, 1, 1))
+	})
+
+	t.Run("merge against its first parent", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "b.txt", "b\n", "base")
+		gittest.Run(t, repo.Dir, "checkout", "-q", "-b", "side")
+		gittest.Commit(t, repo.Dir, "b.txt", "b side\n", "side")
+		gittest.Run(t, repo.Dir, "checkout", "-q", "-")
+		gittest.Commit(t, repo.Dir, "a.txt", "a\n", "main")
+		gittest.Run(t, repo.Dir, "merge", "-q", "--no-ff", "-m", "merge", "side")
+
+		got, err := c.DiffFile(t.Context(), id, gittest.HeadSHA(t, repo.Dir), "b.txt", "", none)
+
+		assertDiff(t, got, err, "b\n", "b side\n", hunk(1, 1, 1, 1))
+	})
+
+	t.Run("rename with an edit", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "a.txt", body+"old ending\n", "add a.txt")
+		renameWithEdit(t, repo.Dir, "a.txt", "b.txt", "new ending")
+
+		got, err := c.DiffFile(t.Context(), id, gittest.HeadSHA(t, repo.Dir), "b.txt", "a.txt", none)
+
+		assertDiff(t, got, err, body+"old ending\n", body+"new ending\n", hunk(21, 1, 21, 1))
+	})
+
+	t.Run("two revisions", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "f", "1\n2\n3\n", "a")
+		a := gittest.HeadSHA(t, repo.Dir)
+		gittest.Commit(t, repo.Dir, "f", "1\nTWO\n3\n", "b")
+
+		got, err := c.DiffRange(t.Context(), id, a, gittest.HeadSHA(t, repo.Dir), "f", "", none)
+
+		assertDiff(t, got, err, "1\n2\n3\n", "1\nTWO\n3\n", hunk(2, 1, 2, 1))
+	})
+
+	t.Run("added", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "x", "x\n", "base")
+		writeFile(t, repo.Dir, "new.txt", "n1\nn2\n")
+		gittest.Run(t, repo.Dir, "add", "new.txt")
+
+		got, err := c.DiffWorking(t.Context(), id, "new.txt", "", true, none)
+
+		assertDiff(t, got, err, "", "n1\nn2\n", hunk(0, 0, 1, 2))
+	})
+
+	t.Run("deleted", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "a.txt", "a1\na2\n", "base")
+		if err := os.Remove(filepath.Join(repo.Dir, "a.txt")); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := c.DiffWorking(t.Context(), id, "a.txt", "", false, none)
+
+		assertDiff(t, got, err, "a1\na2\n", "", hunk(1, 2, 0, 0))
+	})
+
+	t.Run("untracked", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "x", "x\n", "base")
+		writeFile(t, repo.Dir, "u.txt", "u\n")
+
+		got, err := c.DiffWorking(t.Context(), id, "u.txt", "", false, none)
+
+		assertDiff(t, got, err, "", "u\n", hunk(0, 0, 1, 1))
+	})
+
+	t.Run("a commit against the working tree", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "f", "1\n2\n", "base")
+		writeFile(t, repo.Dir, "f", "1\n2\n3\n")
+
+		got, err := c.DiffAgainstWorking(t.Context(), id, gittest.HeadSHA(t, repo.Dir), "f", "", none)
+
+		assertDiff(t, got, err, "1\n2\n", "1\n2\n3\n", hunk(2, 0, 3, 1))
+	})
+
+	t.Run("a commit against an untracked file", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "x", "x\n", "base")
+		writeFile(t, repo.Dir, "u.txt", "u\n")
+
+		got, err := c.DiffAgainstWorking(t.Context(), id, gittest.HeadSHA(t, repo.Dir), "u.txt", "", none)
+
+		assertDiff(t, got, err, "", "u\n", hunk(0, 0, 1, 1))
+	})
+
+	t.Run("pure rename", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "a.txt", "same\n", "base")
+		gittest.Run(t, repo.Dir, "mv", "a.txt", "b.txt")
+
+		got, err := c.DiffWorking(t.Context(), id, "b.txt", "a.txt", true, none)
+
+		assertDiff(t, got, err, "same\n", "same\n")
+	})
+
+	t.Run("mode-only change", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "a.txt", "same\n", "base")
+		if err := os.Chmod(filepath.Join(repo.Dir, "a.txt"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := c.DiffWorking(t.Context(), id, "a.txt", "", false, none)
+
+		assertDiff(t, got, err, "same\n", "same\n")
+	})
+
+	t.Run("last line without a newline", func(t *testing.T) {
+		repo, c, id := openCompareRepo(t)
+		gittest.Commit(t, repo.Dir, "f", "a\nb", "base")
+		writeFile(t, repo.Dir, "f", "a\nB")
+
+		got, err := c.DiffWorking(t.Context(), id, "f", "", false, none)
+
+		assertDiff(t, got, err, "a\nb", "a\nB", hunk(2, 1, 2, 1))
+	})
+}
+
+func TestFR_DIFF_03_DiffCallsTreatFilesGitCallsBinaryAsBinary(t *testing.T) {
+	for _, attributes := range []string{"*.dat binary\n", "*.dat -diff\n"} {
+		t.Run(attributes, func(t *testing.T) {
+			repo := gittest.New(t)
+			gittest.Commit(t, repo.Dir, ".gitattributes", attributes, "attributes")
+			gittest.Commit(t, repo.Dir, "t.dat", "plain text\n", "add t.dat")
+			writeFile(t, repo.Dir, "t.dat", "changed text\n")
+			c, id := openWorktree(t, repo.Dir)
+
+			committed, err := c.DiffFile(t.Context(), id, gittest.HeadSHA(t, repo.Dir), "t.dat", "", core.DiffOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			working, err := c.DiffWorking(t.Context(), id, "t.dat", "", false, core.DiffOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for _, got := range []core.DiffFile{committed, working} {
+				if !got.Binary || got.OldContent != "" || got.NewContent != "" || got.Hunks != nil {
+					t.Errorf("diff = %+v, want Binary with no content and no hunks", got)
+				}
+			}
+		})
+	}
+}
+
 func TestADR_7_ParseCatFileBatchSplitsFoundAndMissingObjectsInOrder(t *testing.T) {
-	data := []byte("aaaa111 blob 5\nhello\nsha^:missing.txt missing\nbbbb222 blob 3\nbye\n")
+	data := []byte("aaaa111 blob 5\x00hello\x00sha^:missing.txt missing\x00bbbb222 blob 3\x00bye\x00")
 
 	blobs, err := parseCatFileBatch(data, 3)
 	if err != nil {
@@ -39,43 +312,6 @@ func TestADR_7_BlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
 	}
 }
 
-func TestFR_DIFF_03_DiffIsBinaryClassifiesNumstatRecords(t *testing.T) {
-	// A fake git.Runner's stdout goes through an OS environment variable
-	// (FAKEGIT_STDOUT), which cannot carry an embedded NUL byte — so the
-	// rename fixture (whose real -z record embeds one) is
-	// exercised directly against parseBinaryNumstat below instead.
-	tests := []struct {
-		name       string
-		stdout     string
-		wantBinary bool
-	}{
-		{"binary file", "-\t-\tfile", true},
-		{"text file", "3\t1\tfile", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("FAKEGIT_STDOUT", tt.stdout)
-			r := git.Runner{Git: fakegit}
-
-			got, err := diffIsBinary(context.Background(), r, t.TempDir(), "sha", "", "file")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != tt.wantBinary {
-				t.Errorf("diffIsBinary = %v, want %v", got, tt.wantBinary)
-			}
-		})
-	}
-}
-
-func TestFR_DIFF_03_ParseBinaryNumstatIgnoresARenameRecordsThirdField(t *testing.T) {
-	record := []byte("1\t0\t\x00old\x00new\x00")
-
-	if parseBinaryNumstat(record) {
-		t.Error("parseBinaryNumstat(rename record) = true, want false")
-	}
-}
-
 func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "first\n", "first")
@@ -84,7 +320,7 @@ func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffFile(context.Background(), wt, sha, "a.txt", "", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +336,7 @@ func TestFR_LOG_04_DiffFileOnAddedFileHasNoOldContent(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffFile(context.Background(), wt, sha, "a.txt", "", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +354,7 @@ func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffFile(context.Background(), wt, sha, "a.txt", "", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +372,7 @@ func TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffFile(context.Background(), wt, sha, "b.txt", "a.txt", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "b.txt", "a.txt", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +391,7 @@ func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T)
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffFile(context.Background(), wt, sha, "bin.dat", "", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "bin.dat", "", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +408,7 @@ func TestFR_DIFF_03_DiffFileTreatsGitattributesDiffOverrideAsBinary(t *testing.T
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffFile(context.Background(), wt, sha, "a.txt", "", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +425,7 @@ func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	capped, err := c.DiffFile(context.Background(), wt, sha, "big.txt", "", false)
+	capped, err := c.DiffFile(t.Context(), wt, sha, "big.txt", "", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,12 +433,15 @@ func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 		t.Errorf("DiffFile = %+v, want TooLarge with no content", capped)
 	}
 
-	full, err := c.DiffFile(context.Background(), wt, sha, "big.txt", "", true)
+	full, err := c.DiffFile(t.Context(), wt, sha, "big.txt", "", core.DiffOptions{Force: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if full.TooLarge || full.NewContent != big {
 		t.Error("DiffFile with force=true: still TooLarge or content mismatch, want the full content")
+	}
+	if want := []core.DiffHunk{hunk(0, 0, 1, 1)}; !slices.Equal(full.Hunks, want) {
+		t.Errorf("DiffFile with force=true: Hunks = %v, want %v", full.Hunks, want)
 	}
 }
 
@@ -215,7 +454,7 @@ func TestQA_PERF_05_DiffFileUnder1MBCompletesWithinBudget(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 
 	start := time.Now()
-	diff, err := c.DiffFile(context.Background(), wt, sha, "file.txt", "", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "file.txt", "", core.DiffOptions{})
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatal(err)
@@ -235,7 +474,7 @@ func TestADR_7_DiffFileOnRootCommitHasNoOldContent(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffFile(context.Background(), wt, sha, "a.txt", "", false)
+	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

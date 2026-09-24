@@ -10,6 +10,7 @@ type Worktree struct {
 	Locked   bool   `json:"locked"`
 	Missing  bool   `json:"missing"` // git's "prunable"; Dirty is always false then, the directory is gone
 	Dirty    bool   `json:"dirty"`
+	Bare     bool   `json:"bare,omitempty"` // git's "bare": a bare repo's own entry
 }
 
 // BranchSummary is one row of ListBranches' result.

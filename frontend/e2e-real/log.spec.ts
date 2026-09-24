@@ -1,9 +1,14 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import { contextMenuItems, logRow, pickFromContextMenu } from './helpers'
-import { gitWith } from './repos'
+import {
+  commitFiles,
+  contextMenuItems,
+  logRow,
+  pickFromContextMenu,
+  rev,
+  shortRev,
+} from './helpers'
+import { gitAfterHistory } from './repos'
 
 // The log's rows, search, filters and copy actions against work's real
 // history (8 commits over main, feature and side).
@@ -37,7 +42,6 @@ async function refNames(row: Locator): Promise<string[]> {
 }
 
 const graphs = (page: Page) => page.locator('.row .graph-cell')
-const chips = (page: Page) => page.locator('[data-test^=chip-]')
 
 test('FR-LOG-01 a row shows the graph, subject, author, date, short hash and ref labels', async ({
   app,
@@ -48,25 +52,23 @@ test('FR-LOG-01 a row shows the graph, subject, author, date, short hash and ref
   await expect(merge.locator('.graph-cell')).toBeVisible()
   await expect(merge.locator('.author')).toHaveText('Bob')
   await expect(merge.locator('.date')).not.toBeEmpty()
-  await expect(merge.locator('.hash')).toHaveText(
-    git(repos.work, 'rev-parse', '--short', 'main').trim(),
-  )
+  await expect(merge.locator('.hash')).toHaveText(shortRev(git, repos.work, 'main'))
   expect(await refNames(merge)).toEqual(['HEAD', 'main', 'origin/main'])
   await expect(logRow(app, 'docs and func b').locator('.ref-label')).toContainText(['v1'])
   await expect(logRow(app, 'side: add side.txt').locator('.author')).toHaveText('Ann')
 })
 
-test('FR-LOG-05 a message search narrows the log to a flat list with its chip; clearing it brings all back', async ({
+test('FR-LOG-05 a message search narrows the log to a flat list; its clear icon brings all back', async ({
   app,
 }) => {
   const search = app.getByPlaceholder('Search message')
   await search.fill('conflict')
   await expectSubjects(app, ['feature: change conflict.txt', 'main: change conflict.txt'])
   await expect(graphs(app)).toHaveCount(0)
-  await expect(app.locator('[data-test=chip-query]')).toHaveText('conflict')
 
-  await search.fill('')
+  await app.locator('[data-test=clear-query]').click()
   await expectSubjects(app, allSubjects)
+  await expect(search).toHaveValue('')
   await expect(graphs(app).first()).toBeVisible()
 })
 
@@ -79,20 +81,20 @@ test("FR-LOG-05 the author field suggests known authors; picking one shows only 
   await bob.click()
   await expectSubjects(app, ["Merge branch 'side'"])
 
-  await app.locator('[data-test=clear-filters]').click()
+  await app.locator('.p-autocomplete-clear-icon').click()
   await expectSubjects(app, allSubjects)
   await expect(app.getByPlaceholder('Author')).toHaveValue('')
 })
 
 test('FR-LOG-05 a short or a full hash finds exactly that commit', async ({ app, git, repos }) => {
   const search = app.getByPlaceholder('Search message')
-  await search.fill(git(repos.work, 'rev-parse', '--short', 'side').trim())
+  await search.fill(shortRev(git, repos.work, 'side'))
   await expectSubjects(app, ['side: add side.txt'])
-  await search.fill(git(repos.work, 'rev-parse', 'feature').trim())
+  await search.fill(rev(git, repos.work, 'feature'))
   await expectSubjects(app, ['feature: add feature.txt'])
 })
 
-test("FR-LOG-06 a branch filter shows that branch's own history, graph included", async ({
+test("FR-LOG-06 a branch filter shows that branch's own history, graph included; its clear icon brings all back", async ({
   app,
 }) => {
   await app.locator('.filter-bar .p-multiselect').click()
@@ -106,7 +108,9 @@ test("FR-LOG-06 a branch filter shows that branch's own history, graph included"
     'feature: add feature.txt',
   ])
   await expect(graphs(app).first()).toBeVisible()
-  await expect(app.locator('[data-test=chip-branches]')).toHaveText('feature')
+
+  await app.locator('.p-multiselect-clear-icon').click()
+  await expectSubjects(app, allSubjects)
 })
 
 test('FR-LOG-07 a path filter shows only the commits touching that folder', async ({ app }) => {
@@ -114,19 +118,21 @@ test('FR-LOG-07 a path filter shows only the commits touching that folder', asyn
   await expectSubjects(app, ['initial: add base files', 'docs and func b'])
 })
 
-test('FR-LOG-08 filters combine to their intersection, show one chip each, and Escape clears them all', async ({
+test('FR-LOG-08 filters combine to their intersection; clearing one keeps the other', async ({
   app,
 }) => {
   const search = app.getByPlaceholder('Search message')
+  const path = app.getByPlaceholder('Path')
   await search.fill('func')
-  await app.getByPlaceholder('Path').fill('src')
+  await path.fill('src')
   await expectSubjects(app, ['add logo and func a', 'docs and func b'])
-  await expect(chips(app)).toHaveText(['func', 'src'])
 
-  await search.press('Escape')
-  await expectSubjects(app, allSubjects)
-  await expect(chips(app)).toHaveCount(0)
+  await app.locator('[data-test=clear-query]').click()
   await expect(search).toHaveValue('')
+  await expect.poll(() => shownSubjects(app)).not.toEqual([...allSubjects].sort())
+
+  await app.locator('[data-test=clear-path]').click()
+  await expectSubjects(app, allSubjects)
 })
 
 test('FR-LOG-12 Copy hash and Copy subject put them on the clipboard', async ({
@@ -147,7 +153,7 @@ test('FR-LOG-12 Copy hash and Copy subject put them on the clipboard', async ({
   await expect.poll(clipboard).toBe('add logo and func a')
 
   await pickFromContextMenu(app, row, 'Copy hash')
-  const sha = git(repos.work, 'rev-parse', 'v1~1').trim()
+  const sha = rev(git, repos.work, 'v1~1')
   await expect.poll(clipboard).toBe(sha)
 })
 
@@ -156,13 +162,9 @@ test('FR-REPO-04 a commit made outside the app appears at the top of the log by 
   repos,
   sandbox,
 }) => {
-  // Two seconds past the history, so the new commit sorts first in
-  // --topo-order even when the history was built in the same second.
-  const later = `${Math.floor(Date.now() / 1000) + 2} +0000`
-  const git = gitWith({ ...sandbox.env, GIT_AUTHOR_DATE: later, GIT_COMMITTER_DATE: later })
-  fs.writeFileSync(path.join(repos.work, 'outside.txt'), 'outside\n')
-  git(repos.work, 'add', 'outside.txt')
-  git(repos.work, 'commit', '-q', '-m', 'outside commit')
+  commitFiles(gitAfterHistory(sandbox.env), repos.work, 'outside commit', {
+    'outside.txt': 'outside\n',
+  })
 
   await expect(app.locator('.row .subject').first()).toHaveText('outside commit')
 })

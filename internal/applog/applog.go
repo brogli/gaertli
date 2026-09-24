@@ -1,0 +1,90 @@
+// Package applog opens nebegit's own log file: one process, one text
+// handler, rotated by size at open.
+package applog
+
+import (
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"runtime"
+)
+
+// maxSize is how large the log file may grow before Open rotates it.
+const maxSize = 5 * 1024 * 1024 // 5 MiB
+
+// Open opens (creating if needed) nebegit's log file at its platform
+// location, rotating an oversized one first, and returns a logger writing
+// to it. NEBEGIT_LOG=debug raises the level from its default, Info, to
+// Debug.
+//
+// On failure the returned logger still works, writing to stderr instead;
+// path is "" and closer is nil.
+func Open() (logger *slog.Logger, path string, closer io.Closer, err error) {
+	level := slog.LevelInfo
+	if os.Getenv("NEBEGIT_LOG") == "debug" {
+		level = slog.LevelDebug
+	}
+	opts := &slog.HandlerOptions{Level: level}
+
+	f, path, err := openFile()
+	if err != nil {
+		return slog.New(slog.NewTextHandler(os.Stderr, opts)), "", nil, err
+	}
+	return slog.New(slog.NewTextHandler(f, opts)), path, f, nil
+}
+
+// openFile opens the log file for appending, rotating an oversized one
+// first.
+func openFile() (*os.File, string, error) {
+	path, err := logPath()
+	if err != nil {
+		return nil, "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, "", err
+	}
+	rotate(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	return f, path, err
+}
+
+// rotate renames an oversized path to path+".1", replacing an older one. A
+// missing or undersized file is left alone; a failed rename is not fatal —
+// Open still proceeds, appending to the existing file.
+func rotate(path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.Size() <= maxSize {
+		return
+	}
+	_ = os.Rename(path, path+".1")
+}
+
+// logPath is nebegit's log file for the current platform.
+func logPath() (string, error) {
+	switch runtime.GOOS {
+	case "windows":
+		// os.UserCacheDir is %LOCALAPPDATA% on Windows.
+		dir, err := os.UserCacheDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(dir, "nebegit", "logs", "nebegit.log"), nil
+	case "darwin":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, "Library", "Logs", "nebegit", "nebegit.log"), nil
+	default:
+		dir := os.Getenv("XDG_STATE_HOME")
+		if dir == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", err
+			}
+			dir = filepath.Join(home, ".local", "state")
+		}
+		return filepath.Join(dir, "nebegit", "nebegit.log"), nil
+	}
+}

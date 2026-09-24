@@ -34,16 +34,14 @@ type ID string
 
 // Job is one job's current state; Info converts it to core.JobInfo.
 type Job struct {
-	ID        ID
-	Kind      string
-	Branch    string // the branch a per-branch job acts on; "" for a repo-wide one
-	State     State
-	Percent   int
-	Message   string
-	StartedAt time.Time
-	EndedAt   time.Time // zero until State is terminal
-	Err       error     // set only when State is Failed
-	Result    any       // set from fn's first return value when State ends Done; nil otherwise
+	ID      ID
+	Kind    string
+	Branch  string // the branch a per-branch job acts on; "" for a repo-wide one
+	State   State
+	Percent int
+	Message string
+	Err     error // set only when State is Failed
+	Result  any   // set from fn's first return value when State ends Done; nil otherwise
 }
 
 // progressInterval throttles progress emission.
@@ -79,24 +77,21 @@ func NewManager(onUpdate func(Job)) *Manager {
 	return &Manager{onUpdate: onUpdate, jobs: make(map[ID]*entry)}
 }
 
-// Start runs fn in its own goroutine under a fresh context, detached from
-// any request context (a job outlives the RPC call that started it). Returns
-// immediately with the job's id; fn's own return decides the terminal
-// state: nil error -> Done (its first return value stored as Result), a
-// plain error -> Failed (Err set), ctx cancelled via this job's own Cancel
-// -> Cancelled, classified by ctx.Err() after fn returns.
+// Start runs fn in its own goroutine under a context that keeps ctx's
+// values but not its cancellation: a job outlives the call that started it.
+// It returns the job's id at once. After fn returns, the job ends Cancelled
+// if Cancel was called, else Failed with fn's error, else Done with fn's
+// result.
 //
-// A kind already queued or running on this Manager is not started twice:
-// Start returns that job's id instead of launching a second process (two
-// fetches of one repo at once only race git's ref locks, so a second one is
-// redundant).
-func (m *Manager) Start(kind string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
-	return m.StartForBranch(kind, "", fn)
+// A kind already queued or running is not started twice: Start returns
+// that job's id.
+func (m *Manager) Start(ctx context.Context, kind string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
+	return m.StartForBranch(ctx, kind, "", fn)
 }
 
 // StartForBranch is Start for a job of kind acting on one branch: one such
 // job per branch runs at a time.
-func (m *Manager) StartForBranch(kind, branch string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
+func (m *Manager) StartForBranch(ctx context.Context, kind, branch string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
 	m.mu.Lock()
 	if id, ok := m.activeLocked(kind, branch); ok {
 		m.mu.Unlock()
@@ -105,15 +100,15 @@ func (m *Manager) StartForBranch(kind, branch string, fn func(ctx context.Contex
 
 	m.next++
 	id := ID(strconv.Itoa(m.next))
-	ctx, cancel := context.WithCancel(context.Background())
+	jobCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	m.jobs[id] = &entry{
-		job:    Job{ID: id, Kind: kind, Branch: branch, State: Queued, Percent: -1, StartedAt: time.Now()},
+		job:    Job{ID: id, Kind: kind, Branch: branch, State: Queued, Percent: -1},
 		cancel: cancel,
 	}
 	m.order = append(m.order, id)
 	m.mu.Unlock()
 
-	go m.run(id, ctx, fn)
+	go m.run(jobCtx, id, fn)
 	return id
 }
 
@@ -128,10 +123,10 @@ func (m *Manager) activeLocked(kind, branch string) (ID, bool) {
 	return "", false
 }
 
-func (m *Manager) run(id ID, ctx context.Context, fn func(context.Context, Progress) (any, error)) {
+func (m *Manager) run(ctx context.Context, id ID, fn func(context.Context, Progress) (any, error)) {
 	m.setState(id, Running)
 	result, err := fn(ctx, func(percent int, message string) { m.updateProgress(id, percent, message) })
-	m.finish(id, ctx, result, err)
+	m.finish(ctx, id, result, err)
 }
 
 func (m *Manager) setState(id ID, state State) {
@@ -159,27 +154,21 @@ func (m *Manager) updateProgress(id ID, percent int, message string) {
 
 // finish classifies fn's outcome, trims history, and emits unconditionally,
 // regardless of the progress throttle.
-func (m *Manager) finish(id ID, ctx context.Context, result any, err error) {
-	m.mu.Lock()
-	e, ok := m.jobs[id]
-	if !ok {
-		m.mu.Unlock()
-		return
+func (m *Manager) finish(ctx context.Context, id ID, result any, err error) {
+	job, ok := m.update(id, func(e *entry) {
+		switch {
+		case ctx.Err() != nil:
+			e.job.State = Cancelled
+		case err != nil:
+			e.job.State, e.job.Err = Failed, err
+		default:
+			e.job.State, e.job.Result = Done, result
+		}
+		m.trimHistoryLocked()
+	})
+	if ok {
+		m.onUpdate(job)
 	}
-	e.job.EndedAt = time.Now()
-	switch {
-	case ctx.Err() != nil:
-		e.job.State = Cancelled
-	case err != nil:
-		e.job.State, e.job.Err = Failed, err
-	default:
-		e.job.State, e.job.Result = Done, result
-	}
-	job := e.job
-	m.trimHistoryLocked()
-	m.mu.Unlock()
-
-	m.onUpdate(job)
 }
 
 // trimHistoryLocked drops the oldest finished jobs beyond historyCap,
@@ -187,8 +176,7 @@ func (m *Manager) finish(id ID, ctx context.Context, result any, err error) {
 // m.mu must be held.
 func (m *Manager) trimHistoryLocked() {
 	finished := 0
-	for i := len(m.order) - 1; i >= 0; i-- {
-		id := m.order[i]
+	for i, id := range slices.Backward(m.order) {
 		if !isTerminal(m.jobs[id].job.State) {
 			continue
 		}

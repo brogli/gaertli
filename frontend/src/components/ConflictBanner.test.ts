@@ -1,50 +1,40 @@
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockContinueOperation, mockAbortOperation, mockSkipOperation, mockRequire } = vi.hoisted(() => ({
-  mockContinueOperation: vi.fn(),
-  mockAbortOperation: vi.fn(),
-  mockSkipOperation: vi.fn(),
-  mockRequire: vi.fn(),
+const { Facade } = vi.hoisted(() => ({
+  Facade: { ContinueOperation: vi.fn(), AbortOperation: vi.fn(), SkipOperation: vi.fn() },
 }))
 
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: {
-    ContinueOperation: mockContinueOperation,
-    AbortOperation: mockAbortOperation,
-    SkipOperation: mockSkipOperation,
-  },
-}))
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
-vi.mock('openvue/useconfirm', () => ({
-  useConfirm: () => ({ require: mockRequire, close: vi.fn() }),
-}))
+vi.mock('openvue/useconfirm', () => import('../testing/confirm'))
+import { confirmOptions, confirmRequire } from '../testing/confirm'
 
 import ConflictBanner from './ConflictBanner.vue'
 import { useRepoStore } from '../stores/repo'
 import { useChangesStore } from '../stores/changes'
 import { changedFilesFixture } from '../testing/fixtures/changes'
+import { findButton } from '../testing/findButton'
 import { summaryFixture } from '../testing/fixtures/summary'
 
-function findButton(wrapper: VueWrapper, text: string) {
-  return wrapper.findAll('button').find((b) => b.text() === text)
+// mountDuring mounts ConflictBanner while operation is in progress.
+function mountDuring(operation: string) {
+  useRepoStore().summary = summaryFixture({ operation })
+  return mount(ConflictBanner, { props: { wt: '/repo' } })
 }
 
 describe('ConflictBanner', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    mockContinueOperation.mockReset().mockResolvedValue(undefined)
-    mockAbortOperation.mockReset().mockResolvedValue(undefined)
-    mockSkipOperation.mockReset().mockResolvedValue(undefined)
-    mockRequire.mockReset()
+    Facade.ContinueOperation.mockReset().mockResolvedValue(undefined)
+    Facade.AbortOperation.mockReset().mockResolvedValue(undefined)
+    Facade.SkipOperation.mockReset().mockResolvedValue(undefined)
+    confirmRequire.mockReset()
   })
 
   it('FR-CONF-04 does not render while no operation is in progress', () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ operation: '' })
-
-    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+    const wrapper = mountDuring('')
 
     expect(wrapper.find('[data-test="conflict-banner"]').exists()).toBe(false)
   })
@@ -65,56 +55,44 @@ describe('ConflictBanner', () => {
   })
 
   it('FR-CONF-04, FR-UX-03, QA-SAFE-01 clicking Abort confirms before calling Facade.AbortOperation', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ operation: 'merge' })
-
-    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+    const wrapper = mountDuring('merge')
     await findButton(wrapper, 'Abort…')!.trigger('click')
 
-    expect(mockRequire).toHaveBeenCalledTimes(1)
-    const options = mockRequire.mock.calls[0]![0] as { accept: () => void }
-    expect(mockAbortOperation).not.toHaveBeenCalled()
+    expect(confirmRequire).toHaveBeenCalledTimes(1)
+    const options = confirmOptions()
+    expect(Facade.AbortOperation).not.toHaveBeenCalled()
 
     options.accept()
 
-    expect(mockAbortOperation).toHaveBeenCalledWith('/repo')
+    expect(Facade.AbortOperation).toHaveBeenCalledWith('/repo')
   })
 
   it('FR-CONF-04, FR-UX-03 declining the confirm dialog does not call Facade.AbortOperation', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ operation: 'merge' })
-
-    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+    const wrapper = mountDuring('merge')
     await findButton(wrapper, 'Abort…')!.trigger('click')
 
-    expect(mockAbortOperation).not.toHaveBeenCalled()
+    expect(Facade.AbortOperation).not.toHaveBeenCalled()
   })
 
-  it.each(['cherry-pick', 'revert'])('FR-CP-07 renders a Skip button while a %s is stopped', (operation) => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ operation })
+  it.each(['cherry-pick', 'revert'])(
+    'FR-CP-07 renders a Skip button while a %s is stopped',
+    (operation) => {
+      const wrapper = mountDuring(operation)
 
-    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
-
-    expect(findButton(wrapper, 'Skip')).toBeDefined()
-  })
+      expect(findButton(wrapper, 'Skip')).toBeDefined()
+    },
+  )
 
   it('FR-CP-07 does not render a Skip button for a merge', () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ operation: 'merge' })
-
-    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+    const wrapper = mountDuring('merge')
 
     expect(findButton(wrapper, 'Skip')).toBeUndefined()
   })
 
   it('FR-CP-07 clicking Skip calls Facade.SkipOperation', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ operation: 'cherry-pick' })
-
-    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+    const wrapper = mountDuring('cherry-pick')
     await findButton(wrapper, 'Skip')!.trigger('click')
 
-    expect(mockSkipOperation).toHaveBeenCalledWith('/repo')
+    expect(Facade.SkipOperation).toHaveBeenCalledWith('/repo')
   })
 })

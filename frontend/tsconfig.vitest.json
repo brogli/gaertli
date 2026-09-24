@@ -2,13 +2,11 @@
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
     "composite": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo"
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo",
+    // Test-only: a guard test walks the source tree with node:fs.
+    "types": ["vite/client", "node"]
   },
-  // Tests sit beside their sources and import them directly (no separate
-  // __tests__ layout), so this project needs the same source globs as
-  // tsconfig.app.json plus the test files that config excludes. "extends"
-  // merges compilerOptions but not include/exclude, so both are restated
-  // here rather than inherited.
+  // include and exclude here replace tsconfig.app.json's, not extend them.
   "include": ["src/**/*.ts", "src/**/*.vue", "bindings/**/*.ts", "src/**/*.test.ts"],
   "exclude": []
 }

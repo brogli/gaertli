@@ -73,15 +73,7 @@ func Serve(ctx context.Context, r io.Reader, w io.Writer, newCore func(core.Even
 	sink := func(ev core.Event) { _ = srv.Notify(ctx, eventMethod, ev) }
 	srv = jrpc2.NewServer(guarded(handlers(newCore(sink))), &jrpc2.ServerOptions{AllowPush: true})
 	srv.Start(channel.Line(r, nopCloser{w}))
-	stopped := make(chan struct{})
-	defer close(stopped)
-	go func() {
-		select {
-		case <-ctx.Done():
-			srv.Stop()
-		case <-stopped:
-		}
-	}()
+	defer context.AfterFunc(ctx, srv.Stop)()
 	if err := srv.Wait(); err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}

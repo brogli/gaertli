@@ -96,6 +96,21 @@ func TestFR_ED_06_OpenFolderReturnsEditorNotFoundWhenNotOnPath(t *testing.T) {
 	coretest.AssertCode(t, err, core.EditorNotFound)
 }
 
+func TestFR_UX_11_OpenFolderNamesTheFailedCommandInArgs(t *testing.T) {
+	t.Setenv("PATH", t.TempDir()) // empty: nothing resolves
+	profile := core.EditorProfile{FolderCmd: "definitely-not-a-real-editor {path}"}
+
+	err := OpenFolder(profile, "/tmp/x")
+
+	ce := coretest.AsError(t, err, core.EditorNotFound)
+	if want := "definitely-not-a-real-editor"; ce.Args["command"] != want {
+		t.Errorf("Args[command] = %q, want %q", ce.Args["command"], want)
+	}
+	if ce.Key != "editorNotOnPath" {
+		t.Errorf("Key = %q, want editorNotOnPath", ce.Key)
+	}
+}
+
 func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	profile := core.EditorProfile{FolderCmd: argvWriterBin + " {path}"}
 
@@ -111,7 +126,7 @@ func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	}
 }
 
-func TestFR_ED_10_ALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
+func TestFR_ED_01_ALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
 	profile := core.EditorProfile{FileCmd: argvWriterBin + " {path}"}
 
 	if err := OpenFile(profile, "/tmp/x", 0); err != nil {

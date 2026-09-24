@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from '../i18n'
 import { useDebounceFn } from '@vueuse/core'
-import InputText from 'openvue/inputtext'
 import AutoComplete from 'openvue/autocomplete'
 import MultiSelect from 'openvue/multiselect'
-import Chip from 'openvue/chip'
+import ClearableInput from './ClearableInput.vue'
 import { useLogStore } from '../stores/log'
 import { useRefsStore } from '../stores/refs'
 import type { LogFilter } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // FilterBar is the log filter: free-text query/author/path (debounced
-// 300ms), branches (applied immediately), active-filter chips, and one
-// clear action (button or Escape).
+// 300ms) and branches. Each field carries its own clear icon and applies at
+// once when cleared; there is no active-filter list or clear-all.
 const log = useLogStore()
 const refs = useRefsStore()
+const { t } = useI18n()
 
 const query = ref(log.filter.query ?? '')
 const author = ref(log.filter.author ?? '')
@@ -31,17 +32,6 @@ const branchOptions = computed(() => {
   return [...local, ...remote]
 })
 
-// Active-filter chips, one per non-empty field.
-const chips = computed(() => {
-  const f = log.filter
-  return [
-    { key: 'query', text: f.query },
-    { key: 'author', text: f.author },
-    { key: 'branches', text: f.branches?.join(', ') },
-    { key: 'path', text: f.path },
-  ].filter((chip): chip is { key: string; text: string } => !!chip.text)
-})
-
 function currentFilter(): LogFilter {
   const f: LogFilter = {}
   if (query.value) f.query = query.value
@@ -53,9 +43,9 @@ function currentFilter(): LogFilter {
 
 const applyDebounced = useDebounceFn(() => void log.applyFilter(currentFilter()), 300)
 
-// Branches is a discrete choice, not a keystroke stream: applied
-// immediately, no debounce.
-function onBranchesChange(): void {
+// A discrete choice (branches) or an explicit clear applies at once, never
+// waiting on the debounce a keystroke stream needs.
+function applyNow(): void {
   void log.applyFilter(currentFilter())
 }
 
@@ -64,45 +54,72 @@ function search(event: { query: string }): void {
   authorSuggestions.value = log.knownAuthors.filter((a) => a.toLowerCase().includes(q))
 }
 
-function clear(): void {
-  query.value = ''
+function clearAuthor(): void {
   author.value = ''
-  path.value = ''
-  branches.value = []
-  void log.clearFilter()
+  applyNow()
 }
 </script>
 
 <template>
-  <div class="filter-bar" @keydown.escape="clear">
-    <InputText v-model="query" placeholder="Search message" @update:model-value="applyDebounced" />
+  <div class="filter-bar">
+    <ClearableInput
+      v-model="query"
+      :placeholder="t('filterBar.searchMessage')"
+      test-id="clear-query"
+      @update:model-value="applyDebounced"
+      @clear="applyNow"
+    />
     <AutoComplete
       v-model="author"
       :suggestions="authorSuggestions"
-      placeholder="Author"
+      :placeholder="t('filterBar.author')"
+      show-clear
       @complete="search"
       @update:model-value="applyDebounced"
+      @clear="clearAuthor"
     />
     <MultiSelect
       v-model="branches"
       :options="branchOptions"
-      placeholder="Branches"
-      @update:model-value="onBranchesChange"
+      filter
+      show-clear
+      :show-toggle-all="false"
+      :filter-placeholder="t('filterBar.searchBranches')"
+      :placeholder="t('filterBar.branches')"
+      @update:model-value="applyNow"
     />
-    <InputText v-model="path" placeholder="Path" @update:model-value="applyDebounced" />
-
-    <template v-if="log.filterActive">
-      <Chip v-for="chip in chips" :key="chip.key" :label="chip.text" :data-test="`chip-${chip.key}`" />
-      <button type="button" data-test="clear-filters" @click="clear">Clear filters</button>
-    </template>
+    <ClearableInput
+      v-model="path"
+      :placeholder="t('filterBar.path')"
+      test-id="clear-path"
+      @update:model-value="applyDebounced"
+      @clear="applyNow"
+    />
   </div>
 </template>
 
 <style scoped>
+/* The fields share one row and shrink with the log view. */
 .filter-bar {
   display: flex;
-  align-items: center;
   gap: 0.5em;
-  flex-wrap: wrap;
+}
+.filter-bar > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.filter-bar :deep(.p-autocomplete-input) {
+  width: 100%;
+  min-width: 0;
+}
+/* IconField (ClearableInput's root) and its InputText: WebKitGTK, unlike
+   Chromium, keeps an input's intrinsic width in a flex row unless both the
+   field and the input itself are told they may shrink to 0. */
+.filter-bar :deep(.p-iconfield) {
+  min-width: 0;
+}
+.filter-bar :deep(.p-inputtext) {
+  width: 100%;
+  min-width: 0;
 }
 </style>

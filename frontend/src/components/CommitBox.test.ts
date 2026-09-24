@@ -2,16 +2,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockCommit, mockSetMessageDraft, mockCommitDetails, mockPush } = vi.hoisted(() => ({
-  mockCommit: vi.fn(),
-  mockSetMessageDraft: vi.fn(),
-  mockCommitDetails: vi.fn(),
-  mockPush: vi.fn(),
+const { Facade } = vi.hoisted(() => ({
+  Facade: { Commit: vi.fn(), SetMessageDraft: vi.fn(), CommitDetails: vi.fn(), Push: vi.fn() },
 }))
 
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { Commit: mockCommit, SetMessageDraft: mockSetMessageDraft, CommitDetails: mockCommitDetails, Push: mockPush },
-}))
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
 import CommitBox from './CommitBox.vue'
 import { useChangesStore } from '../stores/changes'
@@ -34,10 +29,10 @@ describe('CommitBox', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     setActivePinia(createPinia())
-    mockCommit.mockReset().mockResolvedValue(undefined)
-    mockSetMessageDraft.mockReset().mockResolvedValue(undefined)
-    mockCommitDetails.mockReset()
-    mockPush.mockReset().mockResolvedValue('job-1')
+    Facade.Commit.mockReset().mockResolvedValue(undefined)
+    Facade.SetMessageDraft.mockReset().mockResolvedValue(undefined)
+    Facade.CommitDetails.mockReset()
+    Facade.Push.mockReset().mockResolvedValue('job-1')
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -50,7 +45,9 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
+      true,
+    )
   })
 
   it('FR-CHG-05 the Commit button is disabled with a staged file but a blank message', () => {
@@ -59,7 +56,9 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
+      true,
+    )
   })
 
   it('FR-CHG-05 clicking Commit calls Facade.Commit with the message, amend false', async () => {
@@ -70,8 +69,8 @@ describe('CommitBox', () => {
     await wrapper.get('textarea').setValue('a message')
     await wrapper.get('[data-test="commit-submit"]').trigger('click')
 
-    expect(mockCommit).toHaveBeenCalledTimes(1)
-    expect(mockCommit).toHaveBeenCalledWith('/repo', 'a message', false)
+    expect(Facade.Commit).toHaveBeenCalledTimes(1)
+    expect(Facade.Commit).toHaveBeenCalledWith('/repo', 'a message', false)
   })
 
   it('FR-CHG-06 the Commit button is enabled with nothing staged when amend is checked (amend needs nothing staged)', async () => {
@@ -84,7 +83,9 @@ describe('CommitBox', () => {
     await wrapper.get('input[type=checkbox]').setValue(true)
     await wrapper.get('textarea').setValue('a message')
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(false)
+    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
+      false,
+    )
   })
 
   it('FR-CHG-05 a successful commit clears the message and resets amend', async () => {
@@ -107,18 +108,20 @@ describe('CommitBox', () => {
     const changes = useChangesStore()
     changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
     let resolveCommit: () => void = () => {}
-    mockCommit.mockReturnValue(new Promise<void>((resolve) => (resolveCommit = resolve)))
+    Facade.Commit.mockReturnValue(new Promise<void>((resolve) => (resolveCommit = resolve)))
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
     await wrapper.get('[data-test="commit-submit"]').trigger('click')
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
+      true,
+    )
 
     resolveCommit()
     await flushPromises()
 
-    expect(mockCommit).toHaveBeenCalledTimes(1)
+    expect(Facade.Commit).toHaveBeenCalledTimes(1)
   })
 
   it('FR-CHG-06 the Amend checkbox is disabled on an unborn HEAD', () => {
@@ -142,14 +145,14 @@ describe('CommitBox', () => {
   it('FR-CHG-06 checking Amend with an empty message pre-fills it from CommitDetails', async () => {
     const repo = useRepoStore()
     repo.summary = summaryFixture({ sha: 'abc123' })
-    mockCommitDetails.mockResolvedValue({ body: 'last msg' })
+    Facade.CommitDetails.mockResolvedValue({ body: 'last msg' })
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('input[type=checkbox]').setValue(true)
     await flushPromises()
 
-    expect(mockCommitDetails).toHaveBeenCalledTimes(1)
-    expect(mockCommitDetails).toHaveBeenCalledWith('/repo', 'abc123')
+    expect(Facade.CommitDetails).toHaveBeenCalledTimes(1)
+    expect(Facade.CommitDetails).toHaveBeenCalledWith('/repo', 'abc123')
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('last msg')
   })
 
@@ -162,7 +165,7 @@ describe('CommitBox', () => {
     await wrapper.get('input[type=checkbox]').setValue(true)
     await flushPromises()
 
-    expect(mockCommitDetails).not.toHaveBeenCalled()
+    expect(Facade.CommitDetails).not.toHaveBeenCalled()
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('typed draft')
   })
 
@@ -216,8 +219,8 @@ describe('CommitBox', () => {
     await wrapper.get('textarea').setValue('typing...')
     await vi.advanceTimersByTimeAsync(300)
 
-    expect(mockSetMessageDraft).toHaveBeenCalledTimes(1)
-    expect(mockSetMessageDraft).toHaveBeenCalledWith('/repo', 'typing...')
+    expect(Facade.SetMessageDraft).toHaveBeenCalledTimes(1)
+    expect(Facade.SetMessageDraft).toHaveBeenCalledWith('/repo', 'typing...')
   })
 
   it('FR-CHG-08 does not re-save a restored draft that was never edited', async () => {
@@ -229,7 +232,7 @@ describe('CommitBox', () => {
     await wrapper.vm.$nextTick()
     await vi.advanceTimersByTimeAsync(300)
 
-    expect(mockSetMessageDraft).not.toHaveBeenCalled()
+    expect(Facade.SetMessageDraft).not.toHaveBeenCalled()
   })
 
   it('FR-UX-05 Ctrl+K commits, same as clicking Commit', async () => {
@@ -241,7 +244,7 @@ describe('CommitBox', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
     await flushPromises()
 
-    expect(mockCommit).toHaveBeenCalledTimes(1)
+    expect(Facade.Commit).toHaveBeenCalledTimes(1)
   })
 
   it('FR-UX-05 Ctrl+K with nothing staged does not commit, same gating as the button', async () => {
@@ -253,7 +256,7 @@ describe('CommitBox', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
     await flushPromises()
 
-    expect(mockCommit).not.toHaveBeenCalled()
+    expect(Facade.Commit).not.toHaveBeenCalled()
   })
 
   it('FR-CHG-09 with an upstream, checking "Push after commit" then clicking Commit calls Facade.Commit then Facade.Push', async () => {
@@ -268,10 +271,12 @@ describe('CommitBox', () => {
     await wrapper.get('[data-test="commit-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockCommit).toHaveBeenCalledTimes(1)
-    expect(mockPush).toHaveBeenCalledTimes(1)
-    expect(mockPush).toHaveBeenCalledWith('/repo', '')
-    expect(mockCommit.mock.invocationCallOrder[0]!).toBeLessThan(mockPush.mock.invocationCallOrder[0]!)
+    expect(Facade.Commit).toHaveBeenCalledTimes(1)
+    expect(Facade.Push).toHaveBeenCalledTimes(1)
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', '')
+    expect(Facade.Commit.mock.invocationCallOrder[0]!).toBeLessThan(
+      Facade.Push.mock.invocationCallOrder[0]!,
+    )
   })
 
   it('FR-CHG-09 the "Push after commit" checkbox is disabled while Amend is checked', async () => {
@@ -283,7 +288,9 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('input[type=checkbox]').setValue(true) // Amend
 
-    expect((wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled).toBe(true)
+    expect(
+      (wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled,
+    ).toBe(true)
   })
 
   it('FR-CHG-09 the "Push after commit" checkbox is disabled with no upstream', () => {
@@ -292,7 +299,9 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
 
-    expect((wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled).toBe(true)
+    expect(
+      (wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled,
+    ).toBe(true)
   })
 
   it('FR-CHG-09 checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
@@ -308,9 +317,9 @@ describe('CommitBox', () => {
     await wrapper.get('[data-test="commit-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockCommit).toHaveBeenCalledTimes(1)
-    expect(mockCommit).toHaveBeenCalledWith('/repo', 'a message', true)
-    expect(mockPush).not.toHaveBeenCalled()
+    expect(Facade.Commit).toHaveBeenCalledTimes(1)
+    expect(Facade.Commit).toHaveBeenCalledWith('/repo', 'a message', true)
+    expect(Facade.Push).not.toHaveBeenCalled()
   })
 
   it('FR-UX-09 each checkbox is inside a label whose text names it', () => {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"maps"
-	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -44,7 +43,7 @@ func (c *Core) LoadLog(ctx context.Context, id core.WorktreeID) error {
 		c.emitLogProgress(wt.Repo.Key, view.Generation, view.Loaded, view.Done)
 		return nil
 	}
-	go c.streamLog(wt, gen)
+	go c.streamLog(context.WithoutCancel(ctx), wt, gen)
 	return nil
 }
 
@@ -57,7 +56,7 @@ func (c *Core) LogRows(ctx context.Context, id core.WorktreeID, from, to int) (c
 	view := wt.LogSnapshot(from, to)
 	return core.LogRowsResult{
 		Rows: headFor(view.Rows, wt.Path), Loaded: view.Loaded, Done: view.Done, Error: view.Err,
-		Generation: view.Generation, Flat: view.Flat,
+		Generation: view.Generation,
 	}, nil
 }
 
@@ -93,12 +92,25 @@ func (c *Core) ReloadLog(ctx context.Context, id core.WorktreeID) error {
 	if maps.Equal(tips, wt.Repo.LogTips()) {
 		return nil // no ref moved
 	}
-	gen, ok := wt.Repo.LogBeginReload()
-	if !ok {
-		return nil // a load is already running; it will record fresh tips itself
-	}
-	go c.streamLog(wt, gen)
+	if gen, ok := wt.Repo.LogBeginReload(); ok {
+		go c.streamLog(context.WithoutCancel(ctx), wt, gen)
+	} // else a load is already running; it will record fresh tips itself
+	c.reloadFilterIfActive(ctx, wt)
 	return nil
+}
+
+// reloadFilterIfActive restarts wt's own filtered stream after a ref moved,
+// the same way SetLogFilter started it. The filtered view is per-worktree
+// (unlike the repo-wide log above), so it needs its own restart regardless
+// of which window's base reload wins the race, or whether any of them does.
+func (c *Core) reloadFilterIfActive(ctx context.Context, wt *session.Worktree) {
+	filterCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	filter, gen, ok := wt.FilterRestart(cancel)
+	if !ok {
+		cancel() // no filter active: nothing to restart
+		return
+	}
+	go c.streamFilteredLog(filterCtx, wt, filter, gen)
 }
 
 // LogIndexOf implements core.API.
@@ -111,43 +123,46 @@ func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha string) (
 	return core.LogIndexResult{Index: index, Found: found}, nil
 }
 
-// streamLog runs in its own goroutine, detached from LoadLog's ctx (done as
-// soon as LoadLog returns) — a background load outlives one RPC call. gen
-// guards every LogAppend/LogFinish against a reload that superseded it.
-func (c *Core) streamLog(wt *session.Worktree, gen int) {
+// streamLog runs in its own goroutine under a ctx detached from the
+// cancellation of LoadLog's (done as soon as LoadLog returns): a background
+// load outlives one RPC call. gen guards every LogAppend/LogFinish against a
+// reload that superseded it.
+func (c *Core) streamLog(ctx context.Context, wt *session.Worktree, gen int) {
 	repo := wt.Repo
 	progress := func(loaded int, done bool) { c.emitLogProgress(repo.Key, gen, loaded, done) }
-	loaded, logErr := streamCommits(context.Background(), wt, LogArgs(core.LogFilter{}), false, true,
+	loaded, logErr := streamCommits(ctx, wt, core.LogFilter{}, true,
 		func(commit core.LogCommit) { repo.LogAppend(gen, commit) }, progress)
 
 	var tips map[string]string
 	if logErr == nil {
 		// best-effort: a failure here just means the next ReloadLog always
 		// refreshes, rather than failing an otherwise-successful load.
-		tips, _ = refTips(context.Background(), wt.Runner, wt.Path)
+		tips, _ = refTips(ctx, wt.Runner, wt.Path)
 	}
 	repo.LogFinish(gen, logErr, tips)
 	progress(loaded, true)
 	if logErr == nil {
-		writeCommitGraphIfLarge(wt, loaded) // after the done signal: never delays the UI
+		writeCommitGraphIfLarge(ctx, wt, loaded) // after the done signal: never delays the UI
 	}
 }
 
-// streamCommits runs one git log call with args, parses every record into a
-// LogCommit (with its graph row unless flat), and hands each to appendRow;
-// progress fires for the first row and then every progressInterval, never
-// with done. Returns the row count and the call's error, if any.
-func streamCommits(ctx context.Context, wt *session.Worktree, args []string, flat, background bool,
+// streamCommits runs filter's git log call, parses every record into a
+// LogCommit (with its graph row unless filter is flat), and hands each to
+// appendRow; progress fires for the first row and then every
+// progressInterval, never with done. Returns the row count and the call's
+// error, if any.
+func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFilter, background bool,
 	appendRow func(core.LogCommit), progress func(loaded int, done bool)) (loaded int, err *core.Error) {
-	checkedOut, ckErr := worktreeCheckouts(wt.Runner, wt.Path, background)
+	checkedOut, ckErr := worktreeCheckouts(ctx, wt.Runner, wt.Path, background)
 	if ckErr != nil {
 		return 0, core.ErrorOf(ckErr)
 	}
 
+	flat := filter.Flat()
 	layout := graph.NewLayout()
-	lastEmit := time.Time{}
+	var lastEmit time.Time
 	_, runErr := wt.Runner.Stream(ctx, git.Call{
-		Dir: wt.Path, ReadOnly: true, Background: background, Timeout: logTimeout, Args: args,
+		Dir: wt.Path, ReadOnly: true, Background: background, Timeout: logTimeout, Args: LogArgs(filter),
 	}, func(record []byte) error {
 		commit, parents, err := parseLogRecord(record)
 		if err != nil {
@@ -176,15 +191,14 @@ func streamCommits(ctx context.Context, wt *session.Worktree, args []string, fla
 // it cuts git log's time-to-first-record and peak memory at real scale.
 // Skipped once the file exists. A failure is never surfaced: the file is an
 // optimisation, not app state.
-func writeCommitGraphIfLarge(wt *session.Worktree, loaded int) {
+func writeCommitGraphIfLarge(ctx context.Context, wt *session.Worktree, loaded int) {
 	if loaded < largeRepoRows {
 		return
 	}
-	graphFile := filepath.Join(wt.Repo.Key, "objects", "info", "commit-graph")
-	if _, err := os.Stat(graphFile); err == nil {
+	if fileExists(filepath.Join(wt.Repo.Key, "objects", "info", "commit-graph")) {
 		return
 	}
-	_, _ = wt.Runner.Run(context.Background(), git.Call{
+	_, _ = wt.Runner.Run(ctx, git.Call{
 		Dir: wt.Path, Background: true, Timeout: logTimeout,
 		Args: []string{"commit-graph", "write", "--reachable"},
 	})
@@ -219,8 +233,7 @@ func refTips(ctx context.Context, r git.Runner, dir string) (map[string]string, 
 }
 
 // parseRefTips parses for-each-ref's "%(refname)%1f%(objectname)%00"
-// stream — for-each-ref's own %1f/%00 escape syntax, not git log's
-// %x1f/%x00.
+// stream.
 func parseRefTips(out []byte) map[string]string {
 	tips := map[string]string{}
 	for _, record := range nulRecords(out) {
@@ -266,17 +279,14 @@ func parseRefs(decoration string) []core.RefLabel {
 		return nil
 	}
 	var refs []core.RefLabel
-	for _, tok := range strings.Split(decoration, ", ") {
+	for tok := range strings.SplitSeq(decoration, ", ") {
 		switch {
 		case tok == "HEAD":
 			refs = append(refs, core.RefLabel{Name: "HEAD", Kind: "head"})
 		case strings.HasPrefix(tok, "HEAD -> "):
-			refs = append(refs, core.RefLabel{Name: "HEAD", Kind: "head"})
-			refs = append(refs, refFromPath(strings.TrimPrefix(tok, "HEAD -> ")))
-		case strings.HasPrefix(tok, "tag: "):
-			refs = append(refs, refFromPath(strings.TrimPrefix(tok, "tag: ")))
+			refs = append(refs, core.RefLabel{Name: "HEAD", Kind: "head"}, refFromPath(strings.TrimPrefix(tok, "HEAD -> ")))
 		default:
-			refs = append(refs, refFromPath(tok))
+			refs = append(refs, refFromPath(strings.TrimPrefix(tok, "tag: ")))
 		}
 	}
 	return refs
@@ -307,17 +317,13 @@ func toGraphRow(row graph.Row) core.GraphRow {
 
 // worktreeCheckouts maps a commit SHA to every worktree path currently at
 // that HEAD. Any worktree of the repo lists every worktree of it.
-func worktreeCheckouts(r git.Runner, dir string, background bool) (map[string][]string, error) {
-	result, err := r.Run(context.Background(), git.Call{
-		Dir: dir, ReadOnly: true, Background: background,
-		Args: []string{"worktree", "list", "--porcelain", "-z"},
-	})
+func worktreeCheckouts(ctx context.Context, r git.Runner, dir string, background bool) (map[string][]string, error) {
+	worktrees, err := worktreeList(ctx, r, dir, background)
 	if err != nil {
 		return nil, err
 	}
-
 	checkouts := map[string][]string{}
-	for _, wt := range parseWorktreeRecords(result.Stdout) {
+	for _, wt := range worktrees {
 		if wt.Path != "" && wt.SHA != "" {
 			checkouts[wt.SHA] = append(checkouts[wt.SHA], wt.Path)
 		}

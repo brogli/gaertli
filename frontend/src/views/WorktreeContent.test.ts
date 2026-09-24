@@ -1,110 +1,89 @@
-import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '../testing/mountInBody'
+import NoticeArea from '../components/NoticeArea.vue'
 
-const {
-  mockSummary,
-  mockCommandLog,
-  mockLoadLog,
-  mockLogRows,
-  mockRefresh,
-  mockRefs,
-  mockCheckoutCommit,
-  mockUncommittedCount,
-  mockOpenFolder,
-  mockOpenFolderFallback,
-  mockSettingsGet,
-  mockUpdateWindowTitle,
-  mockListBranches,
-  mockJobs,
-  mockStatus,
-  mockDiffFile,
-  mockDiffWorking,
-  mockEventsOn,
-} = vi.hoisted(() => ({
-  mockSummary: vi.fn(),
-  mockCommandLog: vi.fn(),
-  mockLoadLog: vi.fn(),
-  mockLogRows: vi.fn(),
-  mockRefresh: vi.fn(),
-  mockRefs: vi.fn(),
-  mockCheckoutCommit: vi.fn(),
-  mockUncommittedCount: vi.fn(),
-  mockOpenFolder: vi.fn(),
-  mockOpenFolderFallback: vi.fn(),
-  mockSettingsGet: vi.fn(),
-  mockUpdateWindowTitle: vi.fn(),
-  mockListBranches: vi.fn(),
-  mockJobs: vi.fn(),
-  mockStatus: vi.fn(),
-  mockDiffFile: vi.fn(),
-  mockDiffWorking: vi.fn(),
-  mockEventsOn: vi.fn(),
-}))
-
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+const { Facade, AppService, SettingsService } = vi.hoisted(() => ({
   Facade: {
-    Summary: mockSummary,
-    CommandLog: mockCommandLog,
-    LoadLog: mockLoadLog,
-    LogRows: mockLogRows,
+    Summary: vi.fn(),
+    LoadLog: vi.fn(),
+    LogRows: vi.fn(),
     CommitDetails: vi.fn(),
     Commit: vi.fn(),
     SetMessageDraft: vi.fn(),
-    Refresh: mockRefresh,
-    Refs: mockRefs,
-    CheckoutCommit: mockCheckoutCommit,
-    UncommittedCount: mockUncommittedCount,
-    OpenFolder: mockOpenFolder,
-    OpenFolderFallback: mockOpenFolderFallback,
-    ListBranches: mockListBranches,
-    Jobs: mockJobs,
+    Refresh: vi.fn(),
+    Refs: vi.fn(),
+    CheckoutCommit: vi.fn(),
+    UncommittedCount: vi.fn(),
+    OpenFolder: vi.fn(),
+    ListBranches: vi.fn(),
+    ListWorktrees: vi.fn(),
+    Jobs: vi.fn(),
     CancelJob: vi.fn(),
-    Status: mockStatus,
-    DiffFile: mockDiffFile,
-    DiffWorking: mockDiffWorking,
+    Status: vi.fn(),
+    ConfiguredPullMode: vi.fn().mockResolvedValue(''),
+    CompareCommits: vi.fn(),
+    LogIndexOf: vi.fn().mockResolvedValue({ index: 0, found: false }),
   },
-  AppService: { UpdateWindowTitle: mockUpdateWindowTitle },
-  SettingsService: { Get: mockSettingsGet, Set: vi.fn() },
+  AppService: {
+    UpdateWindowTitle: vi.fn(),
+    OpenDiff: vi.fn(),
+    RecentRepos: vi.fn().mockResolvedValue([]),
+    ListWSLDistros: vi.fn().mockResolvedValue([]),
+  },
+  SettingsService: { Get: vi.fn(), Set: vi.fn() },
 }))
 
-vi.mock('@wailsio/runtime', () => ({
-  Events: { On: mockEventsOn },
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+  Facade,
+  AppService,
+  SettingsService,
 }))
+
+vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
+import { Events, emit } from '../testing/runtime'
 
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
+import SplitButton from 'openvue/splitbutton'
 import WorktreeContent from './WorktreeContent.vue'
 import CreateBranchDialog from '../components/CreateBranchDialog.vue'
 import ResetDialog from '../components/ResetDialog.vue'
-import LogList from '../components/LogList.vue'
-import CommitDetailsPanel from '../components/CommitDetailsPanel.vue'
+import LogView from '../components/LogView.vue'
+import CommitDetailView from '../components/CommitDetailView.vue'
 import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
-import ChangesPanel from '../components/ChangesPanel.vue'
-import RefsSidebar from '../components/RefsSidebar.vue'
+import ChangesView from '../components/ChangesView.vue'
+import BranchPicker from '../components/BranchPicker.vue'
+import RepoPicker from '../components/RepoPicker.vue'
+import WorktreePicker from '../components/WorktreePicker.vue'
+import DetachWarningDialog from '../components/DetachWarningDialog.vue'
 import DiffView from '../components/DiffView.vue'
 import SyncControls from '../components/SyncControls.vue'
 import { useLogStore } from '../stores/log'
 import { useChangesStore } from '../stores/changes'
+import { useCompareStore } from '../stores/compare'
 import { commitRow } from '../testing/fixtures/log-rows'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 import { branchFixture } from '../testing/fixtures/branch'
 import { summaryFixture } from '../testing/fixtures/summary'
+import { findButton } from '../testing/findButton'
 import { clickMenuItem } from '../testing/contextMenu'
-import { openSettingsKey } from '../lib/openSettings'
 
-function mountView(props: { path: string }, provide: Record<symbol, unknown> = {}) {
-  return mount(WorktreeContent, { props, global: { provide } })
+function mountView(props: { path: string; distro?: string }) {
+  return mount(WorktreeContent, { props })
 }
 
 const sampleRow = commitRow()
 
-// mountWithCheckoutCommitDialogOpen mounts WorktreeContent with one log row,
-// right-clicks it, and opens "Check out commit" from the resulting menu.
-async function mountWithCheckoutCommitDialogOpen() {
-  const { wrapper, body } = await mountInBody(WorktreeContent, { props: { path: '/home/user/project' } })
+// mountAndPickRowMenuItem mounts WorktreeContent with one log row,
+// right-clicks it, and picks label from the resulting menu.
+async function mountAndPickRowMenuItem(
+  label: string,
+  props: { path: string; distro?: string } = { path: '/home/user/project' },
+) {
+  const { wrapper, body } = await mountInBody(WorktreeContent, { props })
   const log = useLogStore()
   log.rowCache.set(0, sampleRow)
   log.loaded = 1
@@ -112,8 +91,8 @@ async function mountWithCheckoutCommitDialogOpen() {
 
   await wrapper.get('.row').trigger('contextmenu')
   await wrapper.vm.$nextTick()
-  await clickMenuItem(body, 'Check out commit')
-  await wrapper.vm.$nextTick()
+  await clickMenuItem(body, label)
+  await flushPromises()
 
   return { wrapper, body }
 }
@@ -121,71 +100,115 @@ async function mountWithCheckoutCommitDialogOpen() {
 describe('WorktreeContent', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    mockSummary.mockReset()
-    mockSummary.mockResolvedValue(summaryFixture({ path: '/home/user/project' }))
-    mockCommandLog.mockReset()
-    mockCommandLog.mockResolvedValue([])
-    mockLoadLog.mockReset()
-    mockLoadLog.mockResolvedValue(undefined)
-    mockLogRows.mockReset()
-    mockLogRows.mockResolvedValue({ rows: [], loaded: 0, done: true })
-    mockRefresh.mockReset()
-    mockRefresh.mockResolvedValue(undefined)
-    mockRefs.mockReset()
-    mockRefs.mockResolvedValue({ branches: [], remotes: [], tags: [] })
-    mockCheckoutCommit.mockReset()
-    mockCheckoutCommit.mockResolvedValue(undefined)
-    mockUncommittedCount.mockReset()
-    mockUncommittedCount.mockResolvedValue(0)
-    mockOpenFolder.mockReset()
-    mockOpenFolder.mockResolvedValue(undefined)
-    mockOpenFolderFallback.mockReset()
-    mockOpenFolderFallback.mockResolvedValue(undefined)
-    mockSettingsGet.mockReset()
-    mockSettingsGet.mockResolvedValue(defaultSettingsFixture())
-    mockUpdateWindowTitle.mockReset()
-    mockUpdateWindowTitle.mockResolvedValue(undefined)
-    mockListBranches.mockReset()
-    mockListBranches.mockResolvedValue([{ name: 'feature', checkedOutIn: '' }])
-    mockJobs.mockReset()
-    mockJobs.mockResolvedValue([])
-    mockStatus.mockReset()
-    mockStatus.mockResolvedValue(changedFilesFixture())
-    mockDiffFile.mockReset()
-    mockDiffFile.mockResolvedValue({ path: '', binary: false, tooLarge: false })
-    mockDiffWorking.mockReset()
-    mockDiffWorking.mockResolvedValue({ path: '', binary: false, tooLarge: false })
-    mockEventsOn.mockReset()
-    mockEventsOn.mockReturnValue(() => {})
+    Facade.Summary.mockReset().mockResolvedValue(summaryFixture())
+    Facade.LoadLog.mockReset().mockResolvedValue(undefined)
+    Facade.LogRows.mockReset().mockResolvedValue({ rows: [], loaded: 0, done: true })
+    Facade.Refresh.mockReset().mockResolvedValue(undefined)
+    Facade.Refs.mockReset().mockResolvedValue({ branches: [], remotes: [], tags: [] })
+    Facade.CheckoutCommit.mockReset().mockResolvedValue(undefined)
+    Facade.UncommittedCount.mockReset().mockResolvedValue(0)
+    Facade.OpenFolder.mockReset().mockResolvedValue(undefined)
+    SettingsService.Get.mockReset().mockResolvedValue(defaultSettingsFixture())
+    AppService.UpdateWindowTitle.mockReset().mockResolvedValue(undefined)
+    Facade.ListBranches.mockReset().mockResolvedValue([{ name: 'feature', checkedOutIn: '' }])
+    Facade.ListWorktrees.mockReset().mockResolvedValue([])
+    Facade.Jobs.mockReset().mockResolvedValue([])
+    Facade.Status.mockReset().mockResolvedValue(changedFilesFixture())
+    AppService.OpenDiff.mockReset()
+    Events.On.mockReset()
   })
 
-  it('FR-UX-08 renders the commit details in a column beside the log, not below it', async () => {
+  it('FR-UX-08 at the default (medium) width, the log sits beside a side panel showing Details by default', async () => {
     const wrapper = mountView({ path: '/repo' })
     await flushPromises()
 
-    const logColumn = wrapper.find('.log-column')
-    const sideColumn = wrapper.find('.side-column')
-    expect(logColumn.findComponent(LogList).exists()).toBe(true)
-    expect(sideColumn.findComponent(CommitDetailsPanel).exists()).toBe(true)
-
-    // Splitter lays out its panels as one row: same parent, log before side.
-    const parent = logColumn.element.parentElement
-    expect(sideColumn.element.parentElement).toBe(parent)
-    const children = Array.from(parent!.children)
-    expect(children.indexOf(logColumn.element)).toBeLessThan(children.indexOf(sideColumn.element))
+    const [outer] = wrapper.findAllComponents(Splitter)
+    expect(outer!.props('layout')).toBe('horizontal')
+    const [logPanel, sidePanel] = outer!.findAllComponents(SplitterPanel)
+    expect(logPanel!.findComponent(LogView).exists()).toBe(true)
+    expect(sidePanel!.findComponent(CommitDetailView).exists()).toBe(true)
+    expect(sidePanel!.findComponent(ChangesView).exists()).toBe(true) // mounted, hidden
   })
 
-  it('FR-UX-06 lays the four columns out in a Splitter, refs/changes/log/side in order', async () => {
+  it('FR-UX-02 renders no per-command git list: every command goes to the app log instead', async () => {
     const wrapper = mountView({ path: '/repo' })
     await flushPromises()
 
-    expect(wrapper.findComponent(Splitter).exists()).toBe(true)
-    const panels = wrapper.findAllComponents(SplitterPanel)
-    expect(panels).toHaveLength(4)
-    expect(panels[0]!.findComponent(RefsSidebar).exists()).toBe(true)
-    expect(panels[1]!.findComponent(ChangesPanel).exists()).toBe(true)
-    expect(panels[2]!.findComponent(LogList).exists()).toBe(true)
-    expect(panels[3]!.findComponent(CommitDetailsPanel).exists()).toBe(true)
+    expect(wrapper.find('.command-log').exists()).toBe(false)
+  })
+
+  it('FR-UX-07 the toolbar holds the repo, worktree and branch pickers, the sync controls, Refresh, Open in editor and the gear', async () => {
+    const wrapper = mountView({ path: '/repo' })
+    await flushPromises()
+
+    const toolbar = wrapper.get('.toolbar')
+    expect(toolbar.findComponent(RepoPicker).props('path')).toBe('/repo')
+    expect(toolbar.findComponent(WorktreePicker).props('path')).toBe('/repo')
+    expect(toolbar.findComponent(BranchPicker).props('wt')).toBe('/repo')
+    expect(toolbar.findComponent(SyncControls).exists()).toBe(true)
+    const buttonNames = toolbar.findAll('button').map((b) => b.attributes('aria-label') || b.text())
+    expect(buttonNames).toEqual(expect.arrayContaining(['Refresh', 'Open in editor']))
+  })
+
+  it('FR-ED-06 Open in editor failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
+    Facade.OpenFolder.mockRejectedValueOnce(
+      Object.assign(new Error('boom'), {
+        cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' },
+      }),
+    )
+    const wrapper = mountView({ path: '/repo' })
+    const { body: notice } = await mountInBody(NoticeArea)
+    await flushPromises()
+
+    await findButton(wrapper, 'Open in editor')?.trigger('click')
+    await flushPromises()
+
+    expect(notice.text()).toContain('myed')
+    expect(wrapper.find('.toolbar .error-banner').exists()).toBe(false)
+  })
+
+  it('FR-WT-13 the toolbar shows the repo, worktree and branch pickers in that order', async () => {
+    const wrapper = mountView({ path: '/repo' })
+    await flushPromises()
+
+    const buttons = ['repo-picker', 'worktree-picker', 'branch-picker']
+    const order = wrapper
+      .get('.toolbar')
+      .findAll('button')
+      .map((b) => b.attributes('data-test'))
+      .filter((t) => buttons.includes(t ?? ''))
+    expect(order).toEqual(buttons)
+  })
+
+  it('TR-34 the toolbar buttons render their icon; Settings is icon-only with title and aria-label', async () => {
+    Facade.Refs.mockResolvedValue({
+      branches: [branchFixture({ upstream: 'origin/main' })],
+      remotes: [{ name: 'origin', branches: [] }],
+      tags: [],
+    })
+    const wrapper = mountView({ path: '/repo' })
+    await flushPromises()
+
+    const iconOf = (label: string) => findButton(wrapper, label)!.get('.p-button-icon').classes()
+    expect(iconOf('Fetch')).toContain('oi-cloud-download')
+    expect(wrapper.findComponent(SplitButton).get('i').classes()).toContain('oi-download')
+    expect(iconOf('Push')).toContain('oi-upload')
+    expect(iconOf('Refresh')).toContain('oi-refresh')
+    expect(iconOf('Open in editor')).toContain('oi-external-link')
+
+    const settings = wrapper.get('[data-test="open-settings"]')
+    expect(settings.attributes('title')).toBe('Settings')
+    expect(settings.attributes('aria-label')).toBe('Settings')
+    expect(settings.get('.p-button-icon').classes()).toContain('oi-cog')
+  })
+
+  it('FR-UX-04 the gear asks for the Settings', async () => {
+    const wrapper = mountView({ path: '/repo' })
+    await flushPromises()
+
+    await wrapper.get('.toolbar [data-test="open-settings"]').trigger('click')
+
+    expect(wrapper.emitted('open-settings')).toHaveLength(1)
   })
 
   it('FR-WT-09 shows the worktree name from the path prop', () => {
@@ -193,7 +216,7 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-UX-01 shows the error message and reveals gitStderr behind show details', async () => {
-    mockSummary.mockRejectedValueOnce(
+    Facade.Summary.mockRejectedValueOnce(
       Object.assign(new Error('boom'), {
         cause: { message: 'not a git repository', gitStderr: 'fatal: not a git repository' },
       }),
@@ -214,15 +237,28 @@ describe('WorktreeContent', () => {
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    const refreshButton = wrapper.findAll('button').find((b) => b.text() === 'Refresh')
+    const refreshButton = findButton(wrapper, 'Refresh')
     await refreshButton?.trigger('click')
 
-    expect(mockRefresh).toHaveBeenCalledTimes(1)
-    expect(mockRefresh).toHaveBeenCalledWith('/home/user/project')
+    expect(Facade.Refresh).toHaveBeenCalledTimes(1)
+    expect(Facade.Refresh).toHaveBeenCalledWith('/home/user/project')
+  })
+
+  it("ADR-9 a WSL worktree's calls carry its shell id, the UNC path, not the POSIX path it shows", async () => {
+    const wrapper = mountView({ path: '/home/u/r', distro: 'D' })
+    await flushPromises()
+
+    const shellId = '\\\\wsl.localhost\\D\\home\\u\\r'
+    expect(Facade.Summary).toHaveBeenCalledWith(shellId)
+    expect(Facade.LoadLog).toHaveBeenCalledWith(shellId)
+    expect(Facade.ListWorktrees).toHaveBeenCalledWith(shellId)
+    expect(wrapper.findComponent(BranchPicker).props('distro')).toBe('D')
+    expect(wrapper.get('[data-test="repo-picker"]').text()).toContain('r')
+    expect(wrapper.get('[data-test="worktree-picker"]').text()).toContain('r')
   })
 
   it('FR-REPO-03 shows an ahead/behind indicator when the branch has an upstream', async () => {
-    mockRefs.mockResolvedValue({
+    Facade.Refs.mockResolvedValue({
       branches: [branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })],
       remotes: [],
       tags: [],
@@ -237,7 +273,7 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-REPO-03 shows no ahead/behind indicator without an upstream', async () => {
-    mockRefs.mockResolvedValue({ branches: [branchFixture({})], remotes: [], tags: [] })
+    Facade.Refs.mockResolvedValue({ branches: [branchFixture({})], remotes: [], tags: [] })
 
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
@@ -253,31 +289,25 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-BR-08 checking out a commit warns, then confirming calls CheckoutCommit once', async () => {
-    const { wrapper, body } = await mountWithCheckoutCommitDialogOpen()
+    const { wrapper, body } = await mountAndPickRowMenuItem('Check out commit')
 
     expect(body.text()).toContain('detaches HEAD')
 
     await body.get('[data-test="detach-confirm"]').trigger('click')
     await flushPromises()
 
-    expect(mockCheckoutCommit).toHaveBeenCalledTimes(1)
-    expect(mockCheckoutCommit).toHaveBeenCalledWith('/home/user/project', 'abc123')
+    expect(Facade.CheckoutCommit).toHaveBeenCalledTimes(1)
+    expect(Facade.CheckoutCommit).toHaveBeenCalledWith('/home/user/project', 'abc123')
 
     wrapper.unmount()
   })
 
   it('FR-BR-08 shows "Create branch here" while detached, opening the dialog with HEAD\'s own sha', async () => {
-    mockSummary.mockResolvedValue({
-      path: '/home/user/project',
-      branch: '',
-      detached: true,
-      operation: '',
-      sha: 'abc123',
-    })
+    Facade.Summary.mockResolvedValue(summaryFixture({ branch: '', detached: true, sha: 'abc123' }))
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    const createHereButton = wrapper.findAll('button').find((b) => b.text() === 'Create branch here')
+    const createHereButton = findButton(wrapper, 'Create branch here')
     expect(createHereButton).toBeTruthy()
     await createHereButton!.trigger('click')
     await wrapper.vm.$nextTick()
@@ -290,36 +320,38 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-BR-08 shows no "Create branch here" button while attached to a branch', async () => {
-    mockSummary.mockResolvedValue(summaryFixture({ path: '/home/user/project' }))
+    Facade.Summary.mockResolvedValue(summaryFixture())
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    expect(wrapper.findAll('button').find((b) => b.text() === 'Create branch here')).toBeUndefined()
+    expect(findButton(wrapper, 'Create branch here')).toBeUndefined()
+  })
+
+  it('FR-UX-09 "Create branch here" is an OpenVue Button, secondary and outlined, with its icon', async () => {
+    Facade.Summary.mockResolvedValue(summaryFixture({ branch: '', detached: true, sha: 'abc123' }))
+    const wrapper = mountView({ path: '/home/user/project' })
+    await flushPromises()
+
+    const button = findButton(wrapper, 'Create branch here')!
+    expect(button.classes()).toContain('p-button-secondary')
+    expect(button.classes()).toContain('p-button-outlined')
+    expect(button.get('.p-button-icon').classes()).toContain('oi-code-branch')
   })
 
   it('FR-BR-08 cancelling the warning never calls CheckoutCommit and closes the dialog', async () => {
-    const { wrapper, body } = await mountWithCheckoutCommitDialogOpen()
+    const { wrapper, body } = await mountAndPickRowMenuItem('Check out commit')
 
     await body.get('[data-test="detach-cancel"]').trigger('click')
     await flushPromises()
 
-    expect(mockCheckoutCommit).not.toHaveBeenCalled()
+    expect(Facade.CheckoutCommit).not.toHaveBeenCalled()
     expect(body.find('[data-test="detach-confirm"]').exists()).toBe(false)
 
     wrapper.unmount()
   })
 
   it('FR-BR-02, FR-LOG-11 "Reset current branch to here…" opens ResetDialog with the row\'s sha and subject', async () => {
-    const { wrapper, body } = await mountInBody(WorktreeContent, { props: { path: '/home/user/project' } })
-    const log = useLogStore()
-    log.rowCache.set(0, sampleRow)
-    log.loaded = 1
-    await wrapper.vm.$nextTick()
-
-    await wrapper.get('.row').trigger('contextmenu')
-    await wrapper.vm.$nextTick()
-    await clickMenuItem(body, 'Reset current branch to here…')
-    await wrapper.vm.$nextTick()
+    const { wrapper } = await mountAndPickRowMenuItem('Reset current branch to here…')
 
     const dialog = wrapper.findComponent(ResetDialog)
     expect(dialog.exists()).toBe(true)
@@ -330,73 +362,34 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-ED-01 "Open in {name}" is labelled with the editor name and calls OpenFolder with the path', async () => {
-    mockSummary.mockResolvedValue(summaryFixture({ path: '/home/user/project', editorName: 'another editor' }))
+    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'another editor' }))
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    const button = wrapper.findAll('button').find((b) => b.text() === 'Open in another editor')
+    const button = findButton(wrapper, 'Open in another editor')
     expect(button).toBeTruthy()
 
     await button!.trigger('click')
 
-    expect(mockOpenFolder).toHaveBeenCalledTimes(1)
-    expect(mockOpenFolder).toHaveBeenCalledWith('/home/user/project')
+    expect(Facade.OpenFolder).toHaveBeenCalledTimes(1)
+    expect(Facade.OpenFolder).toHaveBeenCalledWith('/home/user/project')
   })
 
-  it('FR-ED-06 an EDITOR_NOT_FOUND error links to Settings via ErrorBanner', async () => {
-    mockSummary.mockResolvedValue(summaryFixture({ path: '/home/user/project', editorName: 'the editor' }))
-    mockOpenFolder.mockRejectedValueOnce(
-      Object.assign(new Error('no editor'), {
-        cause: { message: 'no editor configured', code: 'EDITOR_NOT_FOUND' },
-      }),
-    )
-    const openSettings = vi.fn()
-    const wrapper = mountView({ path: '/home/user/project' }, { [openSettingsKey as symbol]: openSettings })
-    await flushPromises()
-
-    const openButton = wrapper.findAll('button').find((b) => b.text() === 'Open in the editor')
-    await openButton!.trigger('click')
-    await flushPromises()
-
-    const settingsLink = wrapper.findAll('button').find((b) => b.text() === 'Open editor setting')
-    expect(settingsLink).toBeTruthy()
-
-    await settingsLink!.trigger('click')
-
-    expect(openSettings).toHaveBeenCalledTimes(1)
-  })
-
-  it('FR-ED-10 an EDITOR_NOT_FOUND error, then "Open with git\'s editor", calls OpenFolderFallback', async () => {
-    mockSummary.mockResolvedValue(summaryFixture({ path: '/home/user/project', editorName: 'the editor' }))
-    mockOpenFolder.mockRejectedValueOnce(
-      Object.assign(new Error('no editor'), {
-        cause: { message: 'no editor configured', code: 'EDITOR_NOT_FOUND' },
-      }),
-    )
+  it('FR-ED-05 a saved editor change relabels "Open in …" without a refresh', async () => {
+    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'the editor' }))
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
+    expect(findButton(wrapper, 'Open in the editor')).toBeTruthy()
 
-    const openButton = wrapper.findAll('button').find((b) => b.text() === 'Open in the editor')
-    await openButton!.trigger('click')
+    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'another editor' }))
+    emit('settings:changed')
     await flushPromises()
 
-    const fallbackButton = wrapper.findAll('button').find((b) => b.text() === "Open with git's editor")
-    await fallbackButton!.trigger('click')
-
-    expect(mockOpenFolderFallback).toHaveBeenCalledWith('/home/user/project', 'git')
+    expect(findButton(wrapper, 'Open in another editor')).toBeTruthy()
   })
 
   it('FR-WT-06, FR-LOG-11 "Create worktree here…" from the log opens the dialog pre-filled at that commit', async () => {
-    const { wrapper, body } = await mountInBody(WorktreeContent, { props: { path: '/home/user/project' } })
-    const log = useLogStore()
-    log.rowCache.set(0, sampleRow)
-    log.loaded = 1
-    await wrapper.vm.$nextTick()
-
-    await wrapper.get('.row').trigger('contextmenu')
-    await wrapper.vm.$nextTick()
-    await clickMenuItem(body, 'Create worktree here…')
-    await flushPromises()
+    const { wrapper } = await mountAndPickRowMenuItem('Create worktree here…')
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
     expect(dialog.exists()).toBe(true)
@@ -406,18 +399,12 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-REPO-07 a WSL worktree\'s "Create worktree here…" calls ListBranches with the UNC path and opens the dialog with repo path and distro', async () => {
-    const { wrapper, body } = await mountInBody(WorktreeContent, { props: { path: '/home/u/r', distro: 'Ubuntu' } })
-    const log = useLogStore()
-    log.rowCache.set(0, sampleRow)
-    log.loaded = 1
-    await wrapper.vm.$nextTick()
+    const { wrapper } = await mountAndPickRowMenuItem('Create worktree here…', {
+      path: '/home/u/r',
+      distro: 'Ubuntu',
+    })
 
-    await wrapper.get('.row').trigger('contextmenu')
-    await wrapper.vm.$nextTick()
-    await clickMenuItem(body, 'Create worktree here…')
-    await flushPromises()
-
-    expect(mockListBranches).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\home\\u\\r')
+    expect(Facade.ListBranches).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\home\\u\\r')
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
     expect(dialog.props('repoPath')).toBe('/home/u/r')
     expect(dialog.props('distro')).toBe('Ubuntu')
@@ -426,19 +413,10 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-UX-01 a rejected ListBranches for "Create worktree here…" renders ErrorBanner with the error', async () => {
-    mockListBranches.mockRejectedValueOnce(
+    Facade.ListBranches.mockRejectedValueOnce(
       Object.assign(new Error('boom'), { cause: { message: 'list branches failed' } }),
     )
-    const { wrapper, body } = await mountInBody(WorktreeContent, { props: { path: '/home/user/project' } })
-    const log = useLogStore()
-    log.rowCache.set(0, sampleRow)
-    log.loaded = 1
-    await wrapper.vm.$nextTick()
-
-    await wrapper.get('.row').trigger('contextmenu')
-    await wrapper.vm.$nextTick()
-    await clickMenuItem(body, 'Create worktree here…')
-    await flushPromises()
+    const { wrapper } = await mountAndPickRowMenuItem('Create worktree here…')
 
     expect(wrapper.findComponent(CreateWorktreeDialog).exists()).toBe(false)
     expect(wrapper.get('.error-banner').text()).toContain('list branches failed')
@@ -446,46 +424,43 @@ describe('WorktreeContent', () => {
     wrapper.unmount()
   })
 
-  it('FR-WT-06 "Create worktree here…" on a local branch in the refs sidebar opens the dialog on that branch', async () => {
-    mockRefs.mockResolvedValue({
-      branches: [branchFixture({ name: 'feature', current: false })],
-      remotes: [],
-      tags: [],
-    })
+  it('FR-WT-06 "New worktree from here…" in the branch picker opens the dialog with its start', async () => {
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    const item = wrapper.findAll('[role="treeitem"]').find((n) => n.attributes('aria-label') === 'feature')
-    await item?.find('.ref-node').trigger('contextmenu')
-    await wrapper.vm.$nextTick()
-    const body = new DOMWrapper(document.body)
-    await clickMenuItem(body, 'Create worktree here…')
+    wrapper
+      .findComponent(BranchPicker)
+      .vm.$emit('create-worktree', { newBranch: true, start: 'origin/x' })
     await flushPromises()
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
-    expect(dialog.exists()).toBe(true)
-    expect(dialog.props('start')).toEqual({ newBranch: false, branch: 'feature' })
+    expect(dialog.props('start')).toEqual({ newBranch: true, start: 'origin/x' })
+    expect(dialog.props('branches')).toEqual([{ name: 'feature', checkedOutIn: '' }])
   })
 
-  it('FR-WT-06 "Create worktree here…" on a remote branch in the refs sidebar starts a new branch at its name', async () => {
-    mockRefs.mockResolvedValue({
-      branches: [],
-      remotes: [{ name: 'origin', branches: [{ name: 'feature', sha: 'sha-feature' }] }],
-      tags: [],
-    })
+  it('FR-BR-01 "New branch from here…" in the branch picker opens the dialog at that start point', async () => {
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    const item = wrapper.findAll('[role="treeitem"]').find((n) => n.attributes('aria-label') === 'feature')
-    await item?.find('.ref-node').trigger('contextmenu')
-    await wrapper.vm.$nextTick()
-    const body = new DOMWrapper(document.body)
-    await clickMenuItem(body, 'Create worktree here…')
+    wrapper.findComponent(BranchPicker).vm.$emit('create-branch', 'origin/x')
     await flushPromises()
 
-    const dialog = wrapper.findComponent(CreateWorktreeDialog)
-    expect(dialog.exists()).toBe(true)
-    expect(dialog.props('start')).toEqual({ newBranch: true, start: 'feature' })
+    expect(wrapper.findComponent(CreateBranchDialog).props('sha')).toBe('origin/x')
+  })
+
+  it('FR-BR-09 a tag picked in the branch picker warns, then checks out detached', async () => {
+    const { wrapper, body } = await mountInBody(WorktreeContent, {
+      props: { path: '/home/user/project' },
+    })
+
+    wrapper.findComponent(BranchPicker).vm.$emit('checkout-commit', 'sha-v1')
+    await flushPromises()
+    expect(wrapper.findComponent(DetachWarningDialog).exists()).toBe(true)
+    await body.get('[data-test="detach-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(Facade.CheckoutCommit).toHaveBeenCalledWith('/home/user/project', 'sha-v1')
+    wrapper.unmount()
   })
 
   // detailsWithFile seeds the log store's selected commit, one changed file.
@@ -504,59 +479,57 @@ describe('WorktreeContent', () => {
     }
   }
 
-  it('FR-UX-07 a changes-panel selection takes precedence over the commit diff', async () => {
+  it('FR-DIFF-07 the main window shows no diff: a commit file and a changed file open in the diff window', async () => {
+    Facade.Status.mockResolvedValue(
+      changedFilesFixture({ unstaged: [{ path: 'a.txt', status: 'M' }] }),
+    )
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
+    useLogStore().details = detailsWithFile('x.txt')
+    await flushPromises()
+    const commitFile = wrapper.get('.commit-details li')
+    const changedFile = wrapper.get('.changes-body li')
 
-    const log = useLogStore()
-    log.details = detailsWithFile('x.txt')
-    log.selectedFile = { path: 'x.txt', status: 'M' }
-    const changes = useChangesStore()
-    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true, status: 'M' }
-    await wrapper.vm.$nextTick()
+    await commitFile.trigger('click')
+    await changedFile.trigger('click')
+    expect(wrapper.findComponent(DiffView).exists()).toBe(false)
 
-    const diffView = wrapper.findComponent(DiffView)
-    expect(diffView.exists()).toBe(true)
-    expect(diffView.props('working')).toEqual({ path: 'a.txt', oldPath: '', staged: true, status: 'M' })
+    await commitFile.trigger('dblclick')
+    await changedFile.trigger('dblclick')
+    expect(AppService.OpenDiff.mock.calls).toEqual([
+      ['/home/user/project', { kind: 'commit', sha: 'abc123', path: 'x.txt', oldPath: '' }],
+      ['/home/user/project', { kind: 'working', staged: false, path: 'a.txt', oldPath: '' }],
+    ])
+    expect(wrapper.findComponent(DiffView).exists()).toBe(false)
   })
 
-  it('FR-UX-07 selecting a commit file clears the changes-panel selection and shows the commit diff', async () => {
+  it('FR-CMP-02 a compared file opens its diff only in the diff window: a click shows none here, a double-click opens it', async () => {
+    Facade.CompareCommits.mockResolvedValue([
+      { path: 'a.txt', status: 'M' },
+      { path: 'b.txt', status: 'A' },
+    ])
+    const compare = useCompareStore()
+    compare.toggleSelect('/home/user/project', commitRow({ sha: 'sha-a' }), 7)
+    compare.toggleSelect('/home/user/project', commitRow({ sha: 'sha-b' }), 2)
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
+    const file = wrapper.findAll('.compare-view .files li')[1]!
 
-    const changes = useChangesStore()
-    changes.selectedFile = { path: 'a.txt', oldPath: '', staged: true, status: 'M' }
-    const log = useLogStore()
-    log.details = detailsWithFile('x.txt')
-    await wrapper.vm.$nextTick()
+    await file.trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent(DiffView).exists()).toBe(false)
 
-    await wrapper.get('.commit-details li').trigger('click')
-    await wrapper.vm.$nextTick()
-
-    expect(changes.selectedFile).toBeNull()
-    expect(log.selectedFile).toEqual({ path: 'x.txt', status: 'M' })
-    expect(wrapper.findComponent(DiffView).props('working')).toBeNull()
+    await file.trigger('dblclick')
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/home/user/project', {
+      kind: 'range',
+      from: 'sha-a',
+      to: 'sha-b',
+      path: 'b.txt',
+      oldPath: '',
+    })
   })
 
-  it('FR-UX-07 the changes-column collapse control hides and shows the panel, staying visible itself', async () => {
-    const { wrapper } = await mountInBody(WorktreeContent, { props: { path: '/home/user/project' } })
-
-    expect(wrapper.findComponent(ChangesPanel).exists()).toBe(true)
-    expect(wrapper.get('.changes-body').isVisible()).toBe(true)
-
-    const collapseButton = wrapper.get('[data-test="changes-collapse"]')
-    await collapseButton.trigger('click')
-
-    expect(wrapper.get('.changes-body').isVisible()).toBe(false)
-    expect(collapseButton.isVisible()).toBe(true)
-
-    await collapseButton.trigger('click')
-
-    expect(wrapper.get('.changes-body').isVisible()).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('FR-UX-05 F5 refreshes and prevents the WebView\'s own reload', async () => {
+  it("FR-UX-05 F5 refreshes and prevents the WebView's own reload", async () => {
     mountView({ path: '/home/user/project' })
     await flushPromises()
 
@@ -564,7 +537,7 @@ describe('WorktreeContent', () => {
     window.dispatchEvent(event)
     await flushPromises()
 
-    expect(mockRefresh).toHaveBeenCalledTimes(1)
+    expect(Facade.Refresh).toHaveBeenCalledTimes(1)
     expect(event.defaultPrevented).toBe(true)
   })
 
@@ -576,12 +549,25 @@ describe('WorktreeContent', () => {
     await flushPromises()
     expect(loadSpy).toHaveBeenCalledTimes(1)
 
-    const handlers = mockEventsOn.mock.calls.filter((call) => call[0] === 'repo:changed').map((call) => call[1])
-    handlers.forEach((handler) => handler({ data: { scope: 'index' } }))
+    emit('repo:changed', { data: { scope: 'index' } })
     await flushPromises()
 
     expect(loadSpy).toHaveBeenCalledTimes(2)
     expect(loadSpy).toHaveBeenLastCalledWith('/home/user/project')
     wrapper.unmount()
+  })
+
+  it("FR-REPO-04 another window's repo:changed reloads no changes; this window's does", async () => {
+    mountView({ path: '/repo' })
+    await flushPromises()
+    Facade.Status.mockClear()
+
+    emit('repo:changed', { sender: 'window-2', data: { scope: 'index' } })
+    await flushPromises()
+    expect(Facade.Status).not.toHaveBeenCalled()
+
+    emit('repo:changed', { data: { scope: 'index' } })
+    await flushPromises()
+    expect(Facade.Status).toHaveBeenCalledWith('/repo')
   })
 })

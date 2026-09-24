@@ -85,6 +85,11 @@ func loadTexts(deps []Dependency) ([]Dependency, error) {
 		}
 		path, err := licenceFile(d.File)
 		if err != nil {
+			if text, ok := noLicenceFileText[d.Name]; ok {
+				out[i].Text = text
+				byName[d.Name] = text
+				continue
+			}
 			return nil, fmt.Errorf("%s %s: %w", d.Name, d.Version, err)
 		}
 		text, err := os.ReadFile(path)

@@ -9,7 +9,7 @@ import (
 	"unicode/utf16"
 )
 
-// wslPresent reports whether wsl.exe is on PATH. Gates every WSL action.
+// wslPresent reports whether wsl.exe is on PATH.
 func wslPresent() bool {
 	_, err := exec.LookPath("wsl.exe")
 	return err == nil
@@ -18,12 +18,11 @@ func wslPresent() bool {
 // parseDistroList parses `wsl --list --verbose`'s output, UTF-16LE when
 // piped. It skips the header line by position, not by its localized text,
 // and reads each row from the end: VERSION last, STATE (localized, unused)
-// second-last, the rest re-joined as NAME, so a name with spaces parses. A
-// leading '*' marks Default.
+// second-last, the rest re-joined as NAME, so a name with spaces parses. The
+// default distro's leading '*' is skipped.
 func parseDistroList(raw []byte) ([]Distro, error) {
-	lines := strings.Split(decodeWSLText(raw), "\n")
 	var rows []string
-	for _, line := range lines {
+	for line := range strings.Lines(decodeWSLText(raw)) {
 		if line = strings.TrimSpace(line); line != "" {
 			rows = append(rows, line)
 		}
@@ -46,9 +45,8 @@ func parseDistroList(raw []byte) ([]Distro, error) {
 
 func parseDistroRow(row string) (Distro, error) {
 	fields := strings.Fields(row)
-	var isDefault bool
 	if len(fields) > 0 && fields[0] == "*" {
-		isDefault, fields = true, fields[1:]
+		fields = fields[1:]
 	}
 	if len(fields) < 3 {
 		return Distro{}, fmt.Errorf("parseDistroList: bad row %q", row)
@@ -59,7 +57,7 @@ func parseDistroRow(row string) (Distro, error) {
 		return Distro{}, fmt.Errorf("parseDistroList: bad row %q: %w", row, err)
 	}
 	name := strings.Join(fields[:len(fields)-2], " ")
-	return Distro{Name: name, Version: version, Default: isDefault}, nil
+	return Distro{Name: name, Version: version}, nil
 }
 
 // decodeWSLText undoes wsl.exe's own UTF-16LE-when-piped behaviour: a BOM

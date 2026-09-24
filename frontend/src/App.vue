@@ -1,24 +1,18 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import ConfirmDialog from 'openvue/confirmdialog'
+import NoticeArea from './components/NoticeArea.vue'
 import MainView from './views/MainView.vue'
-import CompareDiffView from './views/CompareDiffView.vue'
+import DiffWindowView from './views/DiffWindowView.vue'
+import { diffWindowQuery } from './lib/diffTarget'
 import { useSettingsStore } from './stores/settings'
 
 // A window's query string, fixed for its lifetime, picks its root view:
-// ?view=compare-diff, else the main view.
+// ?view=diff, else the main view.
 const query = new URLSearchParams(window.location.search)
 const path = query.get('path')
 const distro = query.get('distro')
-
-const compareDiffProps = (() => {
-  if (query.get('view') !== 'compare-diff') return null
-  const wt = query.get('wt'),
-    from = query.get('from'),
-    to = query.get('to')
-  if (!wt || !from || !to) return null
-  return { wt, from, to, path: query.get('file') ?? '', oldPath: query.get('oldFile') ?? '' }
-})()
+const diffWindow = diffWindowQuery(query)
 
 // Settings load here for every view: the settings store applies
 // settings.theme window-wide.
@@ -28,6 +22,7 @@ onMounted(() => void settings.load())
 
 <template>
   <ConfirmDialog />
-  <CompareDiffView v-if="compareDiffProps" v-bind="compareDiffProps" />
+  <NoticeArea v-if="!diffWindow" />
+  <DiffWindowView v-if="diffWindow" v-bind="diffWindow" />
   <MainView v-else :path="path ?? ''" :distro="distro ?? undefined" />
 </template>

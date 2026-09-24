@@ -1,22 +1,19 @@
-import { flushPromises } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
+import { useToast } from 'openvue/usetoast'
 
-const { mockReset, mockUncommittedCount, mockRequire } = vi.hoisted(() => ({
-  mockReset: vi.fn(),
-  mockUncommittedCount: vi.fn(),
-  mockRequire: vi.fn(),
-}))
+const { Facade } = vi.hoisted(() => ({ Facade: { Reset: vi.fn(), UncommittedCount: vi.fn() } }))
 
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade: { Reset: mockReset, UncommittedCount: mockUncommittedCount },
-}))
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
-vi.mock('openvue/useconfirm', () => ({
-  useConfirm: () => ({ require: mockRequire, close: vi.fn() }),
-}))
+vi.mock('openvue/useconfirm', () => import('../testing/confirm'))
+import { confirmOptions, confirmRequire } from '../testing/confirm'
 
 import ResetDialog from './ResetDialog.vue'
+import NoticeArea from './NoticeArea.vue'
 import { mountInBody } from '../testing/mountInBody'
+import { NOTICE_GROUP } from '../lib/notice'
 
 function mountDialog(branch = 'main') {
   return mountInBody(ResetDialog, {
@@ -24,51 +21,64 @@ function mountDialog(branch = 'main') {
   })
 }
 
-// capturedOptions reads the options passed to require()'s first call.
-function capturedOptions(): { message: string; accept: () => void } {
-  return mockRequire.mock.calls[0]![0] as { message: string; accept: () => void }
+// resetTo runs one successful reset whose previous commit is previousHead.
+async function resetTo(previousHead: string): Promise<void> {
+  Facade.Reset.mockResolvedValueOnce({ previousHead })
+  const { body } = await mountDialog()
+  await body.get('[data-test="reset-submit"]').trigger('click')
+  await flushPromises()
 }
 
 describe('ResetDialog', () => {
   beforeEach(() => {
-    mockReset.mockReset()
-    mockUncommittedCount.mockReset()
-    mockUncommittedCount.mockResolvedValue(0)
-    mockRequire.mockReset()
+    Facade.Reset.mockReset()
+    Facade.UncommittedCount.mockReset().mockResolvedValue(0)
+    confirmRequire.mockReset()
   })
 
-  it('FR-BR-02 renders the branch, the target subject, and all three mode explanations', async () => {
+  it('FR-BR-02 the first line names the branch, the short hash and the subject', async () => {
     const { body } = await mountDialog()
 
-    expect(body.text()).toContain('main')
-    expect(body.text()).toContain('Fix the bug')
-    expect(body.text()).toContain('moves the branch pointer. Index and working files are unchanged.')
-    expect(body.text()).toContain('moves the branch pointer and resets the index. Working files are unchanged.')
-    expect(body.text()).toContain(
-      'moves the branch pointer, resets the index, and overwrites working files. Uncommitted changes are lost.',
-    )
+    expect(body.text()).toContain('Reset main to abc123 Fix the bug')
   })
 
-  it('FR-BR-07 renders a fourth radio option, Keep, with its fixed explanation', async () => {
+  it('FR-BR-02 the four modes render one per line, each its own block, mixed preselected', async () => {
     const { body } = await mountDialog()
 
-    expect(body.find('input#reset-mode-keep').exists()).toBe(true)
-    expect(body.text()).toContain(
-      'moves the branch pointer, resets the index and working files, but refuses if any local change would be lost.',
-    )
+    const modes = body.findAll('.reset-mode')
+    expect(modes.map((m) => m.text())).toEqual([
+      "Soft Keep the undone commits' changes staged.",
+      "Mixed Keep the undone commits' changes in your files, unstaged.",
+      "Hard Discard the undone commits' changes and all uncommitted changes.",
+      "Keep Discard the undone commits' changes, keep uncommitted ones. Stops if they touch the same files.",
+    ])
+    expect((body.get('input#reset-mode-mixed').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('FR-BR-02 Reset fails: the dialog stays open with the error, no notice', async () => {
+    Facade.Reset.mockRejectedValue(new Error('boom'))
+    const { wrapper, body: dialog } = await mountDialog()
+    const { body: notice } = await mountInBody(NoticeArea)
+
+    await dialog.get('[data-test="reset-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(dialog.find('.error-banner').exists()).toBe(true)
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(notice.find('.notice').exists()).toBe(false)
   })
 
   it('FR-BR-07 clicking Reset at keep mode calls Facade.Reset directly, no confirmation', async () => {
-    mockReset.mockResolvedValue({ previousHead: 'def456' })
+    Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
     const { body } = await mountDialog()
 
     await body.get('input#reset-mode-keep').setValue()
     await body.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockReset).toHaveBeenCalledTimes(1)
-    expect(mockReset).toHaveBeenCalledWith('/repo', 'abc123', 'keep')
-    expect(mockRequire).not.toHaveBeenCalled()
+    expect(Facade.Reset).toHaveBeenCalledTimes(1)
+    expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', 'keep')
+    expect(confirmRequire).not.toHaveBeenCalled()
   })
 
   it('FR-BR-02 renders "HEAD" instead of a blank branch name while detached', async () => {
@@ -78,60 +88,96 @@ describe('ResetDialog', () => {
   })
 
   it('FR-BR-02 clicking Reset at the default mixed mode calls Facade.Reset directly, no confirmation', async () => {
-    mockReset.mockResolvedValue({ previousHead: 'def456' })
+    Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
     const { body } = await mountDialog()
 
     await body.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockReset).toHaveBeenCalledTimes(1)
-    expect(mockReset).toHaveBeenCalledWith('/repo', 'abc123', 'mixed')
-    expect(mockRequire).not.toHaveBeenCalled()
+    expect(Facade.Reset).toHaveBeenCalledTimes(1)
+    expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', 'mixed')
+    expect(confirmRequire).not.toHaveBeenCalled()
   })
 
-  it('FR-BR-04 shows the previous HEAD after a successful reset, and Close closes the dialog', async () => {
-    mockReset.mockResolvedValue({ previousHead: 'abc123' })
-    const { wrapper, body } = await mountDialog()
+  it('FR-BR-04 a successful reset closes the dialog and its notice names the previous short hash, Copy hash copies the full one', async () => {
+    const writeText = vi.fn()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    Facade.Reset.mockResolvedValue({ previousHead: 'deadbeefcafe' })
+    const { wrapper, body: dialog } = await mountDialog()
+    const { body: notice } = await mountInBody(NoticeArea)
 
-    await body.get('[data-test="reset-submit"]').trigger('click')
+    await dialog.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
 
-    expect(body.text()).toContain('abc123')
-
-    await body.get('[data-test="reset-close"]').trigger('click')
-
     expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(notice.text()).toContain('deadbee') // the previous commit's short hash
+
+    await notice.get('[data-test="notice-copy"]').trigger('click')
+    expect(writeText).toHaveBeenCalledWith('deadbeefcafe')
+  })
+
+  it('FR-BR-04 a second reset replaces the notice with its own', async () => {
+    const { body: notice } = await mountInBody(NoticeArea)
+
+    await resetTo('first0000000')
+    expect(notice.findAll('.notice')).toHaveLength(1)
+    expect(notice.text()).toContain('first00')
+
+    await resetTo('second0000000')
+
+    expect(notice.findAll('.notice')).toHaveLength(1)
+    expect(notice.text()).toContain('second0')
+    expect(notice.text()).not.toContain('first00')
+  })
+
+  it("FR-UX-15 a reset's notice leaves another action's notice open", async () => {
+    const { body: notice } = await mountInBody(NoticeArea)
+    const OtherAction = defineComponent({
+      setup() {
+        useToast().add({ group: NOTICE_GROUP, summary: 'Push was rejected', closable: true })
+        return () => null
+      },
+    })
+    mount(OtherAction)
+    await flushPromises()
+
+    await resetTo('first0000000')
+    await resetTo('second0000000')
+
+    expect(notice.findAll('.notice')).toHaveLength(2)
+    expect(notice.text()).toContain('Push was rejected')
+    expect(notice.text()).toContain('second0')
   })
 
   it('FR-BR-03 hard mode confirms first, naming the uncommitted count, before calling Facade.Reset', async () => {
-    mockUncommittedCount.mockResolvedValue(4)
-    mockReset.mockResolvedValue({ previousHead: 'def456' })
+    Facade.UncommittedCount.mockResolvedValue(4)
+    Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
     const { body } = await mountDialog()
 
     await body.get('input#reset-mode-hard').setValue()
     await body.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockReset).not.toHaveBeenCalled()
-    expect(mockRequire).toHaveBeenCalledTimes(1)
-    expect(capturedOptions().message).toContain('4')
+    expect(Facade.Reset).not.toHaveBeenCalled()
+    expect(confirmRequire).toHaveBeenCalledTimes(1)
+    expect(confirmOptions().message).toContain('4')
 
-    capturedOptions().accept()
+    confirmOptions().accept()
     await flushPromises()
 
-    expect(mockReset).toHaveBeenCalledTimes(1)
-    expect(mockReset).toHaveBeenCalledWith('/repo', 'abc123', 'hard')
+    expect(Facade.Reset).toHaveBeenCalledTimes(1)
+    expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', 'hard')
   })
 
   it('FR-UX-03 never calls Facade.Reset if the confirmation is not accepted (QA-SAFE-01)', async () => {
-    mockUncommittedCount.mockResolvedValue(4)
+    Facade.UncommittedCount.mockResolvedValue(4)
     const { body } = await mountDialog()
 
     await body.get('input#reset-mode-hard').setValue()
     await body.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
 
-    expect(mockRequire).toHaveBeenCalledTimes(1)
-    expect(mockReset).not.toHaveBeenCalled()
+    expect(confirmRequire).toHaveBeenCalledTimes(1)
+    expect(Facade.Reset).not.toHaveBeenCalled()
   })
 })

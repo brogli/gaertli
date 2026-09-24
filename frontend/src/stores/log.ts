@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { computed, reactive, ref } from 'vue'
-import { Events } from '@wailsio/runtime'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type {
   ChangedFile,
@@ -8,6 +7,7 @@ import type {
   LogCommit,
   LogFilter,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { onWindowEvent } from '../lib/windowEvents'
 
 type RowView = {
   cache: Map<number, LogCommit>
@@ -37,15 +37,14 @@ function cachedWindow(view: RowView, from: number, to: number): LogCommit[] | nu
 }
 
 // log holds one repo session's commit log: loaded once per LoadLog, row
-// windows cached by index, commit details cached by sha. It also holds this
-// window's filtered view: filterLoaded/filterDone track the filtered
-// stream beside the base loaded/done pair.
+// windows cached by index, each commit's details cached by sha. It also holds this
+// window's filtered view: filterLoaded counts the filtered stream's rows
+// beside the base loaded count.
 export const useLogStore = defineStore('log', () => {
   const loaded = ref(0)
   const done = ref(false)
   const filter = ref<LogFilter>({})
   const filterLoaded = ref(0)
-  const filterDone = ref(false)
   const selectedRow = ref<LogCommit | null>(null)
   const details = ref<CommitDetails | null>(null)
   const selectedFile = ref<ChangedFile | null>(null)
@@ -53,15 +52,15 @@ export const useLogStore = defineStore('log', () => {
 
   // multiSelect is a Shift-click contiguous range, independent of
   // selectedRow (single-row details) and of the compare store's Ctrl-click
-  // pair.
+  // pair. anchorIndex is that single selected row's log index, the anchor a
+  // Shift-click range extends from and the index the compare store needs
+  // when pairing it into a comparison.
   const multiSelect = ref<LogCommit[]>([])
-  let anchorIndex: number | null = null
+  const anchorIndex = ref<number | null>(null)
 
   const detailsCache = new Map<string, CommitDetails>()
   let wt = ''
-  let unlistenProgress: (() => void) | undefined
-  let unlistenChanged: (() => void) | undefined
-  let unlistenReconnected: (() => void) | undefined
+  let unlisten: (() => void)[] = []
 
   // filterActive is !core.LogFilter.Empty(). activeLoaded is the row count
   // LogList's virtualizer shows.
@@ -97,7 +96,6 @@ export const useLogStore = defineStore('log', () => {
     done.value = false
     filter.value = {}
     filterLoaded.value = 0
-    filterDone.value = false
     selectedRow.value = null
     details.value = null
     selectedFile.value = null
@@ -106,35 +104,30 @@ export const useLogStore = defineStore('log', () => {
     authors.clear()
     detailsCache.clear()
 
-    unlistenProgress?.()
-    unlistenProgress = Events.On('log:progress', (ev) => {
-      const payload = ev.data as {
-        loaded: number
-        done: boolean
-        filtered?: boolean
-        generation: number
-      }
-      if (payload.filtered) {
-        filterLoaded.value = payload.loaded
-        filterDone.value = payload.done
-      } else {
-        // a reload restarts the log even when the row count stays the same
-        if (payload.generation !== baseView.generation) resetView(baseView, payload.generation)
-        loaded.value = payload.loaded
-        done.value = payload.done
-      }
-    })
-
-    unlistenChanged?.()
-    unlistenChanged = Events.On('repo:changed', (ev) => {
-      const { scope } = ev.data as { scope: string }
-      if (scope === 'refs') void Facade.ReloadLog(wt)
-    })
-
-    // a respawned core's generation numbers are unrelated to the old ones,
-    // so the log starts over rather than reloading
-    unlistenReconnected?.()
-    unlistenReconnected = Events.On('core:reconnected', () => void Facade.LoadLog(wt))
+    unlisten.forEach((off) => off())
+    unlisten = [
+      onWindowEvent('log:progress', ({ data: progress }) => {
+        // A reload restarts its stream even when the row count stays the
+        // same, base or filtered: either can drop a commit a reset left
+        // unreachable without changing how many rows are loaded.
+        if (progress.filtered) {
+          if (progress.generation !== filterView.generation)
+            resetView(filterView, progress.generation)
+          filterLoaded.value = progress.loaded
+        } else {
+          if (progress.generation !== baseView.generation) resetView(baseView, progress.generation)
+          loaded.value = progress.loaded
+          done.value = progress.done
+        }
+      }),
+      onWindowEvent('repo:changed', (ev) => {
+        const { scope } = ev.data
+        if (scope === 'refs') void Facade.ReloadLog(wt)
+      }),
+      // a respawned core's generation numbers are unrelated to the old
+      // ones, so the log starts over rather than reloading
+      onWindowEvent('core:reconnected', () => void Facade.LoadLog(wt)),
+    ]
 
     await Facade.LoadLog(wt)
   }
@@ -144,16 +137,11 @@ export const useLogStore = defineStore('log', () => {
   async function applyFilter(f: LogFilter): Promise<void> {
     filter.value = f
     filterLoaded.value = 0
-    filterDone.value = false
     selectedRow.value = null
     details.value = null
     selectedFile.value = null
     resetView(filterView)
     await Facade.SetLogFilter(wt, f)
-  }
-
-  function clearFilter(): Promise<void> {
-    return applyFilter({})
   }
 
   async function rows(from: number, to: number): Promise<LogCommit[]> {
@@ -201,23 +189,6 @@ export const useLogStore = defineStore('log', () => {
     selectedFile.value = file
   }
 
-  // nextFile/prevFile step through the selected commit's file list; a no-op
-  // at either end, or with no file selected.
-  function stepFile(step: 1 | -1): void {
-    const files = details.value?.files ?? []
-    const i = files.findIndex((f) => f.path === selectedFile.value?.path)
-    const next = files[i + step]
-    if (i >= 0 && next) selectedFile.value = next
-  }
-
-  function nextFile(): void {
-    stepFile(1)
-  }
-
-  function prevFile(): void {
-    stepFile(-1)
-  }
-
   // jumpTo selects sha's row and asks LogList to scroll to it. A sha not
   // found (not yet streamed, or absent) is a no-op.
   async function jumpTo(sha: string): Promise<void> {
@@ -232,21 +203,22 @@ export const useLogStore = defineStore('log', () => {
   // right-click on a row outside the current range.
   function selectOnly(row: LogCommit, index: number): void {
     multiSelect.value = [row]
-    anchorIndex = index
+    anchorIndex.value = index
   }
 
   // shiftSelectTo extends/creates a range from the last plain-clicked row
   // to toIndex. It goes through rows(), not rowCache: the range may span
   // rows never rendered.
   async function shiftSelectTo(toIndex: number): Promise<void> {
-    if (anchorIndex === null) anchorIndex = toIndex
-    const [lo, hi] = anchorIndex <= toIndex ? [anchorIndex, toIndex] : [toIndex, anchorIndex]
+    if (anchorIndex.value === null) anchorIndex.value = toIndex
+    const [lo, hi] =
+      anchorIndex.value <= toIndex ? [anchorIndex.value, toIndex] : [toIndex, anchorIndex.value]
     multiSelect.value = await rows(lo, hi + 1)
   }
 
   function clearMultiSelect(): void {
     multiSelect.value = []
-    anchorIndex = null
+    anchorIndex.value = null
   }
 
   return {
@@ -254,8 +226,6 @@ export const useLogStore = defineStore('log', () => {
     done,
     flat,
     filter,
-    filterLoaded,
-    filterDone,
     filterActive,
     activeLoaded,
     knownAuthors,
@@ -264,18 +234,16 @@ export const useLogStore = defineStore('log', () => {
     selectedFile,
     pendingScrollTo,
     multiSelect,
+    anchorIndex,
     rowCache,
     load,
     rows,
     select,
     selectFile,
-    nextFile,
-    prevFile,
     jumpTo,
     selectOnly,
     shiftSelectTo,
     clearMultiSelect,
     applyFilter,
-    clearFilter,
   }
 })

@@ -1,56 +1,44 @@
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockLoadLog, mockLogRows, mockReloadLog, mockLogIndexOf, mockEventsOn } = vi.hoisted(
-  () => ({
-    mockLoadLog: vi.fn(),
-    mockLogRows: vi.fn(),
-    mockReloadLog: vi.fn(),
-    mockLogIndexOf: vi.fn(),
-    mockEventsOn: vi.fn(),
-  }),
-)
-
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+const { Facade } = vi.hoisted(() => ({
   Facade: {
-    LoadLog: mockLoadLog,
-    LogRows: mockLogRows,
-    ReloadLog: mockReloadLog,
+    LoadLog: vi.fn(),
+    LogRows: vi.fn(),
+    ReloadLog: vi.fn(),
     CommitDetails: vi.fn(),
-    LogIndexOf: mockLogIndexOf,
+    LogIndexOf: vi.fn(),
     SetLogFilter: vi.fn().mockResolvedValue(undefined),
   },
 }))
 
-vi.mock('@wailsio/runtime', () => ({
-  Events: { On: mockEventsOn },
-}))
+vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+
+vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
+import { Events, emit } from '../testing/runtime'
 
 import { useLogStore } from './log'
 import { commitRow } from '../testing/fixtures/log-rows'
-import { registeredHandler } from '../testing/events'
+import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 function rowFixture(sha: string) {
   return commitRow({ sha, shortSha: sha, subject: 'x' })
 }
 
+// rowsResult is a LogRows answer holding rows.
+function rowsResult(rows: LogCommit[], generation = 0) {
+  return { rows, loaded: rows.length, done: true, generation }
+}
+
 describe('log store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    mockLoadLog.mockReset()
-    mockLoadLog.mockResolvedValue(undefined)
-    mockLogRows.mockReset()
-    mockLogRows.mockResolvedValue({
-      rows: [rowFixture('a')],
-      loaded: 1,
-      done: false,
-      generation: 0,
-    })
-    mockReloadLog.mockReset()
-    mockReloadLog.mockResolvedValue(undefined)
-    mockLogIndexOf.mockReset()
-    mockEventsOn.mockReset()
-    mockEventsOn.mockReturnValue(() => {})
+    Facade.LoadLog.mockReset().mockResolvedValue(undefined)
+    Facade.LogRows.mockReset().mockResolvedValue(rowsResult([rowFixture('a')]))
+    Facade.ReloadLog.mockReset().mockResolvedValue(undefined)
+    Facade.LogIndexOf.mockReset()
+    Events.On.mockReset()
   })
 
   it('FR-LOG-01 rows(from, to) caches its window: a repeated request does not call LogRows again', async () => {
@@ -60,7 +48,7 @@ describe('log store', () => {
     await log.rows(0, 1)
     await log.rows(0, 1)
 
-    expect(mockLogRows).toHaveBeenCalledTimes(1)
+    expect(Facade.LogRows).toHaveBeenCalledTimes(1)
   })
 
   it('rows(from, to) dedupes an in-flight request for the same window', async () => {
@@ -68,15 +56,15 @@ describe('log store', () => {
     await log.load('/repo')
 
     let resolve!: (value: unknown) => void
-    mockLogRows.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+    Facade.LogRows.mockReturnValueOnce(new Promise((r) => (resolve = r)))
 
     const first = log.rows(0, 1) // not yet cached: fetches
     const second = log.rows(0, 1) // requested again before the first resolves
 
-    resolve({ rows: [rowFixture('a')], loaded: 1, done: false, generation: 0 })
+    resolve(rowsResult([rowFixture('a')]))
     await Promise.all([first, second])
 
-    expect(mockLogRows).toHaveBeenCalledTimes(1)
+    expect(Facade.LogRows).toHaveBeenCalledTimes(1)
   })
 
   it('FR-LOG-09 done becomes true once a log:progress event with done: true arrives', async () => {
@@ -84,59 +72,62 @@ describe('log store', () => {
     await log.load('/repo')
     expect(log.done).toBe(false)
 
-    const handler = registeredHandler(mockEventsOn, 'log:progress')
-    handler?.({ data: { loaded: 5, done: true } })
+    emit('log:progress', { data: { loaded: 5, done: true } })
+    await flushPromises()
 
     expect(log.done).toBe(true)
     expect(log.loaded).toBe(5)
+  })
+
+  it("FR-LOG-09 another window's log:progress leaves this window's load as it is", async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+    await log.rows(0, 1)
+    const state = () => ({ loaded: log.loaded, done: log.done, cached: log.rowCache.size })
+    const before = state()
+
+    emit('log:progress', {
+      sender: 'window-2',
+      data: { loaded: 9, done: true, filtered: false, generation: 4 },
+    })
+    await flushPromises()
+
+    expect(state()).toEqual(before)
   })
 
   it('FR-REPO-04 calls ReloadLog on a refs repo:changed event, not on state', async () => {
     const log = useLogStore()
     await log.load('/repo')
 
-    const handler = registeredHandler(mockEventsOn, 'repo:changed')
-    handler?.({ data: { scope: 'refs' } })
-    await Promise.resolve()
-    handler?.({ data: { scope: 'state' } })
-    await Promise.resolve()
+    emit('repo:changed', { data: { scope: 'refs' } })
+    emit('repo:changed', { data: { scope: 'state' } })
+    await flushPromises()
 
-    expect(mockReloadLog).toHaveBeenCalledTimes(1)
-    expect(mockReloadLog).toHaveBeenCalledWith('/repo')
+    expect(Facade.ReloadLog).toHaveBeenCalledTimes(1)
+    expect(Facade.ReloadLog).toHaveBeenCalledWith('/repo')
   })
 
   it('ADR-4 calls LoadLog again on a core:reconnected event', async () => {
     const log = useLogStore()
     await log.load('/repo')
-    mockLoadLog.mockClear()
+    Facade.LoadLog.mockClear()
 
-    const handler = registeredHandler(mockEventsOn, 'core:reconnected')
-    handler?.({})
-    await Promise.resolve()
+    emit('core:reconnected')
+    await flushPromises()
 
-    expect(mockLoadLog).toHaveBeenCalledTimes(1)
-    expect(mockLoadLog).toHaveBeenCalledWith('/repo')
+    expect(Facade.LoadLog).toHaveBeenCalledTimes(1)
+    expect(Facade.LoadLog).toHaveBeenCalledWith('/repo')
   })
 
   it('FR-REPO-04 drops the row cache when Generation changes', async () => {
     const log = useLogStore()
     await log.load('/repo')
 
-    mockLogRows.mockResolvedValueOnce({
-      rows: [rowFixture('a'), rowFixture('b')],
-      loaded: 2,
-      done: true,
-      generation: 0,
-    })
+    Facade.LogRows.mockResolvedValueOnce(rowsResult([rowFixture('a'), rowFixture('b')]))
     await log.rows(0, 2)
     expect(log.rowCache.size).toBe(2)
 
-    mockLogRows.mockResolvedValueOnce({
-      rows: [rowFixture('c')],
-      loaded: 1,
-      done: true,
-      generation: 1,
-    })
+    Facade.LogRows.mockResolvedValueOnce(rowsResult([rowFixture('c')], 1))
     await log.rows(5, 6) // a range not yet cached, so this actually fetches
 
     expect(log.rowCache.size).toBe(1)
@@ -149,12 +140,11 @@ describe('log store', () => {
     await log.load('/repo')
     await log.rows(0, 1)
 
-    registeredHandler(mockEventsOn, 'log:progress')?.({
-      data: { loaded: 1, done: true, generation: 1 },
-    })
+    emit('log:progress', { data: { loaded: 1, done: true, generation: 1 } })
+    await flushPromises()
     expect(log.rowCache.size).toBe(0)
 
-    mockLogRows.mockResolvedValueOnce({ rows: [rowFixture('b')], loaded: 1, done: true, generation: 1 })
+    Facade.LogRows.mockResolvedValueOnce(rowsResult([rowFixture('b')], 1))
     await log.rows(0, 1)
     expect(log.rowCache.get(0)?.sha).toBe('b')
   })
@@ -163,13 +153,12 @@ describe('log store', () => {
     const log = useLogStore()
     await log.load('/repo')
     let resolve!: (value: unknown) => void
-    mockLogRows.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+    Facade.LogRows.mockReturnValueOnce(new Promise((r) => (resolve = r)))
     const stale = log.rows(0, 1)
 
-    registeredHandler(mockEventsOn, 'log:progress')?.({
-      data: { loaded: 1, done: true, generation: 1 },
-    })
-    resolve({ rows: [rowFixture('old')], loaded: 1, done: true, generation: 0 })
+    emit('log:progress', { data: { loaded: 1, done: true, generation: 1 } })
+    await flushPromises()
+    resolve(rowsResult([rowFixture('old')]))
     await stale
 
     expect(log.rowCache.has(0)).toBe(false)
@@ -178,17 +167,12 @@ describe('log store', () => {
   it('FR-LOG-01 jumpTo selects the row and sets pendingScrollTo when the sha is found', async () => {
     const log = useLogStore()
     await log.load('/repo')
-    mockLogIndexOf.mockResolvedValue({ index: 7, found: true })
-    mockLogRows.mockResolvedValue({
-      rows: [rowFixture('deadbeef')],
-      loaded: 8,
-      done: false,
-      generation: 0,
-    })
+    Facade.LogIndexOf.mockResolvedValue({ index: 7, found: true })
+    Facade.LogRows.mockResolvedValue(rowsResult([rowFixture('deadbeef')]))
 
     await log.jumpTo('deadbeef')
 
-    expect(mockLogRows).toHaveBeenCalledWith('/repo', 7, 8)
+    expect(Facade.LogRows).toHaveBeenCalledWith('/repo', 7, 8)
     expect(log.selectedRow?.sha).toBe('deadbeef')
     expect(log.pendingScrollTo).toBe(7)
   })
@@ -196,17 +180,12 @@ describe('log store', () => {
   it('FR-LOG-01 jumpTo is a no-op when the sha is not found', async () => {
     const log = useLogStore()
     await log.load('/repo')
-    mockLogIndexOf.mockResolvedValue({ index: 7, found: true })
-    mockLogRows.mockResolvedValue({
-      rows: [rowFixture('abc')],
-      loaded: 8,
-      done: false,
-      generation: 0,
-    })
+    Facade.LogIndexOf.mockResolvedValue({ index: 7, found: true })
+    Facade.LogRows.mockResolvedValue(rowsResult([rowFixture('abc')]))
     await log.jumpTo('abc')
     expect(log.selectedRow?.sha).toBe('abc')
 
-    mockLogIndexOf.mockResolvedValue({ index: 0, found: false })
+    Facade.LogIndexOf.mockResolvedValue({ index: 0, found: false })
     await log.jumpTo('missing')
 
     expect(log.selectedRow?.sha).toBe('abc')
@@ -216,20 +195,31 @@ describe('log store', () => {
   it('FR-LOG-05 knownAuthors dedupes and sorts every author seen in fetched rows', async () => {
     const log = useLogStore()
     await log.load('/repo')
-    mockLogRows.mockResolvedValueOnce({
-      rows: [
+    Facade.LogRows.mockResolvedValueOnce(
+      rowsResult([
         { ...rowFixture('a'), author: 'Bob' },
         { ...rowFixture('b'), author: 'Alice' },
         { ...rowFixture('c'), author: 'Bob' },
-      ],
-      loaded: 3,
-      done: true,
-      generation: 0,
-    })
+      ]),
+    )
 
     await log.rows(0, 3)
 
     expect(log.knownAuthors).toEqual(['Alice', 'Bob'])
+  })
+
+  it('FR-REPO-04 a filtered log:progress naming a new generation drops the cached rows, even at the same count', async () => {
+    const log = useLogStore()
+    await log.load('/repo')
+    await log.applyFilter({ path: 'x' })
+    Facade.LogRows.mockResolvedValueOnce(rowsResult([rowFixture('a')]))
+    await log.rows(0, 1)
+    expect(log.rowCache.size).toBe(1)
+
+    emit('log:progress', { data: { loaded: 1, done: true, filtered: true, generation: 1 } })
+    await flushPromises()
+
+    expect(log.rowCache.size).toBe(0)
   })
 
   it('FR-LOG-08 clearing a filter shows the base rows already fetched without refetching', async () => {
@@ -239,9 +229,9 @@ describe('log store', () => {
 
     await log.applyFilter({ query: 'x' })
     await log.rows(0, 1)
-    await log.clearFilter()
+    await log.applyFilter({})
     await log.rows(0, 1)
 
-    expect(mockLogRows).toHaveBeenCalledTimes(2)
+    expect(Facade.LogRows).toHaveBeenCalledTimes(2)
   })
 })

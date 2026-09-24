@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from '../i18n'
 import { useRepoStore } from '../stores/repo'
 import { useChangesStore } from '../stores/changes'
 import { useConfirmAction } from '../composables/useConfirmAction'
@@ -17,22 +18,25 @@ const repo = useRepoStore()
 const changes = useChangesStore()
 const { error, run } = useCoreCall()
 const { confirmAction } = useConfirmAction()
+const { t } = useI18n()
 
-const unresolvedCount = computed(() => (changes.files?.conflicted ?? []).length)
-const skippable = computed(() => repo.summary?.operation === 'cherry-pick' || repo.summary?.operation === 'revert')
+const unresolvedCount = computed(() => changes.files?.conflicted?.length ?? 0)
+const skippable = computed(
+  () => repo.summary?.operation === 'cherry-pick' || repo.summary?.operation === 'revert',
+)
 
-async function onContinue(): Promise<void> {
-  await run(() => Facade.ContinueOperation(props.wt))
+function onContinue(): void {
+  void run(() => Facade.ContinueOperation(props.wt))
 }
 
-async function onSkip(): Promise<void> {
-  await run(() => Facade.SkipOperation(props.wt))
+function onSkip(): void {
+  void run(() => Facade.SkipOperation(props.wt))
 }
 
 function onAbort(): void {
   confirmAction(
-    'Abort',
-    `Abort the ${repo.summary?.operation}? This discards its changes.`,
+    t('notices.abort'),
+    t('notices.abortConfirm', { operation: repo.summary?.operation ?? '' }),
     () => void run(() => Facade.AbortOperation(props.wt)),
   )
 }
@@ -40,10 +44,14 @@ function onAbort(): void {
 
 <template>
   <div v-if="repo.summary?.operation" class="conflict-banner" data-test="conflict-banner">
-    <span>{{ repo.summary.operation }} stopped on conflicts</span>
+    <span>{{ t('notices.conflictStopped', { operation: repo.summary.operation }) }}</span>
     <ErrorBanner v-if="error" :error="error" />
-    <button type="button" :disabled="unresolvedCount > 0" @click="onContinue">Continue</button>
-    <button v-if="skippable" type="button" data-test="skip-operation" @click="onSkip">Skip</button>
-    <button type="button" @click="onAbort">Abort…</button>
+    <button type="button" :disabled="unresolvedCount > 0" @click="onContinue">
+      {{ t('notices.continue') }}
+    </button>
+    <button v-if="skippable" type="button" data-test="skip-operation" @click="onSkip">
+      {{ t('notices.skip') }}
+    </button>
+    <button type="button" @click="onAbort">{{ t('notices.abortEllipsis') }}</button>
   </div>
 </template>

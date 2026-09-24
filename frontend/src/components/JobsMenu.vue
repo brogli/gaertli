@@ -1,0 +1,125 @@
+<script setup lang="ts">
+import { computed, onMounted, useTemplateRef } from 'vue'
+import { useI18n } from '../i18n'
+import Popover from 'openvue/popover'
+import Button from 'openvue/button'
+import ProgressBar from 'openvue/progressbar'
+import { useJobsStore } from '../stores/jobs'
+import { useCoreCall } from '../composables/useCoreCall'
+import { useWindowEvent } from '../lib/windowEvents'
+import { iconClass, spinClass } from '../lib/icons'
+import { useToolbarButton } from '../lib/layout'
+import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import ErrorBanner from './ErrorBanner.vue'
+
+// JobsMenu is the toolbar's jobs menu: a fixed-size button naming how many
+// jobs are running, opening a Popover that lists them with an abort button
+// each. Starting or ending a job never resizes the button, so the rest of
+// the toolbar and the log below it never move.
+const props = defineProps<{ wt: string }>()
+const jobs = useJobsStore()
+const { error, run } = useCoreCall()
+const { t } = useI18n()
+const toolbarButton = useToolbarButton()
+
+onMounted(() => void jobs.load(props.wt))
+useWindowEvent('job:update', (ev) => jobs.upsert(ev.data))
+
+// jobLabel names an update-branch job by its branch instead of its kind.
+function jobLabel(job: JobInfo): string {
+  if (job.kind === 'update-branch') return t('jobsMenu.updateBranch', { branch: job.branch })
+  const kindLabels: Record<string, string> = {
+    fetch: t('toolbar.fetch'),
+    pull: t('toolbar.pull'),
+    push: t('toolbar.push'),
+    'force-push': t('toolbar.forcePush'),
+  }
+  return kindLabels[job.kind] ?? job.kind
+}
+
+const count = computed(() => jobs.active.length)
+const tooltip = computed(() =>
+  count.value === 0
+    ? t('jobsMenu.noJobs')
+    : t('jobsMenu.runningJobsCount', { n: count.value }, count.value),
+)
+
+function cancelJob(id: string): void {
+  void run(() => jobs.cancel(id))
+}
+
+const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
+</script>
+
+<template>
+  <Button
+    v-bind="toolbarButton"
+    class="jobs-menu-button"
+    :class="{ idle: count === 0 }"
+    data-test="jobs-menu"
+    :icon="count ? spinClass('jobsRunning') : iconClass('jobsIdle')"
+    :badge="count ? String(count) : undefined"
+    badge-severity="info"
+    :pt="{ pcBadge: { root: { 'data-test': 'jobs-badge' } } }"
+    :title="tooltip"
+    :aria-label="tooltip"
+    @click="popover?.toggle($event)"
+  />
+  <Popover ref="popover">
+    <div class="jobs-list">
+      <ErrorBanner v-if="error" :error="error" />
+      <p v-if="!jobs.active.length" class="jobs-empty">{{ t('jobsMenu.noJobs') }}</p>
+      <div v-for="job in jobs.active" :key="job.id" class="job-row" data-test="job-row">
+        <span class="job-label">{{ jobLabel(job) }}</span>
+        <span v-if="job.message" class="job-message">{{ job.message }}</span>
+        <ProgressBar
+          :value="job.progress"
+          :mode="job.progress < 0 ? 'indeterminate' : 'determinate'"
+        />
+        <button
+          type="button"
+          class="glyph-btn"
+          :title="t('jobsMenu.abort')"
+          :aria-label="t('jobsMenu.abort')"
+          data-test="job-cancel"
+          @click="cancelJob(job.id)"
+        >
+          <i :class="iconClass('abort')" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+  </Popover>
+</template>
+
+<style scoped>
+.jobs-menu-button.idle {
+  color: var(--p-text-muted-color);
+}
+.jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 22rem;
+  max-width: 90vw;
+}
+.jobs-empty {
+  margin: 0;
+  color: var(--p-text-muted-color);
+}
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.job-label {
+  flex: none;
+}
+.job-message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--p-text-muted-color);
+}
+</style>

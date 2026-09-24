@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"log/slog"
 	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -19,6 +21,7 @@ import (
 // by *application.WebviewWindow.
 type shellWindow interface {
 	Focus()
+	SetTitle(title string) application.Window
 	EmitEvent(name string, data ...any) bool
 	OnWindowEvent(eventType events.WindowEventType, callback func(*application.WindowEvent)) func()
 	ID() uint // matches application.Window.ID(), the ctx-carried window
@@ -38,13 +41,14 @@ func (o wailsOpener) NewWithOptions(opts application.WebviewWindowOptions) shell
 }
 
 // windowEntry is one window's bookkeeping; the selection is mutable, since
-// a window can switch.
+// a window can switch. A diff window's selection is the worktree it shows.
 type windowEntry struct {
 	window   shellWindow
-	selected core.WorktreeID // "" = no selection (the panel's empty state)
+	selected core.WorktreeID // "" = no selection (the repo list as the page)
 	path     string          // selected worktree's canonical path; "" if none
 	repo     string          // common git dir, set by SetRepo
 	distro   string          // "" = local; else the WSL distro this window's core runs in
+	focused  bool            // has OS focus
 }
 
 // distroCorer is what Registry needs from a WSL distro's live core
@@ -61,33 +65,29 @@ type distroCorer interface {
 	LiveClient() (*remote.Client, bool)
 }
 
-// compareWindowKey identifies one worktree's a..b comparison: the compare
-// window is scoped per comparison, not per file.
-type compareWindowKey struct {
-	wt   core.WorktreeID
-	a, b string
-}
-
-// compareShowFilePayload is "compare:show-file"'s payload.
-type compareShowFilePayload struct {
-	Path    string `json:"path"`
-	OldPath string `json:"oldPath,omitempty"`
-}
-
 // Registry is the window registry and the Router the Facade forwards
 // through.
 type Registry struct {
+	// ctx is the context of the core calls the registry makes on its own
+	// rather than for one request: a distro core's spawn and the re-opens
+	// after a respawn, a closed window's release, a focus change.
+	ctx context.Context
+	log *slog.Logger // reports a dropped event
+
 	local  core.API
 	opener windowOpener // nil until Bind; set once, after application.New returns
 
 	consent remote.Consent  // nil until SetConsent, wired by Run
 	store   *settings.Store // nil until SetStore; read by pushEditorProfile
 
-	mu             sync.Mutex
-	windows        map[uint]*windowEntry            // one entry per window, keyed by its Wails window id
-	compareWindows map[compareWindowKey]shellWindow // a distinct, non-selecting window kind
-	distros        map[string]distroCorer           // lazily created, one per distro in use
-	newDistroCore  func(distro string) distroCorer
+	mu            sync.Mutex
+	windows       map[uint]*windowEntry          // one entry per main window, keyed by its Wails window id
+	diffWindows   map[diffWindowKey]*windowEntry // each outlives its main window
+	pages         map[shellWindow]*windowEntry   // server-mode browser pages, see pageKey; kept until the process ends, so their worktrees' sessions stay open
+	distros       map[string]distroCorer         // lazily created, one per distro in use
+	newDistroCore func(distro string, sink core.EventSink) distroCorer
+
+	focusMu sync.Mutex // orders setFocused's core calls
 
 	quitting atomic.Bool // set by Quitting; the windows closing after it stay remembered
 }
@@ -95,12 +95,15 @@ type Registry struct {
 // NewRegistry builds an empty Registry.
 func NewRegistry() *Registry {
 	r := &Registry{
-		windows:        make(map[uint]*windowEntry),
-		compareWindows: make(map[compareWindowKey]shellWindow),
-		distros:        make(map[string]distroCorer),
+		ctx:         context.Background(),
+		log:         slog.Default(),
+		windows:     make(map[uint]*windowEntry),
+		diffWindows: make(map[diffWindowKey]*windowEntry),
+		pages:       make(map[shellWindow]*windowEntry),
+		distros:     make(map[string]distroCorer),
 	}
-	r.newDistroCore = func(distro string) distroCorer {
-		return remote.NewDistroCore(distro, buildinfo.App, remote.WslRun, r.consent, r.Dispatch)
+	r.newDistroCore = func(distro string, sink core.EventSink) distroCorer {
+		return remote.NewDistroCore(distro, buildinfo.App, remote.WslRun, r.consent, sink, r.log)
 	}
 	return r
 }
@@ -130,20 +133,20 @@ func (r *Registry) distroCore(distro string) distroCorer {
 	if dc, ok := r.distros[distro]; ok {
 		return dc
 	}
-	dc := r.newDistroCore(distro)
+	dc := r.newDistroCore(distro, r.sinkFor(distro))
 	dc.OnConnect(func(ctx context.Context, c *remote.Client) { r.pushEditorProfile(ctx, c, distro) })
 	r.distros[distro] = dc
 	return dc
 }
 
-// pushEditorProfile sends env's current profile to api. Best-effort: a push
-// failure leaves a stale/default profile in effect until the next
-// successful push, and is not surfaced to the user.
+// pushEditorProfile sends env's current profile ("" = local, else a WSL
+// distro name) to api. Best-effort: a failed push leaves the previous
+// profile in effect until the next one, and is not shown to the user.
 func (r *Registry) pushEditorProfile(ctx context.Context, api core.API, env string) {
 	if r.store == nil {
 		return
 	}
-	_ = api.SetEditorProfile(ctx, profileFor(r.store.Get(), env))
+	_ = api.SetEditorProfile(ctx, editor.OrDefault(r.store.Get().EditorProfiles[env]))
 }
 
 // PushEditorProfiles re-pushes every connected core's profile: the local
@@ -153,8 +156,7 @@ func (r *Registry) PushEditorProfiles(ctx context.Context) {
 	r.pushEditorProfile(ctx, r.local, "")
 
 	r.mu.Lock()
-	distros := make(map[string]distroCorer, len(r.distros))
-	maps.Copy(distros, r.distros)
+	distros := maps.Clone(r.distros)
 	r.mu.Unlock()
 
 	for name, dc := range distros {
@@ -164,32 +166,28 @@ func (r *Registry) PushEditorProfiles(ctx context.Context) {
 	}
 }
 
-// profileFor resolves env's editor profile ("" = local, else a WSL distro
-// name), falling back to editor.Default() when unconfigured.
-func profileFor(s settings.Settings, env string) core.EditorProfile {
-	return editor.OrDefault(s.EditorProfiles[env])
-}
-
-// CoreOf routes an already-open worktree's calls to the core its window was
-// opened against. The WorktreeID alone cannot tell: for a WSL repo it is a
-// Linux-side path, and two distros can each have the same one.
-func (r *Registry) CoreOf(id core.WorktreeID) (core.API, error) {
-	entry, ok := r.lookup(id)
+// CoreOf routes a worktree's calls by its id alone: a WSL worktree's id is
+// its core's id in UNC form (\\wsl.localhost\<distro>\...), which goes to
+// that distro's core as the POSIX id the core knows; any other id goes to
+// the local core unchanged. A call from a server-mode page records the
+// page as showing id.
+func (r *Registry) CoreOf(ctx context.Context, id core.WorktreeID) (core.API, core.WorktreeID, error) {
+	if page, ok := ctx.Value(pageKey{}).(shellWindow); ok {
+		r.showInPage(page, id)
+	}
+	distro, linuxPath, ok := remote.ClassifyWSLPath(string(id))
 	if !ok {
-		return nil, core.Errorf(core.Internal, "unknown worktree")
+		return r.local, id, nil
 	}
-	return r.coreForDistro(entry.distro)
+	c, err := r.distroClient(distro)
+	return c, core.WorktreeID(linuxPath), err
 }
 
-// coreForDistro resolves distro ("" = local) to its core. It routes a
-// worktree a switch or close just orphaned, which CoreOf can no longer
-// find. If Ensure had to respawn, every window this distro backs is
-// re-opened from its remembered path first.
-func (r *Registry) coreForDistro(distro string) (core.API, error) {
-	if distro == "" {
-		return r.local, nil
-	}
-	client, respawned, err := r.distroCore(distro).Ensure(context.Background())
+// distroClient returns distro's live client. If Ensure had to respawn,
+// every window this distro backs is re-opened from its remembered path
+// first.
+func (r *Registry) distroClient(distro string) (core.API, error) {
+	client, respawned, err := r.distroCore(distro).Ensure(r.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +204,7 @@ func (r *Registry) CoreFor(path core.RepoPath) (core.API, error) {
 	if !ok {
 		return r.local, nil
 	}
-	client, _, err := r.distroCore(distro).Ensure(context.Background())
+	client, _, err := r.distroCore(distro).Ensure(r.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -225,24 +223,15 @@ func (r *Registry) findSelectingLocked(wt core.WorktreeID) *windowEntry {
 	return nil
 }
 
-// lookup finds the window currently selecting id.
-func (r *Registry) lookup(id core.WorktreeID) (*windowEntry, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	e := r.findSelectingLocked(id)
-	return e, e != nil
-}
-
 // reopenAfterReconnect re-opens every window's session backed by distro
 // after DistroCore.Ensure had to respawn, then tells each window to reload.
 // Best-effort per window: one failing surfaces the normal error on its next
 // action.
 func (r *Registry) reopenAfterReconnect(distro string, client *remote.Client) {
 	for id, path := range r.pathsForDistro(distro) {
-		if _, err := client.OpenWorktree(context.Background(), core.RepoPath(path)); err != nil {
-			continue
+		if _, err := client.OpenWorktree(r.ctx, core.RepoPath(path)); err == nil {
+			r.dispatch(distro, core.Event{Name: "core:reconnected", Worktree: id})
 		}
-		r.Dispatch(core.Event{Name: "core:reconnected", Worktree: id})
 	}
 }
 
@@ -254,7 +243,7 @@ func (r *Registry) pathsForDistro(distro string) map[core.WorktreeID]string {
 	defer r.mu.Unlock()
 
 	paths := make(map[core.WorktreeID]string)
-	for _, entry := range r.windows {
+	for _, entry := range r.allEntriesLocked() {
 		if entry.selected != "" && entry.distro == distro {
 			paths[entry.selected] = entry.path
 		}
@@ -273,7 +262,7 @@ func (r *Registry) OpenOrFocus(id core.WorktreeID, path, distro string) {
 
 // openOrRegister returns the already open window selecting id, or registers
 // a new one and returns nil, so the caller focuses outside the lock. The
-// close callback closes over window before it is assigned: safe, because
+// close callback reads entry.window before it is assigned: safe, because
 // newWindow returns before the OS can fire WindowClosing.
 func (r *Registry) openOrRegister(id core.WorktreeID, path, distro string) shellWindow {
 	r.mu.Lock()
@@ -282,117 +271,199 @@ func (r *Registry) openOrRegister(id core.WorktreeID, path, distro string) shell
 	if e := r.findSelectingLocked(id); e != nil {
 		return e.window
 	}
-	var window shellWindow
-	window = r.newWindow(windowTitle(path, ""), selectionURL(path, distro), func() {
-		closed, distro := r.closeWindow(window.ID())
-		r.Release(closed, distro)
+	entry := &windowEntry{selected: id, path: path, distro: distro}
+	entry.window = r.newWindow(windowTitle(path, ""), selectionURL(path, distro), mainWindowMinWidth, func() {
+		r.Release(r.closeWindow(entry.window.ID()))
 		r.rememberOpenWorktrees()
 	})
-	wireFocusEvents(window, func(focused bool) { _ = r.local.SetFocused(context.Background(), id, focused) })
-	r.windows[window.ID()] = &windowEntry{window: window, selected: id, path: path, distro: distro}
+	r.wireFocus(entry)
+	r.windows[entry.window.ID()] = entry
 	return nil
 }
 
-// SelectInWindow moves windowID's entry to select wt. It reports the
-// previous selection and the distro that backed it, so the caller can
-// release it through its core. ok is false if windowID names no known
-// window.
-func (r *Registry) SelectInWindow(windowID uint, wt core.WorktreeID, path, distro string) (previous core.WorktreeID, previousDistro string, ok bool) {
+// SelectInWindow moves windowID's entry to select wt and reports the
+// previous selection, for the caller to release. ok is false if windowID
+// names no known window.
+func (r *Registry) SelectInWindow(windowID uint, wt core.WorktreeID, path, distro string) (previous core.WorktreeID, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e, exists := r.windows[windowID]
 	if !exists {
-		return "", "", false
+		return "", false
 	}
-	previous, previousDistro = e.selected, e.distro
+	previous = e.selected
 	e.selected, e.path, e.distro, e.repo = wt, path, distro, ""
-	return previous, previousDistro, true
+	return previous, true
 }
 
-// StillSelected reports whether any window currently selects wt.
-func (r *Registry) StillSelected(wt core.WorktreeID) bool {
-	_, ok := r.lookup(wt)
-	return ok
+// inUse reports whether a main window selects wt or a diff window shows it.
+func (r *Registry) inUse(wt core.WorktreeID) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.ContainsFunc(r.allEntriesLocked(), func(e *windowEntry) bool { return e.selected == wt })
 }
 
-// Release closes wt's session through its core once no window selects it
-// any more; best-effort, nothing user-visible.
-func (r *Registry) Release(wt core.WorktreeID, distro string) {
-	if wt == "" || r.StillSelected(wt) {
+// allEntriesLocked lists the main and the diff windows' entries, and the
+// pages'. Caller holds r.mu.
+func (r *Registry) allEntriesLocked() []*windowEntry {
+	return slices.Concat(
+		slices.Collect(maps.Values(r.windows)),
+		slices.Collect(maps.Values(r.diffWindows)),
+		slices.Collect(maps.Values(r.pages)),
+	)
+}
+
+// Release closes wt's session through its core once no window uses it any
+// more; best-effort, nothing user-visible.
+func (r *Registry) Release(wt core.WorktreeID) {
+	if wt == "" || r.inUse(wt) {
 		return
 	}
-	if c, err := r.coreForDistro(distro); err == nil {
-		_ = c.CloseWorktree(context.Background(), wt)
+	if c, id, err := r.CoreOf(r.ctx, wt); err == nil {
+		_ = c.CloseWorktree(r.ctx, id)
 	}
 }
 
 // closeWindow drops windowID's entry (a real OS close) and reports its
-// former selection and the distro that backed it.
-func (r *Registry) closeWindow(windowID uint) (closed core.WorktreeID, distro string) {
+// former selection.
+func (r *Registry) closeWindow(windowID uint) (closed core.WorktreeID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e, ok := r.windows[windowID]
 	if !ok {
-		return "", ""
+		return ""
 	}
 	delete(r.windows, windowID)
-	return e.selected, e.distro
+	return e.selected
 }
 
-// wireFocusEvents relays a window's OS-level focus state to setFocused.
-func wireFocusEvents(w shellWindow, setFocused func(focused bool)) {
-	w.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) { go setFocused(true) })
-	w.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) { go setFocused(false) })
+// wireFocus relays e's window's OS focus to setFocused.
+func (r *Registry) wireFocus(e *windowEntry) {
+	e.window.OnWindowEvent(events.Common.WindowFocus, func(*application.WindowEvent) { go r.setFocused(e, true) })
+	e.window.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) { go r.setFocused(e, false) })
 }
+
+// setFocused records e's focus and tells the core of e's selection whether
+// any window on it has focus: a main window and its diff window hand focus
+// to each other, in either order. focusMu makes the core keep the answer
+// to the last change. A window without a selection tells no one.
+func (r *Registry) setFocused(e *windowEntry, focused bool) {
+	r.focusMu.Lock()
+	defer r.focusMu.Unlock()
+
+	wt, anyFocused := r.recordFocus(e, focused)
+	if wt == "" {
+		return
+	}
+	if c, id, err := r.CoreOf(r.ctx, wt); err == nil {
+		_ = c.SetFocused(r.ctx, id, anyFocused)
+	}
+}
+
+// recordFocus stores e's focus and reports e's selection and whether any
+// window on it has focus.
+func (r *Registry) recordFocus(e *windowEntry, focused bool) (wt core.WorktreeID, anyFocused bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	e.focused = focused
+	anyFocused = slices.ContainsFunc(r.allEntriesLocked(), func(o *windowEntry) bool {
+		return o.selected == e.selected && o.focused
+	})
+	return e.selected, anyFocused
+}
+
+// mainWindowMinWidth is the narrowest a main window can be resized to: the
+// window body's own narrow layout goes down to this width. A diff window
+// has no such floor.
+const mainWindowMinWidth = 400
 
 // newWindow creates a window that drops itself from the registry when the
-// OS closes it (Wails destroys the window on WindowClosing).
-func (r *Registry) newWindow(title, url string, onClose func()) shellWindow {
+// OS closes it (Wails destroys the window on WindowClosing). minWidth is 0
+// for a window with no minimum.
+func (r *Registry) newWindow(title, url string, minWidth int, onClose func()) shellWindow {
 	window := r.opener.NewWithOptions(application.WebviewWindowOptions{
-		Title:  title,
-		URL:    url,
-		Width:  1200,
-		Height: 800,
+		Title:    title,
+		URL:      url,
+		Width:    1200,
+		Height:   800,
+		MinWidth: minWidth,
 	})
 	window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) { onClose() })
 	return window
 }
 
-// OpenOrFocusCompareDiff opens the compare diff window for wt's a..b
-// comparison, or focuses and retargets it if already open. It is not a
-// worktree-session window: never added to r.windows, never
-// CloseWorktree'd on close.
-func (r *Registry) OpenOrFocusCompareDiff(wt core.WorktreeID, a, b, path, oldPath string) {
-	key := compareWindowKey{wt, a, b}
-	if w := r.openOrRegisterCompareDiff(key, path, oldPath); w != nil {
-		w.Focus()
-		w.EmitEvent("compare:show-file", compareShowFilePayload{Path: path, OldPath: oldPath})
+// OpenOrFocusDiff opens key's diff window on wt's target, or focuses it and
+// shows the target there, releasing the worktree it showed before. A diff
+// window is not a main window, but it keeps its worktree's session open and
+// gets its events until it closes.
+func (r *Registry) OpenOrFocusDiff(key diffWindowKey, wt core.WorktreeID, target DiffTarget) {
+	w, previous := r.openOrRetargetDiff(key, wt, target)
+	if w == nil {
+		return
 	}
+	w.SetTitle(diffWindowTitle(wt, target))
+	w.Focus()
+	w.EmitEvent("diff:show", DiffShow{Wt: wt, Target: target})
+	r.Release(previous)
 }
 
-// openOrRegisterCompareDiff follows openOrRegister's nil-means-just-created
-// convention: nil for a fresh window (already visible, no Focus() needed),
-// the existing window otherwise.
-func (r *Registry) openOrRegisterCompareDiff(key compareWindowKey, path, oldPath string) shellWindow {
+// openOrRetargetDiff moves key's open diff window to wt and returns it with
+// the worktree it showed before, or registers a new window on target and
+// returns nil.
+func (r *Registry) openOrRetargetDiff(key diffWindowKey, wt core.WorktreeID, target DiffTarget) (existing shellWindow, previous core.WorktreeID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if w, ok := r.compareWindows[key]; ok {
-		return w
+	if e, ok := r.diffWindows[key]; ok {
+		previous = e.selected
+		r.showLocked(e, wt)
+		return e.window, previous
 	}
-	w := r.newWindow(
-		compareWindowTitle(string(key.wt), key.a, key.b),
-		compareDiffURL(key.wt, key.a, key.b, path, oldPath),
-		func() { r.removeCompareWindow(key) },
-	)
-	r.compareWindows[key] = w
-	return nil
+	entry := &windowEntry{}
+	r.showLocked(entry, wt)
+	entry.window = r.newWindow(diffWindowTitle(wt, target), diffURL(wt, target), 0, func() {
+		r.Release(r.closeDiffWindow(key))
+	})
+	r.wireFocus(entry)
+	r.diffWindows[key] = entry
+	return nil, ""
 }
 
-func (r *Registry) removeCompareWindow(key compareWindowKey) {
+// showLocked makes e, a diff window or a page, show wt, with the path, repo
+// and distro of the main window selecting it, so wt's events reach e.
+// Caller holds r.mu.
+func (r *Registry) showLocked(e *windowEntry, wt core.WorktreeID) {
+	e.selected, e.path, e.repo, e.distro = wt, "", "", ""
+	if main := r.findSelectingLocked(wt); main != nil {
+		e.path, e.repo, e.distro = main.path, main.repo, main.distro
+	}
+}
+
+// showInPage records that page shows wt, on its first call: a page never
+// switches, and a later call may be about another worktree.
+func (r *Registry) showInPage(page shellWindow, wt core.WorktreeID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.compareWindows, key)
+
+	if _, ok := r.pages[page]; ok {
+		return
+	}
+	entry := &windowEntry{window: page}
+	r.showLocked(entry, wt)
+	r.pages[page] = entry
+}
+
+// closeDiffWindow drops key's diff window and reports the worktree it
+// showed.
+func (r *Registry) closeDiffWindow(key diffWindowKey) core.WorktreeID {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	e, ok := r.diffWindows[key]
+	if !ok {
+		return ""
+	}
+	delete(r.diffWindows, key)
+	return e.selected
 }
 
 // Quitting marks the app as shutting down: the shutdown then closes every
@@ -427,13 +498,8 @@ func (r *Registry) OpenWorktreePaths() []string {
 
 	paths := make([]string, 0, len(r.windows))
 	for _, entry := range r.windows {
-		if entry.selected == "" {
-			continue
-		}
-		if entry.distro != "" {
-			paths = append(paths, remote.BuildWSLPath(entry.distro, entry.path))
-		} else {
-			paths = append(paths, entry.path)
+		if entry.selected != "" {
+			paths = append(paths, shellPath(entry.path, entry.distro))
 		}
 	}
 	return paths
@@ -451,29 +517,56 @@ func (r *Registry) SetRepo(wt core.WorktreeID, repo string) {
 	}
 }
 
-// Dispatch is the core.EventSink of every core: an event with
-// Worktree set goes to the window selecting it, one with only Repo set to
-// every window of that repo.
-func (r *Registry) Dispatch(ev core.Event) {
-	for _, w := range r.targets(ev) {
-		w.EmitEvent(ev.Name, ev.Payload)
+// Dispatch is the local core's core.EventSink: an event with Worktree set
+// goes to every window showing it, one with only Repo set to every local
+// window of that repo.
+func (r *Registry) Dispatch(ev core.Event) { r.dispatch("", ev) }
+
+// sinkFor is distro's core.EventSink: it names the event's worktree by its
+// shell id, then dispatches it among distro's windows.
+func (r *Registry) sinkFor(distro string) core.EventSink {
+	return func(ev core.Event) {
+		if ev.Worktree != "" {
+			ev.Worktree = core.WorktreeID(remote.BuildWSLPath(distro, string(ev.Worktree)))
+		}
+		r.dispatch(distro, ev)
+	}
+}
+
+// dispatch emits ev to the windows it concerns among those distro backs
+// ("" = local), its payload decoded into the event's registered type. An
+// event that does not decode is dropped and logged. A "command" event never
+// reaches a window: it is written to the app log instead.
+func (r *Registry) dispatch(distro string, ev core.Event) {
+	data, err := decodeEvent(ev)
+	if err != nil {
+		r.log.Warn("event dropped", "name", ev.Name, "err", err)
+		return
+	}
+	if entry, ok := data.(core.CommandRecord); ok {
+		logCommand(r.log, ev.Worktree, entry)
+		return
+	}
+	for _, w := range r.targets(distro, ev) {
+		w.EmitEvent(ev.Name, data)
 	}
 }
 
 // targets picks the windows an event concerns; the native calls happen
-// after the lock is released.
-func (r *Registry) targets(ev core.Event) []shellWindow {
+// after the lock is released. A worktree id names its distro itself; a repo
+// key does not.
+func (r *Registry) targets(distro string, ev core.Event) []shellWindow {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	var windows []shellWindow
-	for _, entry := range r.windows {
+	for _, entry := range r.allEntriesLocked() {
 		switch {
 		case ev.Worktree != "":
 			if entry.selected == ev.Worktree { // every window sharing the selection
 				windows = append(windows, entry.window)
 			}
-		case ev.Repo != "" && entry.repo == ev.Repo:
+		case ev.Repo != "" && entry.repo == ev.Repo && entry.distro == distro:
 			windows = append(windows, entry.window)
 		}
 	}

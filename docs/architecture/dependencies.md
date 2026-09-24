@@ -15,13 +15,16 @@ One row per direct dependency in `go.mod` or `package.json`. The choices behind 
 | `vue` ^3.5 | UI framework (TR-03) | — | required | MIT | 2026-09-21 |
 | `pinia` ^4.0.3 | state management (TR-03) | plain `ref` with provide/inject | the official Vue store; setup stores fit `<script setup>` | MIT | 2026-09-21 |
 | `@vueuse/core` ^14.4 | composables: relative time, intervals, the preferred colour scheme | hand-rolled helpers | small, well tested, the standard Vue composable library | MIT | 2026-09-21 |
-| `openvue` 1.0.0, `@openvue/themes` 1.0.0 (exact) | UI components (tree, splitter, dialogs, menus) and the Aura theme | a hand-rolled tree view; CSS `resize` for columns | community continuation of PrimeVue 4.5.5, the last MIT release, same API | MIT | 2026-09-22 |
+| `openvue` 1.0.0, `@openvue/themes` 1.0.0 (exact) | UI components (splitter, dialogs, menus) and the Aura theme | a hand-rolled tree view; CSS `resize` for columns | community continuation of PrimeVue 4.5.5, the last MIT release, same API | MIT | 2026-09-22 |
+| `@openvue/openicons` 1.0.0 (exact) | the icon font every app-drawn icon uses (TR-34) | Unicode glyphs, an SVG icon set of our own | one font shared with OpenVue's own family, no per-icon assets | MIT | 2026-09-23 |
 | `@tanstack/vue-virtual` ^3.13 | virtual-scrolled commit log (QA-PERF-03) | VueUse `useVirtualList` | commit rows wrap; `useVirtualList` handles fixed heights only | MIT | 2026-09-21 |
-| `@codemirror/merge` 6.12.2 (exact) | visual diff, unified and side-by-side (ADR-7) | a hand-rolled line-diff renderer | covers FR-DIFF-01/02 including chunk navigation | MIT | 2026-09-21 |
+| `@codemirror/merge` 6.12.2 (exact) | visual diff, unified and side-by-side (ADR-7) | a hand-rolled line-diff renderer | covers FR-DIFF-01/02 including next/previous change | MIT | 2026-09-21 |
 | `@codemirror/view` 6.43.11, `@codemirror/state` 6.7.4 (exact) | editor views and state built directly by `DiffView.vue` | — | were transitive deps of `@codemirror/merge`; direct because app code imports them | MIT | 2026-09-21 |
 | `@codemirror/language` 6.12.4, `@codemirror/language-data` 6.5.2 (exact) | filename-based, lazily loaded syntax highlighting (FR-DIFF-05) | a hand-maintained extension table | the official CodeMirror language packages | MIT | 2026-09-23 |
 | `@lezer/highlight` 1.2.3 (exact) | `classHighlighter`: plain token classes the app's theme colours | CodeMirror's `defaultHighlightStyle`, which injects its own colours | CodeMirror's own highlighting base | MIT | 2026-09-23 |
 | `@wailsio/runtime` 3.0.0-beta.24 (exact) | JS side of the Wails bindings | — | must match the Go module version | MIT | 2026-09-21 |
+| `vue-i18n` 11.4.12 (exact) | UI text catalogue, Composition API (TR-35) | a hand-rolled key/lookup map | Vue's official i18n library; plurals and interpolation built in | MIT | 2026-09-23 |
+| `@intlify/unplugin-vue-i18n` 11.2.5 (exact, dev) | precompiles locale JSON at build time; enables the CSP-safe runtime-only vue-i18n build | none, vue-i18n's default build compiles messages at runtime | needed for a `eval`-free bundle in the Wails webview | MIT | 2026-09-23 |
 | `vite` ^8, `@vitejs/plugin-vue` ^6 | frontend build (dev) | — | the toolchain of the Wails template and create-vue | MIT | 2026-09-21 |
 | `typescript` ^5.9, `vue-tsc` ^3 | type checking, including SFCs (dev) | — | the only type checker for `.vue` files | Apache-2.0, MIT | 2026-09-21 |
 | `@types/node` ^26 | types for Node-side config files (dev) | — | needed by the create-vue `tsconfig.node.json` split (TR-33) | MIT | 2026-09-22 |

@@ -12,12 +12,12 @@ import (
 func start(argv []string) error {
 	bin, err := exec.LookPath(argv[0])
 	if err != nil {
-		return core.Errorf(core.EditorNotFound, "%q is not on PATH", argv[0])
+		return core.ErrorfArgs(core.EditorNotFound, "editorNotOnPath", map[string]string{"command": argv[0]}, "%q is not on PATH", argv[0])
 	}
 	cmd := exec.Command(bin, argv[1:]...)
 	proc.Detach(cmd)
 	if err := cmd.Start(); err != nil {
-		return core.Errorf(core.EditorNotFound, "could not start %q: %v", bin, err)
+		return core.ErrorfArgs(core.EditorNotFound, "editorStartFailed", map[string]string{"command": bin}, "could not start %q: %v", bin, err)
 	}
 	return cmd.Process.Release()
 }

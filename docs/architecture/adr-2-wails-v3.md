@@ -12,8 +12,8 @@ The shell is Wails v3, pinned to an exact version (TR-02). There is no fallback 
 
 What we use:
 
-- Services: one bound facade struct (`application.NewService`) with the `ServiceStartup`/`ServiceShutdown` hooks. Bound method types must be JSON-serialisable. Go errors reach TypeScript as rejected promises carrying name, message and cause.
-- TypeScript binding generation for the facade.
+- Services bound with `application.NewService`: the generated facade and the shell's own services. Bound method types must be JSON-serialisable. Go errors reach TypeScript as rejected promises carrying name, message and cause.
+- TypeScript binding generation for the bound services and the registered events.
 - Taskfile-based builds.
 - Multi-window, per-window events and the single-instance callback.
 
@@ -22,4 +22,4 @@ What we use:
 - Only `internal/app` imports Wails. Every other package is plain Go and builds with `CGO_ENABLED=0` (TR-07).
 - Upgrading Wails is a deliberate step: bump the pin, regenerate bindings, run the manual checklist.
 - Beta bugs get worked around in `internal/app` or fixed upstream.
-- Wails has no headless or browser mode. Frontend end-to-end tests run against the Vite dev server with a mocked Go layer (TR-31).
+- Wails' server mode (`-tags server`) serves the UI to a browser over HTTP. nebegit uses it only for the real-backend e2e suite and never ships it (TR-31).

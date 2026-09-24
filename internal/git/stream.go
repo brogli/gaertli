@@ -45,11 +45,12 @@ func (r Runner) StreamErr(ctx context.Context, call Call, onLine func([]byte) er
 // covers it: a grandchild (a stalled ssh, a transport's delay) that still
 // holds the output after git exited or was killed is cut off.
 func (r Runner) stream(ctx context.Context, call Call, fromStderr bool, onRecord func([]byte) error) (Result, error) {
-	cmd, effectiveCtx, cancel, command, err := r.prepare(ctx, call)
+	ctx, cancel := withTimeout(ctx, call.Timeout)
+	defer cancel()
+	cmd, command, err := r.prepare(ctx, call)
 	if err != nil {
 		return r.notStarted(call, command, err)
 	}
-	defer cancel()
 
 	var stdout, stderr bytes.Buffer
 	records, output := io.Pipe()
@@ -86,7 +87,7 @@ func (r Runner) stream(ctx context.Context, call Call, fromStderr bool, onRecord
 	recordErr := <-scanned
 
 	result := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes(), ExitCode: cmd.ProcessState.ExitCode()}
-	err = classify(effectiveCtx, cmd, runErr, result, command)
+	err = classify(ctx, cmd, runErr, result, command)
 	if recordErr != nil {
 		err = core.ErrorOf(recordErr)
 	}

@@ -80,6 +80,21 @@ func TestQA_OSS_01_LoadTextsFailsWhenAPackageHasNoLicenceFile(t *testing.T) {
 	}
 }
 
+func TestQA_OSS_01_LoadTextsUsesTheEmbeddedTextForAKnownPackageWithoutOne(t *testing.T) {
+	restore := noLicenceFileText
+	noLicenceFileText = map[string]string{"pkg-without-licence": "MIT, embedded"}
+	t.Cleanup(func() { noLicenceFileText = restore })
+
+	deps, err := loadTexts([]Dependency{{Name: "pkg-without-licence", File: t.TempDir()}})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deps[0].Text != "MIT, embedded" {
+		t.Errorf("text = %q", deps[0].Text)
+	}
+}
+
 func TestQA_OSS_01_LoadTextsUsesTheSameLicenceTextForAPackageWithoutOne(t *testing.T) {
 	licence := filepath.Join(t.TempDir(), "LICENSE")
 	if err := os.WriteFile(licence, []byte("MIT, Wails authors"), 0o644); err != nil {

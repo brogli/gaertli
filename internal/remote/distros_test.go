@@ -12,8 +12,8 @@ const canned = "  NAME               STATE           VERSION\r\n" +
 	"  My Distro          Stopped         1\r\n"
 
 var wantDistros = []Distro{
-	{Name: "Ubuntu-22.04", Version: 2, Default: true},
-	{Name: "My Distro", Version: 1, Default: false},
+	{Name: "Ubuntu-22.04", Version: 2},
+	{Name: "My Distro", Version: 1},
 }
 
 func TestFR_REPO_07_ParseDistroListUTF8(t *testing.T) {

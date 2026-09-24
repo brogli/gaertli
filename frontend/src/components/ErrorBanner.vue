@@ -1,33 +1,42 @@
 <script setup lang="ts">
-import { inject, ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useI18n } from '../i18n'
 import type { CoreError } from '../composables/useCoreCall'
-import { EditorFallbackKind } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { openSettingsKey } from '../lib/openSettings'
+import { Code } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// editorActions: false hides the editor buttons for an error with no
-// worktree editor behind it (SettingsPanel's Test button).
-const { editorActions = true } = defineProps<{ error: CoreError; editorActions?: boolean }>()
-const emit = defineEmits<{ fallback: [kind: EditorFallbackKind] }>()
-// openSettings is absent outside a main window (the compare-diff window has
-// no Settings dialog), and so is its link.
-const openSettings = inject(openSettingsKey, null)
+const props = defineProps<{ error: CoreError }>()
 const expanded = ref(false)
+const i18n = useI18n()
+const { t } = i18n
+
+// headline: the catalogue text for error.key once en.json has an entry for
+// it, INTERNAL's fixed text for a bug or other non-git failure, or the
+// English message as a fallback (an unrecognised key, or none at all).
+const headline = computed(() => {
+  if (props.error.code === Code.Internal) return t('errors.INTERNAL')
+  const key = props.error.key ? `errors.${props.error.key}` : ''
+  return key && i18n.te(key) ? t(key, props.error.args ?? {}) : props.error.message
+})
+
+// detail: what "show details" reveals below the headline. An internal
+// error has no git command or stderr, so its own message goes there
+// instead, untranslated technical detail rather than something to show
+// by default.
+const detail = computed(() =>
+  props.error.code === Code.Internal
+    ? props.error.message
+    : [props.error.command, props.error.gitStderr].filter(Boolean).join('\n'),
+)
 </script>
 
 <template>
   <div class="error-banner">
-    <p>{{ error.message }}</p>
-    <button type="button" @click="expanded = !expanded">show details</button>
-    <template v-if="editorActions && error.code === 'EDITOR_NOT_FOUND'">
-      <button v-if="openSettings" type="button" @click="openSettings">Open editor setting</button>
-      <button type="button" @click="emit('fallback', EditorFallbackKind.FallbackGitEditor)">
-        Open with git's editor
-      </button>
-      <button type="button" @click="emit('fallback', EditorFallbackKind.FallbackSystem)">
-        Open with system default
-      </button>
+    <p>{{ headline }}</p>
+    <!-- an editor start failure's message already names the command -->
+    <template v-if="error.code !== Code.EditorNotFound">
+      <button type="button" @click="expanded = !expanded">{{ t('notices.showDetails') }}</button>
+      <pre v-if="expanded">{{ detail }}</pre>
     </template>
-    <pre v-if="expanded">{{ [error.command, error.gitStderr].filter(Boolean).join('\n') }}</pre>
   </div>
 </template>
 

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -59,11 +61,18 @@ func TestFR_CHG_01_ParseStatusRenameWithUnstagedEditKeepsGroupsSeparate(t *testi
 func openWorktree(t *testing.T, dir string) (*Core, core.WorktreeID) {
 	t.Helper()
 	c := New(func(core.Event) {})
-	wt, err := c.OpenWorktree(context.Background(), core.RepoPath(dir))
+	return c, openOn(t, c, dir).ID
+}
+
+// openOn opens dir on c, closing the session when the test ends.
+func openOn(t *testing.T, c *Core, dir string) core.WorktreeInfo {
+	t.Helper()
+	wt, err := c.OpenWorktree(t.Context(), core.RepoPath(dir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return c, wt.ID
+	t.Cleanup(func() { _ = c.CloseWorktree(context.Background(), wt.ID) })
+	return wt
 }
 
 func writeFile(t *testing.T, dir, name, content string) {
@@ -85,7 +94,7 @@ func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflict(t *testing.T) 
 
 	// Real merge conflict, set up directly via the runner: leaves MERGE_HEAD
 	// and an unmerged conflict.txt.
-	_, _ = (git.Runner{}).Run(context.Background(), git.Call{
+	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
 		Dir: repo.Dir, Args: []string{"merge", "--end-of-options", "feature"},
 	})
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
@@ -98,7 +107,7 @@ func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflict(t *testing.T) 
 	writeFile(t, repo.Dir, "untracked.txt", "new")
 
 	c, id := openWorktree(t, repo.Dir)
-	got, err := c.Status(context.Background(), id)
+	got, err := c.Status(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +134,7 @@ func TestFR_CHG_01_StatusListsAFileChangedBothWaysOnce(t *testing.T) {
 	writeFile(t, repo.Dir, "a.txt", "staged\nmore\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	got, err := c.Status(context.Background(), id)
+	got, err := c.Status(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +153,7 @@ func TestFR_CHG_01_StatusListsAStagedRenameWithOldPath(t *testing.T) {
 	gittest.Run(t, repo.Dir, "mv", "old.txt", "new.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	got, err := c.Status(context.Background(), id)
+	got, err := c.Status(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,11 +174,11 @@ func TestFR_CHG_02_StageFileStagesAnUntrackedFile(t *testing.T) {
 	writeFile(t, repo.Dir, "b.txt", "untracked content\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.StageFile(context.Background(), id, "b.txt"); err != nil {
+	if err := c.StageFile(t.Context(), id, "b.txt"); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(context.Background(), id)
+	got, err := c.Status(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,11 +197,11 @@ func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T)
 	gittest.Run(t, repo.Dir, "add", "--", "a.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.UnstageFile(context.Background(), id, "a.txt"); err != nil {
+	if err := c.UnstageFile(t.Context(), id, "a.txt"); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(context.Background(), id)
+	got, err := c.Status(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +224,7 @@ func TestFR_CHG_02_UnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "a.txt", "clean\n", "add a.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	err := c.UnstageFile(context.Background(), id, "never-tracked.txt")
+	err := c.UnstageFile(t.Context(), id, "never-tracked.txt")
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if !strings.Contains(ce.GitStderr, "pathspec") {
@@ -233,11 +242,11 @@ func TestFR_CHG_02_StageAllStagesEveryChangeAtOnce(t *testing.T) {
 	writeFile(t, repo.Dir, "untracked.txt", "new\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.StageAll(context.Background(), id); err != nil {
+	if err := c.StageAll(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(context.Background(), id)
+	got, err := c.Status(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,14 +266,14 @@ func TestFR_CHG_02_UnstageAllReturnsEveryFileToItsOwnGroup(t *testing.T) {
 	writeFile(t, repo.Dir, "untracked.txt", "new\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.StageAll(context.Background(), id); err != nil {
+	if err := c.StageAll(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.UnstageAll(context.Background(), id); err != nil {
+	if err := c.UnstageAll(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(context.Background(), id)
+	got, err := c.Status(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +295,7 @@ func TestFR_CHG_04_DiffWorkingStagedReturnsHeadAndIndexContent(t *testing.T) {
 	gittest.Run(t, repo.Dir, "add", "--", "a.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "a.txt", "", true, false)
+	diff, err := c.DiffWorking(t.Context(), id, "a.txt", "", true, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +311,7 @@ func TestFR_CHG_04_DiffWorkingStagedOnNewFileHasNoOldContent(t *testing.T) {
 	gittest.Run(t, repo.Dir, "add", "--", "new.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "new.txt", "", true, false)
+	diff, err := c.DiffWorking(t.Context(), id, "new.txt", "", true, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,20 +320,23 @@ func TestFR_CHG_04_DiffWorkingStagedOnNewFileHasNoOldContent(t *testing.T) {
 	}
 }
 
+// A rename git detects: -M pairs paths whose content is at least 50%
+// similar.
 func TestFR_CHG_04_DiffWorkingStagedRenameUsesOldPath(t *testing.T) {
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "old.txt", "pre-rename\n", "add old.txt")
+	base := strings.Repeat("line unchanged\n", 20)
+	gittest.Commit(t, repo.Dir, "old.txt", base+"pre-rename\n", "add old.txt")
 	gittest.Run(t, repo.Dir, "mv", "old.txt", "new.txt")
-	writeFile(t, repo.Dir, "new.txt", "post-rename\n")
+	writeFile(t, repo.Dir, "new.txt", base+"post-rename\n")
 	gittest.Run(t, repo.Dir, "add", "--", "new.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "new.txt", "old.txt", true, false)
+	diff, err := c.DiffWorking(t.Context(), id, "new.txt", "old.txt", true, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if diff.OldContent != "pre-rename\n" || diff.NewContent != "post-rename\n" {
-		t.Errorf("DiffWorking = %+v, want OldContent %q NewContent %q", diff, "pre-rename\n", "post-rename\n")
+	if diff.OldContent != base+"pre-rename\n" || diff.NewContent != base+"post-rename\n" {
+		t.Errorf("DiffWorking = %+v, want OldContent %q NewContent %q", diff, base+"pre-rename\n", base+"post-rename\n")
 	}
 }
 
@@ -334,7 +346,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedReturnsIndexAndWorkingTreeContent(t *testi
 	writeFile(t, repo.Dir, "a.txt", "on-disk content\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "a.txt", "", false, false)
+	diff, err := c.DiffWorking(t.Context(), id, "a.txt", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +363,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedDeletionHasNoNewContent(t *testing.T) {
 	}
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "a.txt", "", false, false)
+	diff, err := c.DiffWorking(t.Context(), id, "a.txt", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +378,7 @@ func TestFR_CHG_04_DiffWorkingUntrackedHasNoOldContent(t *testing.T) {
 	writeFile(t, repo.Dir, "new.txt", "on-disk\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "new.txt", "", false, false)
+	diff, err := c.DiffWorking(t.Context(), id, "new.txt", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +396,7 @@ func TestFR_CHG_04_DiffWorkingHandlesAFileChangedBothWaysCorrectlyForBothCalls(t
 
 	c, id := openWorktree(t, repo.Dir)
 
-	staged, err := c.DiffWorking(context.Background(), id, "a.txt", "", true, false)
+	staged, err := c.DiffWorking(t.Context(), id, "a.txt", "", true, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +404,7 @@ func TestFR_CHG_04_DiffWorkingHandlesAFileChangedBothWaysCorrectlyForBothCalls(t
 		t.Errorf("staged.NewContent = %q, want %q", staged.NewContent, "staged\n")
 	}
 
-	unstaged, err := c.DiffWorking(context.Background(), id, "a.txt", "", false, false)
+	unstaged, err := c.DiffWorking(t.Context(), id, "a.txt", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +419,7 @@ func TestFR_CHG_04_DiffWorkingUntrackedBinaryFileHasNoContent(t *testing.T) {
 	writeFile(t, repo.Dir, "bin.dat", "abc\x00def")
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "bin.dat", "", false, false)
+	diff, err := c.DiffWorking(t.Context(), id, "bin.dat", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +434,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedBinaryFileHasNoContent(t *testing.T) {
 	writeFile(t, repo.Dir, "bin.dat", "xyz\x00123")
 
 	c, id := openWorktree(t, repo.Dir)
-	diff, err := c.DiffWorking(context.Background(), id, "bin.dat", "", false, false)
+	diff, err := c.DiffWorking(t.Context(), id, "bin.dat", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +450,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedCapsHugeFilesWithAForceReloadBypass(t *tes
 	writeFile(t, repo.Dir, "big.txt", big)
 
 	c, id := openWorktree(t, repo.Dir)
-	capped, err := c.DiffWorking(context.Background(), id, "big.txt", "", false, false)
+	capped, err := c.DiffWorking(t.Context(), id, "big.txt", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,70 +458,38 @@ func TestFR_CHG_04_DiffWorkingUnstagedCapsHugeFilesWithAForceReloadBypass(t *tes
 		t.Errorf("DiffWorking = %+v, want TooLarge with no content", capped)
 	}
 
-	full, err := c.DiffWorking(context.Background(), id, "big.txt", "", false, true)
+	full, err := c.DiffWorking(t.Context(), id, "big.txt", "", false, core.DiffOptions{Force: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if full.TooLarge || full.NewContent != big {
 		t.Error("DiffWorking with force=true: still TooLarge or content mismatch, want the full content")
 	}
-}
-
-func TestFR_CHG_04_DiffWorkingIsBinaryTreatsNoIndexExit1AsATolerableDifference(t *testing.T) {
-	tests := []struct {
-		name       string
-		exit       string
-		wantErr    bool
-		wantBinary bool
-	}{
-		{"exit 1: --no-index's real-difference convention, tolerated", "1", false, true},
-		{"exit 2: a genuine failure, not tolerated", "2", true, false},
-		{"exit 0: no difference, parses normally", "0", false, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("FAKEGIT_STDOUT", "-\t-\tfile")
-			t.Setenv("FAKEGIT_EXIT", tt.exit)
-			r := git.Runner{Git: fakegit}
-
-			binary, err := diffWorkingIsBinary(context.Background(), r, t.TempDir(), "file", true, oldSide{})
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("diffWorkingIsBinary() error = nil, want an error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if binary != tt.wantBinary {
-				t.Errorf("binary = %v, want %v", binary, tt.wantBinary)
-			}
-		})
+	if want := []core.DiffHunk{hunk(1, 1, 1, 1)}; !slices.Equal(full.Hunks, want) {
+		t.Errorf("DiffWorking with force=true: Hunks = %v, want %v", full.Hunks, want)
 	}
 }
 
-func TestFR_CHG_04_DiffWorkingTreeOldSideIsPassedExplicitlyNotParsedFromAString(t *testing.T) {
+func TestFR_CHG_04_DiffWorkingShowsAFileWhoseNameHoldsANewline(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows file names cannot hold a newline")
+	}
+	const name = "a\nb.txt"
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "head\n", "add a.txt")
-	head := gittest.HeadSHA(t, repo.Dir)
-	writeFile(t, repo.Dir, "a.txt", "working\n") // unstaged edit, index still holds "head\n"
+	gittest.Commit(t, repo.Dir, name, "old\n", "add")
+	writeFile(t, repo.Dir, name, "new\n")
 
-	r := git.Runner{}
-
-	index, err := diffWorkingTree(context.Background(), r, repo.Dir, "a.txt", oldSide{path: "a.txt"}, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if index.OldContent != "head\n" || index.NewContent != "working\n" {
-		t.Errorf("diffWorkingTree(index old side) = %+v, want OldContent %q NewContent %q", index, "head\n", "working\n")
-	}
-
-	commit, err := diffWorkingTree(context.Background(), r, repo.Dir, "a.txt", oldSide{sha: head, path: "a.txt"}, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if commit.OldContent != "head\n" || commit.NewContent != "working\n" {
-		t.Errorf("diffWorkingTree(commit old side) = %+v, want OldContent %q NewContent %q", commit, "head\n", "working\n")
+	c, id := openWorktree(t, repo.Dir)
+	for _, staged := range []bool{false, true} {
+		if staged {
+			gittest.Run(t, repo.Dir, "add", "--", name)
+		}
+		diff, err := c.DiffWorking(t.Context(), id, name, "", staged, core.DiffOptions{})
+		if err != nil {
+			t.Fatalf("staged=%v: %v", staged, err)
+		}
+		if diff.OldContent != "old\n" || diff.NewContent != "new\n" {
+			t.Errorf("staged=%v: DiffWorking = %q → %q, want %q → %q", staged, diff.OldContent, diff.NewContent, "old\n", "new\n")
+		}
 	}
 }

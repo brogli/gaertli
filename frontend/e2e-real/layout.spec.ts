@@ -1,24 +1,36 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import { refNode } from './helpers'
+import { dragLogBorder, openBranchPicker, openWorktreePicker, refLi } from './helpers'
 
 // Layout at the 1200 x 800 window the fixtures open, with real refs and a
-// real repo path in the selector.
+// real repo path in the pickers.
 
-test('FR-UX-09 no tree scrolls sideways; every tree row fits its panel', async ({ app }) => {
-  // A sideways-scrolling tree gets an overlay scrollbar under WebKitGTK that
-  // covers its last row and swallows clicks on that row's toggle.
-  const roots = await app.locator('.p-tree-root').all()
-  expect(roots.length).toBeGreaterThan(0)
-  for (const root of roots) {
-    const { overflowX, fits } = await root.evaluate((el) => ({
-      overflowX: getComputedStyle(el).overflowX,
-      fits: el.scrollWidth <= el.clientWidth,
-    }))
-    expect(overflowX).toBe('hidden')
-    expect(fits).toBe(true)
+// expectRowsFit: no row of the open picker list is wider than the list,
+// and the list does not scroll sideways.
+async function expectRowsFit(page: Page, list: string): Promise<void> {
+  // A sideways-scrolling list gets an overlay scrollbar under WebKitGTK that
+  // covers its last row and swallows clicks on that row.
+  const scroller = page.locator(`.p-popover ${list} .picker-scroll`)
+  const { overflowX, fits } = await scroller.evaluate((el) => ({
+    overflowX: getComputedStyle(el).overflowX,
+    fits: el.scrollWidth <= el.clientWidth,
+  }))
+  expect(overflowX).toBe('hidden')
+  expect(fits).toBe(true)
+  for (const row of await scroller.locator('li').all()) {
+    expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
   }
+}
+
+test('FR-UX-09 no picker list scrolls sideways; every row fits the list', async ({ app }) => {
+  await openWorktreePicker(app)
+  await expectRowsFit(app, '.worktree-list')
+  await app.keyboard.press('Escape')
+
+  await openBranchPicker(app)
+  await expectRowsFit(app, '.branch-list')
 })
 
 test('FR-UX-09 a long branch name ends in an ellipsis beside its checkbox and shows whole on hover', async ({
@@ -26,13 +38,14 @@ test('FR-UX-09 a long branch name ends in an ellipsis beside its checkbox and sh
   git,
   repos,
 }) => {
-  const long = 'a-rather-long-branch-name-that-does-not-fit-the-sidebar'
+  const long = 'a-rather-long-branch-name-that-does-not-fit-the-branch-picker'
   git(repos.work, 'branch', long, 'main')
   git(repos.work, 'push', '-q', '-u', 'origin', long)
 
-  const node = refNode(app, long)
-  const checkbox = node.locator('[data-test=update-select]')
-  const name = node.locator('.ref-name')
+  await openBranchPicker(app)
+  const li = refLi(app, long)
+  const checkbox = li.locator('[data-test=update-select]')
+  const name = li.locator('.ref-name')
   await expect(checkbox).toBeVisible()
   await expect(name).toHaveAttribute('title', long)
   const [c, n] = [await checkbox.boundingBox(), await name.boundingBox()]
@@ -40,7 +53,7 @@ test('FR-UX-09 a long branch name ends in an ellipsis beside its checkbox and sh
   expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
 })
 
-test('FR-UX-09 a selector worktree row keeps its name, flags and buttons on one line; a long branch name ends in an ellipsis', async ({
+test('FR-UX-09 a worktree row keeps its name, flags and buttons on one line; a long branch name ends in an ellipsis', async ({
   app,
   git,
   repos,
@@ -54,12 +67,16 @@ test('FR-UX-09 a selector worktree row keeps its name, flags and buttons on one 
   fs.writeFileSync(path.join(linked('wt-dirty'), 'new.txt'), 'x\n')
   git(repos.work, 'worktree', 'lock', linked('wt-locked'))
   fs.rmSync(linked('wt-missing'), { recursive: true })
-  const long = 'a-rather-long-branch-name-that-does-not-fit-the-selector'
-  git(repos.work, 'branch', long, 'main')
+  const long = 'a-rather-long-branch-name-that-does-not-fit-the-worktree-picker'
+  linked(long)
 
-  await app.locator('.selector-panel .p-tree-node-toggle-button').first().click()
-  const rows = app.locator('[data-test=worktree-row]')
-  await expect(rows).toHaveCount(5)
+  await openWorktreePicker(app)
+  // The row's own li: its label span and its sibling buttons, all on one
+  // line.
+  const rows = app.locator('.p-popover .picker-rows li', {
+    has: app.locator('[data-test=worktree-row]'),
+  })
+  await expect(rows).toHaveCount(6)
   for (const row of await rows.all()) {
     const boxes = await Promise.all(
       (await row.locator(':scope > *').all()).map(async (child) => (await child.boundingBox())!),
@@ -71,8 +88,7 @@ test('FR-UX-09 a selector worktree row keeps its name, flags and buttons on one 
     }
   }
 
-  const name = app.locator('[data-test=branch-row]', { hasText: long }).locator('.ellipsis')
-  await expect(name).toHaveAttribute('title', long)
+  const name = rows.locator(`[data-test=worktree-branch][title="${long}"]`)
   expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
 })
 
@@ -82,11 +98,14 @@ test('FR-WT-01 a worktree row gives up its folder name before its branch name', 
   repos,
   sandbox,
 }) => {
-  const dir = path.join(sandbox.dir, 'a-worktree-folder-with-a-rather-long-name')
+  const dir = path.join(
+    sandbox.dir,
+    'a-worktree-folder-with-a-rather-long-name-that-cannot-fit-in-a-picker-row',
+  )
   git(repos.work, 'worktree', 'add', '-q', '-b', 'wip', dir, 'main')
 
-  await app.locator('.selector-panel .p-tree-node-toggle-button').first().click()
-  const row = app.locator('[data-test=worktree-row]', { hasText: 'wip' })
+  await openWorktreePicker(app)
+  const row = app.locator('.p-popover [data-test=worktree-row]', { hasText: 'wip' })
   const branch = row.locator('[data-test=worktree-branch]')
   await expect(branch).toHaveText('wip')
   expect(await branch.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
@@ -100,7 +119,9 @@ test('FR-UX-09 the changes heading shows whole; Stage all and Unstage all share 
   const heading = app.locator('.changes-body header h2')
   expect(await heading.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
   const stageAll = await app.getByRole('button', { name: 'Stage all', exact: true }).boundingBox()
-  const unstageAll = await app.getByRole('button', { name: 'Unstage all', exact: true }).boundingBox()
+  const unstageAll = await app
+    .getByRole('button', { name: 'Unstage all', exact: true })
+    .boundingBox()
   expect(Math.abs(stageAll!.y - unstageAll!.y)).toBeLessThan(4)
 })
 
@@ -119,10 +140,13 @@ test('FR-LOG-01 a crowded log row shows two whole ref labels and "+N" naming the
   expect((await row.locator('.subject').boundingBox())!.width).toBeGreaterThanOrEqual(80)
 })
 
-test('FR-UX-09 in a narrow log column the ref labels shrink to an ellipsis; "+N" and the hash stay inside the row', async ({
+test('FR-UX-09 in a narrow log view the ref labels shrink to an ellipsis; "+N" and the hash stay inside the row', async ({
   app,
 }) => {
-  await app.setViewportSize({ width: 1100, height: 800 })
+  await dragLogBorder(app, 350)
+  await expect
+    .poll(async () => (await app.locator('.log-column').boundingBox())!.width)
+    .toBeLessThan(380)
   const list = app.locator('.log-list')
   const row = app.locator('.row', { has: app.locator('.ref-label.head') })
   const rowRight = async () => {

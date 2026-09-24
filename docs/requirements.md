@@ -1,6 +1,6 @@
 # Requirements — nebegit
 
-This doc says **what** the app must do. It says nothing about **how**. See `architecture.md` for that.
+What the app must do. How it is built is in `architecture.md`.
 
 Priorities: **MUST** = needed for v1. **SHOULD** = wanted, can slip.
 Every requirement has an ID. Feature specs and tests refer to these IDs.
@@ -12,7 +12,7 @@ Every requirement has an ID. Feature specs and tests refer to these IDs.
 **nebegit** = Swiss German *näbe* ("beside") + git: the git tool that sits beside your editor.
 
 A desktop GUI for daily git work, used next to a code editor that lacks strong git tooling (first case: the editor).
-It fills the gap left after moving from an IDE to the editor: a strong log viewer, commit compare, worktree handling, and safe sync actions.
+It fills the gap left after moving from an IDE to the editor: a strong log view, commit comparison, worktree handling, and safe sync actions.
 
 ## Goals
 
@@ -33,10 +33,12 @@ It fills the gap left after moving from an IDE to the editor: a strong log viewe
 
 ## Users and context
 
-- Users: developers who know git well. First user is the owner; the app is published as open source for others.
-- Git is installed. The user is already logged in to their remotes through the git command line.
-- The owner uses the editor. Other users may use any editor (FR-ED). The app runs beside it.
-- A window shows one selected worktree at a time; a selector panel in the window switches it. Several windows can be open.
+- Users: developers who know git well. The first user is the owner, who uses the editor; others may use any editor (FR-ED).
+- Single user, single machine.
+- Git is installed and on the path. The user is already logged in to their remotes through the git command line.
+- A window shows one selected worktree at a time; the repo and worktree pickers in its toolbar switch it. Several windows can be open.
+- UI language: English; the UI is translatable (FR-UX-11).
+- Development is spec-driven and test-driven, done hands-off by Claude sessions. The owner handles session handovers and critical decisions only. Process and tooling: `architecture.md`, TR-15 to TR-33.
 
 ---
 
@@ -44,30 +46,8 @@ It fills the gap left after moving from an IDE to the editor: a strong log viewe
 
 - [functional.md](requirements/functional.md): FR-*, one section per area (REPO, LOG, CMP, DIFF, BR, WT, CHG, SYNC, UPD, CP, RV, CONF, ED, UX).
 - [quality.md](requirements/quality.md): QA-*.
-
-## Constraints and assumptions
-
-- Git is installed and on the path.
-- The user is already authenticated for their remotes.
-- Single user, single machine. One worktree per window.
-- UI language: English.
-- Development is spec-driven and test-driven, done hands-off by Claude sessions. The owner handles session handovers and critical decisions only. Process and tooling: `architecture.md`, TR-15 to TR-33.
+- [glossary.md](requirements/glossary.md): the domain terms every document, the code and the UI use (QA-USE-03).
 
 ## Out of scope for v1
 
-Clone · built-in merge editor · interactive rebase · stash management (beyond FR-SYNC-09) · tag management · blame · file history view · submodules · LFS-specific features · pull requests / hosting integration · installers · auto-update · code signing.
-
-## Decisions
-
-| Topic | Decision |
-|---|---|
-| Name | nebegit |
-| Licence | BSD-3-Clause |
-| Hosting / CI | GitHub + GitHub Actions |
-| macOS | Best effort: build only, untested |
-| Worktree handling | A selector panel in the window (repos, worktrees, branches); the rest of the window follows the selection. |
-| Audience | Open source with release downloads |
-| Log actions in v1 | Cherry-pick, revert, check out commit. Reset mode "keep" stays SHOULD. |
-| Process | Hands-off by Claude sessions; critical decisions to the owner. |
-
-No open questions.
+Clone · built-in merge editor · interactive rebase (beyond squash and fixup, FR-LOG-14) · stash management (beyond FR-SYNC-09) · tag management · blame · file history view · submodules · LFS-specific features · installer programs · auto-update · code signing.

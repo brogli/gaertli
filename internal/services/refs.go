@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -16,8 +17,28 @@ import (
 // the tag object.
 const refsFormat = "%(refname)%1f%(objectname)%1f%(*objectname)%1f%(upstream:short)%1f%(upstream:track)%1f%(HEAD)%1f%(worktreepath)%00"
 
+// Refs implements core.API.
+func (c *Core) Refs(ctx context.Context, id core.WorktreeID) (core.Refs, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return core.Refs{}, err
+	}
+	result, err := wt.Runner.Run(ctx, git.Call{
+		Dir: wt.Path, ReadOnly: true, Background: true,
+		Args: []string{"for-each-ref", "--format=" + refsFormat, "refs/heads", "refs/remotes", "refs/tags"},
+	})
+	if err != nil {
+		return core.Refs{}, err
+	}
+	names, err := remoteNames(ctx, wt.Runner, wt.Path)
+	if err != nil {
+		return core.Refs{}, err
+	}
+	return toRefs(parseRefRecords(result.Stdout), names), nil
+}
+
 // parsedRef is one for-each-ref record, before bucketing into core.Refs'
-// three lists or extracting Summary's current-branch fields.
+// three lists.
 type parsedRef struct {
 	Name          string // full refname, e.g. "refs/heads/main"
 	SHA           string // %(*objectname) if non-empty, else %(objectname)
@@ -39,11 +60,10 @@ func parseRefRecords(out []byte) []parsedRef {
 }
 
 // nulRecords splits a %00-terminated git stream into records, stripping the
-// '\n' git appends after each one and dropping empties. Shared by every
-// for-each-ref parser here.
+// '\n' git appends after each one and dropping empties.
 func nulRecords(out []byte) []string {
 	var records []string
-	for _, record := range bytes.Split(out, []byte{0}) {
+	for record := range bytes.SplitSeq(out, []byte{0}) {
 		record = bytes.TrimPrefix(record, []byte("\n"))
 		if len(record) > 0 {
 			records = append(records, string(record))
@@ -74,7 +94,7 @@ func parseTrack(s string) (ahead, behind int, gone bool) {
 		return 0, 0, true
 	}
 	s = strings.TrimSuffix(strings.TrimPrefix(s, "["), "]")
-	for _, part := range strings.Split(s, ", ") {
+	for part := range strings.SplitSeq(s, ", ") {
 		if n, ok := strings.CutPrefix(part, "ahead "); ok {
 			ahead, _ = strconv.Atoi(n)
 		}
@@ -88,12 +108,10 @@ func parseTrack(s string) (ahead, behind int, gone bool) {
 // toRefs buckets parsed refs by refname prefix — for-each-ref sorts its
 // output globally by refname, not by input pattern order — and groups
 // refs/remotes/<remote>/... by <remote> in first-seen order. Everything
-// arrives alphabetically sorted, so no sort step is needed.
-func toRefs(parsed []parsedRef) core.Refs {
+// arrives alphabetically sorted, so no sort step is needed. remoteNames are
+// the configured remotes, needed because a remote's name may contain a slash.
+func toRefs(parsed []parsedRef, remoteNames []string) core.Refs {
 	var refs core.Refs
-	remotes := map[string]*core.Remote{}
-	var order []string
-
 	for _, p := range parsed {
 		switch {
 		case strings.HasPrefix(p.Name, "refs/heads/"):
@@ -101,14 +119,11 @@ func toRefs(parsed []parsedRef) core.Refs {
 		case strings.HasPrefix(p.Name, "refs/tags/"):
 			refs.Tags = append(refs.Tags, core.Tag{Name: strings.TrimPrefix(p.Name, "refs/tags/"), SHA: p.SHA})
 		case strings.HasPrefix(p.Name, "refs/remotes/"):
-			if remote, branch, ok := splitRemoteBranch(p.Name); ok && branch != "HEAD" {
-				addRemoteBranch(remotes, &order, remote, branch, p.SHA) // <remote>/HEAD is the remote's symbolic HEAD, not a branch
+			remote, branch, ok := splitRemoteBranch(strings.TrimPrefix(p.Name, "refs/remotes/"), remoteNames)
+			if ok && branch != "HEAD" { // <remote>/HEAD is the remote's symbolic HEAD, not a branch
+				addRemoteBranch(&refs, remote, core.RemoteBranch{Name: branch, SHA: p.SHA})
 			}
 		}
-	}
-
-	for _, name := range order {
-		refs.Remotes = append(refs.Remotes, *remotes[name])
 	}
 	return refs
 }
@@ -121,48 +136,37 @@ func toBranch(p parsedRef) core.Branch {
 	}
 }
 
-// splitRemoteBranch splits "refs/remotes/<remote>/<branch>" into remote
-// and branch.
-func splitRemoteBranch(name string) (remote, branch string, ok bool) {
-	rest, ok := strings.CutPrefix(name, "refs/remotes/")
-	if !ok {
-		return "", "", false
+// splitRemoteBranch splits "<remote>/<branch>" at the longest configured
+// remote name that prefixes it; a ref of a remote no longer configured
+// splits at its first slash.
+func splitRemoteBranch(rest string, remoteNames []string) (remote, branch string, ok bool) {
+	for _, r := range remoteNames {
+		if b, found := strings.CutPrefix(rest, r+"/"); found && len(r) > len(remote) {
+			remote, branch = r, b
+		}
 	}
-	remote, branch, ok = strings.Cut(rest, "/")
-	return remote, branch, ok
+	if remote != "" {
+		return remote, branch, true
+	}
+	return strings.Cut(rest, "/")
 }
 
-func addRemoteBranch(remotes map[string]*core.Remote, order *[]string, remoteName, branch, sha string) {
-	r, ok := remotes[remoteName]
-	if !ok {
-		r = &core.Remote{Name: remoteName}
-		remotes[remoteName] = r
-		*order = append(*order, remoteName)
-	}
-	r.Branches = append(r.Branches, core.RemoteBranch{Name: branch, SHA: sha})
-}
-
-// loadRefs runs one for-each-ref call over patterns and parses it.
-func loadRefs(ctx context.Context, r git.Runner, dir string, patterns ...string) ([]parsedRef, error) {
-	result, err := r.Run(ctx, git.Call{
-		Dir: dir, ReadOnly: true, Background: true,
-		Args: append([]string{"for-each-ref", "--format=" + refsFormat}, patterns...),
-	})
+// remoteNames lists the configured remotes.
+func remoteNames(ctx context.Context, r git.Runner, dir string) ([]string, error) {
+	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Background: true, Args: []string{"remote"}})
 	if err != nil {
 		return nil, err
 	}
-	return parseRefRecords(result.Stdout), nil
+	return strings.Fields(string(result.Stdout)), nil
 }
 
-// Refs implements core.API.
-func (c *Core) Refs(ctx context.Context, id core.WorktreeID) (core.Refs, error) {
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		return core.Refs{}, err
+// addRemoteBranch appends b to remote's entry in refs.Remotes, adding the
+// entry the first time remote is seen.
+func addRemoteBranch(refs *core.Refs, remote string, b core.RemoteBranch) {
+	i := slices.IndexFunc(refs.Remotes, func(r core.Remote) bool { return r.Name == remote })
+	if i < 0 {
+		i = len(refs.Remotes)
+		refs.Remotes = append(refs.Remotes, core.Remote{Name: remote})
 	}
-	parsed, err := loadRefs(ctx, wt.Runner, wt.Path, "refs/heads", "refs/remotes", "refs/tags")
-	if err != nil {
-		return core.Refs{}, err
-	}
-	return toRefs(parsed), nil
+	refs.Remotes[i].Branches = append(refs.Remotes[i].Branches, b)
 }

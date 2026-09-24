@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
+import { useI18n } from '../i18n'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { formatTimeAgo } from '@vueuse/core'
 import ContextMenu from 'openvue/contextmenu'
 import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
-import { useChangesStore } from '../stores/changes'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import GraphCell from './GraphCell.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import PickDialog from './PickDialog.vue'
-import { buildCommitMenuItems } from '../menus/commitMenu'
-import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  buildComparisonMenuItems,
+  buildOneCommitMenuItems,
+  buildRangeMenuItems,
+  type CommitMenuItem,
+} from '../menus/commitMenu'
+import { timeAgo } from '../lib/format'
+import type { LogCommit, PickOptions } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // LogList is a virtual-scrolled commit list: only the rows in view are
 // rendered, and only their window is fetched.
@@ -22,16 +27,21 @@ const emit = defineEmits<{
   'checkout-commit': [sha: string]
   reset: [sha: string, subject: string]
   'create-worktree': [sha: string]
+  open: []
 }>()
 const log = useLogStore()
 const compare = useCompareStore()
-const changes = useChangesStore()
 const { error, runAndClose } = useCoreCall()
+const { t } = useI18n()
 
 // The cherry-pick/revert options dialog: opened by the "…" menu items, and
 // by a plain "Cherry-pick" on a single selected merge commit, which needs a
 // parent choice cherry-pick has no default for.
-const pickDialog = ref<{ verb: 'cherry-pick' | 'revert'; shas: string[]; singleMerge: boolean } | null>(null)
+const pickDialog = ref<{
+  verb: 'cherry-pick' | 'revert'
+  shas: string[]
+  singleMerge: boolean
+} | null>(null)
 function closePickDialog(): void {
   pickDialog.value = null
   log.clearMultiSelect()
@@ -44,8 +54,8 @@ onMounted(() => {
 const parentRef = ref<HTMLElement | null>(null)
 
 // Rows are one fixed-height line (subject ellipsised), so the virtualizer
-// never measures them: dynamic measurement shifted scrollTop while rows
-// streamed in, leaving a fresh list scrolled away from the top or blank.
+// never measures them: measuring shifted scrollTop while rows streamed in,
+// leaving a fresh list scrolled away from the top or blank.
 const ROW_HEIGHT = 24
 
 // A row shows this many ref labels, then "+N" naming them all on hover.
@@ -65,10 +75,19 @@ const visibleRows = computed(() =>
 )
 const multiSelected = computed(() => new Set(log.multiSelect.map((r) => r.sha)))
 
+// The rows marked selected. An active comparison marks its two rows
+// compare-older/compare-newer instead (below), not selected.
+const selectedShas = computed(() => {
+  if (compare.active) return new Set<string | undefined>()
+  const rows = compare.selection.length ? compare.selection : [log.selectedRow]
+  return new Set(rows.map((r) => r?.sha))
+})
+
+// One LogRows call per window: from the first visible row not yet cached to
+// the last.
 watchEffect(() => {
-  for (const { item, row } of visibleRows.value) {
-    if (!row) void log.rows(item.index, item.index + 1)
-  }
+  const missing = visibleRows.value.filter(({ row }) => !row).map(({ item }) => item.index)
+  if (missing.length) void log.rows(missing[0]!, missing.at(-1)! + 1)
 })
 
 // log.jumpTo sets pendingScrollTo: scroll that row into view and clear it.
@@ -84,70 +103,124 @@ watch(
 // Ctrl/Cmd-click adds row to the compare selection instead of selecting it
 // in the log; the first Ctrl-click of a pair seeds the selection with the
 // plainly selected row. Shift-click extends a multi-select range; any
-// other plain click leaves compare mode and collapses the multi-select to
+// other plain click leaves the comparison and collapses the multi-select to
 // this row.
 function onRowClick(row: LogCommit | undefined, index: number, event: MouseEvent): void {
   if (!row) return
   if (event.ctrlKey || event.metaKey) {
-    if (compare.selection.length === 0 && log.selectedRow && log.selectedRow.sha !== row.sha) {
-      compare.toggleSelect(log.selectedRow) // the plainly selected commit is the "from" side
+    const previous = plainSelectionOtherThan(row)
+    if (compare.selection.length === 0 && previous) {
+      compare.toggleSelect(props.wt, previous.row, previous.index)
     }
-    compare.toggleSelect(row)
+    compare.toggleSelect(props.wt, row, index)
     return
   }
   compare.exit()
-  changes.clearSelection() // a commit selection wins over a stale changes-panel diff
   if (event.shiftKey) void log.shiftSelectTo(index)
   else log.selectOnly(row, index)
   void log.select(row)
 }
 
-function timeAgo(unixSeconds: number): string {
-  return formatTimeAgo(new Date(unixSeconds * 1000))
-}
-
-// Right-clicking a row selects it like a left click, then opens the context
-// menu. Cherry-pick and revert act on the current multi-select if the
-// right-clicked row is part of it, else on that row alone.
+// Right-clicking a row opens the menu that fits what is selected: the pair
+// being compared, a range of 2+, or (default) this row alone, which leaves
+// any comparison or range behind it.
 const menuRef = ref<InstanceType<typeof ContextMenu>>()
-const menuItems = ref<ReturnType<typeof buildCommitMenuItems>>([])
+const menuItems = ref<CommitMenuItem[]>([])
 
 function onContextMenu(event: MouseEvent, row: LogCommit | undefined, index: number): void {
   if (!row) return
-  // compareWithSelected pairs with whatever was selected before this
-  // right-click, captured ahead of the selection changes below.
-  const previouslySelected = log.selectedRow
-  if (!multiSelected.value.has(row.sha)) log.selectOnly(row, index)
+
+  if (compare.active && isCompared(row)) {
+    menuItems.value = buildComparisonMenuItems(comparisonActions(), t)
+    menuRef.value?.show(event)
+    return
+  }
+
+  if (log.multiSelect.length >= 2 && multiSelected.value.has(row.sha)) {
+    void log.select(row)
+    menuItems.value = buildRangeMenuItems(log.multiSelect, rangeActions(), t)
+    menuRef.value?.show(event)
+    return
+  }
+
+  // compareWithPrevious pairs with whatever was plainly selected before
+  // this right-click, captured ahead of the selection changes below.
+  const previous = plainSelectionOtherThan(row)
+  compare.exit()
+  log.selectOnly(row, index)
   void log.select(row)
-  const actions: Parameters<typeof buildCommitMenuItems>[1] = {
+
+  const oneActions: Parameters<typeof buildOneCommitMenuItems>[1] = {
+    ...pickAndRevertActions(),
     openCreateBranch: (sha) => emit('create-branch', sha),
     openCheckoutCommit: (sha) => emit('checkout-commit', sha),
     openReset: (sha, subject) => emit('reset', sha, subject),
-    cherryPick,
-    cherryPickOptions: () => (pickDialog.value = { verb: 'cherry-pick', ...pickTarget() }),
-    revert: () => void runAndClose(() => Facade.Revert(props.wt, shasOf(log.multiSelect)), log.clearMultiSelect),
-    revertOptions: () => (pickDialog.value = { verb: 'revert', ...pickTarget() }),
     openCreateWorktree: (sha) => emit('create-worktree', sha),
     compareWithWorking: () => compare.startAgainstWorking(row),
   }
-  if (previouslySelected && previouslySelected.sha !== row.sha) {
-    actions.compareWithSelected = () => {
-      compare.exit() // a clean two-item pair regardless of any prior ctrl-click state
-      compare.toggleSelect(previouslySelected)
-      compare.toggleSelect(row)
+  if (previous) {
+    oneActions.compareWithPrevious = {
+      shortSha: previous.row.shortSha,
+      run: () => {
+        compare.toggleSelect(props.wt, previous.row, previous.index)
+        compare.toggleSelect(props.wt, row, index)
+      },
     }
   }
-  menuItems.value = buildCommitMenuItems(row, actions)
+  menuItems.value = buildOneCommitMenuItems(row, oneActions, t)
   menuRef.value?.show(event)
+}
+
+// plainSelectionOtherThan is the plainly selected row and its log index,
+// the other half of a comparison with row; null if none or row itself.
+function plainSelectionOtherThan(row: LogCommit): { row: LogCommit; index: number } | null {
+  const selected = log.selectedRow
+  const index = log.anchorIndex
+  return selected && index !== null && selected.sha !== row.sha ? { row: selected, index } : null
+}
+
+function isCompared(row: LogCommit): boolean {
+  return row.sha === compare.older?.sha || row.sha === compare.newer?.sha
+}
+
+// pickAndRevertActions is the cherry-pick/revert action set shared by the
+// one-commit and range menus: both act on log.multiSelect, which
+// selectOnly/shiftSelectTo keep in sync with the visible selection.
+function pickAndRevertActions() {
+  return {
+    cherryPick,
+    cherryPickOptions: () => (pickDialog.value = { verb: 'cherry-pick', ...pickTarget() }),
+    revert: () =>
+      void runAndClose(
+        () => Facade.Revert(props.wt, shasOf(log.multiSelect), gitDefaults),
+        log.clearMultiSelect,
+      ),
+    revertOptions: () => (pickDialog.value = { verb: 'revert', ...pickTarget() }),
+  }
+}
+
+function rangeActions(): Parameters<typeof buildRangeMenuItems>[1] {
+  return {
+    ...pickAndRevertActions(),
+    copyHashes: () => void navigator.clipboard.writeText(shasOf(log.multiSelect).join('\n')),
+  }
+}
+
+function comparisonActions(): Parameters<typeof buildComparisonMenuItems>[0] {
+  return {
+    swap: compare.swap,
+    stopComparing: compare.exit,
+    copyBothHashes: () =>
+      void navigator.clipboard.writeText(`${compare.from?.sha}\n${compare.to?.sha}`),
+  }
 }
 
 function shasOf(rows: LogCommit[]): string[] {
   return rows.map((r) => r.sha)
 }
 
-// pickTarget reads shas and the merge-parent-choice gate off log.multiSelect
-// (always at least the right-clicked row — set just above) — no extra core
-// call, PickDialog's own doc comment.
+// pickTarget is the multi-select's shas, and whether they are one merge
+// commit. The multi-select always holds at least the right-clicked row.
 function pickTarget(): { shas: string[]; singleMerge: boolean } {
   return {
     shas: shasOf(log.multiSelect),
@@ -155,13 +228,19 @@ function pickTarget(): { shas: string[]; singleMerge: boolean } {
   }
 }
 
-// cherryPick acts directly with the default options, the same call path as
-// "Revert" above — except a single selected merge commit, where PickDialog
-// takes over for its parent choice.
+// gitDefaults are the plain "Cherry-pick" and "Revert" items' options.
+const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false, mainline: 0 }
+
+// cherryPick picks with git's defaults, except a single merge commit:
+// PickDialog asks for its parent.
 function cherryPick(): void {
   const target = pickTarget()
   if (target.singleMerge) pickDialog.value = { verb: 'cherry-pick', ...target }
-  else void runAndClose(() => Facade.CherryPick(props.wt, target.shas), log.clearMultiSelect)
+  else
+    void runAndClose(
+      () => Facade.CherryPick(props.wt, target.shas, gitDefaults),
+      log.clearMultiSelect,
+    )
 }
 </script>
 
@@ -175,12 +254,16 @@ function cherryPick(): void {
         :data-index="item.index"
         class="row"
         :class="{
-          selected: row?.sha === log.selectedRow?.sha,
-          'compare-selected': compare.selection.some((r) => r.sha === row?.sha),
+          selected: selectedShas.has(row?.sha ?? ''),
           'multi-selected': multiSelected.size > 1 && multiSelected.has(row?.sha ?? ''),
+          'compare-older': compare.active && row?.sha === compare.older?.sha,
+          'compare-newer': compare.active && row?.sha === compare.newer?.sha,
         }"
         :style="{ transform: `translateY(${item.start}px)` }"
+        tabindex="0"
         @click="onRowClick(row, item.index, $event)"
+        @dblclick="emit('open')"
+        @keydown.enter.self="emit('open')"
         @contextmenu.prevent="onContextMenu($event, row, item.index)"
       >
         <template v-if="row">
@@ -247,15 +330,23 @@ function cherryPick(): void {
 .row:hover {
   background: var(--p-content-hover-background);
 }
-/* Aura's own highlight tokens, not a literal colour: readable in both
-   themes (dark's highlight background is a translucent tint of the primary
-   colour, paired with a light text colour). */
+/* Aura's highlight tokens, not a literal colour: readable in both themes. */
 .row.selected {
   background: var(--p-highlight-background);
   color: var(--p-highlight-color);
 }
 .row.multi-selected {
   background: var(--p-content-hover-background);
+}
+/* A compared row's own colour replaces the shared .selected look: a left
+   border plus a light tint of the row background in that colour. */
+.row.compare-older {
+  border-left: 3px solid var(--nb-older);
+  background: color-mix(in srgb, var(--nb-older) 15%, var(--p-content-background));
+}
+.row.compare-newer {
+  border-left: 3px solid var(--nb-newer);
+  background: color-mix(in srgb, var(--nb-newer) 15%, var(--p-content-background));
 }
 /* The subject takes the space the other parts leave, up to its whole
    text; only then does the author get any. At 6.5em the subject stops

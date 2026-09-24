@@ -27,16 +27,10 @@ func handlers(api core.API) handler.Map {
 			return api.CheckoutCommit(ctx, p.Wt, p.Sha)
 		}),
 		"CherryPick": handler.New(func(ctx context.Context, p cherryPickParams) error {
-			return api.CherryPick(ctx, p.Wt, p.Shas)
-		}),
-		"CherryPickWith": handler.New(func(ctx context.Context, p cherryPickWithParams) error {
-			return api.CherryPickWith(ctx, p.Wt, p.Shas, p.Opts)
+			return api.CherryPick(ctx, p.Wt, p.Shas, p.Opts)
 		}),
 		"CloseWorktree": handler.New(func(ctx context.Context, p closeWorktreeParams) error {
 			return api.CloseWorktree(ctx, p.Wt)
-		}),
-		"CommandLog": handler.New(func(ctx context.Context, p commandLogParams) ([]core.CommandLogEntry, error) {
-			return api.CommandLog(ctx, p.Wt)
 		}),
 		"Commit": handler.New(func(ctx context.Context, p commitParams) error {
 			return api.Commit(ctx, p.Wt, p.Message, p.Amend)
@@ -50,6 +44,9 @@ func handlers(api core.API) handler.Map {
 		"CompareWithWorking": handler.New(func(ctx context.Context, p compareWithWorkingParams) ([]core.ChangedFile, error) {
 			return api.CompareWithWorking(ctx, p.Wt, p.Sha)
 		}),
+		"ConfiguredPullMode": handler.New(func(ctx context.Context, p configuredPullModeParams) (core.PullMode, error) {
+			return api.ConfiguredPullMode(ctx, p.Wt)
+		}),
 		"ContinueOperation": handler.New(func(ctx context.Context, p continueOperationParams) error {
 			return api.ContinueOperation(ctx, p.Wt)
 		}),
@@ -60,16 +57,16 @@ func handlers(api core.API) handler.Map {
 			return api.DeleteBranch(ctx, p.Wt, p.Name, p.Force)
 		}),
 		"DiffAgainstWorking": handler.New(func(ctx context.Context, p diffAgainstWorkingParams) (core.DiffFile, error) {
-			return api.DiffAgainstWorking(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Force)
+			return api.DiffAgainstWorking(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Opts)
 		}),
 		"DiffFile": handler.New(func(ctx context.Context, p diffFileParams) (core.DiffFile, error) {
-			return api.DiffFile(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Force)
+			return api.DiffFile(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Opts)
 		}),
 		"DiffRange": handler.New(func(ctx context.Context, p diffRangeParams) (core.DiffFile, error) {
-			return api.DiffRange(ctx, p.Wt, p.A, p.B, p.Path, p.OldPath, p.Force)
+			return api.DiffRange(ctx, p.Wt, p.A, p.B, p.Path, p.OldPath, p.Opts)
 		}),
 		"DiffWorking": handler.New(func(ctx context.Context, p diffWorkingParams) (core.DiffFile, error) {
-			return api.DiffWorking(ctx, p.Wt, p.Path, p.OldPath, p.Staged, p.Force)
+			return api.DiffWorking(ctx, p.Wt, p.Path, p.OldPath, p.Staged, p.Opts)
 		}),
 		"DiscardFile": handler.New(func(ctx context.Context, p discardFileParams) error {
 			return api.DiscardFile(ctx, p.Wt, p.Path, p.Untracked)
@@ -104,20 +101,17 @@ func handlers(api core.API) handler.Map {
 		"LogRows": handler.New(func(ctx context.Context, p logRowsParams) (core.LogRowsResult, error) {
 			return api.LogRows(ctx, p.Wt, p.From, p.To)
 		}),
+		"MainWorktree": handler.New(func(ctx context.Context, p mainWorktreeParams) (core.Worktree, error) {
+			return api.MainWorktree(ctx, p.GitDir)
+		}),
 		"OpenFile": handler.New(func(ctx context.Context, p openFileParams) error {
 			return api.OpenFile(ctx, p.Wt, p.Path, p.Line)
-		}),
-		"OpenFileFallback": handler.New(func(ctx context.Context, p openFileFallbackParams) error {
-			return api.OpenFileFallback(ctx, p.Wt, p.Path, p.Line, p.Kind)
 		}),
 		"OpenFolder": handler.New(func(ctx context.Context, p openFolderParams) error {
 			return api.OpenFolder(ctx, p.Wt)
 		}),
 		"OpenFolderAt": handler.New(func(ctx context.Context, p openFolderAtParams) error {
 			return api.OpenFolderAt(ctx, p.Path)
-		}),
-		"OpenFolderFallback": handler.New(func(ctx context.Context, p openFolderFallbackParams) error {
-			return api.OpenFolderFallback(ctx, p.Wt, p.Kind)
 		}),
 		"OpenWorktree": handler.New(func(ctx context.Context, p openWorktreeParams) (core.WorktreeInfo, error) {
 			return api.OpenWorktree(ctx, p.Path)
@@ -156,10 +150,7 @@ func handlers(api core.API) handler.Map {
 			return api.Reset(ctx, p.Wt, p.Sha, p.Mode)
 		}),
 		"Revert": handler.New(func(ctx context.Context, p revertParams) error {
-			return api.Revert(ctx, p.Wt, p.Shas)
-		}),
-		"RevertWith": handler.New(func(ctx context.Context, p revertWithParams) error {
-			return api.RevertWith(ctx, p.Wt, p.Shas, p.Opts)
+			return api.Revert(ctx, p.Wt, p.Shas, p.Opts)
 		}),
 		"SetEditorProfile": handler.New(func(ctx context.Context, p setEditorProfileParams) error {
 			return api.SetEditorProfile(ctx, p.Profile)
@@ -190,9 +181,6 @@ func handlers(api core.API) handler.Map {
 		}),
 		"Summary": handler.New(func(ctx context.Context, p summaryParams) (core.Summary, error) {
 			return api.Summary(ctx, p.Wt)
-		}),
-		"TestEditorProfile": handler.New(func(ctx context.Context, p testEditorProfileParams) error {
-			return api.TestEditorProfile(ctx, p.Profile)
 		}),
 		"UncommittedCount": handler.New(func(ctx context.Context, p uncommittedCountParams) (int, error) {
 			return api.UncommittedCount(ctx, p.Wt)

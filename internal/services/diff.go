@@ -4,159 +4,207 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/bluekeyes/go-gitdiff/gitdiff"
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
 )
 
-// maxDiffFileSize caps DiffFile's auto-loaded content. force bypasses it;
-// nothing bypasses Binary.
+// maxDiffFileSize caps a Diff* call's auto-loaded content. Force bypasses
+// it; nothing bypasses Binary.
 const maxDiffFileSize = 5 * 1024 * 1024
 
-// parseCatFileBatch reads cat-file --batch's own framing: per object,
-// "<oid> <type> <size>\n<size bytes of content>\n", or a missing line.
-// want is the number of objects requested, a length sanity check.
-func parseCatFileBatch(data []byte, want int) ([][]byte, error) {
-	var blobs [][]byte
-	for len(data) > 0 {
-		nl := bytes.IndexByte(data, '\n')
-		if nl < 0 {
-			return nil, core.Errorf(core.Internal, "cat-file --batch: unterminated header")
-		}
-		header := string(data[:nl])
-		data = data[nl+1:]
-		if missing(header) {
-			blobs = append(blobs, nil)
-			continue
-		}
-		parts := strings.SplitN(header, " ", 3)
-		size, err := strconv.ParseInt(parts[len(parts)-1], 10, 64)
-		if len(parts) != 3 || err != nil || int64(len(data)) < size+1 {
-			return nil, core.Errorf(core.Internal, "cat-file --batch: bad header %q", header)
-		}
-		blobs = append(blobs, data[:size])
-		data = data[size+1:] // the content's own trailing \n
-	}
-	if len(blobs) != want {
-		return nil, core.Errorf(core.Internal, "cat-file --batch: %d objects, want %d", len(blobs), want)
-	}
-	return blobs, nil
-}
+// fullContext is -U's largest value: git prints one hunk holding every line
+// of both sides.
+const fullContext = "-U2147483647"
 
-// blobSize parses one --batch-check='%(objectsize)' line: a bare number, or
-// a missing line, which reads as size 0 (nothing to cap or fetch).
-func blobSize(line string) (int64, error) {
-	if missing(line) {
-		return 0, nil
+// DiffFile implements core.API. --root diffs a root commit against nothing
+// whatever log.showRoot says.
+func (c *Core) DiffFile(ctx context.Context, id core.WorktreeID, sha, path, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+	old := cmp.Or(oldPath, path)
+	d := fileDiff{
+		path: path, oldPath: oldPath, oldRev: sha + "^:" + old, newRev: sha + ":" + path,
+		cmd: "show", args: []string{"--root", "--format=", "--first-parent", "-M", "--end-of-options", sha, "--", old, path},
 	}
-	n, err := strconv.ParseInt(line, 10, 64)
-	if err != nil {
-		return 0, core.Errorf(core.Internal, "cat-file --batch-check size %q: %v", line, err)
-	}
-	return n, nil
-}
-
-// diffIsBinary asks git's own diff machinery whether path is binary: a
-// NUL-byte sniff of our own would ignore .gitattributes overrides. Both the
-// old-side and new-side path are passed so -M's rename detection still
-// applies when path-restricted.
-func diffIsBinary(ctx context.Context, r git.Runner, dir, sha, oldPath, path string) (bool, error) {
-	return numstatIsBinary(ctx, r, dir, oldPath, path,
-		"show", "--format=", "--numstat", "-z", "-M", "--first-parent", "--end-of-options", sha)
-}
-
-// numstatIsBinary runs gitArgs (a show or diff command producing one
-// --numstat -z record) scoped to the file's old and new path and reads the
-// record's binary marker.
-func numstatIsBinary(ctx context.Context, r git.Runner, dir, oldPath, path string, gitArgs ...string) (bool, error) {
-	result, err := r.Run(ctx, git.Call{
-		Dir: dir, ReadOnly: true,
-		Args: append(gitArgs, "--", cmp.Or(oldPath, path), path),
-	})
-	if err != nil {
-		return false, err
-	}
-	return parseBinaryNumstat(result.Stdout), nil
-}
-
-// parseBinaryNumstat reads one --numstat -z record ("<added>\t<removed>\t..."
-// or "-\t-\t..." for binary) and reports whether it marks a binary file.
-func parseBinaryNumstat(record []byte) bool {
-	record = bytes.TrimSuffix(record, []byte{0})
-	fields := bytes.SplitN(record, []byte{'\t'}, 3)
-	return len(fields) >= 2 && string(fields[0]) == "-" && string(fields[1]) == "-"
-}
-
-// DiffFile implements core.API.
-func (c *Core) DiffFile(ctx context.Context, id core.WorktreeID, sha, path, oldPath string, force bool) (core.DiffFile, error) {
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		return core.DiffFile{}, err
-	}
-	spec := diffSidesSpec{
-		oldRev: sha + "^:" + cmp.Or(oldPath, path), newRev: sha + ":" + path,
-		path: path, oldPath: oldPath, force: force,
-		isBinary: func() (bool, error) { return diffIsBinary(ctx, wt.Runner, wt.Path, sha, oldPath, path) },
-	}
-	return diffSides(ctx, wt.Runner, wt.Path, spec)
+	return c.diff(ctx, id, d, opts)
 }
 
 // DiffAgainstWorking implements core.API.
-func (c *Core) DiffAgainstWorking(ctx context.Context, id core.WorktreeID, sha, path, oldPath string, force bool) (core.DiffFile, error) {
+func (c *Core) DiffAgainstWorking(ctx context.Context, id core.WorktreeID, sha, path, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+	old := cmp.Or(oldPath, path)
+	d := fileDiff{
+		path: path, oldPath: oldPath, oldRev: sha + ":" + old,
+		cmd: "diff", args: []string{"-M", "--end-of-options", sha, "--", old, path},
+	}
+	return c.diff(ctx, id, d, opts)
+}
+
+// diff runs d in id's worktree.
+func (c *Core) diff(ctx context.Context, id core.WorktreeID, d fileDiff, opts core.DiffOptions) (core.DiffFile, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return core.DiffFile{}, err
 	}
-	old := cmp.Or(oldPath, path)
-	return diffWorkingTree(ctx, wt.Runner, wt.Path, path, oldSide{sha: sha, path: old}, force)
+	return d.run(ctx, wt.Runner, wt.Path, opts)
 }
 
-// diffSidesSpec drives diffSides: DiffFile (sha^/sha via git show
-// --first-parent) and DiffRange (a/b via git diff) differ only in how
-// oldRev/newRev and isBinary are built.
-type diffSidesSpec struct {
-	oldRev, newRev, path, oldPath string
-	force                         bool
-	isBinary                      func() (bool, error)
+// fileDiff is one Diff* call: the file, its two sides' objects, and the git
+// diff or show that compares them. Both paths go in the pathspec so -M
+// still pairs a rename.
+type fileDiff struct {
+	path, oldPath  string
+	oldRev, newRev string   // the sides' objects; newRev "" for the working-tree file
+	cmd            string   // "diff" or "show"
+	args           []string // after the patch options: revisions and pathspec
+	noIndex        bool     // git diff --no-index, which exits 1 on a difference
 }
 
-// diffSides runs the size cap, the binary check, the content fetch, and the
-// UTF-8 check shared by DiffFile and DiffRange. The frontend computes the
-// visual diff.
-func diffSides(ctx context.Context, r git.Runner, dir string, s diffSidesSpec) (core.DiffFile, error) {
-	sizes, err := objectSizes(ctx, r, dir, s.oldRev, s.newRev)
+// run caps the size, then takes both sides from git's full-context diff and
+// the hunks from its -U0 diff.
+func (d fileDiff) run(ctx context.Context, r git.Runner, dir string, opts core.DiffOptions) (core.DiffFile, error) {
+	out := core.DiffFile{OldPath: d.oldPath, Path: d.path}
+	tooLarge, untracked, err := d.check(ctx, r, dir)
 	if err != nil {
 		return core.DiffFile{}, err
 	}
-	if !s.force && (sizes[0].size > maxDiffFileSize || sizes[1].size > maxDiffFileSize) {
-		return core.DiffFile{OldPath: s.oldPath, Path: s.path, TooLarge: true}, nil
+	if tooLarge && !opts.Force {
+		out.TooLarge = true
+		return out, nil
+	}
+	if untracked { // git diff lists tracked files only
+		d.args, d.noIndex = []string{"--no-index", "--", os.DevNull, d.path}, true
 	}
 
-	binary, err := s.isBinary()
+	file, err := d.patch(ctx, r, dir, fullContext)
 	if err != nil {
 		return core.DiffFile{}, err
 	}
-	if binary {
-		return core.DiffFile{OldPath: s.oldPath, Path: s.path, Binary: true}, nil
+	if file != nil && file.IsBinary {
+		out.Binary = true
+		return out, nil
 	}
-
-	blobs, err := objectContents(ctx, r, dir, s.oldRev, s.newRev)
+	oldContent, newContent, err := d.contents(ctx, r, dir, file)
 	if err != nil {
 		return core.DiffFile{}, err
 	}
-	return contentDiff(s.oldPath, s.path, blobs[0], blobs[1]), nil
+	if !utf8.Valid(oldContent) || !utf8.Valid(newContent) { // JSON would corrupt it
+		out.Binary = true
+		return out, nil
+	}
+	out.OldContent, out.NewContent = string(oldContent), string(newContent)
+	out.Fingerprint = fingerprint(oldContent, newContent)
+	if file == nil || len(file.TextFragments) == 0 {
+		return out, nil
+	}
+	hunks, err := d.hunks(ctx, r, dir, opts.IgnoreWhitespace)
+	if err != nil {
+		return core.DiffFile{}, err
+	}
+	out.Hunks = hunks
+	return out, nil
 }
 
-// contentDiff carries both sides' content, or reports Binary if either side
-// is not valid UTF-8 (e.g. a Latin-1 file), which JSON would corrupt.
-func contentDiff(oldPath, path string, oldContent, newContent []byte) core.DiffFile {
-	if !utf8.Valid(oldContent) || !utf8.Valid(newContent) {
-		return core.DiffFile{OldPath: oldPath, Path: path, Binary: true}
+// check reads the sides' sizes before any content: whether one is over the
+// cap, and, for a working-tree diff, whether git tracks neither the old
+// path nor path.
+func (d fileDiff) check(ctx context.Context, r git.Runner, dir string) (tooLarge, untracked bool, err error) {
+	if d.newRev != "" {
+		sizes, err := objectSizes(ctx, r, dir, d.oldRev, d.newRev)
+		if err != nil {
+			return false, false, err
+		}
+		return max(sizes[0].size, sizes[1].size) > maxDiffFileSize, false, nil
 	}
-	return core.DiffFile{OldPath: oldPath, Path: path, OldContent: string(oldContent), NewContent: string(newContent)}
+	sizes, err := objectSizes(ctx, r, dir, d.oldRev, ":"+d.path)
+	if err != nil {
+		return false, false, err
+	}
+	newSize, err := workingFileSize(filepath.Join(dir, d.path))
+	if err != nil {
+		return false, false, core.Errorf(core.Internal, "stat %s: %v", d.path, err)
+	}
+	return max(sizes[0].size, newSize) > maxDiffFileSize, sizes[0].missing && sizes[1].missing, nil
+}
+
+// patch runs d's git command with the patch options opts and returns path's
+// entry, nil if git lists no change to it.
+func (d fileDiff) patch(ctx context.Context, r git.Runner, dir string, opts ...string) (*gitdiff.File, error) {
+	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: patchArgs(d.cmd, slices.Concat(opts, d.args)...)})
+	differs := d.noIndex && gitExited(err, result, 1)
+	if err != nil && !differs {
+		return nil, err
+	}
+	return parsePatch(result.Stdout, d.path)
+}
+
+// contents splits file, git's full-context diff, into its old side (context
+// and deleted lines) and new side (context and added lines). Without a hunk
+// (equal content: no change, a pure rename, a mode change) both sides are
+// the old side's object.
+func (d fileDiff) contents(ctx context.Context, r git.Runner, dir string, file *gitdiff.File) (oldContent, newContent []byte, err error) {
+	if file == nil || len(file.TextFragments) == 0 {
+		blobs, err := objectContents(ctx, r, dir, d.oldRev)
+		if err != nil {
+			return nil, nil, err
+		}
+		return blobs[0], blobs[0], nil
+	}
+	if n := len(file.TextFragments); n > 1 {
+		return nil, nil, core.Errorf(core.Internal, "full-context diff of %s has %d hunks", d.path, n)
+	}
+	oldContent, newContent = sides(file.TextFragments[0])
+	return oldContent, newContent, nil
+}
+
+// sides splits a full-context hunk into its old side (context and deleted
+// lines) and its new side (context and added lines).
+func sides(frag *gitdiff.TextFragment) (oldContent, newContent []byte) {
+	var o, n bytes.Buffer
+	for _, l := range frag.Lines {
+		if l.Op != gitdiff.OpAdd {
+			o.WriteString(l.Line)
+		}
+		if l.Op != gitdiff.OpDelete {
+			n.WriteString(l.Line)
+		}
+	}
+	return o.Bytes(), n.Bytes()
+}
+
+// fingerprint identifies a diff's two sides together: DiffFile.Fingerprint,
+// which a LineSelection sends back to show which diff it was taken from.
+func fingerprint(oldContent, newContent []byte) string {
+	h := sha256.New()
+	h.Write(strconv.AppendInt(nil, int64(len(oldContent)), 10))
+	h.Write([]byte{'\n'})
+	h.Write(oldContent)
+	h.Write(newContent)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// hunks is git's -U0 diff of d as hunk headers, with -w if
+// ignoreWhitespace. --inter-hunk-context=0 overrides diff.interHunkContext,
+// which joins nearby hunks with the context lines between them.
+func (d fileDiff) hunks(ctx context.Context, r git.Runner, dir string, ignoreWhitespace bool) ([]core.DiffHunk, error) {
+	opts := []string{"-U0", "--inter-hunk-context=0"}
+	if ignoreWhitespace {
+		opts = append(opts, "-w")
+	}
+	file, err := d.patch(ctx, r, dir, opts...)
+	if err != nil || file == nil {
+		return nil, err
+	}
+	return hunksOf(file), nil
 }
 
 // missing reports cat-file's "<request> missing" line for an absent object
@@ -177,13 +225,13 @@ type objectSize struct {
 func objectSizes(ctx context.Context, r git.Runner, dir string, revs ...string) ([]objectSize, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
-		Args:  []string{"cat-file", "--batch-check=%(objectsize)"},
+		Args:  []string{"cat-file", "--batch-check=%(objectsize)", "-Z"},
 		Stdin: batchStdin(revs),
 	})
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(strings.TrimRight(string(result.Stdout), "\n"), "\n")
+	lines := strings.Split(strings.TrimSuffix(string(result.Stdout), "\x00"), "\x00")
 	if len(lines) != len(revs) {
 		return nil, core.Errorf(core.Internal, "cat-file --batch-check: %d lines, want %d", len(lines), len(revs))
 	}
@@ -198,12 +246,38 @@ func objectSizes(ctx context.Context, r git.Runner, dir string, revs ...string) 
 	return sizes, nil
 }
 
+// blobSize parses one --batch-check='%(objectsize)' line: a bare number, or
+// a missing line, which reads as size 0 (nothing to cap or fetch).
+func blobSize(line string) (int64, error) {
+	if missing(line) {
+		return 0, nil
+	}
+	n, err := strconv.ParseInt(line, 10, 64)
+	if err != nil {
+		return 0, core.Errorf(core.Internal, "cat-file --batch-check size %q: %v", line, err)
+	}
+	return n, nil
+}
+
+// workingFileSize is the size of the working-tree file at full; 0 for a
+// deleted file, whose new side is empty.
+func workingFileSize(full string) (int64, error) {
+	info, err := os.Stat(full)
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
+}
+
 // objectContents fetches revs' raw bytes in one cat-file --batch call. A
 // missing object yields nil, not an error.
 func objectContents(ctx context.Context, r git.Runner, dir string, revs ...string) ([][]byte, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
-		Args:  []string{"cat-file", "--batch"},
+		Args:  []string{"cat-file", "--batch", "-Z"},
 		Stdin: batchStdin(revs),
 	})
 	if err != nil {
@@ -212,7 +286,38 @@ func objectContents(ctx context.Context, r git.Runner, dir string, revs ...strin
 	return parseCatFileBatch(result.Stdout, len(revs))
 }
 
-// batchStdin is cat-file --batch/--batch-check's input: one object spec per line.
+// parseCatFileBatch reads cat-file --batch -Z's framing: per object,
+// "<oid> <type> <size>\x00<size bytes of content>\x00", or a missing entry.
+// want is the number of objects requested, a length sanity check.
+func parseCatFileBatch(data []byte, want int) ([][]byte, error) {
+	var blobs [][]byte
+	for len(data) > 0 {
+		end := bytes.IndexByte(data, 0)
+		if end < 0 {
+			return nil, core.Errorf(core.Internal, "cat-file --batch: unterminated header")
+		}
+		header := string(data[:end])
+		data = data[end+1:]
+		if missing(header) {
+			blobs = append(blobs, nil)
+			continue
+		}
+		parts := strings.SplitN(header, " ", 3)
+		size, err := strconv.ParseInt(parts[len(parts)-1], 10, 64)
+		if len(parts) != 3 || err != nil || int64(len(data)) < size+1 {
+			return nil, core.Errorf(core.Internal, "cat-file --batch: bad header %q", header)
+		}
+		blobs = append(blobs, data[:size])
+		data = data[size+1:] // the NUL after the content
+	}
+	if len(blobs) != want {
+		return nil, core.Errorf(core.Internal, "cat-file --batch: %d objects, want %d", len(blobs), want)
+	}
+	return blobs, nil
+}
+
+// batchStdin is cat-file -Z's input: object specs, each ended by a NUL, so a
+// path may hold a newline.
 func batchStdin(revs []string) []byte {
-	return []byte(strings.Join(revs, "\n") + "\n")
+	return []byte(strings.Join(revs, "\x00") + "\x00")
 }

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -21,7 +20,7 @@ func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	multi, err := c.CommitDetails(context.Background(), wt, multiSHA)
+	multi, err := c.CommitDetails(t.Context(), wt, multiSHA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +34,7 @@ func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 		t.Errorf("Files = %+v, want one Modified file", multi.Files)
 	}
 
-	rename, err := c.CommitDetails(context.Background(), wt, renameSHA)
+	rename, err := c.CommitDetails(t.Context(), wt, renameSHA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +56,7 @@ func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T)
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	details, err := c.CommitDetails(context.Background(), wt, mergeSHA)
+	details, err := c.CommitDetails(t.Context(), wt, mergeSHA)
 	if err != nil {
 		t.Fatal(err)
 	}

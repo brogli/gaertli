@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
@@ -45,33 +44,20 @@ func validateBranchName(ctx context.Context, r git.Runner, dir, name string) err
 		Args: []string{"check-ref-format", "--branch", name}, // safe without a -- of its own
 	})
 	if ce, ok := errors.AsType[*core.Error](err); ok {
-		ce.Code = core.InvalidName
-		ce.Message = fmt.Sprintf("%q is not a valid branch name", name)
+		ce.Retag(core.InvalidName, "invalidBranchName", map[string]string{"name": name}, "%q is not a valid branch name", name)
 	}
 	return err
 }
 
 // Checkout implements core.API.
 func (c *Core) Checkout(ctx context.Context, id core.WorktreeID, branch string) error {
-	return c.switchWorktree(ctx, id, []string{"switch", "--end-of-options", branch})
+	result, err := c.runLocked(ctx, id, "switch", "--end-of-options", branch)
+	return remapDirty(err, result)
 }
 
 // CheckoutCommit implements core.API.
 func (c *Core) CheckoutCommit(ctx context.Context, id core.WorktreeID, sha string) error {
-	return c.switchWorktree(ctx, id, []string{"switch", "--detach", "--end-of-options", sha})
-}
-
-// switchWorktree runs a git switch call under id's worktree write lock and
-// applies remapDirty.
-func (c *Core) switchWorktree(ctx context.Context, id core.WorktreeID, args []string) error {
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		return err
-	}
-	wt.Lock()
-	defer wt.Unlock()
-
-	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
+	result, err := c.runLocked(ctx, id, "switch", "--detach", "--end-of-options", sha)
 	return remapDirty(err, result)
 }
 
