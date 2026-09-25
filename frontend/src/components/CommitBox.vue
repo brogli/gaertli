@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onKeyStroke, useDebounceFn } from '@vueuse/core'
+import { storeToRefs } from 'pinia'
 import { useI18n } from '../i18n'
 import Textarea from 'openvue/textarea'
 import Checkbox from 'openvue/checkbox'
+import Message from 'openvue/message'
 import Button from 'openvue/button'
 import { useChangesStore } from '../stores/changes'
 import { useRepoStore } from '../stores/repo'
@@ -22,7 +24,10 @@ const refs = useRefsStore()
 const { error, run, runAndClose } = useCoreCall()
 const { t } = useI18n()
 
-const message = ref('')
+// The message lives in the changes store, where the window finds it on a
+// core restart; each commit box (one per worktree) starts it empty.
+const { message } = storeToRefs(changes)
+message.value = ''
 const amend = ref(false)
 const pushAfterCommit = ref(false)
 const committing = ref(false)
@@ -146,9 +151,9 @@ onKeyStroke(
       />
       {{ t('changesView.commitBox.amend') }}
     </label>
-    <p v-if="pushedWarning" class="warning">
+    <Message v-if="pushedWarning" severity="warn">
       {{ t('changesView.commitBox.pushedWarning') }}
-    </p>
+    </Message>
     <label>
       <Checkbox
         v-model="pushAfterCommit"

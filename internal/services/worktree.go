@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
@@ -21,13 +22,25 @@ func (c *Core) ListWorktrees(ctx context.Context, path core.RepoPath) ([]core.Wo
 	if err != nil {
 		return nil, err
 	}
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, maxStatusRuns)
 	for i := range worktrees {
-		if !worktrees[i].Missing {
-			worktrees[i].Dirty = c.isDirty(ctx, worktrees[i].Path)
+		w := &worktrees[i]
+		if w.Missing || w.Bare {
+			continue
 		}
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			w.Dirty = c.isDirty(ctx, w.Path)
+		})
 	}
+	wg.Wait()
 	return worktrees, nil
 }
+
+// maxStatusRuns bounds how many status calls ListWorktrees runs at once.
+const maxStatusRuns = 4
 
 // isDirty reports whether dir has any change, untracked files included. A
 // run error counts as clean: this is display data, and the error surfaces
@@ -43,7 +56,7 @@ func (c *Core) isDirty(ctx context.Context, dir string) bool {
 func (c *Core) MainWorktree(ctx context.Context, gitDir core.RepoPath) (core.Worktree, error) {
 	worktrees, err := worktreeList(ctx, c.discover, string(gitDir), false)
 	if err != nil {
-		return core.Worktree{}, core.ErrorfArgs(core.NotARepo, "notARepo", map[string]string{"path": string(gitDir)}, "%s is not a git repository", gitDir)
+		return core.Worktree{}, session.RemapNotARepo(err, gitDir)
 	}
 	for _, wt := range worktrees {
 		if !wt.Bare && !wt.Missing {
@@ -51,22 +64,6 @@ func (c *Core) MainWorktree(ctx context.Context, gitDir core.RepoPath) (core.Wor
 		}
 	}
 	return core.Worktree{}, core.ErrorfArgs(core.NotARepo, "noWorktreeLeft", map[string]string{"path": string(gitDir)}, "%s has no worktree left", gitDir)
-}
-
-// ListBranches implements core.API.
-func (c *Core) ListBranches(ctx context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
-	toplevel, _, _, err := c.sessions.Resolve(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	result, err := c.discover.Run(ctx, git.Call{
-		Dir: toplevel, ReadOnly: true,
-		Args: []string{"for-each-ref", "--format=%(refname:short)%1f%(worktreepath)%00", "refs/heads"},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return parseBranchSummaries(result.Stdout), nil
 }
 
 // AddWorktree implements core.API.
@@ -128,16 +125,16 @@ func (c *Core) RemoveWorktree(ctx context.Context, path core.RepoPath, target st
 	}
 	args = append(args, "--", target)
 	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
-	return remapDirtyWorktree(err, result)
+	return remapDirtyWorktree(err, result, target)
 }
 
 // remapDirtyWorktree reclassifies remove's "contains modified or untracked
 // files" refusal (exit 128) as Code DirtyWorktree, so the caller can confirm
 // the loss and retry forced. A locked worktree's refusal stays GitFailed:
 // force does not fix it.
-func remapDirtyWorktree(err error, result git.Result) error {
+func remapDirtyWorktree(err error, result git.Result, target string) error {
 	if ce := gitFailure(err); ce != nil && result.ExitCode == 128 && bytes.Contains(result.Stderr, []byte("contains modified or untracked files")) {
-		ce.Code = core.DirtyWorktree
+		ce.Retag(core.DirtyWorktree, "worktreeDirty", map[string]string{"path": target}, "%s has uncommitted changes.", target)
 	}
 	return err
 }
@@ -192,8 +189,6 @@ func parseWorktreeRecord(block []byte, main bool) core.Worktree {
 			wt.SHA = value
 		case "branch":
 			wt.Branch = strings.TrimPrefix(value, "refs/heads/")
-		case "detached":
-			wt.Detached = true
 		case "locked":
 			wt.Locked = true
 		case "prunable":
@@ -203,14 +198,4 @@ func parseWorktreeRecord(block []byte, main bool) core.Worktree {
 		}
 	}
 	return wt
-}
-
-// parseBranchSummaries parses ListBranches' for-each-ref output.
-func parseBranchSummaries(out []byte) []core.BranchSummary {
-	var summaries []core.BranchSummary
-	for _, record := range nulRecords(out) {
-		name, worktree, _ := strings.Cut(record, "\x1f")
-		summaries = append(summaries, core.BranchSummary{Name: name, CheckedOutIn: worktree})
-	}
-	return summaries
 }

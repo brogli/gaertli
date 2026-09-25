@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"os"
 	"runtime"
 	"slices"
 	"testing"
@@ -26,28 +25,61 @@ func (p *fakePicker) Pick(dir string) (string, bool) {
 	return p.path, p.ok
 }
 
-func TestAppService_PickAndOpenDoesNothingOnCancel(t *testing.T) {
+func TestFR_WT_13_PickAndOpenDoesNothingOnCancel(t *testing.T) {
 	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("A", "/a", "")
 	s := &AppService{shell: shell{reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{}}
 
-	if err := s.PickAndOpen(t.Context()); err != nil {
+	if err := s.PickAndOpen(callFrom(opener.windows[0].ID())); err != nil {
 		t.Fatal(err)
 	}
-	if len(opener.windows) != 0 {
-		t.Errorf("windows opened = %d, want 0", len(opener.windows))
+	if len(opener.windows) != 1 {
+		t.Errorf("windows opened = %d, want still 1 (the calling window, unchanged)", len(opener.windows))
 	}
 }
 
-func TestAppService_PickAndOpenOpensThePickedPath(t *testing.T) {
+// A window showing repo A picks repo B: that window switches to B, no new
+// window opens.
+func TestFR_WT_13_PickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.T) {
 	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("/a", "/a", "")
 	api := fakeAPI{openWorktree: openAsIs}
 	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{path: "/picked", ok: true}}
+	fw := &fakeCallingWindow{id: opener.windows[0].ID()}
 
-	if err := s.PickAndOpen(t.Context()); err != nil {
+	if err := s.PickAndOpen(context.WithValue(t.Context(), application.WindowKey, fw)); err != nil {
 		t.Fatal(err)
 	}
 	if len(opener.windows) != 1 {
 		t.Errorf("windows opened = %d, want 1", len(opener.windows))
+	}
+	if want := []string{selectionURL("/picked", "")}; !slices.Equal(fw.setURLs, want) {
+		t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
+	}
+}
+
+// Window 1 shows A, window 2 shows B; window 1 picks B: window 2 is brought
+// forward, window 1 stays on A.
+func TestFR_WT_13_PickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *testing.T) {
+	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("/a", "/a", "")
+	reg.OpenOrFocus("/b", "/b", "")
+	window2 := opener.windows[1]
+	api := fakeAPI{openWorktree: openAsIs}
+	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{path: "/b", ok: true}}
+	fw := &fakeCallingWindow{id: opener.windows[0].ID()}
+
+	if err := s.PickAndOpen(context.WithValue(t.Context(), application.WindowKey, fw)); err != nil {
+		t.Fatal(err)
+	}
+	if len(opener.windows) != 2 {
+		t.Fatalf("windows opened = %d, want still 2", len(opener.windows))
+	}
+	if len(fw.setURLs) != 0 {
+		t.Errorf("calling window's SetURL calls = %v, want none (left unchanged)", fw.setURLs)
+	}
+	if window2.focusCount == 0 {
+		t.Error("window 2 was not focused, want it brought forward")
 	}
 }
 
@@ -56,81 +88,115 @@ func TestFR_WT_08_OpenPathOpensALocalPath(t *testing.T) {
 	api := fakeAPI{openWorktree: openAsIs}
 	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
 
-	if err := s.OpenPath(t.Context(), "/repo-feature"); err != nil {
-		t.Fatal(err)
-	}
+	s.OpenPath(t.Context(), "/repo-feature")
 	if len(opener.windows) != 1 {
 		t.Errorf("windows opened = %d, want 1", len(opener.windows))
 	}
 }
 
-func TestAppService_RecentReposListsStoredEntries(t *testing.T) {
+func TestFR_REPO_02_RecentReposListsStoredEntries(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) { s.AddRecent(settings.RecentRepo{Path: "/a"}, time.Now()) }); err != nil {
 		t.Fatal(err)
 	}
 	s := &AppService{shell: shell{store: store}}
 
-	got, err := s.RecentRepos(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := s.RecentRepos()
 	if len(got) != 1 || got[0].Path != "/a" {
 		t.Errorf("RecentRepos() = %+v, want one entry for /a", got)
 	}
 }
 
-func TestFR_REPO_07_PickAndOpenWSLSeedsThePickerAtTheDistroRoot(t *testing.T) {
-	reg, _ := newTestRegistry()
-	picker := &fakePicker{}
-	s := &AppService{shell: shell{reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: picker}
+// The one folder dialog reaches a distro through its network share; the
+// picked path alone decides the core.
+func TestFR_REPO_07_OpenFolderOpensAFolderInsideADistroOnItsCore(t *testing.T) {
+	for _, picked := range []string{`\\wsl.localhost\Ubuntu\home\u\r`, `\\wsl$\Ubuntu\home\u\r`} {
+		t.Run(picked, func(t *testing.T) {
+			reg, opener := newTestRegistry()
+			serveDistroCores(t, reg, fakeAPI{openWorktree: openAsIs})
+			reg.OpenOrFocus("", "", "")
+			store := newTestStore(t)
+			s := &AppService{
+				shell:  shell{api: NewFacade(reg), reg: reg, store: store, notify: &fakeNotifier{}},
+				picker: &fakePicker{path: picked, ok: true},
+			}
+			fw := &fakeCallingWindow{id: opener.windows[0].ID()}
 
-	if err := s.PickAndOpenWSL(t.Context(), "Ubuntu-22.04"); err != nil {
-		t.Fatal(err)
-	}
+			if err := s.PickAndOpen(context.WithValue(t.Context(), application.WindowKey, fw)); err != nil {
+				t.Fatal(err)
+			}
 
-	if want := `\\wsl.localhost\Ubuntu-22.04`; picker.dir != want {
-		t.Errorf("Pick dir = %q, want %q", picker.dir, want)
+			if len(opener.windows) != 1 {
+				t.Fatalf("windows opened = %d, want still 1", len(opener.windows))
+			}
+			if want := []string{selectionURL("/home/u/r", "Ubuntu")}; !slices.Equal(fw.setURLs, want) {
+				t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
+			}
+			recents := store.Get().RecentRepos
+			if len(recents) != 1 || recents[0].Path != "/home/u/r" || recents[0].Distro != "Ubuntu" {
+				t.Errorf("recent repos = %+v, want /home/u/r in Ubuntu", recents)
+			}
+		})
 	}
 }
 
-func TestFR_REPO_07_PickAndOpenWSLOpensThePickedPath(t *testing.T) {
+func TestFR_REPO_07_OpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
 	reg, opener := newTestRegistry()
-	api := fakeAPI{openWorktree: openAsIs}
+	reg.SetLocal(fakeAPI{openWorktree: openAsIs})
+	reg.OpenOrFocus("", "", "")
+	store := newTestStore(t)
 	s := &AppService{
-		shell:  shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}},
-		picker: &fakePicker{path: `\\wsl.localhost\Ubuntu-22.04\home\user\project`, ok: true},
+		shell:  shell{api: NewFacade(reg), reg: reg, store: store, notify: &fakeNotifier{}},
+		picker: &fakePicker{path: "/repos/r", ok: true},
 	}
+	fw := &fakeCallingWindow{id: opener.windows[0].ID()}
 
-	if err := s.PickAndOpenWSL(t.Context(), "Ubuntu-22.04"); err != nil {
+	if err := s.PickAndOpen(context.WithValue(t.Context(), application.WindowKey, fw)); err != nil {
 		t.Fatal(err)
 	}
+
 	if len(opener.windows) != 1 {
-		t.Errorf("windows opened = %d, want 1", len(opener.windows))
+		t.Fatalf("windows opened = %d, want still 1", len(opener.windows))
+	}
+	if want := []string{selectionURL("/repos/r", "")}; !slices.Equal(fw.setURLs, want) {
+		t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
+	}
+	if recents := store.Get().RecentRepos; len(recents) != 1 || recents[0].Distro != "" {
+		t.Errorf("recent repos = %+v, want /repos/r with no distro", recents)
 	}
 }
 
-// An unknown distro needs no bespoke handling either: open()'s generic
-// notify-and-do-nothing-else covers it.
-func TestFR_REPO_07_PickAndOpenWSLNotifiesOnDistroNotFound(t *testing.T) {
+// NewWindow always opens another window with no selection, unlike
+// OpenOrFocus("", ...), which would focus one already open.
+func TestFR_WT_13_NewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
-	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
-		return core.WorktreeInfo{}, core.Errorf(core.DistroNotFound, "distro %q not found", "bogus")
-	}}
-	notify := &fakeNotifier{}
-	s := &AppService{
-		shell:  shell{api: api, reg: reg, store: newTestStore(t), notify: notify},
-		picker: &fakePicker{path: `\\wsl.localhost\bogus\home\x`, ok: true},
-	}
+	reg.OpenOrFocus("", "", "")
+	s := &AppService{shell: shell{reg: reg}}
 
-	if err := s.PickAndOpenWSL(t.Context(), "bogus"); err != nil {
+	s.NewWindow()
+
+	if len(opener.windows) != 2 {
+		t.Fatalf("windows opened = %d, want 2", len(opener.windows))
+	}
+	if opener.windows[1].url != selectionURL("", "") {
+		t.Errorf("new window's url = %q, want the empty selection", opener.windows[1].url)
+	}
+}
+
+// NewWindow leaves settings' remembered open worktrees unchanged: an
+// empty-selection window is not one of them.
+func TestFR_WT_13_NewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
+	reg, _ := newTestRegistry()
+	store := newTestStore(t)
+	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/a"} }); err != nil {
 		t.Fatal(err)
 	}
-	if notify.calls != 1 {
-		t.Errorf("notify.Show calls = %d, want 1", notify.calls)
-	}
-	if len(opener.windows) != 0 {
-		t.Errorf("windows opened = %d, want 0", len(opener.windows))
+	s := &AppService{shell: shell{reg: reg, store: store}}
+
+	s.NewWindow()
+
+	if got := store.Get().OpenWorktrees; !slices.Equal(got, []string{"/a"}) {
+		t.Errorf("OpenWorktrees = %v, want unchanged [/a]", got)
 	}
 }
 
@@ -139,9 +205,7 @@ func TestFR_REPO_07_OpenPathOpensTheGivenPath(t *testing.T) {
 	api := fakeAPI{openWorktree: openAsIs}
 	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
 
-	if err := s.OpenPath(t.Context(), `\\wsl.localhost\Ubuntu-22.04\home\user\project`); err != nil {
-		t.Fatal(err)
-	}
+	s.OpenPath(t.Context(), `\\wsl.localhost\Ubuntu-22.04\home\user\project`)
 	if len(opener.windows) != 1 {
 		t.Errorf("windows opened = %d, want 1", len(opener.windows))
 	}
@@ -158,9 +222,7 @@ func TestFR_DIFF_07_OpenDiffOpensADiffWindowOnTheTarget(t *testing.T) {
 	s := &AppService{shell: shell{reg: reg}}
 	target := DiffTarget{Kind: CommitDiff, Sha: "1111111111a", Path: "f.txt"}
 
-	if err := s.OpenDiff(callFrom(opener.windows[0].ID()), "/x/project", target); err != nil {
-		t.Fatal(err)
-	}
+	s.OpenDiff(callFrom(opener.windows[0].ID()), "/x/project", target)
 
 	if len(opener.windows) != 2 {
 		t.Fatalf("windows opened = %d, want the main window and one diff window", len(opener.windows))
@@ -186,9 +248,7 @@ func TestFR_DIFF_07_OpenDiffFromTheSameMainWindowRetargetsItsDiffWindow(t *testi
 	}
 
 	for _, target := range targets {
-		if err := s.OpenDiff(ctx, "/x/project", target); err != nil {
-			t.Fatal(err)
-		}
+		s.OpenDiff(ctx, "/x/project", target)
 	}
 
 	if len(opener.windows) != 2 {
@@ -219,9 +279,7 @@ func TestFR_DIFF_07_EachMainWindowHasItsOwnDiffWindow(t *testing.T) {
 	target := DiffTarget{Kind: WorkingDiff, Path: "f"}
 
 	for _, mainWindow := range opener.windows[:2] {
-		if err := s.OpenDiff(callFrom(mainWindow.ID()), "/a", target); err != nil {
-			t.Fatal(err)
-		}
+		s.OpenDiff(callFrom(mainWindow.ID()), "/a", target)
 	}
 
 	if len(opener.windows) != 4 {
@@ -241,9 +299,7 @@ func TestFR_DIFF_07_WithNoCallingWindowTheDiffWindowIsKeyedByItsWorktree(t *test
 	target := DiffTarget{Kind: WorkingDiff, Path: "f"}
 
 	for _, wt := range []core.WorktreeID{"/a", "/a", "/b"} {
-		if err := s.OpenDiff(t.Context(), wt, target); err != nil {
-			t.Fatal(err)
-		}
+		s.OpenDiff(t.Context(), wt, target)
 	}
 
 	if len(opener.windows) != 2 {
@@ -254,42 +310,18 @@ func TestFR_DIFF_07_WithNoCallingWindowTheDiffWindowIsKeyedByItsWorktree(t *test
 	}
 }
 
-func TestFR_REPO_06_InstallWSLLauncherInstallsTheRunningBinaryIntoTheDistro(t *testing.T) {
-	reg, _ := newTestRegistry()
-	fdc := &fakeDistroCore{}
-	reg.newDistroCore = func(string, core.EventSink) distroCorer { return fdc }
-	s := &AppService{shell: shell{reg: reg}}
-
-	if err := s.InstallWSLLauncher(t.Context(), "Ubuntu-22.04"); err != nil {
-		t.Fatal(err)
-	}
-
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(fdc.installLauncherCalls) != 1 || fdc.installLauncherCalls[0] != self {
-		t.Errorf("InstallLauncher calls = %v, want one call with %q", fdc.installLauncherCalls, self)
-	}
-}
-
-// The window comes from ctx; a windowless/background call is a no-op, not
-// an error.
+// The window comes from ctx; a windowless/background call is a no-op.
 func TestFR_WT_09_UpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
 	fw := &fakeCallingWindow{}
 	ctx := context.WithValue(t.Context(), application.WindowKey, fw)
 	s := &AppService{}
 
-	if err := s.UpdateWindowTitle(ctx, "/x/project", "main"); err != nil {
-		t.Fatal(err)
-	}
+	s.UpdateWindowTitle(ctx, "/x/project", "main")
 	if want := []string{"project [main]"}; !slices.Equal(fw.setTitles, want) {
 		t.Errorf("SetTitle calls = %v, want %v", fw.setTitles, want)
 	}
 
-	if err := s.UpdateWindowTitle(t.Context(), "/x/project", "main"); err != nil {
-		t.Errorf("UpdateWindowTitle with no window in ctx = %v, want nil", err)
-	}
+	s.UpdateWindowTitle(t.Context(), "/x/project", "main")
 	if len(fw.setTitles) != 1 {
 		t.Errorf("SetTitle calls = %d, want still 1 (no window in ctx)", len(fw.setTitles))
 	}
@@ -298,10 +330,7 @@ func TestFR_WT_09_UpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
 func TestFR_UX_02_LogPathReportsTheAppLogsLocation(t *testing.T) {
 	s := &AppService{shell: shell{logPath: "/x/nebegit.log"}}
 
-	got, err := s.LogPath(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := s.LogPath()
 	if got.Path != "/x/nebegit.log" || got.Error != "" {
 		t.Errorf("LogPath() = %+v, want Path /x/nebegit.log, no Error", got)
 	}
@@ -310,10 +339,7 @@ func TestFR_UX_02_LogPathReportsTheAppLogsLocation(t *testing.T) {
 func TestFR_UX_02_LogPathReportsWhyTheLogCouldNotOpen(t *testing.T) {
 	s := &AppService{shell: shell{logErr: "permission denied"}}
 
-	got, err := s.LogPath(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := s.LogPath()
 	if got.Path != "" || got.Error != "permission denied" {
 		t.Errorf("LogPath() = %+v, want empty Path, Error %q", got, "permission denied")
 	}
@@ -366,12 +392,12 @@ func TestFR_WT_13_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t
 	var mainWorktreeArg core.RepoPath
 	var openedPaths []core.RepoPath
 	api := fakeAPI{
-		openWorktree: func(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+		openWorktree: func(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 			openedPaths = append(openedPaths, path)
 			if path == `\\wsl.localhost\Ubuntu\home\u\r-old` {
 				return core.WorktreeInfo{}, core.Errorf(core.NotARepo, "gone")
 			}
-			return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path)}, nil
+			return openAsIs(ctx, path)
 		},
 		mainWorktree: func(_ context.Context, gitDir core.RepoPath) (core.Worktree, error) {
 			mainWorktreeArg = gitDir
@@ -442,6 +468,28 @@ func TestFR_WT_13_SelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *t
 	coretest.AssertCode(t, err, core.NotARepo)
 	if openCount != 1 {
 		t.Errorf("OpenWorktree called %d times, want 1 (no retry with a wrong folder)", openCount)
+	}
+}
+
+// nativeConsent needs no *application.App: it must work before Wails' own
+// App.Run creates its platform layer.
+func TestQA_PORT_02_ConsentAsksItsQuestionWithoutTheWailsApp(t *testing.T) {
+	for _, want := range []bool{true, false} {
+		var gotTitle, gotMsg string
+		c := nativeConsent{ask: func(title, msg string) bool {
+			gotTitle, gotMsg = title, msg
+			return want
+		}}
+
+		if got := c.Ask("Ubuntu"); got != want {
+			t.Errorf("Ask() = %v, want %v", got, want)
+		}
+		if wantTitle := text(appName, nil); gotTitle != wantTitle {
+			t.Errorf("title = %q, want %q", gotTitle, wantTitle)
+		}
+		if wantMsg := consentMessage("Ubuntu"); gotMsg != wantMsg {
+			t.Errorf("message = %q, want %q", gotMsg, wantMsg)
+		}
 	}
 }
 

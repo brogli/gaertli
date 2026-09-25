@@ -4,24 +4,29 @@
 // implements only the calls the log and layout scenarios need.
 
 import { objectNames, setTransport, type Events } from '@wailsio/runtime'
-import type {
-  ChangedFile,
-  ChangedFiles,
-  CommitDetails,
-  DiffFile,
-  LogRowsResult,
-  Refs,
-  Summary,
-  Worktree,
-  WorktreeID,
+import {
+  JobState,
+  type ChangedFile,
+  type ChangedFiles,
+  type CommitDetails,
+  type DiffFile,
+  type LogIndexResult,
+  type LogRowsResult,
+  type LogSearchResult,
+  type Refs,
+  type Summary,
+  type Worktree,
+  type WorktreeID,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { PullMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import type {
   RecentRepo,
-  Settings,
+  Preferences,
 } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+import type { LogPathInfo } from '../../bindings/github.com/brogli/nebegit/internal/app/models'
 import { branchFixture } from './fixtures/branch'
 import { changedFilesFixture } from './fixtures/changes'
+import { diffFileFixture, hunk } from './fixtures/diff'
+import { jobFixture } from './fixtures/job'
 import { LOG_ROWS_FIXTURE } from './fixtures/log-rows'
 import { defaultSettingsFixture } from './fixtures/settings'
 import { summaryFixture } from './fixtures/summary'
@@ -34,6 +39,9 @@ const ROUND_TRIP_MS = 20
 function delay<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ROUND_TRIP_MS))
 }
+
+// query is the page's URL query, where a test asks for a fixture variant.
+const query = new URLSearchParams(location.search)
 
 // STATUS_FIXTURE: a working tree with a file in every group, for the
 // layout case that checks a file row's buttons and the "Stage all"/"Unstage
@@ -51,7 +59,7 @@ const STATUS_FIXTURE = changedFilesFixture({
 // the changes view's scrolling case, which needs a change
 // list taller than the window.
 function statusFixture(): ChangedFiles {
-  const count = Number(new URLSearchParams(location.search).get('changedFiles') ?? '0')
+  const count = Number(query.get('changedFiles') ?? '0')
   if (!count) return STATUS_FIXTURE
   return changedFilesFixture({
     unstaged: Array.from({ length: count }, (_, i) => ({
@@ -67,7 +75,7 @@ function statusFixture(): ChangedFiles {
 // name, a remote branch and a tag, so the branch picker and the sync
 // controls render real content.
 function refsFixture(): Refs {
-  const hasUpstream = new URLSearchParams(location.search).has('upstream')
+  const hasUpstream = query.has('upstream')
   return {
     branches: [
       branchFixture({
@@ -110,8 +118,12 @@ const RECENT_FIXTURE: RecentRepo[] = [
 ]
 
 // commitDetailsFixture: a plausible commit for whichever row the layout
-// case clicks, with a changed file.
+// case clicks, with a changed file; or, with ?commitFiles=<n>, n files and
+// a message as many lines long, for the commit detail view's scrolling
+// case, which needs both parts taller than the window.
 function commitDetailsFixture(sha: string): CommitDetails {
+  const count = Number(query.get('commitFiles') ?? '0')
+  const subject = 'Fixture commit for the layout e2e case.'
   return {
     sha,
     parents: [],
@@ -121,28 +133,25 @@ function commitDetailsFixture(sha: string): CommitDetails {
     committer: 'Ada Fixture',
     committerEmail: 'ada@example.com',
     committerAt: 1_700_000_000,
-    body: 'Fixture commit for the layout e2e case.',
-    files: [{ path: 'src/components/staged-one.ts', status: 'M' }],
+    body: [subject, '', ...Array.from({ length: count }, (_, i) => `Line ${i}.`)].join('\n'),
+    files: count
+      ? Array.from({ length: count }, (_, i) => ({ path: `src/file-${i}.ts`, status: 'M' }))
+      : [{ path: 'src/components/staged-one.ts', status: 'M' }],
   }
 }
 
 // DIFF_FILE_FIXTURE: real old/new content, so DiffView mounts CodeMirror
 // and shows its toolbar instead of a loading/binary placeholder.
-const DIFF_FILE_FIXTURE: DiffFile = {
+const DIFF_FILE_FIXTURE = diffFileFixture({
   path: 'src/components/staged-one.ts',
   oldPath: '',
-  binary: false,
-  tooLarge: false,
-  // Long enough to need more height than the side column has, as a real
+  // Long enough to need more height than the diff window has, as a real
   // source file does.
   oldContent: 'line one\nline two\nline three\n' + 'unchanged line\n'.repeat(200),
   newContent:
     'line one\nline TWO, changed\nline three\nline four\n' + 'unchanged line\n'.repeat(200),
-  hunks: [
-    { oldStart: 2, oldLines: 1, newStart: 2, newLines: 1 },
-    { oldStart: 3, oldLines: 0, newStart: 4, newLines: 1 },
-  ],
-}
+  hunks: [hunk(2, 1, 2, 1), hunk(3, 0, 4, 1)],
+})
 
 declare global {
   interface Window {
@@ -206,9 +215,9 @@ let fetchJobSeq = 0
 // receives them from the real core.
 function runFetchJob(): string {
   const id = `job-fetch-${fetchJobSeq++}`
-  dispatchEvent('job:update', { id, kind: 'fetch', state: 'running', progress: -1, message: '' })
+  dispatchEvent('job:update', jobFixture({ id, progress: -1 }))
   setTimeout(() => {
-    dispatchEvent('job:update', { id, kind: 'fetch', state: 'done', progress: 100, message: '' })
+    dispatchEvent('job:update', jobFixture({ id, state: JobState.JobDone, progress: 100 }))
   }, FETCH_JOB_MS)
   return id
 }
@@ -229,6 +238,22 @@ export const Facade = {
     })
   },
 
+  LogIndexOf(_wt: WorktreeID, sha: string): Promise<LogIndexResult> {
+    const index = LOG_ROWS_FIXTURE.findIndex((row) => row.sha === sha)
+    return delay(index === -1 ? { index: -1, found: false } : { index, found: true })
+  },
+
+  SearchLog(_wt: WorktreeID, query: string): Promise<LogSearchResult> {
+    if (!query) return delay({ generation: 0, filtered: false })
+    const bySha = LOG_ROWS_FIXTURE.findIndex((row) => row.sha === query)
+    if (bySha !== -1) return delay({ indices: [bySha], generation: 0, filtered: false })
+    const q = query.toLowerCase()
+    const indices = LOG_ROWS_FIXTURE.flatMap((row, i) =>
+      row.subject.toLowerCase().includes(q) ? [i] : [],
+    )
+    return delay({ indices, generation: 0, filtered: false })
+  },
+
   Summary(): Promise<Summary> {
     return Promise.resolve(summaryFixture({ editorName: 'the editor' }))
   },
@@ -243,10 +268,6 @@ export const Facade = {
 
   Refs(): Promise<Refs> {
     return delay(refsFixture())
-  },
-
-  ConfiguredPullMode(): Promise<PullMode> {
-    return Promise.resolve(PullMode.$zero)
   },
 
   Status(): Promise<ChangedFiles> {
@@ -277,15 +298,18 @@ export const AppService = {
   ListWSLDistros(): Promise<[]> {
     return Promise.resolve([])
   },
+  NewWindow(): Promise<void> {
+    return Promise.resolve(undefined)
+  },
   UpdateWindowTitle(): Promise<void> {
     return Promise.resolve(undefined)
   },
-  LogPath(): Promise<{ path: string; error: string }> {
+  LogPath(): Promise<LogPathInfo> {
     return Promise.resolve({ path: '/mock/nebegit.log', error: '' })
   },
 }
 export const SettingsService = {
-  Get(): Promise<Settings> {
+  Get(): Promise<Preferences> {
     return Promise.resolve(defaultSettingsFixture())
   },
 }

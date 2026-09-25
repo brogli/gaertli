@@ -63,3 +63,52 @@ jobs:
           GOFLAGS: -mod=readonly
           npm_config_offline: "true"
         run: task ${{ matrix.task }}
+
+  git-2-42:
+    # The Go tests also run against the oldest supported git (git.MinVersion),
+    # built from source since ubuntu-24.04 ships a newer one. No frontend
+    # build, so only the packages that do not embed it; race detector on,
+    # since a new, self-contained Linux job can turn it on without touching
+    # the matrix above.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Cache git 2.42 build
+        id: git-2-42-cache
+        uses: actions/cache@v4
+        with:
+          path: /opt/git-2.42
+          key: git-2.42.4-ubuntu-24.04-v1
+
+      - name: Build git 2.42 (online)
+        if: steps.git-2-42-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y dh-autoreconf zlib1g-dev
+          curl -fsSL https://mirrors.edge.kernel.org/pub/software/scm/git/git-2.42.4.tar.gz -o /tmp/git-2.42.tar.gz
+          tar xzf /tmp/git-2.42.tar.gz -C /tmp
+          cd /tmp/git-2.42.4
+          make configure
+          ./configure --prefix=/opt/git-2.42
+          make NO_CURL=1 NO_EXPAT=1 NO_GETTEXT=1 NO_TCLTK=1 NO_OPENSSL=1 -j"$(nproc)" all
+          make NO_CURL=1 NO_EXPAT=1 NO_GETTEXT=1 NO_TCLTK=1 NO_OPENSSL=1 install
+
+      - name: Put git 2.42 first on PATH
+        run: echo /opt/git-2.42/bin >> "$GITHUB_PATH"
+
+      - name: Setup (online)
+        run: go mod download
+
+      - name: test:go:race on git 2.42 (offline)
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: |
+          git --version
+          go tool task test:go:race

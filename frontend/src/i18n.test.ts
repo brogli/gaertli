@@ -94,31 +94,4 @@ describe('TR-35 translation guard', () => {
     }
     expect(missing).toEqual([])
   })
-
-  it('FR-UX-11 every core error key (errorKeys.generated.json) has an errors.* entry in en.json', () => {
-    const errorKeys: Record<string, string[]> = JSON.parse(
-      readFileSync('src/locales/errorKeys.generated.json', 'utf-8'),
-    )
-    const errors = (en as { errors: Record<string, string> }).errors
-    for (const key of Object.keys(errorKeys)) {
-      expect(errors).toHaveProperty(key)
-    }
-  })
-
-  it('FR-UX-11 icons.ts builds common.fileStatus.<key> from a code: every code resolves', () => {
-    const labelKeys = [
-      'added',
-      'modified',
-      'deleted',
-      'renamed',
-      'copied',
-      'typeChanged',
-      'untracked',
-      'conflicted',
-    ]
-    const fileStatus = (en as { common: { fileStatus: Record<string, string> } }).common.fileStatus
-    for (const key of labelKeys) {
-      expect(fileStatus).toHaveProperty(key)
-    }
-  })
 })

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -17,8 +18,12 @@ import (
 )
 
 // largeRepoRows is the loaded-row threshold above which streamLog writes
-// git's own commit-graph file once. A var so tests can lower it.
-var largeRepoRows = 20_000
+// git's own commit-graph file once. Tests lower it with Store; atomic
+// because writeCommitGraphIfLarge reads it from a streamLog goroutine that
+// can still be running after the test that lowered it has returned.
+var largeRepoRows atomic.Int64
+
+func init() { largeRepoRows.Store(20_000) }
 
 const progressInterval = 100 * time.Millisecond
 
@@ -40,7 +45,7 @@ func (c *Core) LoadLog(ctx context.Context, id core.WorktreeID) error {
 		// Another window of this repo loaded it, or is loading it: the
 		// caller's window learns the current count the same way.
 		view := wt.LogSnapshot(0, 0)
-		c.emitLogProgress(wt.Repo.Key, view.Generation, view.Loaded, view.Done)
+		c.emitLogProgress(wt.Repo.Key, view.Generation, view.Loaded, view.Done, view.Err)
 		return nil
 	}
 	go c.streamLog(context.WithoutCancel(ctx), wt, gen)
@@ -66,9 +71,9 @@ func (c *Core) LogRows(ctx context.Context, id core.WorktreeID, from, to int) (c
 func headFor(rows []core.LogCommit, path string) []core.LogCommit {
 	out := make([]core.LogCommit, len(rows))
 	for i, row := range rows {
-		refs := slices.DeleteFunc(slices.Clone(row.Refs), func(r core.RefLabel) bool { return r.Kind == "head" })
+		refs := slices.DeleteFunc(slices.Clone(row.Refs), func(r core.RefLabel) bool { return r.Kind == core.HeadRef })
 		if slices.Contains(row.CheckedOutIn, path) {
-			refs = slices.Insert(refs, 0, core.RefLabel{Name: "HEAD", Kind: "head"})
+			refs = slices.Insert(refs, 0, core.RefLabel{Name: "HEAD", Kind: core.HeadRef})
 		}
 		row.Refs = refs
 		out[i] = row
@@ -129,7 +134,7 @@ func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha string) (
 // reload that superseded it.
 func (c *Core) streamLog(ctx context.Context, wt *session.Worktree, gen int) {
 	repo := wt.Repo
-	progress := func(loaded int, done bool) { c.emitLogProgress(repo.Key, gen, loaded, done) }
+	progress := func(loaded int, done bool) { c.emitLogProgress(repo.Key, gen, loaded, done, nil) }
 	loaded, logErr := streamCommits(ctx, wt, core.LogFilter{}, true,
 		func(commit core.LogCommit) { repo.LogAppend(gen, commit) }, progress)
 
@@ -140,7 +145,7 @@ func (c *Core) streamLog(ctx context.Context, wt *session.Worktree, gen int) {
 		tips, _ = refTips(ctx, wt.Runner, wt.Path)
 	}
 	repo.LogFinish(gen, logErr, tips)
-	progress(loaded, true)
+	c.emitLogProgress(repo.Key, gen, loaded, true, logErr)
 	if logErr == nil {
 		writeCommitGraphIfLarge(ctx, wt, loaded) // after the done signal: never delays the UI
 	}
@@ -192,7 +197,7 @@ func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFil
 // Skipped once the file exists. A failure is never surfaced: the file is an
 // optimisation, not app state.
 func writeCommitGraphIfLarge(ctx context.Context, wt *session.Worktree, loaded int) {
-	if loaded < largeRepoRows {
+	if int64(loaded) < largeRepoRows.Load() {
 		return
 	}
 	if fileExists(filepath.Join(wt.Repo.Key, "objects", "info", "commit-graph")) {
@@ -244,8 +249,8 @@ func parseRefTips(out []byte) map[string]string {
 	return tips
 }
 
-func (c *Core) emitLogProgress(repoKey string, gen, loaded int, done bool) {
-	payload, _ := json.Marshal(core.LogProgress{Loaded: loaded, Done: done, Generation: gen})
+func (c *Core) emitLogProgress(repoKey string, gen, loaded int, done bool, err *core.Error) {
+	payload, _ := json.Marshal(core.LogProgress{Loaded: loaded, Done: done, Generation: gen, Error: err})
 	c.sink(core.Event{Name: "log:progress", Repo: repoKey, Payload: payload})
 }
 
@@ -282,9 +287,9 @@ func parseRefs(decoration string) []core.RefLabel {
 	for tok := range strings.SplitSeq(decoration, ", ") {
 		switch {
 		case tok == "HEAD":
-			refs = append(refs, core.RefLabel{Name: "HEAD", Kind: "head"})
+			refs = append(refs, core.RefLabel{Name: "HEAD", Kind: core.HeadRef})
 		case strings.HasPrefix(tok, "HEAD -> "):
-			refs = append(refs, core.RefLabel{Name: "HEAD", Kind: "head"}, refFromPath(strings.TrimPrefix(tok, "HEAD -> ")))
+			refs = append(refs, core.RefLabel{Name: "HEAD", Kind: core.HeadRef}, refFromPath(strings.TrimPrefix(tok, "HEAD -> ")))
 		default:
 			refs = append(refs, refFromPath(strings.TrimPrefix(tok, "tag: ")))
 		}
@@ -292,8 +297,11 @@ func parseRefs(decoration string) []core.RefLabel {
 	return refs
 }
 
-var refKinds = []struct{ prefix, kind string }{
-	{"refs/heads/", "branch"}, {"refs/remotes/", "remote"}, {"refs/tags/", "tag"},
+var refKinds = []struct {
+	prefix string
+	kind   core.RefKind
+}{
+	{"refs/heads/", core.BranchRef}, {"refs/remotes/", core.RemoteRef}, {"refs/tags/", core.TagRef},
 }
 
 func refFromPath(path string) core.RefLabel {
@@ -310,7 +318,7 @@ func refFromPath(path string) core.RefLabel {
 func toGraphRow(row graph.Row) core.GraphRow {
 	edges := make([]core.GraphEdge, len(row.Edges))
 	for i, e := range row.Edges {
-		edges[i] = core.GraphEdge{Lane: e.Lane, Kind: string(e.Kind)}
+		edges[i] = core.GraphEdge{Lane: e.Lane, Kind: core.EdgeKind(e.Kind), Colour: e.Colour}
 	}
 	return core.GraphRow{Lane: row.Lane, Colour: row.Colour, Edges: edges, Overflow: row.Overflow}
 }

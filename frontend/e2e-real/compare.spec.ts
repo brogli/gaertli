@@ -2,7 +2,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page, Request } from '@playwright/test'
 import { test, expect } from './fixtures'
-import { contextMenuItems, hunksText, logRow, pickFromContextMenu, rev, shortRev } from './helpers'
+import {
+  contextMenuItems,
+  diffText,
+  hunksText,
+  logRow,
+  pickFromContextMenu,
+  rev,
+  shortRev,
+} from './helpers'
 
 // Comparing two commits, or a commit with the working tree, in the main
 // window's side column. A double-click's diff window is a native window:
@@ -126,7 +134,7 @@ test('FR-CMP-02 a click on a compared file shows no diff; a double-click opens i
 
   await app.keyboard.press('Escape')
   await expect(compareView(app)).toBeHidden()
-  await expect(app.locator('.commit-details')).toBeVisible()
+  await expect(app.locator('.commit-details')).toBeHidden() // the whole selection is dropped
 })
 
 test('FR-CMP-03 the comparison shows from → to; Swap reverses the direction', async ({
@@ -138,11 +146,11 @@ test('FR-CMP-03 the comparison shows from → to; Swap reverses the direction', 
   const view = compareView(app)
   const initial = shortRev(git, repos.work, 'v1~2')
   const feature = shortRev(git, repos.work, 'feature')
-  await expect(view.locator('header')).toContainText(`older ${initial} → newer ${feature}`)
+  await expect(view.locator('header')).toContainText(`${initial} → ${feature}`)
   await expect.poll(() => listedFiles(view)).toContain('Added feature.txt')
 
   await view.locator('[data-test=swap]').click()
-  await expect(view.locator('header')).toContainText(`newer ${feature} → older ${initial}`)
+  await expect(view.locator('header')).toContainText(`${feature} → ${initial}`)
   await expect.poll(() => listedFiles(view)).toContain('Deleted feature.txt')
 })
 
@@ -184,5 +192,5 @@ test('FR-CMP-04 compare with working tree lists committed and uncommitted differ
 
   const diff = await openDiff(repos.work, { kind: 'againstWorking', sha, file: 'hunks.txt' })
   await expect(diff.locator('.file-list li')).toHaveCount(5)
-  await expect(diff.locator('.diff-view .cm-content')).toContainText('line 7 changed')
+  await expect(diffText(diff)).toContainText('line 7 changed')
 })

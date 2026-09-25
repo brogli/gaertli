@@ -121,6 +121,23 @@ func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
 	}
 }
 
+func TestFR_REPO_03_SummaryReportsTheBranchByItsNameWhenATagSharesIt(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "switch", "-c", "v1")
+	gittest.Run(t, repo.Dir, "tag", "v1")
+	c, id := openWorktree(t, repo.Dir)
+
+	got, err := c.Summary(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Branch != "v1" {
+		t.Errorf("Branch = %q, want v1", got.Branch)
+	}
+}
+
 func TestFR_REPO_03_SummaryReportsDetachedHEAD(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")

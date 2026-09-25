@@ -16,5 +16,15 @@ type EventSink func(Event)
 
 // RepoChanged is the payload of a "repo:changed" event.
 type RepoChanged struct {
-	Scope string `json:"scope"` // "refs" | "index" | "worktrees" | "state"
+	Scope ChangeScope `json:"scope"`
 }
+
+// ChangeScope is what part of a repo's git state changed.
+type ChangeScope string
+
+const (
+	RefsChanged      ChangeScope = "refs"      // HEAD, refs/, packed-refs — any worktree's
+	IndexChanged     ChangeScope = "index"     // a worktree's index file, or its working tree (status poll)
+	WorktreesChanged ChangeScope = "worktrees" // an entry added/removed under worktrees/
+	StateChanged     ChangeScope = "state"     // MERGE_HEAD, CHERRY_PICK_HEAD, REVERT_HEAD, rebase-*, sequencer/
+)

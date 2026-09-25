@@ -9,9 +9,6 @@ internal/remote/nebegit-core-linux
 frontend/node_modules/
 frontend/playwright-report/
 frontend/test-results/
-build/linux/appimage/build
-build/linux/appimage/nebegit
-build/linux/appimage/nebegit.png
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 build/linux/nebegit.desktop
 .claude/worktrees/

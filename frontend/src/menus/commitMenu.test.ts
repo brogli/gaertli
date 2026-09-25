@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  buildComparisonMenuItems,
   buildOneCommitMenuItems,
-  buildRangeMenuItems,
+  buildSelectionMenuItems,
+  buildSquashMenuItems,
   type CommitMenuItem,
 } from './commitMenu'
 import { commitRow as row } from '../testing/fixtures/log-rows'
@@ -146,21 +146,56 @@ describe('buildOneCommitMenuItems', () => {
   })
 })
 
-describe('buildRangeMenuItems', () => {
-  it('FR-LOG-11 range of 3: exactly the count-labelled cherry-pick, revert and copy items', () => {
+function selectionActions() {
+  return {
+    cherryPick: vi.fn(),
+    cherryPickOptions: vi.fn(),
+    revert: vi.fn(),
+    revertOptions: vi.fn(),
+    copyHashes: vi.fn(),
+    swap: vi.fn(),
+    stopComparing: vi.fn(),
+  }
+}
+
+describe('buildSelectionMenuItems', () => {
+  it('FR-LOG-11 three commits: pick, revert, squash, fixup, copy hashes, no swap', () => {
+    const rows = [row({ sha: 'a' }), row({ sha: 'b' }), row({ sha: 'c' })]
+    const squash = buildSquashMenuItems(3, null, { squash: vi.fn(), fixup: vi.fn() }, t)
+
+    const items = buildSelectionMenuItems(rows, selectionActions(), squash, t)
+
+    expect(labelsOf(items)).toEqual([
+      'Cherry-pick 3 commits',
+      'Cherry-pick 3 commits…',
+      'Revert 3 commits',
+      'Revert 3 commits…',
+      'Squash 3 commits…',
+      'Fixup 3 commits…',
+      'Copy 3 hashes',
+    ])
+  })
+
+  it('FR-LOG-11 two commits: the same shape, plus swap and stop comparing last', () => {
+    const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
+
+    const items = buildSelectionMenuItems(rows, selectionActions(), [], t)
+
+    expect(labelsOf(items)).toEqual([
+      'Cherry-pick 2 commits',
+      'Cherry-pick 2 commits…',
+      'Revert 2 commits',
+      'Revert 2 commits…',
+      'Copy 2 hashes',
+      'Swap',
+      'Stop comparing',
+    ])
+  })
+
+  it('FR-LOG-11 an empty squash section adds nothing', () => {
     const rows = [row({ sha: 'a' }), row({ sha: 'b' }), row({ sha: 'c' })]
 
-    const items = buildRangeMenuItems(
-      rows,
-      {
-        cherryPick: vi.fn(),
-        cherryPickOptions: vi.fn(),
-        revert: vi.fn(),
-        revertOptions: vi.fn(),
-        copyHashes: vi.fn(),
-      },
-      t,
-    )
+    const items = buildSelectionMenuItems(rows, selectionActions(), [], t)
 
     expect(labelsOf(items)).toEqual([
       'Cherry-pick 3 commits',
@@ -171,81 +206,26 @@ describe('buildRangeMenuItems', () => {
     ])
   })
 
-  it('FR-UX-11 a range of 1 selects the singular plural form', () => {
-    const items = buildRangeMenuItems(
-      [row()],
-      {
-        cherryPick: vi.fn(),
-        cherryPickOptions: vi.fn(),
-        revert: vi.fn(),
-        revertOptions: vi.fn(),
-        copyHashes: vi.fn(),
-      },
-      t,
-    )
-
-    expect(labelsOf(items)).toEqual([
-      'Cherry-pick 1 commit',
-      'Cherry-pick 1 commit…',
-      'Revert 1 commit',
-      'Revert 1 commit…',
-      'Copy 1 hash',
-    ])
-  })
-
-  it('FR-LOG-11 each range item calls its own action', () => {
+  it('FR-LOG-11 each item calls its own action', () => {
     const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
-    const actions = {
-      cherryPick: vi.fn(),
-      cherryPickOptions: vi.fn(),
-      revert: vi.fn(),
-      revertOptions: vi.fn(),
-      copyHashes: vi.fn(),
-    }
-    const items = buildRangeMenuItems(rows, actions, t)
+    const actions = selectionActions()
+    const items = buildSelectionMenuItems(rows, actions, [], t)
 
     findItem(items, 'Cherry-pick 2 commits').command()
     findItem(items, 'Cherry-pick 2 commits…').command()
     findItem(items, 'Revert 2 commits').command()
     findItem(items, 'Revert 2 commits…').command()
     findItem(items, 'Copy 2 hashes').command()
+    findItem(items, 'Swap').command()
+    findItem(items, 'Stop comparing').command()
 
     expect(actions.cherryPick).toHaveBeenCalledTimes(1)
     expect(actions.cherryPickOptions).toHaveBeenCalledTimes(1)
     expect(actions.revert).toHaveBeenCalledTimes(1)
     expect(actions.revertOptions).toHaveBeenCalledTimes(1)
     expect(actions.copyHashes).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('buildComparisonMenuItems', () => {
-  it('FR-LOG-11 exactly: Swap, Stop comparing, Copy both hashes', () => {
-    const items = buildComparisonMenuItems(
-      { swap: vi.fn(), stopComparing: vi.fn(), copyBothHashes: vi.fn() },
-      t,
-    )
-
-    expect(labelsOf(items)).toEqual(['Swap', 'Stop comparing', 'Copy both hashes'])
-  })
-
-  it('FR-CMP-03 "Swap" and "Stop comparing" call their own actions', () => {
-    const actions = { swap: vi.fn(), stopComparing: vi.fn(), copyBothHashes: vi.fn() }
-    const items = buildComparisonMenuItems(actions, t)
-
-    findItem(items, 'Swap').command()
-    findItem(items, 'Stop comparing').command()
-
     expect(actions.swap).toHaveBeenCalledTimes(1)
     expect(actions.stopComparing).toHaveBeenCalledTimes(1)
-  })
-
-  it('FR-LOG-11 "Copy both hashes" calls copyBothHashes', () => {
-    const actions = { swap: vi.fn(), stopComparing: vi.fn(), copyBothHashes: vi.fn() }
-    const items = buildComparisonMenuItems(actions, t)
-
-    findItem(items, 'Copy both hashes').command()
-
-    expect(actions.copyBothHashes).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -256,3 +236,20 @@ function findItem(items: CommitMenuItem[], label: string): { label: string; comm
   if (!item) throw new Error(`menu item not found: ${label}`)
   return item
 }
+
+describe('buildSquashMenuItems', () => {
+  it('FR-LOG-11 squash and fixup, labelled with the count', () => {
+    const items = buildSquashMenuItems(3, null, { squash: vi.fn(), fixup: vi.fn() }, t)
+
+    expect(labelsOf(items)).toEqual(['Squash 3 commits…', 'Fixup 3 commits…'])
+  })
+
+  it('FR-LOG-14 with a blocker: one disabled item saying why, no actions', () => {
+    const actions = { squash: vi.fn(), fixup: vi.fn() }
+    const items = buildSquashMenuItems(2, 'a rebase is in progress', actions, t)
+
+    expect(items).toEqual([
+      { label: 'Squash and fixup not possible: a rebase is in progress', disabled: true },
+    ])
+  })
+})

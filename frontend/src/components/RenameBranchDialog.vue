@@ -6,7 +6,9 @@ import Button from 'openvue/button'
 import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { DIALOG } from '../lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
+import FormField from './FormField.vue'
 
 // RenameBranchDialog edits a local branch's name in place, pre-filled with
 // its current one.
@@ -26,10 +28,23 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <Dialog visible :header="t('dialogs.renameBranch.header')" modal @update:visible="emit('close')">
+  <Dialog
+    visible
+    v-bind="DIALOG"
+    :header="t('dialogs.renameBranch.header')"
+    @update:visible="emit('close')"
+  >
     <ErrorBanner v-if="error" :error="error" />
-    <InputText v-model="newName" :placeholder="t('dialogs.renameBranch.namePlaceholder')" />
+    <FormField v-slot="{ id }" :label="t('dialogs.branchName')">
+      <InputText :id="id" v-model="newName" autofocus fluid />
+    </FormField>
     <template #footer>
+      <Button
+        :label="t('common.cancel')"
+        severity="secondary"
+        data-test="dialog-cancel"
+        @click="emit('close')"
+      />
       <Button
         :label="t('dialogs.renameBranch.rename')"
         data-test="rename-branch-submit"

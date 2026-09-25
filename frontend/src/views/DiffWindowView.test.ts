@@ -1,6 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 const { Facade, SettingsService } = vi.hoisted(() => ({
   Facade: {
@@ -27,6 +28,7 @@ vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
 import { Events, Window, emit } from '../testing/runtime'
 
 import DiffWindowView from './DiffWindowView.vue'
+import DiffView from '../components/DiffView.vue'
 import { DiffKind, type DiffTarget } from '../lib/diffTarget'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
 import { diffFileFixture, hunk } from '../testing/fixtures/diff'
@@ -156,6 +158,30 @@ describe('DiffWindowView', () => {
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'both.txt', 0)
   })
 
+  it("FR-DIFF-07 the diff gets the window's target, with the chosen working-tree file's side and status", async () => {
+    const wrapper = await mountWindow({
+      kind: DiffKind.WorkingDiff,
+      staged: true,
+      path: 'a.txt',
+      oldPath: '',
+    })
+    const diffProps = () => wrapper.findComponent(DiffView).props()
+
+    expect(diffProps()).toMatchObject({
+      wt: '/repo',
+      target: { kind: DiffKind.WorkingDiff, path: 'a.txt', staged: true },
+      status: 'M',
+    })
+
+    await rows(wrapper)[2]!.trigger('click')
+    await flushPromises()
+
+    expect(diffProps()).toMatchObject({
+      target: { kind: DiffKind.WorkingDiff, path: 'new.txt', staged: false },
+      status: '?',
+    })
+  })
+
   it('FR-DIFF-07 clicking a file in the list shows its diff', async () => {
     const wrapper = await mountWindow({
       kind: DiffKind.CommitDiff,
@@ -261,7 +287,7 @@ describe('DiffWindowView', () => {
 
     const statusCalls = Facade.Status.mock.calls.length
     const diffCalls = Facade.DiffWorking.mock.calls.length
-    emit('repo:changed', { data: { scope: 'index' } })
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
 
     expect(Facade.Status.mock.calls.length).toBeGreaterThan(statusCalls)
@@ -293,5 +319,15 @@ describe('DiffWindowView', () => {
     await rows(wrapper)[1]!.get('[data-test="open-editor"]').trigger('click')
 
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'b.txt', 0)
+  })
+
+  it('ADR-4 after a WSL core restart the window reloads its file list and its diff', async () => {
+    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+
+    emit('core:reconnected')
+    await flushPromises()
+
+    expect(Facade.CommitDetails).toHaveBeenCalledTimes(2)
+    expect(Facade.DiffFile).toHaveBeenCalledTimes(2)
   })
 })

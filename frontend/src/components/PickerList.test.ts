@@ -1,7 +1,7 @@
-import { flushPromises, mount } from '@vue/test-utils'
 import { h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import PickerList from './PickerList.vue'
+import { mountInBody } from '../testing/mountInBody'
 import type { PickerRow } from './pickerRow'
 
 type Row = PickerRow & { label: string }
@@ -16,7 +16,7 @@ const rows: Row[] = [
 // activate) plus, per row, a sibling button that calls action with the
 // row's key; waits for the rows in view to render.
 async function mountList(action = vi.fn(), listRows: Row[] = rows) {
-  const wrapper = mount(PickerList<Row>, {
+  const { wrapper } = await mountInBody(PickerList<Row>, {
     props: { rows: listRows, placeholder: 'Filter' },
     slots: {
       row: ({ row, activate }: { row: Row; activate: () => void }) => [
@@ -24,9 +24,7 @@ async function mountList(action = vi.fn(), listRows: Row[] = rows) {
         h('button', { class: 'act', onClick: () => action(row.key) }),
       ],
     },
-    attachTo: document.body,
   })
-  await flushPromises()
   return wrapper
 }
 
@@ -63,6 +61,36 @@ describe('PickerList', () => {
 
     expect(wrapper.emitted('activate')).toEqual([[rows[1]]])
     expect(wrapper.get('li.active').text()).toBe('alpha')
+  })
+
+  it("FR-BR-09 a right-click on a row makes it the active row and asks for its menu at the pointer; a header's asks nothing", async () => {
+    const wrapper = await mountList()
+
+    await wrapper.findAll('li')[0]!.trigger('contextmenu')
+    await wrapper
+      .findAll('li')[2]!
+      .get('.main')
+      .trigger('contextmenu', { clientX: 40, clientY: 50 })
+
+    const menus = wrapper.emitted<[Row, MouseEvent]>('menu')!
+    expect(menus.map(([row]) => row)).toEqual([rows[2]])
+    expect([menus[0]![1].clientX, menus[0]![1].clientY]).toEqual([40, 50])
+    expect(wrapper.get('li.active').text()).toBe('beta')
+  })
+
+  it("FR-BR-09 Shift+F10 or the context-menu key in the filter asks for the active row's menu at that row", async () => {
+    const wrapper = await mountList()
+    const filter = wrapper.get('input')
+
+    await filter.trigger('keydown', { key: 'ArrowDown' })
+    await filter.trigger('keydown', { key: 'F10', shiftKey: true })
+    await filter.trigger('keydown', { key: 'ContextMenu' })
+    await filter.trigger('keydown', { key: 'F10' })
+
+    const menus = wrapper.emitted<[Row, MouseEvent]>('menu')!
+    expect(menus.map(([row]) => row)).toEqual([rows[2], rows[2]])
+    const { left, bottom } = wrapper.get('li.active').element.getBoundingClientRect()
+    expect([menus[0]![1].clientX, menus[0]![1].clientY]).toEqual([left, bottom])
   })
 
   it('FR-BR-09 a long list renders only the rows in view', async () => {

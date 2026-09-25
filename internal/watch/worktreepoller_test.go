@@ -9,6 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
@@ -25,8 +26,8 @@ func TestFR_REPO_04_WorktreePollerObservesAWorkingFileEditDirectly(t *testing.T)
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
-	got := make(chan Scope, 10)
-	p := NewWorktreePoller(git.Runner{}, repo.Dir, func(s Scope) { got <- s })
+	got := make(chan core.ChangeScope, 10)
+	p := NewWorktreePoller(git.Runner{}, repo.Dir, func(s core.ChangeScope) { got <- s })
 	p.Focus()
 	defer p.Close()
 
@@ -34,7 +35,7 @@ func TestFR_REPO_04_WorktreePollerObservesAWorkingFileEditDirectly(t *testing.T)
 		t.Fatal(err)
 	}
 
-	waitForScope(t, got, Index)
+	waitForScope(t, got, core.IndexChanged)
 }
 
 // A second edit to a file already listed as changed leaves git status's
@@ -49,7 +50,7 @@ func TestFR_REPO_04_WorktreePollerSeesAFurtherEditToAnAlreadyChangedFile(t *test
 				t.Fatal(err)
 			}
 			var changes atomic.Int32
-			p := NewWorktreePoller(git.Runner{}, repo.Dir, func(Scope) { changes.Add(1) })
+			p := NewWorktreePoller(git.Runner{}, repo.Dir, func(core.ChangeScope) { changes.Add(1) })
 			defer p.Close()
 			p.CheckNow() // baseline: the file already changed
 
@@ -76,7 +77,7 @@ func TestFR_REPO_04_WorktreePollerBacksOffAfterASlowPollThenResets(t *testing.T)
 			polls = append(polls, time.Now())
 			mu.Unlock()
 		}}
-		p := NewWorktreePoller(runner, t.TempDir(), func(Scope) {})
+		p := NewWorktreePoller(runner, t.TempDir(), func(core.ChangeScope) {})
 
 		p.Focus() // poll #1: slow, the baseline
 		defer p.Close()
@@ -102,7 +103,7 @@ func TestQA_PERF_06_BlurStopsPollingAfterTheTimer(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var count atomic.Int32
 		runner := git.Runner{Git: nonexistentGit, Log: func(git.Entry) { count.Add(1) }}
-		p := NewWorktreePoller(runner, t.TempDir(), func(Scope) {})
+		p := NewWorktreePoller(runner, t.TempDir(), func(core.ChangeScope) {})
 		defer p.Close()
 
 		p.Focus()

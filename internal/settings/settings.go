@@ -16,22 +16,51 @@ import (
 // maxRecent bounds RecentRepos.
 const maxRecent = 10
 
-// Settings is the whole persisted file.
+// Settings is the whole persisted file: the shell's own record of recent
+// repos and open windows, and the user's Preferences.
 type Settings struct {
 	RecentRepos   []RecentRepo `json:"recentRepos"`   // most-recent-first, capped at maxRecent
 	OpenWorktrees []string     `json:"openWorktrees"` // windows open at last quit
+	Preferences
+}
 
+// Preferences are the settings the user edits; the frontend reads and saves
+// them through SettingsService.
+type Preferences struct {
 	// EditorProfiles is keyed by environment: "" for local, else a WSL
 	// distro name.
 	EditorProfiles map[string]core.EditorProfile `json:"editorProfiles,omitempty"`
 
-	ProtectedBranches        []string `json:"protectedBranches"`
-	DefaultPullMode          string   `json:"defaultPullMode"`          // "merge" | "rebase"
-	DiffMode                 string   `json:"diffMode"`                 // "unified" | "side-by-side"
-	AutoFetchIntervalMinutes int      `json:"autoFetchIntervalMinutes"` // 0 = disabled
-	Theme                    string   `json:"theme"`                    // "" = follow the OS, "light", "dark"
-	IgnoreWhitespace         bool     `json:"ignoreWhitespace"`         // the diff view's whitespace toggle
+	ProtectedBranches        []string      `json:"protectedBranches"`
+	DefaultPullMode          core.PullMode `json:"defaultPullMode"`
+	DiffMode                 DiffMode      `json:"diffMode"`
+	AutoFetchIntervalMinutes int           `json:"autoFetchIntervalMinutes"` // 0 = disabled
+	Theme                    Theme         `json:"theme"`
+	IgnoreWhitespace         bool          `json:"ignoreWhitespace"` // the diff view's whitespace toggle
+	DebugMode                bool          `json:"debugMode"`        // each window shows the debug strip
+
+	// WorktreeFolders is the base folder for new worktrees, keyed like
+	// EditorProfiles. An absent entry means the folder holding the repo's
+	// main worktree.
+	WorktreeFolders map[string]string `json:"worktreeFolders,omitempty"`
 }
+
+// DiffMode is how the diff view lays out a file's two sides.
+type DiffMode string
+
+const (
+	UnifiedDiff    DiffMode = "unified"
+	SideBySideDiff DiffMode = "side-by-side"
+)
+
+// Theme is the UI's colour scheme.
+type Theme string
+
+const (
+	SystemTheme Theme = "" // follows the OS preference
+	LightTheme  Theme = "light"
+	DarkTheme   Theme = "dark"
+)
 
 // RecentRepo is one entry of Settings.RecentRepos.
 type RecentRepo struct {
@@ -50,10 +79,11 @@ func (r RecentRepo) sameRepo(other RecentRepo) bool {
 	return r.Path == other.Path || (r.RepoKey != "" && r.RepoKey == other.RepoKey)
 }
 
-// Default is a fresh install's settings: no recents, nothing open, git's own
-// pull default (--no-rebase), unified diffs, and no auto-fetch.
+// Default is a fresh install's settings: no recents, nothing open, main and
+// master protected, git's own pull default (--no-rebase), unified diffs,
+// and no auto-fetch.
 func Default() Settings {
-	return Settings{DefaultPullMode: "merge", DiffMode: "unified"}
+	return Settings{Preferences: Preferences{ProtectedBranches: []string{"main", "master"}, DefaultPullMode: core.PullMerge, DiffMode: UnifiedDiff}}
 }
 
 // Path is <os.UserConfigDir()>/nebegit/settings.json.

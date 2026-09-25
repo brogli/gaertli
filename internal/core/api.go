@@ -26,12 +26,11 @@ type API interface {
 	OpenWorktree(ctx context.Context, path RepoPath) (WorktreeInfo, error)
 
 	// Summary is the worktree's branch and state, without ahead/behind and
-	// refs. Cheap: the watcher calls it again on every change.
+	// refs. Cheap: the UI calls it again on every change.
 	Summary(ctx context.Context, wt WorktreeID) (Summary, error)
 
 	// Refs lists local branches, remote-tracking branches, and tags. Not
-	// cached: one for-each-ref call costs one process spawn regardless of
-	// the ref count.
+	// cached: two git calls, whatever the ref count.
 	Refs(ctx context.Context, wt WorktreeID) (Refs, error)
 
 	// LoadLog starts loading the repo's commit log and graph unless already
@@ -147,22 +146,32 @@ type API interface {
 	CompareWithWorking(ctx context.Context, wt WorktreeID, sha string) ([]ChangedFile, error)
 
 	// SetLogFilter starts wt's own filtered log view, or clears it for an
-	// empty filter. The view is per window, apart from the repo's shared
-	// log; a new filter kills the previous one's stream. Rows arrive like
-	// LoadLog's.
+	// empty filter. The view belongs to the worktree, shared by every
+	// window selecting it, apart from the repo's shared log; a new filter
+	// kills the previous one's stream. Rows arrive like LoadLog's.
 	SetLogFilter(ctx context.Context, wt WorktreeID, filter LogFilter) error
 
-	// CreateBranch creates name at start (any revision git resolves) and,
-	// if checkout, switches to it in the same atomic call. An invalid name
-	// is Code InvalidName, checked before any write; a duplicate is
-	// GitFailed; local changes blocking the switch are DirtyWorktree.
+	// SearchLog finds query in wt's current view (its filtered view if one
+	// is set, else the base log): a hash resolves to that commit's row
+	// alone, if the view has it; otherwise every row whose message matches,
+	// case-insensitively. An empty query matches nothing. Read-only: no
+	// queue, no stream.
+	SearchLog(ctx context.Context, wt WorktreeID, query string) (LogSearchResult, error)
+
+	// CreateBranch creates name at start (any revision git resolves; a
+	// branch or tag as its full ref name, since git refuses a short name
+	// that is both) and, if checkout, switches to it in the same atomic
+	// call. An invalid name is Code InvalidName, checked before any write;
+	// a duplicate is GitFailed; local changes blocking the switch are
+	// DirtyWorktree.
 	CreateBranch(ctx context.Context, wt WorktreeID, name, start string, checkout bool) error
 
-	// Checkout switches wt to branch: a local branch, or a remote-tracking
-	// one git's DWIM turns into a new tracking branch. Local changes in the
-	// way are DirtyWorktree; anything else (ambiguous or unknown name,
-	// branch checked out in another worktree) is GitFailed. No pre-check,
-	// no stash.
+	// Checkout switches wt to branch: a local branch's name, or a
+	// remote-tracking branch's full ref name (refs/remotes/<remote>/<name>),
+	// which becomes a new local branch tracking it. Local changes in the
+	// way are DirtyWorktree; anything else (unknown name, a local branch of
+	// that name already there, branch checked out in another worktree) is
+	// GitFailed. No pre-check, no stash.
 	Checkout(ctx context.Context, wt WorktreeID, branch string) error
 
 	// CheckoutCommit detaches wt's HEAD at sha. Same errors as Checkout.
@@ -192,6 +201,29 @@ type API interface {
 	// ignored.
 	Revert(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
 
+	// SquashCheck tells whether Squash and Fixup can fold shas (two or more
+	// commits, any order), and what to say first. Blocker, in this order: an
+	// operation in progress, a detached HEAD, a sha not reachable from HEAD
+	// or shas with no common ancestor, a merge commit between the oldest
+	// sha and HEAD, uncommitted changes to tracked files (DirtyWorktree).
+	// Every other blocker is GitFailed. Reads only.
+	SquashCheck(ctx context.Context, wt WorktreeID, shas []string) (SquashCheck, error)
+
+	// Squash folds shas into one commit with message, exactly as given
+	// apart from surrounding whitespace (a prepare-commit-msg hook can
+	// still change it, as for any commit), in the oldest sha's place and with
+	// its author; the other commits between it and HEAD are replayed in
+	// their order after it. It runs git rebase -i with a prepared todo
+	// under the write lock; no editor ever starts. A blocker (SquashCheck)
+	// refuses before any write. A rebase that stops is left for the resolve
+	// flow: Code Conflicts when files conflict, else Code Stopped with git's
+	// reason. A blank message, or fewer than two distinct shas, is Code
+	// Internal.
+	Squash(ctx context.Context, wt WorktreeID, shas []string, message string) (SquashResult, error)
+
+	// Fixup is Squash keeping the oldest sha's message exactly.
+	Fixup(ctx context.Context, wt WorktreeID, shas []string) (SquashResult, error)
+
 	// SetEditorProfile sets the profile this core's OpenFolder/OpenFile use.
 	// The shell calls it directly on each core when connecting: the
 	// generated Facade would route it to the local core only.
@@ -213,24 +245,21 @@ type API interface {
 	// session or poller.
 	ListWorktrees(ctx context.Context, path RepoPath) ([]Worktree, error)
 
-	// ListBranches lists path's repo's local branches and where each is
-	// checked out, for a repo with no open worktree. Stateless.
-	ListBranches(ctx context.Context, path RepoPath) ([]BranchSummary, error)
-
 	// MainWorktree finds a repo's main worktree straight from its common
 	// git dir (gitDir), with no worktree of the caller's own needed: the
 	// repo picker's fallback when a repo's remembered worktree is gone.
 	// Bare with no worktree left is Code NotARepo.
 	MainWorktree(ctx context.Context, gitDir RepoPath) (Worktree, error)
 
-	// AddWorktree creates a worktree at target on the existing branch, or,
-	// if newBranch, on a new branch started at start. target must not exist
+	// AddWorktree creates a worktree at target on the existing branch (by
+	// name: a full ref would detach), or, if newBranch, on a new branch
+	// started at start (as for CreateBranch). target must not exist
 	// or must be empty (git's refusal). A new branch name is validated
 	// first (Code InvalidName): worktree add -b's argument is not protected
 	// by --.
 	AddWorktree(ctx context.Context, path RepoPath, target, branch, start string, newBranch bool) (Worktree, error)
 
-	// Jobs lists wt's repo's queued and running jobs plus a bounded history
+	// Jobs lists wt's repo's running jobs plus a bounded history
 	// of finished ones. Updates arrive as "job:update" events.
 	Jobs(ctx context.Context, wt WorktreeID) ([]JobInfo, error)
 
@@ -258,11 +287,6 @@ type API interface {
 	// a conflicting pop is GitFailed.
 	PullWithStash(ctx context.Context, wt WorktreeID, mode PullMode) (string, error)
 
-	// ConfiguredPullMode is the pull mode wt's git config names for its
-	// current branch: branch.<name>.rebase, else pull.rebase. "" if neither
-	// is set or HEAD is detached.
-	ConfiguredPullMode(ctx context.Context, wt WorktreeID) (PullMode, error)
-
 	// PopStash applies the stash entry whose commit is sha and drops it on
 	// success; sha is resolved to its current stash@{n} at call time. A
 	// conflicting pop keeps the entry. Code Internal if no entry has sha.
@@ -285,17 +309,19 @@ type API interface {
 	ForcePush(ctx context.Context, wt WorktreeID) (string, error)
 
 	// UpdateBranch fast-forwards branch from its upstream as a job. No
-	// upstream is Code NoUpstream, before any git call. Checked out
-	// nowhere: fetched straight into the branch, NotFastForward if
-	// diverged. Checked out in a worktree: DirtyWorktree if that worktree
-	// is dirty, else fetch and merge --ff-only under its lock. The job's
-	// Result is an UpdateBranchResult.
+	// upstream is Code NoUpstream, before any job starts. Checked out
+	// nowhere: fetched straight into the branch. Checked out in a
+	// worktree: DirtyWorktree if that worktree is dirty, else fetch and
+	// merge --ff-only under its lock. Either way a diverged branch is
+	// NotFastForward. The job's Result is an UpdateBranchResult.
 	UpdateBranch(ctx context.Context, wt WorktreeID, branch string) (string, error)
 
 	// ContinueOperation runs --continue for wt's in-progress merge, rebase,
 	// cherry-pick, or revert (Summary.Operation) under the write lock, with
 	// GIT_EDITOR=true so no editor waits. No operation in progress is Code
-	// Internal; unresolved files are Code Conflicts.
+	// GitFailed (key noOperation). A step that leaves the operation in
+	// progress is a stop: Code Conflicts while files conflict, else Code
+	// Stopped with git's reason.
 	ContinueOperation(ctx context.Context, wt WorktreeID) error
 
 	// AbortOperation runs --abort the same way, back to the pre-operation
@@ -303,8 +329,9 @@ type API interface {
 	AbortOperation(ctx context.Context, wt WorktreeID) error
 
 	// SkipOperation skips the current commit of a stopped cherry-pick or
-	// revert. Any other operation, or none, is Code Internal: merge has no
-	// --skip, and rebase is not supported.
+	// revert. Any other operation is Code GitFailed (key
+	// operationNotSkippable): merge has no --skip, and rebase is not
+	// supported.
 	SkipOperation(ctx context.Context, wt WorktreeID) error
 
 	// RenameBranch renames name to newName, validated first (Code
@@ -312,8 +339,9 @@ type API interface {
 	RenameBranch(ctx context.Context, wt WorktreeID, name, newName string) error
 
 	// DeleteBranch deletes name. Without force, a branch with commits not
-	// merged into HEAD is Code Unmerged. A branch checked out in any
-	// worktree refuses either way (GitFailed).
+	// merged into its upstream, or into HEAD if it has none, is Code
+	// Unmerged. A branch checked out in any worktree refuses either way
+	// (GitFailed).
 	DeleteBranch(ctx context.Context, wt WorktreeID, name string, force bool) error
 
 	// RemoveWorktree removes the worktree at target in path's repo. Without
@@ -333,7 +361,7 @@ type Version struct {
 }
 
 // Protocol is bumped whenever the wire format of API changes.
-const Protocol = 1
+const Protocol = 3
 
 // WorktreeID names a worktree session. Issued by the core that owns the
 // repo; opaque to the UI. The shell and the UI name a WSL distro's
@@ -354,18 +382,28 @@ type WorktreeInfo struct {
 
 // Summary is the worktree's branch and state.
 type Summary struct {
-	Branch       string `json:"branch"` // "" when Detached
-	Detached     bool   `json:"detached"`
-	Operation    string `json:"operation"`     // "", "merge", "rebase", "cherry-pick", "revert"
-	SHA          string `json:"sha,omitempty"` // HEAD's commit; "" for an unborn HEAD
-	EditorName   string `json:"editorName"`    // the effective editor profile's Name
-	MessageDraft string `json:"messageDraft"`  // "" if none
+	Branch       string    `json:"branch"` // "" when Detached
+	Detached     bool      `json:"detached"`
+	Operation    Operation `json:"operation"`     // "" if none
+	SHA          string    `json:"sha,omitempty"` // HEAD's commit; "" for an unborn HEAD
+	EditorName   string    `json:"editorName"`    // the effective editor profile's Name
+	MessageDraft string    `json:"messageDraft"`  // "" if none
 
 	// PullStash is the commit of the newest stash entry PullWithStash made
 	// that is still in the stash list, "" if none. A commit, not a
 	// stash@{n} index, which shifts whenever anything else stashes.
 	PullStash string `json:"pullStash"`
 }
+
+// Operation is a merge, rebase, cherry-pick or revert in progress.
+type Operation string
+
+const (
+	MergeOperation      Operation = "merge"
+	RebaseOperation     Operation = "rebase"
+	CherryPickOperation Operation = "cherry-pick"
+	RevertOperation     Operation = "revert"
+)
 
 // ResetResult is Reset's result: the HEAD commit before the reset, so the
 // user can go back. "" only if HEAD was unborn.

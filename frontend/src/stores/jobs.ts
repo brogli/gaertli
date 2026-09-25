@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { JobState, type JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // jobs holds the worktree's repo-level jobs: load fetches the current list,
 // upsert applies one "job:update" event.
@@ -11,9 +11,7 @@ export const useJobsStore = defineStore('jobs', () => {
 
   // active is what the jobs menu shows: a job's terminal "job:update" drops
   // it.
-  const active = computed(() =>
-    items.value.filter((j) => j.state === 'queued' || j.state === 'running'),
-  )
+  const active = computed(() => items.value.filter((j) => j.state === JobState.JobRunning))
 
   async function load(id: string): Promise<void> {
     wt = id

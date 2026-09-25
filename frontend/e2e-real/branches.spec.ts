@@ -8,6 +8,7 @@ import {
   confirmDialog,
   currentBranch,
   logRow,
+  notice,
   openBranchPicker,
   pickerAction,
   pickerError,
@@ -36,7 +37,7 @@ async function resetTo(page: Page, subject: string, mode: ResetMode): Promise<vo
 
 async function openNewBranch(page: Page, subject: string, name: string): Promise<void> {
   await pickFromContextMenu(page, logRow(page, subject), 'New branch from here…')
-  await page.getByRole('dialog').getByPlaceholder('Branch name').fill(name)
+  await page.getByRole('dialog').getByLabel('Branch name').fill(name)
 }
 
 function branchButton(page: Page) {
@@ -133,7 +134,7 @@ test('FR-BR-09 a branch picked in the branch picker is checked out; a new branch
 
   await pickRefAction(app, 'feature', 'New branch from here…')
   const dialog = app.getByRole('dialog', { name: 'New branch' })
-  await dialog.getByPlaceholder('Branch name').fill('from-feature')
+  await dialog.getByLabel('Branch name').fill('from-feature')
   await dialog.getByLabel('Check out after creation').uncheck()
   await dialog.getByRole('button', { name: 'Create' }).click()
 
@@ -143,7 +144,7 @@ test('FR-BR-09 a branch picked in the branch picker is checked out; a new branch
   expect(rev(git, repos.work, 'from-feature')).toBe(rev(git, repos.work, 'feature'))
 })
 
-test('FR-BR-09 "New branch…" in the branch picker creates a branch at HEAD and checks it out', async ({
+test('FR-BR-09 "New branch…" in the branch picker creates a branch at the current branch and checks it out', async ({
   app,
   repos,
   git,
@@ -152,11 +153,28 @@ test('FR-BR-09 "New branch…" in the branch picker creates a branch at HEAD and
   await openBranchPicker(app)
   await pickerAction(app, 'New branch…').click()
   const dialog = app.getByRole('dialog', { name: 'New branch' })
-  await dialog.getByPlaceholder('Branch name').fill('from-picker')
+  await dialog.getByLabel('Branch name').fill('from-picker')
   await dialog.getByRole('button', { name: 'Create' }).click()
 
   await expect.poll(() => currentBranch(git, repos.work)).toBe('from-picker')
   expect(rev(git, repos.work, 'from-picker')).toBe(head)
+})
+
+test('FR-BR-01 "New branch…" starts the branch at the branch picked from the list', async ({
+  app,
+  repos,
+  git,
+}) => {
+  await openBranchPicker(app)
+  await pickerAction(app, 'New branch…').click()
+  const dialog = app.getByRole('dialog', { name: 'New branch' })
+  await dialog.getByLabel('Branch name').fill('from-list')
+  await dialog.locator('[data-test=start-branch]').click()
+  await app.getByRole('option', { name: 'feature', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create' }).click()
+
+  await expect.poll(() => currentBranch(git, repos.work)).toBe('from-list')
+  expect(rev(git, repos.work, 'from-list')).toBe(rev(git, repos.work, 'feature'))
 })
 
 test('FR-BR-09 a remote-only branch checks out as a new branch tracking it', async ({
@@ -225,7 +243,7 @@ test('FR-BR-08 checking out a commit warns first, then shows detached HEAD and o
   await expect(branchButton(app)).toContainText(`${target.slice(0, 7)} (detached)`)
 
   await app.getByRole('button', { name: 'Create branch here' }).click()
-  await dialog.getByPlaceholder('Branch name').fill('rescued')
+  await dialog.getByLabel('Branch name').fill('rescued')
   await dialog.getByRole('button', { name: 'Create' }).click()
   await expect.poll(() => currentBranch(git, repos.work)).toBe('rescued')
   expect(rev(git, repos.work, 'rescued')).toBe(target)
@@ -378,13 +396,11 @@ test('FR-BR-06 Rename… and Delete are offered on local branches other than the
 }) => {
   expect(await refActions(app, 'B')).toEqual(expect.arrayContaining(['Rename…', 'Delete']))
   await app.keyboard.press('Escape')
-  await app.keyboard.press('Escape')
 
   const remoteItems = await refActions(app, 'origin/feature')
   expect(remoteItems).toContain('Check out')
   expect(remoteItems).not.toContain('Rename…')
   expect(remoteItems).not.toContain('Delete')
-  await app.keyboard.press('Escape')
   await app.keyboard.press('Escape')
 
   const currentItems = await refActions(app, 'main')
@@ -402,7 +418,7 @@ test('FR-BR-06 renaming refuses an invalid or taken name with a message, then re
     ['feature', /already exists/],
   ] as const) {
     await pickRefAction(app, 'B', 'Rename…')
-    await dialog.getByPlaceholder('Branch name').fill(name)
+    await dialog.getByLabel('Branch name').fill(name)
     await dialog.getByRole('button', { name: 'Rename' }).click()
     await expect(dialog.locator('.error-banner')).toContainText(message)
     await app.keyboard.press('Escape')
@@ -411,7 +427,7 @@ test('FR-BR-06 renaming refuses an invalid or taken name with a message, then re
   expect(git(repos.work, 'branch', '--list', 'B').trim()).toBe('B')
 
   await pickRefAction(app, 'B', 'Rename…')
-  await dialog.getByPlaceholder('Branch name').fill('B2')
+  await dialog.getByLabel('Branch name').fill('B2')
   await dialog.getByRole('button', { name: 'Rename' }).click()
 
   await expect.poll(() => git(repos.work, 'branch', '--list', 'B', 'B2').trim()).toBe('B2')
@@ -450,7 +466,7 @@ test("FR-BR-06 a branch checked out in another worktree is not deleted: git's re
 }) => {
   await pickRefAction(app, 'side', 'Delete')
 
-  await expect(pickerError(app)).toContainText(repos.work2)
+  await expect(notice(app)).toContainText(repos.work2)
   await expect(confirmDialog(app)).toBeHidden()
   expect(git(repos.work, 'branch', '--list', 'side').trim()).toContain('side')
 })

@@ -1,16 +1,22 @@
 import type { Translate } from '../i18n'
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-export type CommitMenuItem = { label: string; command: () => void } | { separator: true }
+export type CommitMenuItem =
+  { label: string; command: () => void } | { label: string; disabled: true } | { separator: true }
 
-interface OneCommitActions {
-  openCreateBranch: (sha: string) => void
-  openCheckoutCommit: (sha: string) => void
-  openReset: (sha: string, subject: string) => void
+// PickActions are the cherry-pick and revert items the one-commit and range
+// menus share.
+interface PickActions {
   cherryPick: () => void
   cherryPickOptions: () => void
   revert: () => void
   revertOptions: () => void
+}
+
+interface OneCommitActions extends PickActions {
+  openCreateBranch: (sha: string) => void
+  openCheckoutCommit: (sha: string) => void
+  openReset: (sha: string, subject: string) => void
   openCreateWorktree: (sha: string) => void
   compareWithWorking: () => void
   // compareWithPrevious is present only when another commit was already
@@ -18,18 +24,12 @@ interface OneCommitActions {
   compareWithPrevious?: { shortSha: string; run: () => void }
 }
 
-interface RangeActions {
-  cherryPick: () => void
-  cherryPickOptions: () => void
-  revert: () => void
-  revertOptions: () => void
+// SelectionActions is the menu for two or more selected commits, however
+// they were selected: swap and stopComparing apply only with exactly two.
+interface SelectionActions extends PickActions {
   copyHashes: () => void
-}
-
-interface ComparisonActions {
   swap: () => void
   stopComparing: () => void
-  copyBothHashes: () => void
 }
 
 // buildOneCommitMenuItems is the menu for a plain right-click on a single
@@ -78,15 +78,18 @@ export function buildOneCommitMenuItems(
   return items
 }
 
-// buildRangeMenuItems is the menu for a right-click inside a Shift-click
-// range of two or more commits.
-export function buildRangeMenuItems(
+// buildSelectionMenuItems is the menu for a right-click inside a selection
+// of two or more commits, however it was made. squash is the squash/fixup
+// items already checked and built (buildSquashMenuItems), spliced in after
+// cherry-pick and revert; empty while that check is still in flight.
+export function buildSelectionMenuItems(
   rows: LogCommit[],
-  actions: RangeActions,
+  actions: SelectionActions,
+  squash: CommitMenuItem[],
   t: Translate,
 ): CommitMenuItem[] {
   const n = rows.length
-  return [
+  const items: CommitMenuItem[] = [
     { label: t('logView.menu.cherryPickCount', { n }, n), command: actions.cherryPick },
     {
       label: t('logView.menu.cherryPickCountOptions', { n }, n),
@@ -94,21 +97,41 @@ export function buildRangeMenuItems(
     },
     { label: t('logView.menu.revertCount', { n }, n), command: actions.revert },
     { label: t('logView.menu.revertCountOptions', { n }, n), command: actions.revertOptions },
+  ]
+  if (squash.length) items.push({ separator: true }, ...squash)
+  items.push(
     { separator: true },
     { label: t('logView.menu.copyHashesCount', { n }, n), command: actions.copyHashes },
-  ]
+  )
+  if (n === 2) {
+    items.push(
+      { separator: true },
+      { label: t('logView.menu.swap'), command: actions.swap },
+      { label: t('logView.menu.stopComparing'), command: actions.stopComparing },
+    )
+  }
+  return items
 }
 
-// buildComparisonMenuItems is the menu for a right-click on one of the two
-// commits already being compared.
-export function buildComparisonMenuItems(
-  actions: ComparisonActions,
+interface SquashActions {
+  squash: () => void
+  fixup: () => void
+}
+
+// buildSquashMenuItems is the squash and fixup part of a menu on n
+// selected commits, or, when blocker names why they cannot run, one
+// disabled item saying so.
+export function buildSquashMenuItems(
+  n: number,
+  blocker: string | null,
+  actions: SquashActions,
   t: Translate,
 ): CommitMenuItem[] {
+  if (blocker) {
+    return [{ label: t('logView.menu.squashBlocked', { reason: blocker }), disabled: true }]
+  }
   return [
-    { label: t('logView.menu.swap'), command: actions.swap },
-    { label: t('logView.menu.stopComparing'), command: actions.stopComparing },
-    { separator: true },
-    { label: t('logView.menu.copyBothHashes'), command: actions.copyBothHashes },
+    { label: t('logView.menu.squashCount', { n }, n), command: actions.squash },
+    { label: t('logView.menu.fixupCount', { n }, n), command: actions.fixup },
   ]
 }

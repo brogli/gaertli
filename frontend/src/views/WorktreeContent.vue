@@ -15,7 +15,7 @@ import { useCoreCall } from '../composables/useCoreCall'
 import { useOpenInEditor } from '../composables/useOpenInEditor'
 import { useAutoFetch } from '../composables/useAutoFetch'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { BranchSummary } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from '../components/ErrorBanner.vue'
 import JobsMenu from '../components/JobsMenu.vue'
 import LogView from '../components/LogView.vue'
@@ -28,12 +28,13 @@ import RepoPicker from '../components/RepoPicker.vue'
 import WorktreePicker from '../components/WorktreePicker.vue'
 import CreateBranchDialog from '../components/CreateBranchDialog.vue'
 import DetachWarningDialog from '../components/DetachWarningDialog.vue'
+import BranchInWorktreeDialog from '../components/BranchInWorktreeDialog.vue'
 import ResetDialog from '../components/ResetDialog.vue'
 import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
 import SyncControls from '../components/SyncControls.vue'
-import type { WorktreeStart } from '../components/worktreeStart'
+import { commitStart, type StartPoint, type WorktreeStart } from '../components/startPoint'
 import { repoPath } from '../lib/path'
-import { useWindowEvent } from '../lib/windowEvents'
+import { useRepoChanged, useWindowEvent } from '../lib/windowEvents'
 import { iconClass } from '../lib/icons'
 import { useLayout, useToolbarButton } from '../lib/layout'
 
@@ -55,22 +56,13 @@ const { error, run } = useCoreCall()
 const { openFolder: openInEditor } = useOpenInEditor(wt, run)
 useAutoFetch(() => wt)
 
-// The dialogs LogList's context menu opens, one instance each.
-const createBranchSha = ref<string | null>(null)
-const checkoutCommitSha = ref<string | null>(null)
-const resetTarget = ref<{ sha: string; subject: string } | null>(null)
-
-// "Create worktree here…" from the log's commit menu or the branch picker,
-// pre-filling CreateWorktreeDialog.
+// The dialogs the log view's context menu and the branch picker open, one
+// instance each, and what they start at.
+const createBranchStart = ref<StartPoint | null>(null)
 const createWorktreeStart = ref<WorktreeStart | null>(null)
-const createWorktreeBranches = ref<BranchSummary[]>([])
-
-async function openCreateWorktree(start: WorktreeStart): Promise<void> {
-  const branches = await run(() => Facade.ListBranches(wt))
-  if (branches === undefined) return
-  createWorktreeBranches.value = branches ?? []
-  createWorktreeStart.value = start
-}
+const checkoutCommitSha = ref<string | null>(null)
+const checkoutElsewhere = ref<{ branch: string; path: string } | null>(null)
+const resetTarget = ref<{ sha: string; subject: string } | null>(null)
 
 onMounted(() => {
   void run(() => repo.loadSummary(wt))
@@ -80,8 +72,12 @@ onMounted(() => {
 
 // repo:changed{scope:"index"} covers this worktree's staging writes and
 // outside changes to the working tree.
-useWindowEvent('repo:changed', (ev) => {
-  if (ev.data.scope === 'index') void changes.load(wt)
+useRepoChanged([ChangeScope.IndexChanged], () => void changes.load(wt))
+
+// A restarted WSL core knows nothing of this window: it gets the commit
+// message being typed, then the window reloads from scratch.
+useWindowEvent('core:reconnected', () => {
+  void Facade.SetMessageDraft(wt, changes.message).finally(() => window.location.reload())
 })
 
 // Manual refresh: if anything differs, repo:changed arrives the normal way.
@@ -104,7 +100,7 @@ const editorLabel = computed(() =>
 // "Create branch here" while detached: its button renders only with a
 // loaded summary.
 function openCreateBranchHere(): void {
-  createBranchSha.value = repo.summary!.sha ?? null
+  createBranchStart.value = commitStart(repo.summary!.sha ?? '')
 }
 
 // The view the medium layout's side panel, or the narrow layout's full
@@ -121,11 +117,18 @@ watch([() => log.selectedRow, () => compare.active, () => compare.workingCommit]
 
 // LogView's own events, shared by every layout.
 const logViewListeners = {
-  'create-branch': (sha: string) => (createBranchSha.value = sha),
+  'create-branch': (sha: string) => (createBranchStart.value = commitStart(sha)),
   'checkout-commit': (sha: string) => (checkoutCommitSha.value = sha),
   reset: (sha: string, subject: string) => (resetTarget.value = { sha, subject }),
-  'create-worktree': (sha: string) => void openCreateWorktree({ newBranch: true, start: sha }),
+  'create-worktree': (sha: string) =>
+    (createWorktreeStart.value = { newBranch: true, start: commitStart(sha) }),
   open: () => (view.value = 'details'),
+}
+
+// The branch picker's Show in log and Show history: only narrow can hide
+// the log view.
+function showLog(): void {
+  if (layout.value === 'narrow') view.value = 'log'
 }
 
 // (n) beside "Changes" in the switch: every file the changes view lists,
@@ -176,9 +179,11 @@ const narrow = computed(() => layout.value === 'narrow')
       <BranchPicker
         :wt="wt"
         :distro="distro"
-        @create-branch="createBranchSha = $event"
-        @create-worktree="openCreateWorktree"
+        @create-branch="createBranchStart = $event"
+        @create-worktree="createWorktreeStart = $event"
         @checkout-commit="checkoutCommitSha = $event"
+        @checkout-elsewhere="(branch, path) => (checkoutElsewhere = { branch, path })"
+        @show-log="showLog"
       />
       <Button
         v-if="repo.summary?.detached"
@@ -282,16 +287,23 @@ const narrow = computed(() => layout.value === 'narrow')
       </div>
     </div>
     <CreateBranchDialog
-      v-if="createBranchSha !== null"
+      v-if="createBranchStart"
       :wt="wt"
-      :sha="createBranchSha"
-      @close="createBranchSha = null"
+      :start="createBranchStart"
+      @close="createBranchStart = null"
     />
     <DetachWarningDialog
       v-if="checkoutCommitSha !== null"
       :wt="wt"
       :sha="checkoutCommitSha"
       @close="checkoutCommitSha = null"
+    />
+    <BranchInWorktreeDialog
+      v-if="checkoutElsewhere"
+      :branch="checkoutElsewhere.branch"
+      :path="checkoutElsewhere.path"
+      :distro="distro"
+      @close="checkoutElsewhere = null"
     />
     <ResetDialog
       v-if="resetTarget !== null"
@@ -305,7 +317,6 @@ const narrow = computed(() => layout.value === 'narrow')
       v-if="createWorktreeStart"
       :repo-path="path"
       :distro="distro"
-      :branches="createWorktreeBranches"
       :start="createWorktreeStart"
       @close="createWorktreeStart = null"
     />

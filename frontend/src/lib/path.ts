@@ -11,6 +11,30 @@ export function parentPath(path: string): string {
   return splitPath(path).parent
 }
 
+// joinPath is name inside folder, joined with folder's own separator: "/"
+// unless folder uses only "\".
+export function joinPath(folder: string, name: string): string {
+  if (!folder) return name
+  const separator = folder.includes('\\') && !folder.includes('/') ? '\\' : '/'
+  return folder.replace(/[\\/]+$/, '') + separator + name
+}
+
+// lastSegment is path's raw text after its last separator: "" for a path
+// ending in one. Unlike basename, withLastSegment(path, lastSegment(path))
+// is path again, so a field typed into keeps what was typed.
+export function lastSegment(path: string): string {
+  return path.slice(lastSegmentStart(path))
+}
+
+// withLastSegment is path with its last segment replaced by name.
+export function withLastSegment(path: string, name: string): string {
+  return path.slice(0, lastSegmentStart(path)) + name
+}
+
+function lastSegmentStart(path: string): number {
+  return Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1
+}
+
 function splitPath(path: string): { parent: string; name: string } {
   const trimmed = path.replace(/(?<=.)[\\/]+$/, '')
   const i = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))

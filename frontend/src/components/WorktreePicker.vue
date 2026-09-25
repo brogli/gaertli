@@ -2,10 +2,11 @@
 import { computed, onMounted, ref, useTemplateRef } from 'vue'
 import { useI18n } from '../i18n'
 import Popover from 'openvue/popover'
+import Button from 'openvue/button'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
+  ChangeScope,
   Code,
-  type BranchSummary,
   type Worktree,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { useCoreCall } from '../composables/useCoreCall'
@@ -13,9 +14,9 @@ import { useOpenInEditor } from '../composables/useOpenInEditor'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { basename, repoPath } from '../lib/path'
 import { shortSha } from '../lib/format'
-import { useWindowEvent } from '../lib/windowEvents'
+import { useRepoChanged } from '../lib/windowEvents'
 import { iconClass } from '../lib/icons'
-import { useLayout } from '../lib/layout'
+import { ICON_BUTTON, useLayout, useToolbarButton } from '../lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
 import PickerList from './PickerList.vue'
@@ -31,6 +32,7 @@ const { openFolderAt } = useOpenInEditor(() => props.wt, run)
 const { confirmAction } = useConfirmAction()
 const { t } = useI18n()
 const layout = useLayout()
+const toolbarButton = useToolbarButton()
 
 const worktrees = ref<Worktree[]>([])
 
@@ -42,18 +44,17 @@ onMounted(load)
 
 // repo:changed{scope:"worktrees"} covers a create, remove or prune from any
 // window on this repo.
-useWindowEvent('repo:changed', (ev) => {
-  if (ev.data.scope === 'worktrees') void load()
-})
+useRepoChanged([ChangeScope.WorktreesChanged], () => void load())
 
 // id is the "wt id" a shell-level call takes for one of this repo's
-// worktrees: path- or worktree-routed for a local repo, its UNC form for a
-// WSL one. The list itself carries POSIX paths, native to the core.
+// worktrees: the path itself for a local repo, its UNC form for a WSL one.
+// The list itself carries POSIX paths, native to the core.
 function id(path: string): string {
   return repoPath(path, props.distro)
 }
 
 function worktreeLabel(w: Worktree): string {
+  if (w.bare) return t('worktreePicker.bareRepo')
   return w.branch || t('worktreePicker.detachedAt', { sha: shortSha(w.sha) })
 }
 function isCurrent(w: Worktree): boolean {
@@ -70,12 +71,16 @@ function actionRow(key: string, label: string, action: () => void): Row {
 const query = ref('')
 const rows = computed<Row[]>(() => {
   const all: Row[] = [
-    actionRow('new-worktree', t('worktreePicker.newWorktree'), () => void openNewWorktree()),
+    actionRow('new-worktree', t('worktreePicker.newWorktree'), () =>
+      closeAnd(() => (creatingWorktree.value = true)),
+    ),
+    // A bare repo has no files to switch to: PickerList never activates it.
     ...worktrees.value.map((w): Row => ({
       key: w.path,
+      header: !!w.bare,
       kind: 'worktree',
       worktree: w,
-      text: `${worktreeLabel(w)} ${basename(w.path)}`,
+      text: `${basename(w.path)} ${worktreeLabel(w)}`,
     })),
     ...(worktrees.value.some((w) => w.missing)
       ? [actionRow('prune', t('worktreePicker.cleanUpStale'), () => void prune())]
@@ -115,12 +120,7 @@ function openInEditor(w: Worktree): void {
   closeAnd(() => openFolderAt(id(w.path)))
 }
 
-const newWorktreeBranches = ref<BranchSummary[] | null>(null)
-async function openNewWorktree(): Promise<void> {
-  const branches = await run(() => Facade.ListBranches(props.wt))
-  if (branches === undefined) return
-  closeAnd(() => (newWorktreeBranches.value = branches ?? []))
-}
+const creatingWorktree = ref(false)
 
 async function prune(): Promise<void> {
   await run(() => Facade.PruneWorktrees(props.wt))
@@ -158,7 +158,7 @@ async function removeThenRetryIfDirty(w: Worktree): Promise<void> {
 
 // remove returns the refusal's code; a DIRTY_WORKTREE one is not shown, the
 // caller asks again instead.
-async function remove(w: Worktree, force: boolean): Promise<string | undefined> {
+async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
   await run(() => Facade.RemoveWorktree(props.wt, id(w.path), force))
   const code = error.value?.code
   if (!code) void load()
@@ -168,8 +168,8 @@ async function remove(w: Worktree, force: boolean): Promise<string | undefined> 
 </script>
 
 <template>
-  <button
-    type="button"
+  <Button
+    v-bind="toolbarButton"
     class="picker-button"
     data-test="worktree-picker"
     :title="path"
@@ -181,7 +181,7 @@ async function remove(w: Worktree, force: boolean): Promise<string | undefined> 
       <span class="ellipsis">{{ basename(path) }}</span>
       <i :class="iconClass('dropdown')" aria-hidden="true"></i>
     </template>
-  </button>
+  </Button>
   <Popover ref="popover" @show="onShow">
     <div class="worktree-list">
       <ErrorBanner v-if="error" :error="error" />
@@ -209,21 +209,19 @@ async function remove(w: Worktree, force: boolean): Promise<string | undefined> 
               <span class="current-marker" aria-hidden="true">
                 <i v-if="isCurrent(row.worktree)" :class="iconClass('current')"></i>
               </span>
+              <span class="ellipsis" data-test="worktree-folder">
+                {{ basename(row.worktree.path) }}
+              </span>
               <span
-                class="ellipsis"
+                class="muted ellipsis leftover"
                 data-test="worktree-branch"
                 :title="worktreeLabel(row.worktree)"
               >
                 {{ worktreeLabel(row.worktree) }}
               </span>
-              <span
-                class="muted ellipsis leftover"
-                data-test="worktree-folder"
-                :title="row.worktree.path"
-              >
-                {{ basename(row.worktree.path) }}
-              </span>
-              <span v-if="row.worktree.main" class="muted">{{ t('worktreePicker.main') }}</span>
+              <span v-if="row.worktree.main && !row.worktree.bare" class="muted">{{
+                t('worktreePicker.main')
+              }}</span>
               <span
                 v-if="row.worktree.dirty"
                 class="dirty-marker"
@@ -247,49 +245,44 @@ async function remove(w: Worktree, force: boolean): Promise<string | undefined> 
                 t('worktreePicker.missing')
               }}</span>
             </span>
-            <button
-              type="button"
-              class="glyph-btn"
-              data-test="open-in-new-window"
-              :title="t('worktreePicker.openInNewWindow')"
-              :aria-label="t('worktreePicker.openInNewWindow')"
-              @click="openInNewWindow(row.worktree)"
-            >
-              <i :class="iconClass('externalLink')" aria-hidden="true"></i>
-            </button>
-            <button
-              v-if="!row.worktree.missing"
-              type="button"
-              class="glyph-btn"
-              data-test="open-in-editor"
-              :title="t('worktreePicker.openInEditor')"
-              :aria-label="t('worktreePicker.openInEditor')"
-              @click="openInEditor(row.worktree)"
-            >
-              <i :class="iconClass('openEditor')" aria-hidden="true"></i>
-            </button>
-            <button
-              v-if="!row.worktree.main && !isCurrent(row.worktree)"
-              type="button"
-              class="glyph-btn"
-              data-test="remove-worktree"
-              :title="t('worktreePicker.removeWorktree')"
-              :aria-label="t('worktreePicker.removeWorktree')"
-              @click="removeWorktree(row.worktree)"
-            >
-              <i :class="iconClass('removeWorktree')" aria-hidden="true"></i>
-            </button>
+            <template v-if="!row.worktree.bare">
+              <Button
+                v-bind="ICON_BUTTON"
+                :icon="iconClass('externalLink')"
+                data-test="open-in-new-window"
+                :title="t('worktreePicker.openInNewWindow')"
+                :aria-label="t('worktreePicker.openInNewWindow')"
+                @click="openInNewWindow(row.worktree)"
+              />
+              <Button
+                v-if="!row.worktree.missing"
+                v-bind="ICON_BUTTON"
+                :icon="iconClass('openEditor')"
+                data-test="open-in-editor"
+                :title="t('worktreePicker.openInEditor')"
+                :aria-label="t('worktreePicker.openInEditor')"
+                @click="openInEditor(row.worktree)"
+              />
+              <Button
+                v-if="!row.worktree.main && !isCurrent(row.worktree)"
+                v-bind="ICON_BUTTON"
+                :icon="iconClass('removeWorktree')"
+                data-test="remove-worktree"
+                :title="t('worktreePicker.removeWorktree')"
+                :aria-label="t('worktreePicker.removeWorktree')"
+                @click="removeWorktree(row.worktree)"
+              />
+            </template>
           </template>
         </template>
       </PickerList>
     </div>
   </Popover>
   <CreateWorktreeDialog
-    v-if="newWorktreeBranches"
+    v-if="creatingWorktree"
     :repo-path="path"
     :distro="distro"
-    :branches="newWorktreeBranches"
-    @close="newWorktreeBranches = null"
+    @close="creatingWorktree = false"
     @created="load"
   />
 </template>

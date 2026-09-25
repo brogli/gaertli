@@ -16,7 +16,7 @@ import (
 type Core struct {
 	sink     core.EventSink
 	sessions *session.Manager
-	discover git.Runner // no Log, no session: ListWorktrees/ListBranches's stateless reads
+	discover git.Runner // no Log, no session: ListWorktrees' and MainWorktree's stateless reads
 
 	// editorProfile is the profile pushed by SetEditorProfile, set from a
 	// different goroutine than the ones reading it.

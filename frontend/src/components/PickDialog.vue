@@ -3,10 +3,13 @@ import { computed, ref } from 'vue'
 import Dialog from 'openvue/dialog'
 import Checkbox from 'openvue/checkbox'
 import Button from 'openvue/button'
+import InputNumber from 'openvue/inputnumber'
 import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { DIALOG } from '../lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
+import FormField from './FormField.vue'
 
 // PickDialog is cherry-pick's and revert's options dialog: apply without
 // committing, add the "cherry picked from" line (cherry-pick only), and,
@@ -46,21 +49,26 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <Dialog visible :header="header" modal @update:visible="emit('close')">
+  <Dialog visible v-bind="DIALOG" :header="header" @update:visible="emit('close')">
     <ErrorBanner v-if="error" :error="error" />
-    <label>
+    <label class="action-row">
       <Checkbox v-model="noCommit" binary />
       {{ t('dialogs.pick.applyWithoutCommitting') }}
     </label>
-    <label v-if="verb === 'cherry-pick'">
+    <label v-if="verb === 'cherry-pick'" class="action-row">
       <Checkbox v-model="recordOrigin" binary />
       {{ t('dialogs.pick.recordOrigin') }}
     </label>
-    <label v-if="showMainline">
-      {{ t('dialogs.pick.pickAgainstParent') }}
-      <input v-model.number="mainline" type="number" min="1" data-test="pick-mainline" />
-    </label>
+    <FormField v-if="showMainline" v-slot="{ id }" :label="t('dialogs.pick.pickAgainstParent')">
+      <InputNumber v-model="mainline" :input-id="id" :min="1" fluid data-test="pick-mainline" />
+    </FormField>
     <template #footer>
+      <Button
+        :label="t('common.cancel')"
+        severity="secondary"
+        data-test="dialog-cancel"
+        @click="emit('close')"
+      />
       <Button :label="t('dialogs.pick.confirm')" data-test="pick-submit" @click="onSubmit" />
     </template>
   </Dialog>

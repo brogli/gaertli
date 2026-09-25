@@ -3,7 +3,9 @@ package git
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -34,14 +36,37 @@ func TestTR_09_DefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
 	assertEnvAbsent(t, env, "LC_ALL")
 }
 
+// A git started from a terminal must not reach it: a prompt on /dev/tty
+// fails at once instead of stopping git in a background process group.
+func TestTR_09_GitRunsInASessionOfItsOwnWithoutATerminal(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("reads /proc")
+	}
+	result, err := (Runner{Git: "sh"}).Run(t.Context(), Call{Args: []string{"-c", `echo $$; cut -d' ' -f6 /proc/$$/stat`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pid, session, _ := strings.Cut(strings.TrimSpace(string(result.Stdout)), "\n")
+	if session != pid {
+		t.Errorf("session = %s, want git's own (%s)", session, pid)
+	}
+}
+
 func TestTR_09_ReadOnlyAddsOptionalLocks(t *testing.T) {
 	env := runEnvDump(t, Call{ReadOnly: true})
 	assertEnv(t, env, "GIT_OPTIONAL_LOCKS", "0")
 }
 
-func TestTR_09_ContinueAddsGitEditor(t *testing.T) {
-	env := runEnvDump(t, Call{Continue: true})
+func TestTR_09_NoEditorAddsGitEditor(t *testing.T) {
+	env := runEnvDump(t, Call{NoEditor: true})
 	assertEnv(t, env, "GIT_EDITOR", "true")
+}
+
+func TestTR_09_EnvAddsTheCallsOwnVariables(t *testing.T) {
+	env := runEnvDump(t, Call{Env: []string{"GIT_SEQUENCE_EDITOR=:", "NEBEGIT_TODO=pick 1"}})
+	assertEnv(t, env, "GIT_SEQUENCE_EDITOR", ":")
+	assertEnv(t, env, "NEBEGIT_TODO", "pick 1")
 }
 
 // unsetenvForTest clears key for the duration of the test, restoring it
@@ -162,6 +187,12 @@ func TestFR_UX_01_AGitFailuresMessageIsGitsOwn(t *testing.T) {
 		{"at most four lines", "a\nb\nc\nd\ne\n", "a\nb\nc\nd"},
 		{"leads with the fatal line, not progress before it", "Preparing worktree (new branch 'x')\nfatal: '/t' already exists\n", "'/t' already exists"},
 		{"no output: the exit code", "", "git exited 3"},
+		{"progress redrawn in place with \\r and ESC[K: only its last state",
+			"Rebasing (2/5)\rRebasing (3/5)\r\x1b[Kerror: untracked files would be overwritten:\n\tz.txt\nhint: move them\n",
+			"untracked files would be overwritten:\nz.txt"},
+		{"a line after progress on the same line keeps its own text",
+			"Rebasing (4/6)\x1b[K\rExecuting: git commit --amend\nrefusing\nwarning: execution failed\n",
+			"Executing: git commit --amend\nrefusing\nwarning: execution failed"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -251,6 +282,132 @@ func TestQA_SAFE_02_CancelActuallyKillsProcess(t *testing.T) {
 	_, _ = (Runner{Git: fakegit}).Run(ctx, Call{Args: []string{"whatever"}})
 
 	assertStopped(t, heartbeat)
+}
+
+// git removes its lock files when interrupted, not when killed.
+func TestQA_SAFE_04_CancelInterruptsGitBeforeKillingIt(t *testing.T) {
+	skipWithoutPOSIXSignals(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(100*time.Millisecond, cancel)
+
+	result, err := (Runner{Git: "sh"}).Run(ctx, Call{Args: []string{"-c", `trap 'echo interrupted >&2; exit 1' TERM; sleep 10 & wait`}})
+
+	coretest.AssertCode(t, err, core.Cancelled)
+	if !strings.Contains(string(result.Stderr), "interrupted") {
+		t.Errorf("stderr = %q, want the interrupt's trap to have run", result.Stderr)
+	}
+}
+
+func TestQA_SAFE_04_AGitIgnoringTheInterruptIsKilledAfterTheGracePeriod(t *testing.T) {
+	skipWithoutPOSIXSignals(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(100*time.Millisecond, cancel)
+
+	start := time.Now()
+	_, err := (Runner{Git: "sh"}).Run(ctx, Call{Args: []string{"-c", `trap '' TERM; exec sleep 10`}})
+	elapsed := time.Since(start)
+
+	coretest.AssertCode(t, err, core.Cancelled)
+	if elapsed > 5*time.Second {
+		t.Errorf("Run() took %s, want it back soon after the 2s grace period", elapsed)
+	}
+}
+
+// The kill after the grace period reaches git alone; a hook or transport
+// that ignores the interrupt must not outlive the cancel.
+func TestQA_SAFE_04_CancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) {
+	dir := t.TempDir()
+
+	err := runCancelledAfter(t, 100*time.Millisecond,
+		`(trap '' TERM; exec sleep 20) >/dev/null 2>&1 & echo $! >`+dir+`/pid; wait`)
+
+	coretest.AssertCode(t, err, core.Cancelled)
+	pid := readTrimmed(t, dir+"/pid")
+	if !within(4*time.Second, func() bool { return processGone(pid) }) {
+		t.Fatal("the child that ignored the interrupt still runs after the grace period")
+	}
+}
+
+// A hook or transport that ends its own way on the interrupt, after its
+// output left git's pipes, gets the grace period to do so.
+func TestQA_SAFE_04_AChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
+	dir := t.TempDir()
+
+	err := runCancelledAfter(t, 200*time.Millisecond,
+		`(exec >/dev/null 2>&1; trap 'sleep 0.3; echo x >`+dir+`/cleaned; exit 0' TERM; sleep 30 & wait) & wait`)
+
+	coretest.AssertCode(t, err, core.Cancelled)
+	if !within(2*time.Second, func() bool { _, err := os.Stat(dir + "/cleaned"); return err == nil }) {
+		t.Fatal("the child was killed before its clean-up ended")
+	}
+}
+
+// git that ended before the cancel was never interrupted, so nothing of
+// its group is killed either, though a child still held its output.
+func TestQA_SAFE_04_NothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
+	dir := t.TempDir()
+
+	err := runCancelledAfter(t, 300*time.Millisecond, `(sleep 5 & echo $! >`+dir+`/pid; wait) &`)
+
+	coretest.AssertCode(t, err, core.Cancelled)
+	pid := readTrimmed(t, dir+"/pid")
+	t.Cleanup(func() { _ = exec.Command("kill", pid).Run() })
+	time.Sleep(time.Second) // Run returned when the pipes closed, 2s in: now past cancel plus the grace period
+	if processGone(pid) {
+		t.Error("the child of a git that ended before the cancel was killed")
+	}
+}
+
+// runCancelledAfter runs script through sh as the git of a call whose ctx
+// ends after delay.
+func runCancelledAfter(t *testing.T, delay time.Duration, script string) error {
+	t.Helper()
+	if runtime.GOOS != "linux" {
+		t.Skip("reads /proc")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(delay, cancel)
+	_, err := (Runner{Git: "sh"}).Run(ctx, Call{Args: []string{"-c", script}})
+	return err
+}
+
+func readTrimmed(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// within polls done until it holds or timeout passes.
+func within(timeout time.Duration, done func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for !done() {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return true
+}
+
+// processGone reports whether pid has exited: no longer listed, or a
+// zombie its new parent has not reaped yet.
+func processGone(pid string) bool {
+	stat, err := os.ReadFile("/proc/" + pid + "/stat")
+	if err != nil {
+		return true
+	}
+	_, rest, _ := strings.Cut(string(stat), ") ")
+	return strings.HasPrefix(rest, "Z")
+}
+
+func skipWithoutPOSIXSignals(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell and signals")
+	}
 }
 
 // sleepWithHeartbeat makes fakegit sleep 5s while touching the returned

@@ -6,6 +6,7 @@ import MainView from './views/MainView.vue'
 import DiffWindowView from './views/DiffWindowView.vue'
 import { diffWindowQuery } from './lib/diffTarget'
 import { useSettingsStore } from './stores/settings'
+import { DIALOG } from './lib/layout'
 
 // A window's query string, fixed for its lifetime, picks its root view:
 // ?view=diff, else the main view.
@@ -21,8 +22,8 @@ onMounted(() => void settings.load())
 </script>
 
 <template>
-  <ConfirmDialog />
-  <NoticeArea v-if="!diffWindow" />
+  <ConfirmDialog :style="DIALOG.style" />
+  <NoticeArea />
   <DiffWindowView v-if="diffWindow" v-bind="diffWindow" />
   <MainView v-else :path="path ?? ''" :distro="distro ?? undefined" />
 </template>

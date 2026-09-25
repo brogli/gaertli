@@ -2,8 +2,7 @@ import { test, expect } from './fixtures'
 import { openRepoPicker, openSettings, pickerAction } from './helpers'
 
 // The repo picker on work's repo: naming, the start page with no selection,
-// and Open folder/Open WSL folder. Switching repos is covered by the
-// component tests.
+// and Open folder. Switching repos is covered by the component tests.
 
 test('FR-WT-05 with no worktree selected the window shows the repo list as its page', async ({
   page,
@@ -27,12 +26,14 @@ test('FR-UX-04 Settings opens as a dialog from the gear, also with no worktree s
   await openSettings(page)
 })
 
-test('FR-REPO-07 a host without WSL offers no "Open WSL folder…", and Settings shows no error about it', async ({
+test('FR-REPO-07 "Open folder…" and "New window" are the only actions, and Settings shows no error about WSL', async ({
   app,
 }) => {
   await openRepoPicker(app)
-  await expect(pickerAction(app, 'Open folder…')).toBeVisible()
-  await expect(pickerAction(app, 'Open WSL folder…')).toHaveCount(0)
+  await expect(app.locator('.p-popover [data-test=picker-action]')).toHaveText([
+    'Open folder…',
+    'New window',
+  ])
   await app.keyboard.press('Escape')
 
   const dialog = await openSettings(app)

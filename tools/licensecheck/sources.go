@@ -71,10 +71,11 @@ var sameLicenceAs = map[string]string{
 	"@wailsio/runtime": "github.com/wailsapp/wails/v3",
 }
 
-// loadTexts fills each dependency's Text from File: the licence file itself,
-// or the first licence file in that package directory, else the text of the
-// dependency sameLicenceAs names. A dependency with none of these is an
-// error: its notice would be incomplete.
+// loadTexts fills each dependency's Text: the text of the dependency
+// sameLicenceAs names, else from File (the licence file itself, or the
+// first licence file in that package directory), else noLicenceFileText's.
+// A dependency with none of these is an error: its notice would be
+// incomplete.
 func loadTexts(deps []Dependency) ([]Dependency, error) {
 	out := slices.Clone(deps)
 	byName := map[string]string{}

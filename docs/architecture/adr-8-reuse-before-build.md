@@ -36,10 +36,13 @@ Frontend:
 | UI components | OpenVue 1.0, the continuation of PrimeVue 4.5 with the same API: context menu, dialog, confirm dialog, splitter, multiselect |
 | Composables | VueUse |
 | State | Pinia, setup stores; `createTestingPinia` in tests |
-| Virtual list for the log | `@tanstack/vue-virtual`: commit rows wrap (`dependencies.md`) |
+| Virtual list for the log | `@tanstack/vue-virtual` |
 | Diff view | `@codemirror/merge` (ADR-7) |
-| Dates | VueUse `formatTimeAgo` |
-| Tests | Vitest, Vue Test Utils, happy-dom; generated bindings mocked with `vi.mock` |
+| Icons | OpenIcons (TR-34) |
+| UI texts | vue-i18n (TR-35) |
+| Dates | VueUse `formatTimeAgoIntl` (`Intl.RelativeTimeFormat`), in the UI's locale |
+| Fonts | Inter and JetBrains Mono from Fontsource |
+| Tests | Vitest, Vue Test Utils, happy-dom; generated bindings mocked |
 | Lint and format | ESLint flat config with oxlint, `vue-tsc`, Prettier (TR-33) |
 
 ## Consequences

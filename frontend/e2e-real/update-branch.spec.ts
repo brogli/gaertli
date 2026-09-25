@@ -22,8 +22,6 @@ import {
 // Updating local branches other than work's own from their upstreams,
 // with other pushing the new commits to the remote.
 
-const remoteTip = (git: Git, repos: Repos, branch: string) => rev(git, repos.remote, branch)
-
 async function updateFromUpstream(page: Page, branch: string): Promise<void> {
   await pickRefAction(page, branch, 'Update from upstream')
 }
@@ -50,7 +48,7 @@ test('FR-UPD-01 Update from upstream fast-forwards a branch that is not checked 
 
   await updateFromUpstream(app, 'B')
 
-  await expect.poll(() => rev(git, repos.work, 'B')).toBe(remoteTip(git, repos, 'B'))
+  await expect.poll(() => rev(git, repos.work, 'B')).toBe(rev(git, repos.remote, 'B'))
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
   expect(currentBranch(git, repos.work)).toBe('main')
   expect(git(repos.work, 'status', '--porcelain')).toBe(status)
@@ -60,7 +58,6 @@ test('FR-UPD-01 Update from upstream fast-forwards a branch that is not checked 
 
 test('FR-UPD-01 a branch without an upstream offers no Update from upstream', async ({ app }) => {
   expect(await refActions(app, 'B')).toContain('Update from upstream')
-  await app.keyboard.press('Escape')
   await app.keyboard.press('Escape')
   expect(await refActions(app, 'side')).not.toContain('Update from upstream')
 })
@@ -82,7 +79,7 @@ test('FR-UPD-02 an update runs as a background job while the app stays usable', 
   await expect(jobsMenuButton(app)).toHaveAttribute('title', '1 running job')
 
   await expect(jobsMenuButton(app)).toHaveAttribute('title', 'No running jobs')
-  expect(rev(git, repos.work, 'B')).toBe(remoteTip(git, repos, 'B'))
+  expect(rev(git, repos.work, 'B')).toBe(rev(git, repos.remote, 'B'))
 })
 
 test('FR-UPD-05 the result names the branch, the commit count and the new commit, then says already up to date', async ({
@@ -93,7 +90,7 @@ test('FR-UPD-05 the result names the branch, the commit count and the new commit
   pushFromClone(git, repos.other, 'B', { 'q1.txt': 'q1\n' }, 'remote q1')
   const app = await openApp(repos.work)
   const from = rev(git, repos.work, 'B')
-  const tip = remoteTip(git, repos, 'B')
+  const tip = rev(git, repos.remote, 'B')
 
   await updateFromUpstream(app, 'B')
   await expect(notice(app)).toContainText(
@@ -134,7 +131,7 @@ test.describe('B checked out in another worktree', () => {
 
     await updateFromUpstream(app, 'B')
 
-    await expect.poll(() => rev(git, repos.work, 'B')).toBe(remoteTip(git, repos, 'B'))
+    await expect.poll(() => rev(git, repos.work, 'B')).toBe(rev(git, repos.remote, 'B'))
     expect(fs.readFileSync(path.join(work3(repos), 'q4.txt'), 'utf8')).toBe('q4\n')
     expect(git(work3(repos), 'status', '--porcelain')).toBe('')
   })
@@ -168,11 +165,11 @@ test('FR-UPD-06 Update 2 branches fast-forwards each selected branch', async ({
   const app = await openApp(repos.work)
 
   await openBranchPicker(app)
-  await refLi(app, 'B').locator('[data-test=update-select]').check()
-  await refLi(app, 'topic/x').locator('[data-test=update-select]').check()
+  await refLi(app, 'B').locator('[data-test=update-select] input').check()
+  await refLi(app, 'topic/x').locator('[data-test=update-select] input').check()
   await pickerAction(app, 'Update 2 branches').click()
 
-  await expect.poll(() => rev(git, repos.work, 'B')).toBe(remoteTip(git, repos, 'B'))
-  await expect.poll(() => rev(git, repos.work, 'topic/x')).toBe(remoteTip(git, repos, 'topic/x'))
+  await expect.poll(() => rev(git, repos.work, 'B')).toBe(rev(git, repos.remote, 'B'))
+  await expect.poll(() => rev(git, repos.work, 'topic/x')).toBe(rev(git, repos.remote, 'topic/x'))
   expect(rev(git, repos.work, 'HEAD')).toBe(rev(git, repos.work, 'main'))
 })

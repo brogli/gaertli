@@ -17,9 +17,10 @@ import { useChangesStore } from '../stores/changes'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 import { findButton } from '../testing/findButton'
 import { summaryFixture } from '../testing/fixtures/summary'
+import { Operation } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // mountDuring mounts ConflictBanner while operation is in progress.
-function mountDuring(operation: string) {
+function mountDuring(operation: Operation) {
   useRepoStore().summary = summaryFixture({ operation })
   return mount(ConflictBanner, { props: { wt: '/repo' } })
 }
@@ -34,7 +35,7 @@ describe('ConflictBanner', () => {
   })
 
   it('FR-CONF-04 does not render while no operation is in progress', () => {
-    const wrapper = mountDuring('')
+    const wrapper = mountDuring(Operation.$zero)
 
     expect(wrapper.find('[data-test="conflict-banner"]').exists()).toBe(false)
   })
@@ -42,7 +43,7 @@ describe('ConflictBanner', () => {
   it('FR-CONF-04 disables Continue while a conflicted file remains, enabling once cleared', async () => {
     const repo = useRepoStore()
     const changes = useChangesStore()
-    repo.summary = summaryFixture({ operation: 'merge' })
+    repo.summary = summaryFixture({ operation: Operation.MergeOperation })
     changes.files = changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] })
 
     const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
@@ -55,7 +56,7 @@ describe('ConflictBanner', () => {
   })
 
   it('FR-CONF-04, FR-UX-03, QA-SAFE-01 clicking Abort confirms before calling Facade.AbortOperation', async () => {
-    const wrapper = mountDuring('merge')
+    const wrapper = mountDuring(Operation.MergeOperation)
     await findButton(wrapper, 'Abort…')!.trigger('click')
 
     expect(confirmRequire).toHaveBeenCalledTimes(1)
@@ -68,13 +69,13 @@ describe('ConflictBanner', () => {
   })
 
   it('FR-CONF-04, FR-UX-03 declining the confirm dialog does not call Facade.AbortOperation', async () => {
-    const wrapper = mountDuring('merge')
+    const wrapper = mountDuring(Operation.MergeOperation)
     await findButton(wrapper, 'Abort…')!.trigger('click')
 
     expect(Facade.AbortOperation).not.toHaveBeenCalled()
   })
 
-  it.each(['cherry-pick', 'revert'])(
+  it.each([Operation.CherryPickOperation, Operation.RevertOperation])(
     'FR-CP-07 renders a Skip button while a %s is stopped',
     (operation) => {
       const wrapper = mountDuring(operation)
@@ -84,13 +85,13 @@ describe('ConflictBanner', () => {
   )
 
   it('FR-CP-07 does not render a Skip button for a merge', () => {
-    const wrapper = mountDuring('merge')
+    const wrapper = mountDuring(Operation.MergeOperation)
 
     expect(findButton(wrapper, 'Skip')).toBeUndefined()
   })
 
   it('FR-CP-07 clicking Skip calls Facade.SkipOperation', async () => {
-    const wrapper = mountDuring('cherry-pick')
+    const wrapper = mountDuring(Operation.CherryPickOperation)
     await findButton(wrapper, 'Skip')!.trigger('click')
 
     expect(Facade.SkipOperation).toHaveBeenCalledWith('/repo')

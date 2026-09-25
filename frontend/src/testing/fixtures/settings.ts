@@ -1,18 +1,22 @@
-import type { Settings } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+import { PullMode } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  DiffMode,
+  Theme,
+  type Preferences,
+} from '../../../bindings/github.com/brogli/nebegit/internal/settings'
 
-// defaultSettingsFixture is a fully-populated Settings value, shared by
+// defaultSettingsFixture is a fully-populated Preferences value, shared by
 // every test that mocks SettingsService.Get.
-export function defaultSettingsFixture(overrides: Partial<Settings> = {}): Settings {
+export function defaultSettingsFixture(overrides: Partial<Preferences> = {}): Preferences {
   return {
-    recentRepos: [],
-    openWorktrees: [],
     editorProfiles: {},
     protectedBranches: [],
-    defaultPullMode: 'merge',
-    diffMode: 'unified',
+    defaultPullMode: PullMode.PullMerge,
+    diffMode: DiffMode.UnifiedDiff,
     autoFetchIntervalMinutes: 0,
-    theme: '',
+    theme: Theme.SystemTheme,
     ignoreWhitespace: false,
+    debugMode: false,
     ...overrides,
   }
 }

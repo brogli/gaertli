@@ -19,35 +19,20 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade
 
 vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
 
+import Splitter from 'openvue/splitter'
+import SplitterPanel from 'openvue/splitterpanel'
 import CommitDetailView from './CommitDetailView.vue'
 import CompareView from './CompareView.vue'
 import CompareWorkingView from './CompareWorkingView.vue'
 import { useLogStore } from '../stores/log'
 import { useCompareStore } from '../stores/compare'
 import { commitRow } from '../testing/fixtures/log-rows'
-import type { CommitDetails } from '../../bindings/github.com/brogli/nebegit/internal/core'
-
-// details: the canned CommitDetails shared by the tests below, overridable
-// field by field.
-function details(overrides: Partial<CommitDetails> = {}): CommitDetails {
-  return {
-    sha: 'abc123',
-    parents: [],
-    author: 'Alice',
-    authorEmail: 'alice@example.com',
-    authorAt: 0,
-    committer: 'Bob',
-    committerEmail: 'bob@example.com',
-    committerAt: 0,
-    body: 'Fix the bug',
-    files: [],
-    ...overrides,
-  }
-}
+import { commitDetailsFixture } from '../testing/fixtures/commitDetails'
 
 describe('CommitDetailView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    localStorage.clear()
     Facade.CompareCommits.mockReset().mockResolvedValue([])
     Facade.CompareWithWorking.mockReset().mockResolvedValue([])
     Facade.CommitDetails.mockReset()
@@ -63,7 +48,7 @@ describe('CommitDetailView', () => {
 
   it('FR-LOG-03 renders the message, author/committer, parents, and changed files once selected', async () => {
     Facade.CommitDetails.mockResolvedValue(
-      details({
+      commitDetailsFixture({
         parents: ['parent1', 'parent2'],
         body: 'Fix the bug\n\nSome more detail.',
         files: [
@@ -88,9 +73,33 @@ describe('CommitDetailView', () => {
     expect(wrapper.text()).toContain('b.txt')
   })
 
+  it('FR-LOG-15 splits a commit with a remembered divider, starting in the middle: message and fields above, changed files below', async () => {
+    Facade.CommitDetails.mockResolvedValue(
+      commitDetailsFixture({ files: [{ path: 'a.txt', status: 'M' }] }),
+    )
+
+    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
+    const log = useLogStore()
+    await log.select(commitRow())
+    await flushPromises()
+
+    const splitter = wrapper.getComponent(Splitter)
+    expect(splitter.props()).toMatchObject({
+      layout: 'vertical',
+      stateKey: 'nebegit.layout.commitDetail',
+      stateStorage: 'local',
+    })
+    const [message, files] = splitter.findAllComponents(SplitterPanel)
+    expect([message!.props('size'), files!.props('size')]).toEqual([50, 50])
+    expect(message!.find('.subject').text()).toBe('Fix the bug')
+    expect(message!.find('.fields').exists()).toBe(true)
+    expect(message!.find('.changed-files').exists()).toBe(false)
+    expect(files!.findAll('.files li')).toHaveLength(1)
+  })
+
   it('FR-LOG-04 a click only marks a file row; a double-click opens it in the diff window', async () => {
     Facade.CommitDetails.mockResolvedValue(
-      details({
+      commitDetailsFixture({
         files: [
           { path: 'a.txt', status: 'M' },
           { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
@@ -117,9 +126,32 @@ describe('CommitDetailView', () => {
     })
   })
 
+  it("FR-LOG-16 in the folder tree a double-click opens a commit's file in the diff window", async () => {
+    Facade.CommitDetails.mockResolvedValue(
+      commitDetailsFixture({ files: [{ path: 'src/b.txt', status: 'M' }] }),
+    )
+
+    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
+    const log = useLogStore()
+    await log.select(commitRow())
+    await flushPromises()
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+
+    await wrapper
+      .get('[role="treeitem"][aria-label="b.txt"] [data-pc-section="nodecontent"]')
+      .trigger('dblclick')
+
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: 'commit',
+      sha: 'abc123',
+      path: 'src/b.txt',
+      oldPath: '',
+    })
+  })
+
   it('FR-UX-10 labels Author and Committer with dates when they differ, and shows short-hash parents with the full SHA in title', async () => {
     Facade.CommitDetails.mockResolvedValue(
-      details({
+      commitDetailsFixture({
         sha: 'a'.repeat(40),
         parents: ['b'.repeat(40), 'c'.repeat(40)],
         authorAt: 1_700_000_000,
@@ -143,7 +175,7 @@ describe('CommitDetailView', () => {
 
   it('FR-UX-10 hides the Committer field when author and committer match', async () => {
     Facade.CommitDetails.mockResolvedValue(
-      details({
+      commitDetailsFixture({
         sha: 'a'.repeat(40),
         authorAt: 1_700_000_000,
         committer: 'Alice',
@@ -162,7 +194,9 @@ describe('CommitDetailView', () => {
   })
 
   it('FR-ED-02 an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
-    Facade.CommitDetails.mockResolvedValue(details({ files: [{ path: 'a.txt', status: 'M' }] }))
+    Facade.CommitDetails.mockResolvedValue(
+      commitDetailsFixture({ files: [{ path: 'a.txt', status: 'M' }] }),
+    )
 
     const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
     const log = useLogStore()
@@ -179,10 +213,8 @@ describe('CommitDetailView', () => {
     const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
     const log = useLogStore()
     await log.select(commitRow())
-    const compare = useCompareStore()
 
-    compare.toggleSelect('/repo', commitRow({ sha: 'sha-a' }), 0)
-    compare.toggleSelect('/repo', commitRow({ sha: 'sha-b' }), 1)
+    log.selection = [commitRow({ sha: 'sha-a' }), commitRow({ sha: 'sha-b' })]
     await flushPromises()
 
     expect(wrapper.findComponent(CompareView).exists()).toBe(true)
@@ -200,5 +232,16 @@ describe('CommitDetailView', () => {
 
     expect(wrapper.findComponent(CompareWorkingView).exists()).toBe(true)
     expect(wrapper.find('.commit-details').exists()).toBe(false)
+  })
+
+  it("FR-LOG-13 says how many commits are selected instead of a commit's fields when three or more are picked", async () => {
+    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
+    const log = useLogStore()
+    await log.select(commitRow())
+
+    log.selection = ['sha-a', 'sha-b', 'sha-c'].map((sha) => commitRow({ sha }))
+    await flushPromises()
+
+    expect(wrapper.text()).toBe('3 commits selected')
   })
 })

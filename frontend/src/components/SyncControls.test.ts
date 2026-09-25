@@ -1,5 +1,6 @@
-import { flushPromises } from '@vue/test-utils'
+import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({
@@ -9,7 +10,6 @@ const { Facade } = vi.hoisted(() => ({
     Push: vi.fn(),
     ForcePush: vi.fn(),
     PullWithStash: vi.fn(),
-    ConfiguredPullMode: vi.fn(),
   },
 }))
 
@@ -19,10 +19,14 @@ vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
 vi.mock('openvue/useconfirm', () => import('../testing/confirm'))
 import { confirmOptions, confirmRequire } from '../testing/confirm'
 
-const mockSettings = vi.fn()
+// A reactive stand-in for the settings store: settingsStore.settings can be
+// reassigned mid-test to prove the button follows a live change, the way a
+// save in another window reaches this one (stores/settings.ts).
+import type { Preferences } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+const settingsStore = reactive<{ settings: Preferences | null }>({ settings: null })
 
 vi.mock('../stores/settings', () => ({
-  useSettingsStore: () => ({ settings: mockSettings() }),
+  useSettingsStore: () => settingsStore,
 }))
 
 import { createI18n } from 'vue-i18n'
@@ -33,12 +37,17 @@ import SyncControls from './SyncControls.vue'
 import NoticeArea from './NoticeArea.vue'
 import { useJobsStore } from '../stores/jobs'
 import { useRefsStore } from '../stores/refs'
-import { Code, PullMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import type { Branch } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  Code,
+  JobKind,
+  JobState,
+  PullMode,
+  type Branch,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
 import { findButton } from '../testing/findButton'
 import { branchFixture } from '../testing/fixtures/branch'
-import type { DOMWrapper } from '@vue/test-utils'
+import { jobFixture } from '../testing/fixtures/job'
 
 function mountControls(props: { compact?: boolean } = {}) {
   return mountInBody(SyncControls, { props: { wt: '/repo', ...props } })
@@ -56,14 +65,13 @@ function setRefs(branch: Partial<Branch> = {}, remotes = ['origin']): void {
 // rejectPush ends a push job rejected as not fast-forward. Force push shows
 // only as the rejection notice's action; useJobNotices renders it.
 async function rejectPush(): Promise<void> {
-  useJobsStore().upsert({
-    id: 'j1',
-    kind: 'push',
-    state: 'failed',
-    progress: 0,
-    message: '',
-    error: { code: Code.NotFastForward, message: 'Updates were rejected' },
-  })
+  useJobsStore().upsert(
+    jobFixture({
+      kind: JobKind.PushJob,
+      state: JobState.JobFailed,
+      error: { code: Code.NotFastForward, message: 'Updates were rejected' },
+    }),
+  )
   await flushPromises()
 }
 
@@ -81,10 +89,9 @@ describe('SyncControls', () => {
     Facade.Push.mockReset().mockResolvedValue('job-1')
     Facade.ForcePush.mockReset().mockResolvedValue('job-1')
     Facade.PullWithStash.mockReset().mockResolvedValue('job-1')
-    Facade.ConfiguredPullMode.mockReset().mockResolvedValue('')
     confirmRequire.mockReset()
     setRefs()
-    mockSettings.mockReset().mockReturnValue(defaultSettingsFixture())
+    settingsStore.settings = defaultSettingsFixture()
   })
 
   it('FR-UX-11 the Fetch button reads toolbar.fetch from the active locale, not a literal', async () => {
@@ -117,7 +124,7 @@ describe('SyncControls', () => {
 
     for (const label of ['Fetch', 'Pull', 'Push']) {
       const button = findButton(body, label)!
-      expect((button.element as HTMLButtonElement).disabled).toBe(true)
+      expect(button.element.disabled).toBe(true)
       expect(button.attributes('title')).toBe('This repo has no remote')
     }
     expect(body.find('select').exists()).toBe(false)
@@ -142,10 +149,10 @@ describe('SyncControls', () => {
     setRefs({ current: false })
     const { body } = await mountControls()
 
-    expect((findButton(body, 'Fetch')!.element as HTMLButtonElement).disabled).toBe(false)
+    expect(findButton(body, 'Fetch')!.element.disabled).toBe(false)
     for (const label of ['Pull', 'Push']) {
       const button = findButton(body, label)!
-      expect((button.element as HTMLButtonElement).disabled).toBe(true)
+      expect(button.element.disabled).toBe(true)
       expect(button.attributes('title')).toBe('No branch is checked out')
     }
   })
@@ -155,7 +162,7 @@ describe('SyncControls', () => {
     const { body } = await mountControls()
 
     const push = findButton(body, 'Push and set upstream')!
-    expect((push.element as HTMLButtonElement).disabled).toBe(false)
+    expect(push.element.disabled).toBe(false)
     expect(body.find('[data-test="upstream-remote"]').exists()).toBe(false)
   })
 
@@ -238,7 +245,7 @@ describe('SyncControls', () => {
 
   it('FR-SYNC-06, FR-UX-03, QA-SAFE-01 force push on a protected branch confirms first, naming it protected', async () => {
     setRefs({ name: 'main', upstream: 'origin/main' })
-    mockSettings.mockReturnValue(defaultSettingsFixture({ protectedBranches: ['main'] }))
+    settingsStore.settings = defaultSettingsFixture({ protectedBranches: ['main'] })
     const { body: notice } = await mountInBody(NoticeArea)
     await mountControls()
 
@@ -273,22 +280,21 @@ describe('SyncControls', () => {
     expect(Facade.ForcePush).not.toHaveBeenCalled()
   })
 
-  it('FR-SYNC-02 the SplitButton runs the preselected mode; a rebase config preselects "Pull (rebase)"', async () => {
+  it('FR-SYNC-02 the button shows and runs Settings’ default pull mode', async () => {
     setRefs({ upstream: 'origin/main' })
-    Facade.ConfiguredPullMode.mockResolvedValue(PullMode.PullRebase)
+    settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
     const { body } = await mountControls()
     await flushPromises()
 
     expect(findButton(body, 'Pull (rebase)')).toBeTruthy()
     await findButton(body, 'Pull (rebase)')!.trigger('click')
 
-    expect(Facade.Pull).toHaveBeenCalledTimes(1)
     expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
   })
 
-  it('FR-SYNC-02 choosing "Pull with merge" from the SplitButton menu runs it and relabels the button', async () => {
+  it('FR-SYNC-02 choosing "Pull with merge" from the SplitButton menu runs it once without changing the button', async () => {
     setRefs({ upstream: 'origin/main' })
-    Facade.ConfiguredPullMode.mockResolvedValue(PullMode.PullRebase)
+    settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
     const { body } = await mountControls()
     await flushPromises()
 
@@ -299,10 +305,10 @@ describe('SyncControls', () => {
 
     expect(Facade.Pull).toHaveBeenCalledTimes(1)
     expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullMerge)
-    expect(findButton(body, 'Pull (merge)')).toBeTruthy()
+    expect(findButton(body, 'Pull (rebase)')).toBeTruthy()
   })
 
-  it('FR-SYNC-02 the last pull mode chosen is preselected again after a reload', async () => {
+  it('FR-SYNC-02 a menu choice is not remembered: a reload shows Settings’ default again', async () => {
     setRefs({ upstream: 'origin/main' })
     const first = await mountControls()
     await flushPromises()
@@ -313,12 +319,24 @@ describe('SyncControls', () => {
     const second = await mountControls()
     await flushPromises()
 
-    expect(findButton(second.body, 'Pull (rebase)')).toBeTruthy()
+    expect(findButton(second.body, 'Pull (merge)')).toBeTruthy()
+  })
+
+  it('FR-SYNC-02 a Settings default saved in another window updates the button without a remount', async () => {
+    setRefs({ upstream: 'origin/main' })
+    const { body } = await mountControls()
+    await flushPromises()
+    expect(findButton(body, 'Pull (merge)')).toBeTruthy()
+
+    settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
+    await flushPromises()
+
+    expect(findButton(body, 'Pull (rebase)')).toBeTruthy()
   })
 
   it('FR-UX-01 a rejected Fetch renders ErrorBanner with the error', async () => {
     Facade.Fetch.mockRejectedValueOnce(
-      Object.assign(new Error('boom'), { cause: { message: 'network unreachable' } }),
+      new Error('boom', { cause: { message: 'network unreachable' } }),
     )
     const { body } = await mountControls()
 

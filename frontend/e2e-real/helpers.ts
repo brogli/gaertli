@@ -25,28 +25,25 @@ export function refRow(page: Page, name: string): Locator {
   })
 }
 
-// refLi is that row's <li>: the row and its sibling checkbox/actions button
-// both live inside it.
+// refLi is that row's <li>: the row and its sibling checkbox both live
+// inside it.
 export function refLi(page: Page, name: string): Locator {
   return page.locator('.p-popover .picker-rows li', {
     has: page.locator(`.ref-name:text-is("${name}")`),
   })
 }
 
-// refActions opens the branch picker and name's actions menu, and lists
-// the menu's items.
+// refActions opens the branch picker and right-clicks name's row, and lists
+// its context menu's items.
 export async function refActions(page: Page, name: string): Promise<string[]> {
   await openBranchPicker(page)
-  await refLi(page, name).locator('[data-test=ref-actions]').click()
-  const items = page.locator('.p-menu [role=menuitem]')
-  await items.first().waitFor()
-  return items.allTextContents()
+  return contextMenuItems(page, refRow(page, name))
 }
 
-// pickRefAction picks item from name's actions menu in the branch picker.
+// pickRefAction picks item from name's context menu in the branch picker.
 export async function pickRefAction(page: Page, name: string, item: string): Promise<void> {
-  await refActions(page, name)
-  await page.locator('.p-menu [role=menuitem]', { hasText: item }).first().click()
+  await openBranchPicker(page)
+  await pickFromContextMenu(page, refRow(page, name), item)
 }
 
 // openRepoPicker opens the toolbar's repo picker.
@@ -116,6 +113,11 @@ export function diffRow(page: Page, group: string, name: string): Locator {
   return fileRow(page, group, name, '.file-list')
 }
 
+// diffText is the diff window's diff text.
+export function diffText(page: Page): Locator {
+  return page.locator('.diff-view .cm-content')
+}
+
 export function confirmDialog(page: Page): Locator {
   return page.locator('.p-confirmdialog')
 }
@@ -131,7 +133,7 @@ export function conflictBanner(page: Page): Locator {
 // notice is the app's current notice (NoticeArea.vue); last() rides out the
 // brief overlap while an older one leaves and a newer one enters.
 export function notice(page: Page): Locator {
-  return page.locator('.notice').last()
+  return page.locator('.p-toast-message').last()
 }
 
 // jobsMenuButton is the toolbar's jobs menu button.
@@ -165,7 +167,7 @@ export async function dragLogBorder(page: Page, x: number): Promise<void> {
 }
 
 // choosePull opens the sync controls' Pull split button's menu and picks
-// mode, running a pull with it and preselecting it for next time.
+// mode, running a pull with it once.
 export async function choosePull(page: Page, mode: 'merge' | 'rebase'): Promise<void> {
   await page.locator('.sync-controls .p-splitbutton-dropdown').click()
   await page.locator('.p-tieredmenu-item-content', { hasText: `Pull with ${mode}` }).click()

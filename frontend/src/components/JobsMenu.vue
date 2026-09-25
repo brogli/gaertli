@@ -8,8 +8,8 @@ import { useJobsStore } from '../stores/jobs'
 import { useCoreCall } from '../composables/useCoreCall'
 import { useWindowEvent } from '../lib/windowEvents'
 import { iconClass, spinClass } from '../lib/icons'
-import { useToolbarButton } from '../lib/layout'
-import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { ICON_BUTTON, useToolbarButton } from '../lib/layout'
+import { JobKind, type JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
 // JobsMenu is the toolbar's jobs menu: a fixed-size button naming how many
@@ -27,12 +27,13 @@ useWindowEvent('job:update', (ev) => jobs.upsert(ev.data))
 
 // jobLabel names an update-branch job by its branch instead of its kind.
 function jobLabel(job: JobInfo): string {
-  if (job.kind === 'update-branch') return t('jobsMenu.updateBranch', { branch: job.branch })
-  const kindLabels: Record<string, string> = {
-    fetch: t('toolbar.fetch'),
-    pull: t('toolbar.pull'),
-    push: t('toolbar.push'),
-    'force-push': t('toolbar.forcePush'),
+  if (job.kind === JobKind.UpdateBranchJob)
+    return t('jobsMenu.updateBranch', { branch: job.branch })
+  const kindLabels: Partial<Record<JobKind, string>> = {
+    [JobKind.FetchJob]: t('toolbar.fetch'),
+    [JobKind.PullJob]: t('toolbar.pull'),
+    [JobKind.PushJob]: t('toolbar.push'),
+    [JobKind.ForcePushJob]: t('toolbar.forcePush'),
   }
   return kindLabels[job.kind] ?? job.kind
 }
@@ -54,8 +55,6 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
 <template>
   <Button
     v-bind="toolbarButton"
-    class="jobs-menu-button"
-    :class="{ idle: count === 0 }"
     data-test="jobs-menu"
     :icon="count ? spinClass('jobsRunning') : iconClass('jobsIdle')"
     :badge="count ? String(count) : undefined"
@@ -68,7 +67,7 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
   <Popover ref="popover">
     <div class="jobs-list">
       <ErrorBanner v-if="error" :error="error" />
-      <p v-if="!jobs.active.length" class="jobs-empty">{{ t('jobsMenu.noJobs') }}</p>
+      <p v-if="!count" class="jobs-empty">{{ t('jobsMenu.noJobs') }}</p>
       <div v-for="job in jobs.active" :key="job.id" class="job-row" data-test="job-row">
         <span class="job-label">{{ jobLabel(job) }}</span>
         <span v-if="job.message" class="job-message">{{ job.message }}</span>
@@ -76,25 +75,20 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
           :value="job.progress"
           :mode="job.progress < 0 ? 'indeterminate' : 'determinate'"
         />
-        <button
-          type="button"
-          class="glyph-btn"
+        <Button
+          v-bind="ICON_BUTTON"
+          :icon="iconClass('abort')"
           :title="t('jobsMenu.abort')"
           :aria-label="t('jobsMenu.abort')"
           data-test="job-cancel"
           @click="cancelJob(job.id)"
-        >
-          <i :class="iconClass('abort')" aria-hidden="true"></i>
-        </button>
+        />
       </div>
     </div>
   </Popover>
 </template>
 
 <style scoped>
-.jobs-menu-button.idle {
-  color: var(--p-text-muted-color);
-}
 .jobs-list {
   display: flex;
   flex-direction: column;

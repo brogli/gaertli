@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { App } from 'vue'
 
 const { LogService } = vi.hoisted(() => ({
@@ -16,8 +16,11 @@ function fakeApp(): App {
 }
 
 describe('installErrorLogging', () => {
-  it('FR-UX-02 a component error reaches the app log', () => {
+  beforeEach(() => {
     LogService.Error.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('FR-UX-02 a component error reaches the app log', () => {
     const app = fakeApp()
     installErrorLogging(app)
 
@@ -27,7 +30,6 @@ describe('installErrorLogging', () => {
   })
 
   it('FR-UX-02 an uncaught window error reaches the app log', () => {
-    LogService.Error.mockReset().mockResolvedValue(undefined)
     installErrorLogging(fakeApp())
 
     window.dispatchEvent(new ErrorEvent('error', { message: 'window boom' }))
@@ -36,7 +38,6 @@ describe('installErrorLogging', () => {
   })
 
   it('FR-UX-02 an unhandled promise rejection reaches the app log', () => {
-    LogService.Error.mockReset().mockResolvedValue(undefined)
     installErrorLogging(fakeApp())
     const event = new Event('unhandledrejection') as PromiseRejectionEvent
     Object.defineProperty(event, 'reason', { value: 'rejected boom' })

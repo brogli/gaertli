@@ -3,22 +3,24 @@ package watch
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/brogli/nebegit/internal/core"
 )
 
 func TestFR_REPO_04_ClassifyMapsPathsToTheirScope(t *testing.T) {
 	commonDir := "/repo/.git"
 	cases := []struct {
 		path      string
-		wantScope Scope
+		wantScope core.ChangeScope
 		wantOK    bool
 	}{
-		{"HEAD", Refs, true},
-		{"refs/heads/x", Refs, true},
-		{"packed-refs", Refs, true},
-		{"index", Index, true},
-		{"MERGE_HEAD", State, true},
-		{"rebase-merge", State, true},
-		{"worktrees/name/HEAD", Refs, true},
+		{"HEAD", core.RefsChanged, true},
+		{"refs/heads/x", core.RefsChanged, true},
+		{"packed-refs", core.RefsChanged, true},
+		{"index", core.IndexChanged, true},
+		{"MERGE_HEAD", core.StateChanged, true},
+		{"rebase-merge", core.StateChanged, true},
+		{"worktrees/name/HEAD", core.RefsChanged, true},
 		{"index.lock", "", false},
 		{"logs/HEAD", "", false},
 	}

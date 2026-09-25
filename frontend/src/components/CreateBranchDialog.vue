@@ -7,35 +7,53 @@ import Button from 'openvue/button'
 import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { DIALOG } from '../lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
+import FormField from './FormField.vue'
+import StartPointField from './StartPointField.vue'
+import { startRev, type StartPoint } from './startPoint'
 
-// CreateBranchDialog is the "new branch from here" dialog. sha is the
-// start point: a commit's sha, or HEAD's sha while detached.
-const props = defineProps<{ wt: string; sha: string }>()
+// CreateBranchDialog is the "new branch" dialog, opened on its start point.
+const props = defineProps<{ wt: string; start: StartPoint }>()
 const emit = defineEmits<{ close: [] }>()
 
 const name = ref('')
+const start = ref(props.start)
 const checkout = ref(true)
 const { error, runAndClose } = useCoreCall()
 const { t } = useI18n()
 
 async function submit(): Promise<void> {
   await runAndClose(
-    () => Facade.CreateBranch(props.wt, name.value, props.sha, checkout.value),
+    () => Facade.CreateBranch(props.wt, name.value, startRev(start.value), checkout.value),
     () => emit('close'),
   )
 }
 </script>
 
 <template>
-  <Dialog visible :header="t('dialogs.createBranch.header')" modal @update:visible="emit('close')">
+  <Dialog
+    visible
+    v-bind="DIALOG"
+    :header="t('dialogs.createBranch.header')"
+    @update:visible="emit('close')"
+  >
     <ErrorBanner v-if="error" :error="error" />
-    <InputText v-model="name" :placeholder="t('dialogs.createBranch.namePlaceholder')" />
-    <label>
+    <FormField v-slot="{ id }" :label="t('dialogs.branchName')">
+      <InputText :id="id" v-model="name" autofocus fluid />
+    </FormField>
+    <StartPointField v-model="start" />
+    <label class="action-row">
       <Checkbox v-model="checkout" binary />
       {{ t('dialogs.createBranch.checkoutAfter') }}
     </label>
     <template #footer>
+      <Button
+        :label="t('common.cancel')"
+        severity="secondary"
+        data-test="dialog-cancel"
+        @click="emit('close')"
+      />
       <Button
         :label="t('dialogs.createBranch.create')"
         data-test="create-branch-submit"

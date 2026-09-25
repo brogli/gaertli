@@ -1,10 +1,10 @@
 import { ref } from 'vue'
-import type { Error as GoError } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Code, type Error as GoError } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // CoreError is core.Error as a rejected bound-method call carries it in
-// .cause. Only message is sure: a rejection that is no core error has
-// nothing else.
-export type CoreError = Partial<GoError> & Pick<GoError, 'message'>
+// .cause, plus retry once run() attaches it. Only message is sure: a
+// rejection that is no core error has nothing else.
+export type CoreError = Partial<GoError> & Pick<GoError, 'message'> & { retry?: () => void }
 
 // useCoreCall wraps a bound-method call: run(call) awaits it,
 // catching a rejection and exposing it as a CoreError for ErrorBanner.
@@ -22,6 +22,8 @@ export function useCoreCall() {
       return await call()
     } catch (e) {
       const err = toCoreError(e)
+      // A held lock is worth a retry: call is the exact call that failed.
+      if (err.code === Code.Locked) err.retry = () => void run(call, onError)
       if (!onError?.(err)) error.value = err
       return undefined
     }

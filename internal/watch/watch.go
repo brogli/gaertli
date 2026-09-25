@@ -6,16 +6,6 @@ package watch
 
 import "time"
 
-// Scope is what part of the repo's git state changed.
-type Scope string
-
-const (
-	Refs      Scope = "refs"      // HEAD, refs/, packed-refs — any worktree's
-	Index     Scope = "index"     // a worktree's index file, or its working tree (status poll)
-	Worktrees Scope = "worktrees" // an entry added/removed under worktrees/
-	State     Scope = "state"     // MERGE_HEAD, CHERRY_PICK_HEAD, REVERT_HEAD, rebase-*, sequencer/
-)
-
 // Timing knobs. Vars so tests can shorten them before constructing the
 // watcher or poller under test.
 var (

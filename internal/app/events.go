@@ -23,6 +23,7 @@ func init() {
 	application.RegisterEvent[core.LogProgress]("log:progress")
 	application.RegisterEvent[core.JobInfo]("job:update")
 	application.RegisterEvent[core.CommandRecord]("command")
+	application.RegisterEvent[core.EditorRecord]("editor")
 	application.RegisterEvent[application.Void]("core:reconnected")
 	application.RegisterEvent[DiffShow]("diff:show")
 	application.RegisterEvent[application.Void]("settings:changed")
@@ -35,6 +36,7 @@ var eventPayloads = map[string]func(json.RawMessage) (any, error){
 	"log:progress":     decodePayload[core.LogProgress],
 	"job:update":       decodePayload[core.JobInfo],
 	"command":          decodePayload[core.CommandRecord],
+	"editor":           decodePayload[core.EditorRecord],
 	"core:reconnected": noPayload,
 	"diff:show":        decodePayload[DiffShow],
 	"settings:changed": noPayload,

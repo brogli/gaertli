@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
+import Button from 'openvue/button'
 import { useI18n } from '../i18n'
 import { useCompareStore } from '../stores/compare'
 import { useCoreCall } from '../composables/useCoreCall'
 import { useOpenInEditor } from '../composables/useOpenInEditor'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DiffKind } from '../lib/diffTarget'
+import { DiffKind, fileTarget } from '../lib/diffTarget'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { iconClass } from '../lib/icons'
-import ChangedFileList from './ChangedFileList.vue'
+import { ICON_BUTTON } from '../lib/layout'
+import ChangedFiles from './ChangedFiles.vue'
 import ErrorBanner from './ErrorBanner.vue'
 
 // CompareWorkingView shows the compare store's workingCommit and the files
@@ -24,12 +26,10 @@ const { t } = useI18n()
 
 function openDiff(f: ChangedFile): void {
   if (!compare.workingCommit) return
-  void AppService.OpenDiff(props.wt, {
-    kind: DiffKind.AgainstWorkingDiff,
-    sha: compare.workingCommit.sha,
-    path: f.path,
-    oldPath: f.oldPath ?? '',
-  })
+  void AppService.OpenDiff(
+    props.wt,
+    fileTarget(f, { kind: DiffKind.AgainstWorkingDiff, sha: compare.workingCommit.sha }),
+  )
 }
 
 watch(
@@ -46,23 +46,23 @@ onKeyStroke('Escape', () => compare.exit())
 <template>
   <section class="compare-working-view">
     <header>
-      <span class="from">{{ compare.workingCommit?.shortSha }}</span>
+      <span class="from" data-test="from-tag" :title="compare.workingCommit?.sha">{{
+        compare.workingCommit?.shortSha
+      }}</span>
       {{ compare.workingCommit?.subject }}
       &rarr; {{ t('compareView.toWorkingTree') }}
-      <button
-        type="button"
-        class="glyph-btn"
+      <Button
+        v-bind="ICON_BUTTON"
+        :icon="iconClass('close')"
         data-test="exit"
         :title="t('compareView.close')"
         :aria-label="t('compareView.close')"
         @click="compare.exit"
-      >
-        <i :class="iconClass('close')" aria-hidden="true"></i>
-      </button>
+      />
     </header>
     <p class="hint">{{ t('compareView.untrackedHint') }}</p>
     <ErrorBanner v-if="error" :error="error" />
-    <ChangedFileList
+    <ChangedFiles
       :files="compare.files"
       :selected="compare.selectedFile"
       @select="compare.selectFile"
@@ -77,5 +77,13 @@ onKeyStroke('Escape', () => compare.exit())
   margin: 0.25rem 0;
   color: var(--p-text-muted-color);
   font-size: 0.85em;
+}
+/* The from box, in the colour of its mark in the log view. */
+.from {
+  padding: 0 0.4em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-family: var(--nb-font-mono);
+  color: var(--nb-from);
 }
 </style>

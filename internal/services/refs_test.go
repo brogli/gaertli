@@ -230,7 +230,9 @@ func TestFR_LOG_01_RefsGroupsARemoteWhoseNameHasASlashUnderItsWholeName(t *testi
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	sha := gittest.HeadSHA(t, repo.Dir)
 	gittest.Run(t, repo.Dir, "remote", "add", "team", "https://example.invalid/team.git")
-	gittest.Run(t, repo.Dir, "remote", "add", "team/x", "https://example.invalid/x.git")
+	// A newer git's "remote add" refuses a name nested under an existing
+	// remote's; a repo set up by an older git or by hand still has both.
+	gittest.Run(t, repo.Dir, "config", "remote.team/x.url", "https://example.invalid/x.git")
 	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/main", sha)
 	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/x/master", sha)
 	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/gone/topic", sha) // a remote no longer configured

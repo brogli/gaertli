@@ -47,16 +47,30 @@ tasks:
       - go mod download
       - task: common:install:frontend:deps
 
-  test:
-    summary: Runs Go and frontend tests offline
-    deps:
-      - task: common:build:frontend
+  test:go:
+    summary: Runs the Go tests offline
     env:
       GOPROXY: off
       GOFLAGS: -mod=readonly
       GOTOOLCHAIN: local
     cmds:
       - go test ./...
+
+  test:go:race:
+    summary: Runs the git-facing Go tests with the race detector, no frontend build needed (used by the git-2-42 CI job)
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      - go test -race ./internal/... ./cmd/nebegit-core/...
+
+  test:
+    summary: Runs Go and frontend tests offline
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - task: test:go
       - task: common:frontend:run
         vars: { SCRIPT: test:unit }
 

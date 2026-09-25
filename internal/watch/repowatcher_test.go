@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
@@ -25,14 +27,14 @@ func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
 	setInterval(t, &DebounceInterval, 20*time.Millisecond)
 
 	var mu sync.Mutex
-	var got []Scope
-	w := &RepoWatcher{pending: map[Scope]bool{}, onChange: func(s Scope) {
+	var got []core.ChangeScope
+	w := &RepoWatcher{pending: map[core.ChangeScope]bool{}, onChange: func(s core.ChangeScope) {
 		mu.Lock()
 		defer mu.Unlock()
 		got = append(got, s)
 	}}
 
-	for _, s := range []Scope{Refs, State, Refs, State, Refs} {
+	for _, s := range []core.ChangeScope{core.RefsChanged, core.StateChanged, core.RefsChanged, core.StateChanged, core.RefsChanged} {
 		w.notify(s)
 	}
 	time.Sleep(10 * DebounceInterval)
@@ -42,9 +44,9 @@ func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("onChange calls = %d %v, want 2", len(got), got)
 	}
-	seen := map[Scope]bool{got[0]: true, got[1]: true}
-	if !seen[Refs] || !seen[State] {
-		t.Errorf("onChange scopes = %v, want one Refs and one State", got)
+	seen := map[core.ChangeScope]bool{got[0]: true, got[1]: true}
+	if !seen[core.RefsChanged] || !seen[core.StateChanged] {
+		t.Errorf("onChange scopes = %v, want one core.RefsChanged and one State", got)
 	}
 }
 
@@ -69,15 +71,15 @@ func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromOutside(t *testing.T) {
 
 	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
 
-	waitForScope(t, got, Refs)
+	waitForScope(t, got, core.RefsChanged)
 }
 
 // watchRepo starts a RepoWatcher on repo's git dir, closed when the test
 // ends, and returns it with the channel its onChange feeds.
-func watchRepo(t *testing.T, repo *gittest.Repo) (*RepoWatcher, chan Scope) {
+func watchRepo(t *testing.T, repo *gittest.Repo) (*RepoWatcher, chan core.ChangeScope) {
 	t.Helper()
-	got := make(chan Scope, 10)
-	w, err := NewRepoWatcher(filepath.Join(repo.Dir, ".git"), func(s Scope) { got <- s })
+	got := make(chan core.ChangeScope, 10)
+	w, err := NewRepoWatcher(filepath.Join(repo.Dir, ".git"), func(s core.ChangeScope) { got <- s })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +95,62 @@ func TestFR_REPO_04_RepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	waitForScope(t, got, State)
+	waitForScope(t, got, core.StateChanged)
+}
+
+// pollOnly is a RepoWatcher on commonDir with no fsnotify and no ticker:
+// only an explicit CheckNow reports, as the fallback poll would.
+func pollOnly(t *testing.T, commonDir string) (*RepoWatcher, chan core.ChangeScope) {
+	t.Helper()
+	setInterval(t, &DebounceInterval, 10*time.Millisecond)
+	got := make(chan core.ChangeScope, 10)
+	w := &RepoWatcher{commonDir: commonDir, pending: map[core.ChangeScope]bool{}, onChange: func(s core.ChangeScope) { got <- s }}
+	w.mtimes = w.walk()
+	return w, got
+}
+
+func TestFR_REPO_04_FallbackPollReportsEachKindOfChange(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		before func(gitDir string) error // the state the poll starts from
+		change func(gitDir string) error
+		want   core.ChangeScope
+	}{
+		{"deleted state file",
+			func(d string) error { return os.WriteFile(filepath.Join(d, "MERGE_HEAD"), nil, 0o644) },
+			func(d string) error { return os.Remove(filepath.Join(d, "MERGE_HEAD")) },
+			core.StateChanged},
+		{"created state dir",
+			func(string) error { return nil },
+			func(d string) error { return os.Mkdir(filepath.Join(d, "rebase-merge"), 0o755) },
+			core.StateChanged},
+		{"deleted state dir",
+			func(d string) error { return os.Mkdir(filepath.Join(d, "sequencer"), 0o755) },
+			func(d string) error { return os.Remove(filepath.Join(d, "sequencer")) },
+			core.StateChanged},
+		{"removed worktree",
+			func(d string) error {
+				wt := filepath.Join(d, "worktrees", "wt")
+				return errors.Join(os.MkdirAll(wt, 0o755), os.WriteFile(filepath.Join(wt, "HEAD"), nil, 0o644))
+			},
+			func(d string) error { return os.RemoveAll(filepath.Join(d, "worktrees", "wt")) },
+			core.WorktreesChanged},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gitDir := t.TempDir()
+			if err := tc.before(gitDir); err != nil {
+				t.Fatal(err)
+			}
+			w, got := pollOnly(t, gitDir)
+
+			if err := tc.change(gitDir); err != nil {
+				t.Fatal(err)
+			}
+			w.CheckNow()
+
+			waitForScope(t, got, tc.want)
+		})
+	}
 }
 
 func TestQA_COMP_02_RepoWatcherToleratesConcurrentReadsWhileWriting(t *testing.T) {
@@ -126,10 +183,10 @@ func TestQA_COMP_02_RepoWatcherToleratesConcurrentReadsWhileWriting(t *testing.T
 		t.Errorf("concurrent call failed: %v", err)
 	}
 
-	waitForScope(t, got, Refs)
+	waitForScope(t, got, core.RefsChanged)
 }
 
-func waitForScope(t *testing.T, got chan Scope, want Scope) {
+func waitForScope(t *testing.T, got chan core.ChangeScope, want core.ChangeScope) {
 	t.Helper()
 	deadline := time.After(2 * time.Second)
 	for {

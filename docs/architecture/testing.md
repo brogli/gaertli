@@ -7,7 +7,7 @@ Every acceptance case in a feature spec becomes one test, written before the cod
 | Parser unit tests | Recorded git output → structs: odd file names, renames, empty repo, detached HEAD. | Go test, inline fixtures |
 | Graph unit tests | Hand-made histories → expected lanes. | Go test |
 | Integration tests | Real git against temp repos built by a helper, with a local bare repo as the remote. Every core method. | Go test |
-| Protocol tests | A slice of the integration suite runs a second time through the RPC client and a real `nebegit-core --stdio` child. This tests the WSL transport without WSL. | Go test |
+| Protocol tests | The RPC client and dispatcher over a pipe: errors and events crossing it, panic recovery. The WSL client against a real `nebegit-core` child process: version handshake, deploy consent, reconnect, path translation. This tests the WSL transport without WSL. | Go test |
 | Frontend component tests | Stores and components with mocked bindings. The default for UI cases (TR-31). | Vitest, Vue Test Utils |
 | Frontend e2e | Cases a component test cannot prove (TR-31), against the Vite dev server with a mocked Go layer. | Playwright |
 | Real-backend e2e | Flows that mocks cannot prove (TR-31). The app runs in Wails server mode with the real core; each test gets its own scratch repos, settings file and stand-in editor. Linux only. | Playwright |
@@ -24,21 +24,23 @@ The owner runs this per platform before a release. `tools/trace` accepts the IDs
 | FR-REPO-01 | "Open folder…" shows the native dialog, and the picked directory opens as a worktree. | Windows, Linux |
 | TR-13, FR-REPO-02 | Quit and relaunch: recent repos and the windows open at quit are restored. | Windows, Linux |
 | FR-REPO-04 | Edit a file in the editor, commit in a terminal: the window updates within the stated times, and at once on focus. | Windows, Linux |
-| FR-REPO-06 | `nebegit <path>` from a Windows, Linux and WSL terminal opens or focuses the right window. Inside a distro, after "Install nebegit command": `nebegit <path>` and `nebegit` (the current directory) work whether the app is running or not. | Windows, WSL, Linux |
-| FR-REPO-07 | "Open WSL folder" with two or more distros, one of them WSL 1: both are listed, WSL 1 disabled; a WSL 2 distro opens at its root and the repo opens in a native window. | Windows |
+| FR-REPO-06 | `nebegit <path>` from a Windows, Linux and WSL terminal opens or focuses the right window. Inside a distro the app has opened a repo of: `nebegit <path>` and `nebegit` (the current directory) work whether the app is running or not; after moving the app and opening a repo of that distro from its new place, they start the moved app. | Windows, WSL, Linux |
+| FR-REPO-07 | "Open folder…": a folder picked under the Linux entry (`\\wsl.localhost\<distro>\…`), and one typed as `\\wsl$\<distro>\…`, open on the WSL core in a native window; a Windows folder still opens locally. The recent list marks the WSL repos with their distro. A recent repo of a distro that is no longer installed says so. | Windows |
 | ADR-9, FR-WT-05 | Choose another worktree in the worktree picker: title and content switch in place, no new window. Switching back shows fresh state. | Windows, Linux |
 | FR-WT-04, FR-ED-01, FR-ED-02 | Configure the editor, another editor and a custom command, each for a different environment (Windows, a WSL distro). "Open in editor" from a window, from a worktree row in the worktree picker, and for a file from the commit detail view, compare, the change list and the diff window's toolbar opens the right folder or file with that environment's profile. | all |
 | FR-WT-08, FR-WT-09 | Opening a worktree that already has a window focuses it. Titles show worktree and branch. | all |
 | FR-WT-11 | Two repos, one worktree of each in its own window: both work independently at the same time. | Windows, Linux |
 | FR-CMP-01, FR-CMP-02, FR-DIFF-07 | Compare two commits (Ctrl-click, or "Compare with <short hash>") and double-click a file: the diff window opens with the file list and diff; next/previous change and file work; the main window stays usable; Escape and the close button close it; double-clicking another file, also a commit's or a working-tree file, reuses the window. | Windows, Linux |
-| FR-CONF-05 | Resolve a conflict from a pull, merge, cherry-pick or revert: nebegit shows no merge editor of its own; resolution happens in the external editor. | all |
-| QA-PORT-02 | First use of a distro via "Open WSL folder": the consent dialog names the distro and target path before any copy. Declining leaves no file and shows `DEPLOY_REFUSED`. Accepting opens the repo; git, hooks and the editor run inside WSL. | Windows |
-| QA-PORT-02 | With a WSL repo open, run `wsl --shutdown`, then retry an action: the window recovers without being reopened; a brief error is acceptable. | Windows |
+| FR-CONF-02 | Resolve a conflict from a pull, merge, cherry-pick or revert: nebegit shows no merge editor of its own; resolution happens in the external editor. | all |
+| QA-PORT-02 | First use of a distro via "Open folder…": the consent dialog names the distro and the `nebegit` command before any copy. Declining leaves no file and shows `DEPLOY_REFUSED`. Accepting opens the repo; git, hooks and the editor run inside WSL. | Windows |
+| QA-PORT-02 | With a WSL repo open, a job running and a commit message typed, run `wsl --shutdown`, then retry an action or open another folder of that distro: the window reloads without being reopened, the jobs menu is idle, the typed message is kept; a brief error is acceptable. | Windows |
 | QA-PORT-03 | Across this checklist, no feature exists on one of Windows and Linux but not the other, apart from the documented WSL and macOS exceptions. | Windows, Linux |
+| FR-UX-18, TR-36 | The UI text is in the same font on Windows and Linux; an error notice shows red, top right, in light and dark. | Windows, Linux |
 | QA-PERF-01 | A fresh launch shows a usable window within 2 s (stopwatch; there is no window-ready signal to automate against). | Windows, Linux |
 | QA-PERF-03 | Scrolling the 100k-commit log shows no visible freeze. | Windows, Linux |
 | QA-INST-01 | Start without WebView2 (Windows) or WebKitGTK (Linux): Windows shows a native message naming WebView2; on Linux the loader fails before any Go code runs, so check the failure is visible in the terminal. | Windows, Linux |
-| QA-INST-01 | On a fresh machine, download the release zip or AppImage and run it: it starts with only git and the webview runtime installed, as the README says. | Windows, Linux |
+| QA-INST-01 | On a fresh machine, download the release zip (Windows) or tar.gz (Linux) and run it: it starts with only git and the webview runtime installed, as the README says. | Windows, Linux |
+| QA-INST-01, FR-REPO-06 | On a fresh machine, install the release `.deb` or `.rpm`: the package manager installs git, GTK4 and WebKitGTK as dependencies; `nebegit` runs immediately, on `PATH`, with no separate prerequisite step. | Linux |
 | QA-USE-01 | An an IDE git user finds commit (Ctrl+K), pull (Ctrl+T), push (Ctrl+Shift+K) and "Compare with working tree" (commit context menu) where they expect them. | all |
 | QA-USE-02 | Editor presets, ignore-whitespace and the theme picker are each at most two steps from the main window. | all |
 | QA-OSS-05 | Run the clone check (a copy-paste detector, with identifiers and literals ignored) of the Go and TypeScript code against every public codebase the project took ideas from (e.g. lazygit, mhutchie/vscode-git-graph): no clone outside the parts credited in `THIRD-PARTY-NOTICES.txt`. | — |
@@ -46,4 +48,6 @@ The owner runs this per platform before a release. `tools/trace` accepts the IDs
 
 ## CI
 
-GitHub Actions, on `windows-latest` and `ubuntu-24.04` (with `libgtk-4-dev` and `libwebkitgtk-6.0-dev`). Each job has two steps: install dependencies with network access, then run offline (TR-14): lint (`golangci-lint`, `oxlint`, `eslint`, `vue-tsc`), tests, build. The Linux job runs the Go tests against git 2.40 and against the runner's current git. `macos-latest` only builds (QA-PORT-04). The real-backend e2e suite runs as its own Linux entry, with Chromium installed in the online step.
+GitHub Actions, on Windows and Linux runners. Each job has two steps: install dependencies with network access, then run offline (TR-14): lint (`golangci-lint`, `oxlint`, `eslint`, `vue-tsc`), tests, build. macOS only builds (QA-PORT-04). The real-backend e2e suite runs as its own Linux job; the mocked-layer e2e suite runs nightly with the performance checks.
+
+A separate Linux job runs the Go tests, with the race detector, against the oldest supported git (TR-04) built from source (QA-COMP-03); the other jobs use the runner's newer git.

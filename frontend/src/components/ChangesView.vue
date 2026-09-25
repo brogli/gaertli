@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import Button from 'openvue/button'
 import { useI18n } from '../i18n'
+import { SECONDARY_BUTTON } from '../lib/layout'
 import { useChangesStore } from '../stores/changes'
 import { useCoreCall } from '../composables/useCoreCall'
 import { useOpenInEditor } from '../composables/useOpenInEditor'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DiffKind } from '../lib/diffTarget'
+import { DiffKind, fileTarget } from '../lib/diffTarget'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ChangedFileList from './ChangedFileList.vue'
 import CommitBox from './CommitBox.vue'
@@ -30,12 +32,7 @@ const { t } = useI18n()
 const selected = ref<{ file: ChangedFile; staged: boolean } | null>(null)
 
 function openDiff(file: ChangedFile, staged: boolean): void {
-  void AppService.OpenDiff(props.wt, {
-    kind: DiffKind.WorkingDiff,
-    staged,
-    path: file.path,
-    oldPath: file.oldPath ?? '',
-  })
+  void AppService.OpenDiff(props.wt, fileTarget(file, { kind: DiffKind.WorkingDiff, staged }))
 }
 
 // The index-scope repo:changed event after each write reloads the list.
@@ -125,8 +122,12 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
       <header>
         <h2>{{ t('changesView.heading') }}</h2>
         <div class="header-actions">
-          <button type="button" @click="stageAll">{{ t('changesView.stageAll') }}</button>
-          <button type="button" @click="unstageAll">{{ t('changesView.unstageAll') }}</button>
+          <Button v-bind="SECONDARY_BUTTON" :label="t('changesView.stageAll')" @click="stageAll" />
+          <Button
+            v-bind="SECONDARY_BUTTON"
+            :label="t('changesView.unstageAll')"
+            @click="unstageAll"
+          />
         </div>
       </header>
       <ErrorBanner v-if="error" :error="error" />

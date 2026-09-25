@@ -9,29 +9,40 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// dispatchCommand runs a "command" event for wt through a Registry whose
-// log writes to a fresh buffer, and returns what was logged.
-func dispatchCommand(t *testing.T, wt core.WorktreeID, entry core.CommandRecord) string {
+// dispatchLogged runs a name event carrying record for wt through a
+// Registry whose log writes to a fresh buffer at level, and returns what
+// was logged.
+func dispatchLogged(t *testing.T, level slog.Level, name string, wt core.WorktreeID, record any) string {
 	t.Helper()
 	r, _ := newTestRegistry()
 	var logged strings.Builder
-	r.log = slog.New(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	r.log = slog.New(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: level}))
 
-	payload, err := json.Marshal(entry)
+	payload, err := json.Marshal(record)
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.Dispatch(core.Event{Name: "command", Worktree: wt, Payload: payload})
+	r.Dispatch(core.Event{Name: name, Worktree: wt, Payload: payload})
 	return logged.String()
 }
 
-func TestFR_UX_02_AUserStartedCommandIsLoggedAtInfo(t *testing.T) {
-	out := dispatchCommand(t, "wt1", core.CommandRecord{
+func TestFR_UX_02_ASuccessfulCommandAtInfoLevelLogsNothing(t *testing.T) {
+	out := dispatchLogged(t, slog.LevelInfo, "command", "wt1", core.CommandRecord{
 		Command: "git status", Dir: "/repo", DurationMS: 12, ExitCode: 0,
 	})
 
-	if !strings.Contains(out, "level=INFO") {
-		t.Errorf("log = %q, want level=INFO", out)
+	if out != "" {
+		t.Errorf("log = %q, want no record for a successful command at Info level", out)
+	}
+}
+
+func TestFR_UX_02_ASuccessfulCommandAtDebugLevelLogsOneDebugRecord(t *testing.T) {
+	out := dispatchLogged(t, slog.LevelDebug, "command", "wt1", core.CommandRecord{
+		Command: "git status", Dir: "/repo", DurationMS: 12, ExitCode: 0,
+	})
+
+	if !strings.Contains(out, "level=DEBUG") {
+		t.Errorf("log = %q, want level=DEBUG", out)
 	}
 	for _, want := range []string{`cmd=`, `"git status"`, `dir=/repo`, `exit=0`, `ms=12`, `worktree=wt1`} {
 		if !strings.Contains(out, want) {
@@ -40,21 +51,18 @@ func TestFR_UX_02_AUserStartedCommandIsLoggedAtInfo(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_ABackgroundCommandIsLoggedAtDebugNotInfo(t *testing.T) {
-	out := dispatchCommand(t, "wt1", core.CommandRecord{
+func TestFR_UX_02_ABackgroundCommandAtDebugLevelLogsOneDebugRecord(t *testing.T) {
+	out := dispatchLogged(t, slog.LevelDebug, "command", "wt1", core.CommandRecord{
 		Command: "git status", Background: true, ExitCode: 0,
 	})
 
-	if strings.Contains(out, "level=INFO") {
-		t.Errorf("log = %q, want no Info record for a background command", out)
-	}
 	if !strings.Contains(out, "level=DEBUG") {
-		t.Errorf("log = %q, want a Debug record", out)
+		t.Errorf("log = %q, want level=DEBUG", out)
 	}
 }
 
-func TestFR_UX_02_AFailedUserStartedCommandIsLoggedAtWarnWithMaskedStderr(t *testing.T) {
-	out := dispatchCommand(t, "wt1", core.CommandRecord{
+func TestFR_UX_02_AFailedCommandLogsWarnEvenAtInfoLevel(t *testing.T) {
+	out := dispatchLogged(t, slog.LevelInfo, "command", "wt1", core.CommandRecord{
 		Command:   "git fetch",
 		ExitCode:  128,
 		ErrorCode: "GIT_FAILED",
@@ -75,17 +83,56 @@ func TestFR_UX_02_AFailedUserStartedCommandIsLoggedAtWarnWithMaskedStderr(t *tes
 	}
 }
 
-func TestFR_UX_02_ACommandEventIsNeverEmittedToAWindow(t *testing.T) {
-	r, opener := newTestRegistry()
-	r.OpenOrFocus("/a", "/a", "")
+func TestFR_UX_02_AnEditorStartIsLoggedAtDebugWithItsArgv(t *testing.T) {
+	out := dispatchLogged(t, slog.LevelDebug, "editor", "wt1", core.EditorRecord{Argv: []string{"editor", "/repo"}})
 
-	payload, err := json.Marshal(core.CommandRecord{Command: "git status"})
-	if err != nil {
-		t.Fatal(err)
+	if strings.Contains(out, "level=INFO") || strings.Contains(out, "level=WARN") {
+		t.Errorf("log = %q, want no Info or Warn record for a started editor", out)
 	}
-	r.Dispatch(core.Event{Name: "command", Worktree: "/a", Payload: payload})
+	if !strings.Contains(out, "level=DEBUG") {
+		t.Errorf("log = %q, want level=DEBUG", out)
+	}
+	for _, want := range []string{`argv=`, `editor`, `/repo`, `worktree=wt1`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log = %q, want it to contain %q", out, want)
+		}
+	}
+}
 
-	if n := len(opener.windows[0].emitted); n != 0 {
-		t.Errorf("emitted %d events, want 0 (logged instead)", n)
+func TestFR_UX_02_AFailedEditorStartIsLoggedAtWarnWithItsArgvAndError(t *testing.T) {
+	out := dispatchLogged(t, slog.LevelDebug, "editor", "wt1", core.EditorRecord{
+		Argv: []string{"myed", "/repo"}, Error: `"myed" is not on PATH`,
+	})
+
+	if !strings.Contains(out, "level=WARN") {
+		t.Errorf("log = %q, want level=WARN", out)
+	}
+	for _, want := range []string{`argv=`, `myed`, `err=`, "not on PATH"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log = %q, want it to contain %q", out, want)
+		}
+	}
+}
+
+func TestFR_UX_02_CommandAndEditorEventsAreNeverEmittedToAWindow(t *testing.T) {
+	records := map[string]any{
+		"command": core.CommandRecord{Command: "git status"},
+		"editor":  core.EditorRecord{Argv: []string{"editor"}},
+	}
+	for name, record := range records {
+		t.Run(name, func(t *testing.T) {
+			r, opener := newTestRegistry()
+			r.OpenOrFocus("/a", "/a", "")
+
+			payload, err := json.Marshal(record)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Dispatch(core.Event{Name: name, Worktree: "/a", Payload: payload})
+
+			if n := len(opener.windows[0].emitted); n != 0 {
+				t.Errorf("emitted %d events, want 0 (logged instead)", n)
+			}
+		})
 	}
 }

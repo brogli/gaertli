@@ -1,45 +1,51 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from '../i18n'
 import Popover from 'openvue/popover'
-import Menu from 'openvue/menu'
+import Button from 'openvue/button'
+import Checkbox from 'openvue/checkbox'
+import ContextMenu from 'openvue/contextmenu'
 import type { MenuItem } from 'openvue/menuitem'
-import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Code, type Branch } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { useRefsStore } from '../stores/refs'
 import { useRepoStore } from '../stores/repo'
 import { useLogStore } from '../stores/log'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useCoreCall, type CoreError } from '../composables/useCoreCall'
 import { useConfirmAction } from '../composables/useConfirmAction'
-import { repoPath } from '../lib/path'
 import { shortSha } from '../lib/format'
 import { iconClass } from '../lib/icons'
-import { useLayout } from '../lib/layout'
+import { useLayout, useToolbarButton } from '../lib/layout'
+import { errorNotice, useNotices } from '../lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
 import PickerList from './PickerList.vue'
 import RenameBranchDialog from './RenameBranchDialog.vue'
 import type { PickerRow } from './pickerRow'
-import type { WorktreeStart } from './worktreeStart'
+import { branchStart, commitStart, type StartPoint, type WorktreeStart } from './startPoint'
 
 // BranchPicker is the toolbar button naming the current branch; it opens a
 // searchable list of the local branches, remote branches and tags. A click
-// checks an entry out; its actions button opens a menu of the rest. The
-// dialogs another component already hosts are asked for by event: a new
+// checks an entry out; a right-click opens a context menu of its actions.
+// The dialogs another component already hosts are asked for by event: a new
 // branch at a start point, a new worktree, a detached checkout.
 // distro is set only for a WSL window; a path from the core is POSIX there.
 const props = defineProps<{ wt: string; distro?: string | undefined }>()
 const emit = defineEmits<{
-  'create-branch': [start: string]
+  'create-branch': [start: StartPoint]
   'create-worktree': [start: WorktreeStart]
   'checkout-commit': [sha: string]
+  'checkout-elsewhere': [branch: string, path: string]
+  'show-log': []
 }>()
 const refs = useRefsStore()
 const repo = useRepoStore()
 const log = useLogStore()
 const { error, run, runAndClose } = useCoreCall()
 const { confirmAction } = useConfirmAction()
+const notices = useNotices()
 const { t } = useI18n()
 const layout = useLayout()
+const toolbarButton = useToolbarButton()
 
 // The button's text: the branch, or the short hash while detached, and any
 // operation in progress.
@@ -61,8 +67,8 @@ const tracked = computed(() => {
 })
 
 // RefRow is one checkout-able entry; name is what the list shows and the
-// filter matches, e.g. "origin/x" for a remote branch.
-type RefRow = PickerRow & { name: string; sha: string } & (
+// filter matches, e.g. "origin/x" for a remote branch, ref its full ref name.
+type RefRow = PickerRow & { name: string; ref: string; sha: string } & (
     { kind: 'local'; branch: Branch } | { kind: 'remote'; shortName: string } | { kind: 'tag' }
   )
 type ActionRow = PickerRow & { kind: 'action'; label: string; run: () => void }
@@ -73,35 +79,39 @@ function actionRow(key: string, label: string, run: () => void): ActionRow {
   return { key, kind: 'action', label, run }
 }
 
+const localRows = computed(() =>
+  (refs.refs?.branches ?? []).map((b): RefRow => ({
+    key: `local:${b.name}`,
+    kind: 'local',
+    name: b.name,
+    ref: `refs/heads/${b.name}`,
+    sha: b.sha,
+    branch: b,
+  })),
+)
+
 const sections = computed<{ label: string; rows: RefRow[] }[]>(() => [
+  { label: t('refs.local'), rows: localRows.value },
   {
-    label: t('branchPicker.local'),
-    rows: (refs.refs?.branches ?? []).map((b) => ({
-      key: `local:${b.name}`,
-      kind: 'local',
-      name: b.name,
-      sha: b.sha,
-      branch: b,
-    })),
-  },
-  {
-    label: t('branchPicker.remote'),
+    label: t('refs.remote'),
     rows: (refs.refs?.remotes ?? []).flatMap((r) =>
       (r.branches ?? []).map((b): RefRow => ({
         key: `remote:${r.name}/${b.name}`,
         kind: 'remote',
         name: `${r.name}/${b.name}`,
+        ref: `refs/remotes/${r.name}/${b.name}`,
         sha: b.sha,
         shortName: b.name,
       })),
     ),
   },
   {
-    label: t('branchPicker.tags'),
+    label: t('refs.tags'),
     rows: (refs.refs?.tags ?? []).map((tag) => ({
       key: `tag:${tag.name}`,
       kind: 'tag',
       name: tag.name,
+      ref: `refs/tags/${tag.name}`,
       sha: tag.sha,
     })),
   },
@@ -125,7 +135,7 @@ const rows = computed<Row[]>(() => {
   const matches = (text: string) => text.toLowerCase().includes(q)
   const actions = [
     actionRow('new-branch', t('branchPicker.newBranch'), () =>
-      closeAnd(() => emit('create-branch', repo.summary?.sha ?? '')),
+      closeAnd(() => emit('create-branch', currentStart())),
     ),
     ...(checked.value.size >= 2
       ? [
@@ -162,19 +172,48 @@ function activate(row: Row): void {
   else if (row.kind !== 'section') checkout(row)
 }
 
-// A local branch checked out in another worktree switches this window to
-// that worktree instead. A remote branch checks out by its short name: git's
-// DWIM makes it a new tracking branch. A tag detaches HEAD, after the warning.
-// A refusal stays in the list with git's reason.
-function checkout(row: RefRow): void {
-  if (row.kind === 'local' && row.branch.current) hide()
-  else if (row.kind === 'local' && row.branch.checkedOutIn) {
-    const path = repoPath(row.branch.checkedOutIn, props.distro)
-    void runAndClose(() => AppService.SelectWorktree(path), hide)
-  } else if (row.kind === 'local') void runAndClose(() => Facade.Checkout(props.wt, row.name), hide)
-  else if (row.kind === 'remote')
-    void runAndClose(() => Facade.Checkout(props.wt, row.shortName), hide)
-  else closeAnd(() => emit('checkout-commit', row.sha))
+// A Runner runs a core call for a row click or a menu action.
+type Runner = (call: () => Promise<unknown>) => Promise<unknown>
+
+// inList runs a row click's call and closes the list once it succeeded; a
+// refusal stays in the list with git's reason.
+const inList: Runner = (call) => runAndClose(call, hide)
+
+// fromMenu runs a menu action's call. The click on the menu, outside the
+// list, has closed the list, so a refusal shows as a notice.
+const fromMenu: Runner = (call) => run(call, showRefusal)
+
+function showRefusal(refusal: CoreError): boolean {
+  notices.show('branch-picker', errorNotice(refusal))
+  return true
+}
+
+// A local branch checked out in another worktree asks before switching this
+// window there instead of checking it out. A remote branch checks out as
+// the local branch of its short name if there is one, else by its full ref
+// as a new tracking branch. A tag detaches HEAD, after the warning.
+function checkout(row: RefRow, runCall: Runner = inList): void {
+  if (row.kind === 'remote') {
+    const local = localRows.value.find((r) => r.name === row.shortName)
+    if (local) checkout(local, runCall)
+    else void runCall(() => Facade.Checkout(props.wt, row.ref))
+  } else if (row.kind === 'tag') closeAnd(() => emit('checkout-commit', row.sha))
+  else if (row.branch.current) hide()
+  else if (row.branch.checkedOutIn) {
+    const path = row.branch.checkedOutIn
+    closeAnd(() => emit('checkout-elsewhere', row.name, path))
+  } else void runCall(() => Facade.Checkout(props.wt, row.name))
+}
+
+// showHistory filters the log to ref, keeping the filter's other fields.
+function showHistory(ref: string): void {
+  void log.applyFilter({ ...log.filter, branches: [ref] })
+  emit('show-log')
+}
+
+// A new branch starts at the current branch, or at HEAD while detached.
+function currentStart(): StartPoint {
+  return refs.current ? branchStart(refs.current.name) : commitStart(repo.summary?.sha ?? '')
 }
 
 // A local branch checked out somewhere cannot get a second worktree; a new
@@ -182,78 +221,78 @@ function checkout(row: RefRow): void {
 function worktreeStart(row: RefRow): WorktreeStart {
   return row.kind === 'local' && !row.branch.current && !row.branch.checkedOutIn
     ? { newBranch: false, branch: row.name }
-    : { newBranch: true, start: row.name }
+    : { newBranch: true, start: { ref: row.ref } }
 }
 
 function menuItems(row: RefRow): MenuItem[] {
   const local = row.kind === 'local' ? row.branch : undefined
   const other = !local?.current
   return [
-    ...(other ? [{ label: t('branchPicker.checkOut'), command: () => checkout(row) }] : []),
+    ...(other
+      ? [{ label: t('branchPicker.checkOut'), command: () => checkout(row, fromMenu) }]
+      : []),
     {
       label: t('branchPicker.newBranchFromHere'),
-      command: () => closeAnd(() => emit('create-branch', row.name)),
+      command: () => emit('create-branch', { ref: row.ref }),
     },
     {
       label: t('branchPicker.newWorktreeFromHere'),
-      command: () => closeAnd(() => emit('create-worktree', worktreeStart(row))),
+      command: () => emit('create-worktree', worktreeStart(row)),
     },
     ...(local && other && local.upstream
       ? [
           {
             label: t('branchPicker.updateFromUpstream'),
-            command: () => void runAndClose(() => Facade.UpdateBranch(props.wt, row.name), hide),
+            command: () => void fromMenu(() => Facade.UpdateBranch(props.wt, row.name)),
           },
         ]
       : []),
     ...(local && other
       ? [
-          {
-            label: t('branchPicker.rename'),
-            command: () => closeAnd(() => (renameTarget.value = row.name)),
-          },
-          { label: t('branchPicker.delete'), command: () => void deleteBranch(row.name) },
+          { label: t('branchPicker.rename'), command: () => (renameTarget.value = row.name) },
+          { label: t('branchPicker.delete'), command: () => deleteBranch(row.name) },
         ]
       : []),
-    { label: t('branchPicker.showInLog'), command: () => closeAnd(() => void log.jumpTo(row.sha)) },
+    {
+      label: t('branchPicker.showInLog'),
+      command: () => {
+        void log.jumpTo(row.sha)
+        emit('show-log')
+      },
+    },
+    ...(row.kind === 'tag'
+      ? [{ label: t('branchPicker.showHistory'), command: () => showHistory(row.ref) }]
+      : []),
   ]
 }
 
-const menu = useTemplateRef<InstanceType<typeof Menu>>('menu')
+const menu = useTemplateRef<InstanceType<typeof ContextMenu>>('menu')
 const menuModel = ref<MenuItem[]>([])
-// menuButton is the actions button whose menu is open.
-let menuButton: EventTarget | null = null
 
-// A second click on the same button closes its menu. Moving to another
-// row's button shows the menu anew on the next tick: Menu positions itself
-// only when it enters, not when shown again while still open.
-function openMenu(event: MouseEvent, row: RefRow): void {
-  const button = event.currentTarget
-  const openHere = menuButton === button
-  menu.value?.hide()
-  if (openHere) return
+// openMenu opens a ref row's actions at event: the pointer, or the row
+// itself when opened from the keyboard.
+function openMenu(row: Row, event: MouseEvent): void {
+  if (row.kind === 'action' || row.kind === 'section') return
   menuModel.value = menuItems(row)
-  void nextTick(() => {
-    menu.value?.show(event, button)
-    menuButton = button
-  })
+  menu.value?.show(event)
 }
 
 const renameTarget = ref<string | null>(null)
 
 // A merged branch is deleted without asking. An UNMERGED_BRANCH refusal asks,
 // naming git's reason, then deletes forced. Any other refusal (the branch in
-// use elsewhere) stays in the list, no retry offered.
-async function deleteBranch(name: string): Promise<void> {
-  await runAndClose(() => Facade.DeleteBranch(props.wt, name, false), hide)
-  if (error.value?.code !== Code.Unmerged) return
-  const reason = error.value.message
-  error.value = null
-  confirmAction(
-    t('branchPicker.deleteUnmergedTitle'),
-    t('branchPicker.deleteUnmergedConfirm', { reason }),
-    () => {
-      void runAndClose(() => Facade.DeleteBranch(props.wt, name, true), hide)
+// use elsewhere) is a notice, no retry offered.
+function deleteBranch(name: string): void {
+  void run(
+    () => Facade.DeleteBranch(props.wt, name, false),
+    (refusal) => {
+      if (refusal.code !== Code.Unmerged) return showRefusal(refusal)
+      confirmAction(
+        t('branchPicker.deleteUnmergedTitle'),
+        t('branchPicker.deleteUnmergedConfirm', { reason: refusal.message }),
+        () => void fromMenu(() => Facade.DeleteBranch(props.wt, name, true)),
+      )
+      return true
     },
   )
 }
@@ -268,8 +307,8 @@ async function updateChecked(): Promise<void> {
 </script>
 
 <template>
-  <button
-    type="button"
+  <Button
+    v-bind="toolbarButton"
     class="picker-button"
     data-test="branch-picker"
     :title="headLabel"
@@ -285,8 +324,8 @@ async function updateChecked(): Promise<void> {
       </span>
       <i :class="iconClass('dropdown')" aria-hidden="true"></i>
     </template>
-  </button>
-  <Popover ref="popover" @show="query = ''" @hide="menu?.hide()">
+  </Button>
+  <Popover ref="popover" @show="query = ''">
     <div class="branch-list">
       <ErrorBanner v-if="error" :error="error" />
       <PickerList
@@ -294,6 +333,7 @@ async function updateChecked(): Promise<void> {
         :rows="rows"
         :placeholder="t('branchPicker.searchPlaceholder')"
         @activate="activate"
+        @menu="openMenu"
       >
         <template #row="{ row, activate: onActivate }">
           <h3 v-if="row.kind === 'section'">{{ row.label }}</h3>
@@ -305,15 +345,17 @@ async function updateChecked(): Promise<void> {
             >{{ row.label }}</span
           >
           <template v-else>
-            <input
-              v-if="updatable(row)"
-              type="checkbox"
-              data-test="update-select"
-              :checked="checked.has(row.name)"
-              :title="t('branchPicker.selectToUpdate', { name: row.name })"
-              :aria-label="t('branchPicker.selectToUpdate', { name: row.name })"
-              @change="setChecked(row.name, ($event.target as HTMLInputElement).checked)"
-            />
+            <span class="update-slot">
+              <Checkbox
+                v-if="updatable(row)"
+                binary
+                data-test="update-select"
+                :model-value="checked.has(row.name)"
+                :title="t('branchPicker.selectToUpdate', { name: row.name })"
+                :aria-label="t('branchPicker.selectToUpdate', { name: row.name })"
+                @update:model-value="setChecked(row.name, $event)"
+              />
+            </span>
             <span class="row" data-test="ref-row" @click="onActivate">
               <span class="current-marker">
                 <i
@@ -337,20 +379,10 @@ async function updateChecked(): Promise<void> {
               </span>
               <span v-else class="leftover"></span>
             </span>
-            <button
-              type="button"
-              class="glyph-btn"
-              data-test="ref-actions"
-              :title="t('branchPicker.actionsFor', { name: row.name })"
-              :aria-label="t('branchPicker.actionsFor', { name: row.name })"
-              @click="openMenu($event, row)"
-            >
-              <i :class="iconClass('rowMenu')" aria-hidden="true"></i>
-            </button>
           </template>
         </template>
       </PickerList>
-      <Menu ref="menu" :model="menuModel" popup append-to="self" @hide="menuButton = null" />
+      <ContextMenu ref="menu" :model="menuModel" />
     </div>
   </Popover>
   <RenameBranchDialog
@@ -374,6 +406,13 @@ async function updateChecked(): Promise<void> {
   width: 28rem;
   max-width: 90vw;
   max-height: 70vh;
+}
+/* A checkbox's width on every ref row, filled only where the branch can be
+   updated, so every name starts at the same x. */
+.update-slot {
+  flex: none;
+  display: flex;
+  width: var(--p-checkbox-width);
 }
 .current-marker {
   font-size: 0.75em;

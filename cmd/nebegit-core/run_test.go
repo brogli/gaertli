@@ -43,7 +43,7 @@ func TestFR_REPO_06_LaunchFailsClearlyWithoutWSLOrGuiPath(t *testing.T) {
 		wantSubstr string
 	}{
 		{"WSL_DISTRO_NAME unset", "", "not running inside a WSL distro shell"},
-		{"no gui-path file next to the binary", "Ubuntu-22.04", `Install nebegit command in this distro`},
+		{"no gui-path file next to the binary", "Ubuntu-22.04", "open a repo of this distro in the nebegit app first"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/brogli/nebegit/internal/applog"
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/services"
 	"github.com/brogli/nebegit/internal/settings"
@@ -24,9 +25,9 @@ const singleInstanceID = "nebegit" // stable per machine; no reverse-domain owne
 
 // Run starts the shell. args is os.Args (argv[0] included, see pathArg).
 func Run(assets fs.FS, args []string) error {
-	if !gitPresent() {
-		showFatal(text(appName, nil), text(missingGit, nil))
-		return errors.New("git not found on PATH")
+	if ok, msg := checkGit(context.Background(), git.Runner{}); !ok {
+		showFatal(text(appName, nil), msg)
+		return errors.New("git prerequisite not met")
 	}
 
 	path, ok := pathArg(args)
@@ -40,7 +41,8 @@ func Run(assets fs.FS, args []string) error {
 		return err
 	}
 
-	logger, logPath, logCloser, logErr := applog.Open()
+	// SettingsService.Set moves the level on a later DebugMode change.
+	logger, logPath, logCloser, logLevel, logErr := applog.Open(store.Get().DebugMode)
 	slog.SetDefault(logger)
 	if logCloser != nil {
 		defer func() { _ = logCloser.Close() }()
@@ -50,15 +52,15 @@ func Run(assets fs.FS, args []string) error {
 	reg.SetStore(store)
 	reg.SetLocal(services.New(reg.Dispatch))
 	reg.PushEditorProfiles(context.Background())
+	reg.SetConsent(nativeConsent{ask: askYesNo})
 
 	var sh shell
 	onPath := func(path string) { sh.launch(context.Background(), path) }
 	a := application.New(options(assets, reg, onPath, logger))
 	reg.Bind(a)
-	reg.SetConsent(wailsConsent{app: a})
 	sh = shell{api: NewFacade(reg), reg: reg, store: store, notify: wailsNotifier{app: a}, logPath: logPath, logErr: errString(logErr)}
 	a.RegisterService(application.NewService(&AppService{shell: sh, picker: wailsPicker{app: a}}))
-	a.RegisterService(application.NewService(NewSettingsService(store, reg, a.Event)))
+	a.RegisterService(application.NewService(NewSettingsService(store, reg, a.Event, logLevel)))
 	// The frontend's uncaught errors reach the same app log, at Error, via
 	// Wails' own bound log service.
 	a.RegisterService(application.NewService(wailslog.NewWithConfig(&wailslog.Config{Logger: logger})))
@@ -198,7 +200,7 @@ func (sh shell) launch(ctx context.Context, path string) bool {
 func (sh shell) open(ctx context.Context, path string) bool {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {
-		sh.notify.Show(text(appName, nil), openFailedMessage(err))
+		sh.notify.Show(text(appName, nil), core.ErrorOf(err).Message)
 		return false
 	}
 	distro, _, _ := remote.ClassifyWSLPath(path)
@@ -238,22 +240,45 @@ type callingWindow interface {
 	SetTitle(title string) application.Window
 }
 
-// switchTo moves w's selection to path: validates it like open, navigates
-// the window (SetURL reloads it), records settings, and releases the
-// worktree just left. Unlike open, a failure is returned rather than shown:
-// the picker that asked has an ErrorBanner.
+// switchTo moves w's selection to path (selectInWindow), validated like
+// open. Unlike open, a failure is returned rather than shown: the picker
+// that asked has an ErrorBanner.
 func (sh shell) switchTo(ctx context.Context, w callingWindow, path string) error {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {
 		return err
 	}
+	sh.selectInWindow(w, wt, path)
+	return nil
+}
+
+// switchOrFocus is switchTo, except that when another window already shows
+// path's worktree that window is brought forward instead, leaving w
+// unchanged: "Open folder…"'s own rule, unlike SelectWorktree and
+// SelectRecentRepo, which always switch this window.
+func (sh shell) switchOrFocus(ctx context.Context, w callingWindow, path string) error {
+	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
+	if err != nil {
+		return err
+	}
+	if other := sh.reg.windowShowing(wt.ID, w.ID()); other != nil {
+		other.Focus()
+		return nil
+	}
+	sh.selectInWindow(w, wt, path)
+	return nil
+}
+
+// selectInWindow moves w's selection to wt (already resolved from path):
+// navigates the window (SetURL reloads it), records settings, and releases
+// the worktree just left.
+func (sh shell) selectInWindow(w callingWindow, wt core.WorktreeInfo, path string) {
 	distro, _, _ := remote.ClassifyWSLPath(path)
 	previous, _ := sh.reg.SelectInWindow(w.ID(), wt.ID, wt.Path, distro)
 	sh.reg.SetRepo(wt.ID, wt.RepoKey)
 	w.SetURL(selectionURL(wt.Path, distro))
 	sh.reg.Release(previous)
 	sh.remember(wt, distro)
-	return nil
 }
 
 // shellPath is path in the shell's id form: UNC for a WSL repo (distro
@@ -277,12 +302,4 @@ func selectionURL(path, distro string) string {
 		u += "&distro=" + url.QueryEscape(distro)
 	}
 	return u
-}
-
-// openFailedMessage is the user-facing text for a validation failure.
-func openFailedMessage(err error) string {
-	if ce, ok := errors.AsType[*core.Error](err); ok {
-		return ce.Message
-	}
-	return err.Error()
 }

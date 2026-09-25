@@ -1,8 +1,10 @@
 package services
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -10,6 +12,24 @@ import (
 	"github.com/brogli/nebegit/internal/core/coretest"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
+
+// onlyEditorRecord finds the one "editor" event among events and decodes
+// its payload, failing t if there is none.
+func onlyEditorRecord(t *testing.T, events []core.Event) core.EditorRecord {
+	t.Helper()
+	for _, ev := range events {
+		if ev.Name != "editor" {
+			continue
+		}
+		var record core.EditorRecord
+		if err := json.Unmarshal(ev.Payload, &record); err != nil {
+			t.Fatal(err)
+		}
+		return record
+	}
+	t.Fatal("no editor event sunk")
+	return core.EditorRecord{}
+}
 
 // pushArgvWriter installs an editor profile whose folder/file commands are
 // argvWriterBin (built in TestMain, log_test.go), and returns the file it
@@ -114,6 +134,53 @@ func TestFR_ED_02_OpenFileReturnsFileNotFoundForAMissingPathStartingNoEditor(t *
 
 	coretest.AssertCode(t, err, core.FileNotFound)
 	assertNoEditorStarted(t, outFile)
+}
+
+func TestFR_UX_02_OpenFileLogsTheEditorStart(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+
+	var events []core.Event
+	c := New(func(ev core.Event) { events = append(events, ev) })
+	pushArgvWriter(t, c)
+	wt := openOn(t, c, repo.Dir)
+
+	if err := c.OpenFile(t.Context(), wt.ID, "seed.txt", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	record := onlyEditorRecord(t, events)
+	if want := []string{argvWriterBin, filepath.Join(repo.Dir, "seed.txt")}; !slices.Equal(record.Argv, want) {
+		t.Errorf("argv = %v, want %v", record.Argv, want)
+	}
+	if record.Error != "" {
+		t.Errorf("error = %q, want none", record.Error)
+	}
+}
+
+func TestFR_UX_02_OpenFileWithACommandNotOnPathLogsTheArgvAndTheError(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+
+	var events []core.Event
+	c := New(func(ev core.Event) { events = append(events, ev) })
+	profile := core.EditorProfile{FolderCmd: "definitely-not-a-real-editor {path}", FileCmd: "definitely-not-a-real-editor {path}"}
+	if err := c.SetEditorProfile(t.Context(), profile); err != nil {
+		t.Fatal(err)
+	}
+	wt := openOn(t, c, repo.Dir)
+	t.Setenv("PATH", t.TempDir()) // empty: nothing resolves, set after opening (which itself needs git)
+
+	err := c.OpenFile(t.Context(), wt.ID, "seed.txt", 0)
+	coretest.AssertCode(t, err, core.EditorNotFound)
+
+	record := onlyEditorRecord(t, events)
+	if want := []string{"definitely-not-a-real-editor", filepath.Join(repo.Dir, "seed.txt")}; !slices.Equal(record.Argv, want) {
+		t.Errorf("argv = %v, want %v", record.Argv, want)
+	}
+	if record.Error == "" {
+		t.Error("error = \"\", want the start failure")
+	}
 }
 
 func TestFR_UX_11_OpenFileNamesTheMissingPathInArgs(t *testing.T) {

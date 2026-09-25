@@ -13,6 +13,7 @@ import { confirmOptions, confirmRequire } from '../testing/confirm'
 import ResetDialog from './ResetDialog.vue'
 import NoticeArea from './NoticeArea.vue'
 import { mountInBody } from '../testing/mountInBody'
+import { footerButtons } from '../testing/dialog'
 import { NOTICE_GROUP } from '../lib/notice'
 
 function mountDialog(branch = 'main') {
@@ -52,7 +53,7 @@ describe('ResetDialog', () => {
       "Hard Discard the undone commits' changes and all uncommitted changes.",
       "Keep Discard the undone commits' changes, keep uncommitted ones. Stops if they touch the same files.",
     ])
-    expect((body.get('input#reset-mode-mixed').element as HTMLInputElement).checked).toBe(true)
+    expect(body.get<HTMLInputElement>('input#reset-mode-mixed').element.checked).toBe(true)
   })
 
   it('FR-BR-02 Reset fails: the dialog stays open with the error, no notice', async () => {
@@ -65,7 +66,7 @@ describe('ResetDialog', () => {
 
     expect(dialog.find('.error-banner').exists()).toBe(true)
     expect(wrapper.emitted('close')).toBeUndefined()
-    expect(notice.find('.notice').exists()).toBe(false)
+    expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
   it('FR-BR-07 clicking Reset at keep mode calls Facade.Reset directly, no confirmation', async () => {
@@ -120,12 +121,12 @@ describe('ResetDialog', () => {
     const { body: notice } = await mountInBody(NoticeArea)
 
     await resetTo('first0000000')
-    expect(notice.findAll('.notice')).toHaveLength(1)
+    expect(notice.findAll('.p-toast-message')).toHaveLength(1)
     expect(notice.text()).toContain('first00')
 
     await resetTo('second0000000')
 
-    expect(notice.findAll('.notice')).toHaveLength(1)
+    expect(notice.findAll('.p-toast-message')).toHaveLength(1)
     expect(notice.text()).toContain('second0')
     expect(notice.text()).not.toContain('first00')
   })
@@ -144,7 +145,7 @@ describe('ResetDialog', () => {
     await resetTo('first0000000')
     await resetTo('second0000000')
 
-    expect(notice.findAll('.notice')).toHaveLength(2)
+    expect(notice.findAll('.p-toast-message')).toHaveLength(2)
     expect(notice.text()).toContain('Push was rejected')
     expect(notice.text()).toContain('second0')
   })
@@ -179,5 +180,13 @@ describe('ResetDialog', () => {
 
     expect(confirmRequire).toHaveBeenCalledTimes(1)
     expect(Facade.Reset).not.toHaveBeenCalled()
+  })
+
+  it('FR-UX-17 Cancel and Reset sit together at the bottom; Cancel closes', async () => {
+    const { wrapper, body } = await mountDialog()
+
+    expect(footerButtons(body)).toEqual(['Cancel', 'Reset'])
+    await body.get('[data-test="dialog-cancel"]').trigger('click')
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 })

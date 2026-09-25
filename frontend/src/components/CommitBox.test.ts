@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -14,13 +14,27 @@ import { useRepoStore } from '../stores/repo'
 import { useRefsStore } from '../stores/refs'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 import { summaryFixture } from '../testing/fixtures/summary'
-import type { Branch, Refs } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  Operation,
+  type Branch,
+  type Refs,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { branchFixture } from '../testing/fixtures/branch'
 
 const props = { wt: '/repo' }
 
 function refsFixture(overrides: Partial<Branch> = {}): Refs {
   return { branches: [branchFixture(overrides)], remotes: [], tags: [] }
+}
+
+// amendCheckbox is the Amend checkbox's <input>, the first of the box's
+// two checkboxes.
+function amendCheckbox(wrapper: VueWrapper) {
+  return wrapper.get<HTMLInputElement>('input[type=checkbox]')
+}
+
+function submitButton(wrapper: VueWrapper) {
+  return wrapper.get<HTMLButtonElement>('[data-test="commit-submit"]')
 }
 
 describe('CommitBox', () => {
@@ -45,9 +59,7 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
-      true,
-    )
+    expect(submitButton(wrapper).element.disabled).toBe(true)
   })
 
   it('FR-CHG-05 the Commit button is disabled with a staged file but a blank message', () => {
@@ -56,9 +68,7 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
-      true,
-    )
+    expect(submitButton(wrapper).element.disabled).toBe(true)
   })
 
   it('FR-CHG-05 clicking Commit calls Facade.Commit with the message, amend false', async () => {
@@ -67,7 +77,7 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
-    await wrapper.get('[data-test="commit-submit"]').trigger('click')
+    await submitButton(wrapper).trigger('click')
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
     expect(Facade.Commit).toHaveBeenCalledWith('/repo', 'a message', false)
@@ -80,12 +90,10 @@ describe('CommitBox', () => {
     repo.summary = summaryFixture({ sha: 'abc123' })
 
     const wrapper = mount(CommitBox, { props })
-    await wrapper.get('input[type=checkbox]').setValue(true)
+    await amendCheckbox(wrapper).setValue(true)
     await wrapper.get('textarea').setValue('a message')
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
-      false,
-    )
+    expect(submitButton(wrapper).element.disabled).toBe(false)
   })
 
   it('FR-CHG-05 a successful commit clears the message and resets amend', async () => {
@@ -96,12 +104,12 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
-    await wrapper.get('input[type=checkbox]').setValue(true)
-    await wrapper.get('[data-test="commit-submit"]').trigger('click')
+    await amendCheckbox(wrapper).setValue(true)
+    await submitButton(wrapper).trigger('click')
     await flushPromises()
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
-    expect((wrapper.get('input[type=checkbox]').element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.get('textarea').element.value).toBe('')
+    expect(amendCheckbox(wrapper).element.checked).toBe(false)
   })
 
   it('FR-CHG-05 the Commit button is disabled while a commit is in flight, so a double-click cannot amend twice', async () => {
@@ -112,11 +120,9 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
-    await wrapper.get('[data-test="commit-submit"]').trigger('click')
+    await submitButton(wrapper).trigger('click')
 
-    expect((wrapper.get('[data-test="commit-submit"]').element as HTMLButtonElement).disabled).toBe(
-      true,
-    )
+    expect(submitButton(wrapper).element.disabled).toBe(true)
 
     resolveCommit()
     await flushPromises()
@@ -130,16 +136,16 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
 
-    expect((wrapper.get('input[type=checkbox]').element as HTMLInputElement).disabled).toBe(true)
+    expect(amendCheckbox(wrapper).element.disabled).toBe(true)
   })
 
   it('FR-CHG-06 the Amend checkbox is disabled while an operation (merge, rebase, …) is in progress', () => {
     const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123', operation: 'merge' })
+    repo.summary = summaryFixture({ sha: 'abc123', operation: Operation.MergeOperation })
 
     const wrapper = mount(CommitBox, { props })
 
-    expect((wrapper.get('input[type=checkbox]').element as HTMLInputElement).disabled).toBe(true)
+    expect(amendCheckbox(wrapper).element.disabled).toBe(true)
   })
 
   it('FR-CHG-06 checking Amend with an empty message pre-fills it from CommitDetails', async () => {
@@ -148,12 +154,12 @@ describe('CommitBox', () => {
     Facade.CommitDetails.mockResolvedValue({ body: 'last msg' })
 
     const wrapper = mount(CommitBox, { props })
-    await wrapper.get('input[type=checkbox]').setValue(true)
+    await amendCheckbox(wrapper).setValue(true)
     await flushPromises()
 
     expect(Facade.CommitDetails).toHaveBeenCalledTimes(1)
     expect(Facade.CommitDetails).toHaveBeenCalledWith('/repo', 'abc123')
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('last msg')
+    expect(wrapper.get('textarea').element.value).toBe('last msg')
   })
 
   it('FR-CHG-06 checking Amend never clobbers a message already typed', async () => {
@@ -162,11 +168,11 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('typed draft')
-    await wrapper.get('input[type=checkbox]').setValue(true)
+    await amendCheckbox(wrapper).setValue(true)
     await flushPromises()
 
     expect(Facade.CommitDetails).not.toHaveBeenCalled()
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('typed draft')
+    expect(wrapper.get('textarea').element.value).toBe('typed draft')
   })
 
   it('FR-CHG-06 warns that an amended, already-pushed commit will need a force push', async () => {
@@ -176,9 +182,21 @@ describe('CommitBox', () => {
     refs.refs = refsFixture({ upstream: 'origin/main', ahead: 0 })
 
     const wrapper = mount(CommitBox, { props })
-    await wrapper.get('input[type=checkbox]').setValue(true)
+    await amendCheckbox(wrapper).setValue(true)
 
     expect(wrapper.text()).toContain('already been pushed')
+  })
+
+  it("FR-CHG-06 the pushed warning is an OpenVue warn Message, like squash's", async () => {
+    const repo = useRepoStore()
+    repo.summary = summaryFixture({ sha: 'abc123' })
+    const refs = useRefsStore()
+    refs.refs = refsFixture({ upstream: 'origin/main', ahead: 0 })
+
+    const wrapper = mount(CommitBox, { props })
+    await amendCheckbox(wrapper).setValue(true)
+
+    expect(wrapper.get('.p-message-warn').text()).toContain('already been pushed')
   })
 
   it('FR-CHG-06 does not warn when the current branch is ahead of its upstream', async () => {
@@ -188,7 +206,7 @@ describe('CommitBox', () => {
     refs.refs = refsFixture({ upstream: 'origin/main', ahead: 1 })
 
     const wrapper = mount(CommitBox, { props })
-    await wrapper.get('input[type=checkbox]').setValue(true)
+    await amendCheckbox(wrapper).setValue(true)
 
     expect(wrapper.text()).not.toContain('already been pushed')
   })
@@ -200,7 +218,7 @@ describe('CommitBox', () => {
     refs.refs = refsFixture({ upstream: '' })
 
     const wrapper = mount(CommitBox, { props })
-    await wrapper.get('input[type=checkbox]').setValue(true)
+    await amendCheckbox(wrapper).setValue(true)
 
     expect(wrapper.text()).not.toContain('already been pushed')
   })
@@ -211,7 +229,7 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('restored')
+    expect(wrapper.get('textarea').element.value).toBe('restored')
   })
 
   it('FR-CHG-08 saves the message as a draft, debounced 300ms', async () => {
@@ -268,7 +286,7 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
     await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
-    await wrapper.get('[data-test="commit-submit"]').trigger('click')
+    await submitButton(wrapper).trigger('click')
     await flushPromises()
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
@@ -286,10 +304,10 @@ describe('CommitBox', () => {
     refs.refs = refsFixture({ upstream: 'origin/main' })
 
     const wrapper = mount(CommitBox, { props })
-    await wrapper.get('input[type=checkbox]').setValue(true) // Amend
+    await amendCheckbox(wrapper).setValue(true)
 
     expect(
-      (wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled,
+      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
     ).toBe(true)
   })
 
@@ -300,7 +318,7 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
 
     expect(
-      (wrapper.get('[data-test="push-after-commit"] input').element as HTMLInputElement).disabled,
+      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
     ).toBe(true)
   })
 
@@ -313,8 +331,8 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
     await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
-    await wrapper.get('input[type=checkbox]').setValue(true) // Amend, ticked after Push after commit
-    await wrapper.get('[data-test="commit-submit"]').trigger('click')
+    await amendCheckbox(wrapper).setValue(true) // Amend, ticked after Push after commit
+    await submitButton(wrapper).trigger('click')
     await flushPromises()
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)

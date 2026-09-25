@@ -1,6 +1,7 @@
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 const { Facade } = vi.hoisted(() => ({
   Facade: { Refs: vi.fn() },
@@ -25,19 +26,8 @@ describe('refs store', () => {
     await refs.load('/repo')
     expect(Facade.Refs).toHaveBeenCalledTimes(1)
 
-    emit('repo:changed', { data: { scope: 'refs' } })
-    emit('repo:changed', { data: { scope: 'state' } })
-    await flushPromises()
-
-    expect(Facade.Refs).toHaveBeenCalledTimes(2)
-  })
-
-  it('ADR-4 reloads Refs on a core:reconnected event', async () => {
-    const refs = useRefsStore()
-    await refs.load('/repo')
-    expect(Facade.Refs).toHaveBeenCalledTimes(1)
-
-    emit('core:reconnected')
+    emit('repo:changed', { data: { scope: ChangeScope.RefsChanged } })
+    emit('repo:changed', { data: { scope: ChangeScope.StateChanged } })
     await flushPromises()
 
     expect(Facade.Refs).toHaveBeenCalledTimes(2)

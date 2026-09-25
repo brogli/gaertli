@@ -107,15 +107,52 @@ describe('ChangedFileList', () => {
     expect(row.get('.path').attributes('title')).toBe('b.txt')
   })
 
+  it("FR-CHG-02 the action button is the row's first element, before the status icon", () => {
+    const wrapper = mount(ChangedFileList, {
+      props: { files, action: 'stage', secondAction: 'discard' },
+    })
+
+    const row = wrapper.findAll('li')[1]!
+    const children = [...row.element.children].map(
+      (el) => el.getAttribute('data-test') || el.className,
+    )
+    expect(children[0]).toBe('action')
+    expect(children[1]).toContain('status')
+  })
+
+  it("FR-CHG-02 open-in-editor and the second action stay at the row's end", () => {
+    const wrapper = mount(ChangedFileList, {
+      props: { files, action: 'unstage', secondAction: 'discard' },
+    })
+
+    const row = wrapper.findAll('li')[1]!
+    const children = [...row.element.children].map(
+      (el) => el.getAttribute('data-test') || el.className,
+    )
+    expect(children.at(-1)).toBe('actions')
+    const actionsChildren = [...row.get('.actions').element.children].map((el) =>
+      el.getAttribute('data-test'),
+    )
+    expect(actionsChildren).toEqual(['open-editor', 'second-action'])
+  })
+
+  it("FR-CHG-02 a row with no action kind (a commit's file list) shows no button before the status icon", () => {
+    const wrapper = mount(ChangedFileList, { props: { files } })
+
+    const row = wrapper.findAll('li')[1]!
+    const first = row.element.children[0]!
+    expect(first.className).toContain('status')
+  })
+
   it('FR-UX-11 the action button icon and label come from the action kind, not the caller’s own text', () => {
     const stage = mount(ChangedFileList, { props: { files, action: 'stage' } })
     const markResolved = mount(ChangedFileList, { props: { files, action: 'markResolved' } })
 
     const stageButton = stage.findAll('[data-test="action"]')[0]!
     const resolveButton = markResolved.findAll('[data-test="action"]')[0]!
-    expect(stageButton.get('i').classes()).toContain('oi-plus')
+    expect(stageButton.get('.p-button-icon').classes()).toContain('oi-plus')
     expect(stageButton.attributes('aria-label')).toBe('Stage')
-    expect(resolveButton.get('i').classes()).toContain('oi-check')
+    expect(resolveButton.get('.p-button-icon').classes()).toContain('oi-check')
     expect(resolveButton.attributes('aria-label')).toBe('Mark resolved')
   })
 

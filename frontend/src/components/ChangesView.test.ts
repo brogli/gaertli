@@ -42,15 +42,8 @@ function mountWith(files: Partial<ChangedFiles>) {
 describe('ChangesView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    Facade.StageFile.mockReset().mockResolvedValue(undefined)
-    Facade.UnstageFile.mockReset().mockResolvedValue(undefined)
-    Facade.StageAll.mockReset().mockResolvedValue(undefined)
-    Facade.UnstageAll.mockReset().mockResolvedValue(undefined)
-    Facade.DiscardFile.mockReset().mockResolvedValue(undefined)
-    Facade.Status.mockReset().mockResolvedValue(changedFilesFixture())
-    Facade.OpenFile.mockReset().mockResolvedValue(undefined)
-    Facade.Commit.mockReset().mockResolvedValue(undefined)
-    Facade.SetMessageDraft.mockReset().mockResolvedValue(undefined)
+    for (const fn of Object.values(Facade)) fn.mockReset().mockResolvedValue(undefined)
+    Facade.Status.mockResolvedValue(changedFilesFixture())
     confirmRequire.mockReset()
     AppService.OpenDiff.mockReset()
   })
@@ -78,7 +71,7 @@ describe('ChangesView', () => {
 
     await wrapper.setProps({ wt: '/other' })
 
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+    expect(wrapper.get('textarea').element.value).toBe('')
   })
 
   it("FR-CHG-02 clicking an unstaged row's Stage button calls Facade.StageFile with its path", async () => {
@@ -128,9 +121,7 @@ describe('ChangesView', () => {
 
   it('FR-ED-06 OpenFile failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
     Facade.OpenFile.mockRejectedValueOnce(
-      Object.assign(new Error('boom'), {
-        cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' },
-      }),
+      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
     )
     const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
     const { body: notice } = await mountInBody(NoticeArea)
@@ -140,6 +131,24 @@ describe('ChangesView', () => {
 
     expect(notice.text()).toContain('myed')
     expect(wrapper.find('.error-banner').exists()).toBe(false)
+  })
+
+  it("FR-UX-15 a second EDITOR_NOT_FOUND failure replaces the first one's notice", async () => {
+    const notFound = (editor: string) =>
+      new Error('boom', {
+        cause: { code: 'EDITOR_NOT_FOUND', message: `"${editor}" is not on PATH` },
+      })
+    Facade.OpenFile.mockRejectedValueOnce(notFound('myed')).mockRejectedValueOnce(notFound('editor'))
+    const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
+    const { body: notice } = await mountInBody(NoticeArea)
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+    await flushPromises()
+
+    expect(notice.findAll('.p-toast-message')).toHaveLength(1)
+    expect(notice.text()).toContain('editor')
   })
 
   it('FR-CHG-02 "Stage all" calls Facade.StageAll once; the index event reloads the list', async () => {
@@ -167,7 +176,7 @@ describe('ChangesView', () => {
     expect(Facade.StageFile).toHaveBeenCalledWith('/repo', 'c.txt')
   })
 
-  it('FR-CONF-05 a conflicted row is not selectable and opens no diff window', async () => {
+  it('FR-CONF-02 a conflicted row is not selectable and opens no diff window', async () => {
     const wrapper = mountWith({ conflicted: [{ path: 'c.txt', status: 'UU' }] })
     await wrapper.get('li').trigger('click')
     await wrapper.get('li').trigger('dblclick')

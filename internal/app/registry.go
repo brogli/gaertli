@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"maps"
+	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -56,7 +57,6 @@ type windowEntry struct {
 // tests.
 type distroCorer interface {
 	Ensure(ctx context.Context) (*remote.Client, bool, error)
-	InstallLauncher(ctx context.Context, guiExePath string) error
 
 	// OnConnect and LiveClient back PushEditorProfiles: OnConnect registers
 	// the push for every fresh connect, LiveClient lets a settings change
@@ -102,8 +102,9 @@ func NewRegistry() *Registry {
 		pages:       make(map[shellWindow]*windowEntry),
 		distros:     make(map[string]distroCorer),
 	}
+	guiExe, _ := os.Executable() // "" leaves a distro's nebegit command unset, and the log says so
 	r.newDistroCore = func(distro string, sink core.EventSink) distroCorer {
-		return remote.NewDistroCore(distro, buildinfo.App, remote.WslRun, r.consent, sink, r.log)
+		return remote.NewDistroCore(distro, buildinfo.App, guiExe, remote.WslRun, r.consent, sink, r.log)
 	}
 	return r
 }
@@ -179,22 +180,11 @@ func (r *Registry) CoreOf(ctx context.Context, id core.WorktreeID) (core.API, co
 	if !ok {
 		return r.local, id, nil
 	}
-	c, err := r.distroClient(distro)
-	return c, core.WorktreeID(linuxPath), err
-}
-
-// distroClient returns distro's live client. If Ensure had to respawn,
-// every window this distro backs is re-opened from its remembered path
-// first.
-func (r *Registry) distroClient(distro string) (core.API, error) {
-	client, respawned, err := r.distroCore(distro).Ensure(r.ctx)
+	client, err := r.distroClient(distro)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	if respawned {
-		r.reopenAfterReconnect(distro, client)
-	}
-	return client, nil
+	return client, core.WorktreeID(linuxPath), nil
 }
 
 // CoreFor routes a WSL-shaped path to that distro's core, deploying
@@ -204,11 +194,25 @@ func (r *Registry) CoreFor(path core.RepoPath) (core.API, error) {
 	if !ok {
 		return r.local, nil
 	}
-	client, _, err := r.distroCore(distro).Ensure(r.ctx)
+	client, err := r.distroClient(distro)
 	if err != nil {
 		return nil, err
 	}
 	return remote.NewDistroPathClient(client, distro), nil
+}
+
+// distroClient returns distro's live client. If Ensure had to respawn,
+// every window this distro backs is re-opened from its remembered path
+// first, whichever call found the core dead.
+func (r *Registry) distroClient(distro string) (*remote.Client, error) {
+	client, respawned, err := r.distroCore(distro).Ensure(r.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if respawned {
+		r.reopenAfterReconnect(distro, client)
+	}
+	return client, nil
 }
 
 // findSelectingLocked returns the window currently selecting wt, or nil.
@@ -261,9 +265,7 @@ func (r *Registry) OpenOrFocus(id core.WorktreeID, path, distro string) {
 }
 
 // openOrRegister returns the already open window selecting id, or registers
-// a new one and returns nil, so the caller focuses outside the lock. The
-// close callback reads entry.window before it is assigned: safe, because
-// newWindow returns before the OS can fire WindowClosing.
+// a new one and returns nil, so the caller focuses outside the lock.
 func (r *Registry) openOrRegister(id core.WorktreeID, path, distro string) shellWindow {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -271,14 +273,43 @@ func (r *Registry) openOrRegister(id core.WorktreeID, path, distro string) shell
 	if e := r.findSelectingLocked(id); e != nil {
 		return e.window
 	}
-	entry := &windowEntry{selected: id, path: path, distro: distro}
-	entry.window = r.newWindow(windowTitle(path, ""), selectionURL(path, distro), mainWindowMinWidth, func() {
+	r.addWindowLocked(&windowEntry{selected: id, path: path, distro: distro})
+	return nil
+}
+
+// addWindowLocked opens entry's main window on its selection (none when
+// entry selects nothing) and registers it. The close callback reads
+// entry.window before it is assigned: safe, because newWindow returns
+// before the OS can fire WindowClosing.
+func (r *Registry) addWindowLocked(entry *windowEntry) {
+	entry.window = r.newWindow(windowTitle(entry.path, ""), selectionURL(entry.path, entry.distro), mainWindowMinWidth, func() {
 		r.Release(r.closeWindow(entry.window.ID()))
 		r.rememberOpenWorktrees()
 	})
 	r.wireFocus(entry)
 	r.windows[entry.window.ID()] = entry
+}
+
+// windowShowing returns the main window, other than exclude, already
+// selecting wt, or nil: PickAndOpen's "brings forward".
+func (r *Registry) windowShowing(wt core.WorktreeID, exclude uint) shellWindow {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id, e := range r.windows {
+		if id != exclude && e.selected == wt {
+			return e.window
+		}
+	}
 	return nil
+}
+
+// NewWindow opens a new main window with no worktree selected: unlike
+// OpenOrFocus("", "", ""), which would focus one already open, this always
+// opens another.
+func (r *Registry) NewWindow() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.addWindowLocked(&windowEntry{})
 }
 
 // SelectInWindow moves windowID's entry to select wt and reports the
@@ -545,6 +576,10 @@ func (r *Registry) dispatch(distro string, ev core.Event) {
 	}
 	if entry, ok := data.(core.CommandRecord); ok {
 		logCommand(r.log, ev.Worktree, entry)
+		return
+	}
+	if entry, ok := data.(core.EditorRecord); ok {
+		logEditor(r.log, ev.Worktree, entry)
 		return
 	}
 	for _, w := range r.targets(distro, ev) {

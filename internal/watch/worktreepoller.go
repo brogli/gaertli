@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
 )
 
@@ -25,7 +26,7 @@ var StatusArgs = []string{"status", "--porcelain=v2", "-z", "--branch", "--untra
 type WorktreePoller struct {
 	runner   git.Runner
 	dir      string
-	onChange func(Scope)
+	onChange func(core.ChangeScope)
 
 	inFlight atomic.Bool
 
@@ -39,13 +40,13 @@ type WorktreePoller struct {
 
 // NewWorktreePoller builds a poller for dir, unfocused until Focus is
 // called.
-func NewWorktreePoller(runner git.Runner, dir string, onChange func(Scope)) *WorktreePoller {
+func NewWorktreePoller(runner git.Runner, dir string, onChange func(core.ChangeScope)) *WorktreePoller {
 	return &WorktreePoller{runner: runner, dir: dir, onChange: onChange, interval: PollInterval}
 }
 
-// Focus establishes a baseline with one immediate CheckNow (no onChange on
-// this first call — nothing to compare against yet) and starts a timer at
-// PollInterval. Calling Focus while already focused is a no-op.
+// Focus runs one immediate CheckNow and starts a timer at PollInterval.
+// The first poll ever only sets the baseline: nothing to compare against
+// yet. Calling Focus while already focused is a no-op.
 func (p *WorktreePoller) Focus() {
 	p.mu.Lock()
 	if p.focused {
@@ -59,8 +60,8 @@ func (p *WorktreePoller) Focus() {
 	p.tick()
 }
 
-// Blur stops the timer: a backgrounded window's poller makes no git calls
-// at all.
+// Blur stops the timer, so an unfocused worktree is polled only on
+// Refresh.
 func (p *WorktreePoller) Blur() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -112,7 +113,7 @@ func (p *WorktreePoller) CheckNow() {
 	p.mu.Unlock()
 
 	if changed {
-		p.onChange(Index)
+		p.onChange(core.IndexChanged)
 	}
 }
 

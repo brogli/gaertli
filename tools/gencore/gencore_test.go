@@ -16,10 +16,9 @@ func TestTR_28_GeneratesFacadeClientDispatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, out := range outputs {
-		name := out.name
-		golden := filepath.Join("testdata/fixture/golden", name+".golden")
+		golden := filepath.Join("testdata/fixture/golden", filepath.Base(out.path)+".golden")
 		if *update {
-			if err := os.WriteFile(golden, files[name], 0o644); err != nil {
+			if err := os.WriteFile(golden, files[out.path], 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -27,8 +26,8 @@ func TestTR_28_GeneratesFacadeClientDispatcher(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(files[name]) != string(want) {
-			t.Errorf("%s differs from golden (run with -update to accept):\n%s", name, files[name])
+		if string(files[out.path]) != string(want) {
+			t.Errorf("%s differs from golden (run with -update to accept):\n%s", golden, files[out.path])
 		}
 	}
 }
@@ -66,7 +65,7 @@ func TestTR_28_GeneratedCodeIsCurrent(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(files[out.name]) != string(want) {
+		if string(files[out.path]) != string(want) {
 			t.Errorf("%s is stale; run go generate ./internal/core", out.path)
 		}
 	}

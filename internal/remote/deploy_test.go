@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,15 +31,19 @@ func localRunner(ctx context.Context, distro string, args ...string) (*exec.Cmd,
 	return exec.CommandContext(ctx, args[0], args[1:]...), nil
 }
 
-type consentCall struct{ distro, target string }
+// newDeployer is Ubuntu-22.04's DistroCore for version 1.0.0, deploying
+// through localRunner.
+func newDeployer(consent Consent) *DistroCore {
+	return NewDistroCore("Ubuntu-22.04", "1.0.0", `C:\nebegit.exe`, localRunner, consent, nil, slog.Default())
+}
 
 type fakeConsent struct {
 	accept bool
-	calls  []consentCall
+	calls  []string // distro asked, once per Ask call
 }
 
-func (f *fakeConsent) Ask(distro, target string) bool {
-	f.calls = append(f.calls, consentCall{distro, target})
+func (f *fakeConsent) Ask(distro string) bool {
+	f.calls = append(f.calls, distro)
 	return f.accept
 }
 
@@ -52,14 +57,14 @@ func deployedPath(t *testing.T, version string) string {
 func TestQA_PORT_02_EnsureDeployedAsksOnceThenSkipsOnceDeployed(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: true}
+	dc := newDeployer(consent)
 
-	if err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
+	if err := dc.ensureDeployed(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
-	wantTarget := "$HOME/.cache/nebegit/1.0.0/nebegit-core"
-	if len(consent.calls) != 1 || consent.calls[0] != (consentCall{"Ubuntu-22.04", wantTarget}) {
-		t.Fatalf("consent.calls = %+v, want one call for (Ubuntu-22.04, %s)", consent.calls, wantTarget)
+	if len(consent.calls) != 1 || consent.calls[0] != "Ubuntu-22.04" {
+		t.Fatalf("consent.calls = %+v, want one call for %q", consent.calls, "Ubuntu-22.04")
 	}
 	got, err := os.ReadFile(deployedPath(t, "1.0.0"))
 	if err != nil {
@@ -69,7 +74,7 @@ func TestQA_PORT_02_EnsureDeployedAsksOnceThenSkipsOnceDeployed(t *testing.T) {
 		t.Errorf("deployed content = %q, want %q", got, embeddedCore)
 	}
 
-	if err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
+	if err := dc.ensureDeployed(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if len(consent.calls) != 1 {
@@ -81,14 +86,14 @@ func TestQA_PORT_02_EnsureDeployedDeclinedConsentCopiesNothing(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: false}
 
-	err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0")
+	err := newDeployer(consent).ensureDeployed(t.Context())
 
 	ce := coretest.AsError(t, err, core.DeployRefused)
 	if ce.Args["distro"] != "Ubuntu-22.04" {
 		t.Errorf("Args[distro] = %q, want %q", ce.Args["distro"], "Ubuntu-22.04")
 	}
-	if ce.Key != "deployRefused" {
-		t.Errorf("Key = %q, want deployRefused", ce.Key)
+	if ce.Key != "deployNeeded" {
+		t.Errorf("Key = %q, want deployNeeded", ce.Key)
 	}
 	if _, statErr := os.Stat(deployedPath(t, "1.0.0")); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Errorf("target exists after a declined consent")
@@ -106,7 +111,7 @@ func TestADR_3_EnsureDeployedRecopiesOnSizeMismatch(t *testing.T) {
 	}
 	consent := &fakeConsent{accept: true}
 
-	if err := ensureDeployed(t.Context(), localRunner, consent, "Ubuntu-22.04", "1.0.0"); err != nil {
+	if err := newDeployer(consent).ensureDeployed(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 

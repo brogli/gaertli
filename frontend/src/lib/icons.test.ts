@@ -1,5 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { globSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { statusIcon } from './icons'
 import { i18n } from '../i18n'
@@ -37,17 +36,8 @@ describe('statusIcon', () => {
 // classes, never a symbol or emoji glyph, an HTML entity standing in for
 // one, or its own oi- class string. The right arrow and the ellipsis are
 // ordinary running-text punctuation ("old → new", "New branch…"), not icons.
-function vueFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = join(dir, entry.name)
-    if (entry.isDirectory()) return vueFiles(full)
-    return entry.name.endsWith('.vue') ? [full] : []
-  })
-}
-
-// Relative to the frontend package root, where vitest runs.
-const srcDir = 'src'
-const files = vueFiles(srcDir)
+// The glob is relative to the frontend package root, where vitest runs.
+const files = globSync('src/**/*.vue')
 
 const ALLOWED_SYMBOLS = new Set(['→', '…'])
 const SYMBOL_OR_EMOJI = /\p{S}|\p{Extended_Pictographic}/u

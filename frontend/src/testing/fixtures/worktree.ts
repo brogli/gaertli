@@ -5,7 +5,6 @@ export function worktreeFixture(overrides: Partial<Worktree> = {}): Worktree {
   return {
     path: '/repoA/wt',
     branch: 'feature',
-    detached: false,
     sha: 'sha1',
     main: false,
     locked: false,

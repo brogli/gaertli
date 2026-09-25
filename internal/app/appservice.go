@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"os"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/remote"
@@ -12,7 +11,8 @@ import (
 )
 
 // folderPicker shows the native folder picker, seeded at dir ("" = the
-// platform default).
+// platform default). On Windows it reaches a WSL distro's folders through
+// the \\wsl.localhost share.
 type folderPicker interface {
 	Pick(dir string) (path string, ok bool)
 }
@@ -31,44 +31,35 @@ func (p wailsPicker) Pick(dir string) (path string, ok bool) {
 	return selection, true
 }
 
-// wailsConsent bridges DialogManager's callback-based Question dialog to
-// Consent's blocking bool: the shell asks before the core is copied into a
-// distro, naming exactly where.
-type wailsConsent struct{ app *application.App }
+// nativeConsent asks before installing the shell's helper and the nebegit
+// command in a distro, through ask rather than a Wails dialog: a distro
+// deploy can happen while restoring windows at startup, before Wails' own
+// App.Run creates its platform layer, and a Wails dialog needs that layer.
+type nativeConsent struct {
+	ask func(title, msg string) bool
+}
 
-func (c wailsConsent) Ask(distro, targetPath string) bool {
-	result := make(chan bool, 1)
-	yes := (&application.Button{Label: "Copy"}).OnClick(func() { result <- true })
-	no := (&application.Button{Label: "Cancel", IsCancel: true}).OnClick(func() { result <- false })
-	c.app.Dialog.Question().
-		SetTitle(text(appName, nil)).
-		SetMessage(text(deployConsent, map[string]string{"distro": distro, "path": targetPath})).
-		AddButtons([]*application.Button{yes, no}).
-		SetDefaultButton(yes).SetCancelButton(no).
-		Show()
-	return <-result
+func (c nativeConsent) Ask(distro string) bool {
+	return c.ask(text(appName, nil), consentMessage(distro))
+}
+
+// consentMessage is the consent dialog's text.
+func consentMessage(distro string) string {
+	return text(deployConsent, map[string]string{"distro": distro})
 }
 
 // AppService is the shell's own Wails service: windows, native dialogs,
-// recent repos and WSL setup, which no core.API method covers.
+// recent repos, the installed WSL distros and the app log's path, which no
+// core.API method covers.
 type AppService struct {
 	shell
 	picker folderPicker
 }
 
-// pickAndOpen shows the native folder picker seeded at dir ("" = the
-// platform default) and opens the choice; cancelling returns nil.
-func (s *AppService) pickAndOpen(ctx context.Context, dir string) error {
-	if path, ok := s.PickFolder(ctx, dir); ok {
-		s.open(ctx, path)
-	}
-	return nil
-}
-
 // PickFolder shows the native folder picker seeded at dir, with no "open it
 // as a repo" side effect: CreateWorktreeDialog's target field must not be
 // validated as an existing repo.
-func (s *AppService) PickFolder(ctx context.Context, dir string) (path string, ok bool) {
+func (s *AppService) PickFolder(dir string) (path string, ok bool) {
 	return s.picker.Pick(dir)
 }
 
@@ -114,67 +105,67 @@ func (s *AppService) SelectRecentRepo(ctx context.Context, repo settings.RecentR
 // UpdateWindowTitle sets the calling window's OS title from its worktree's
 // path and branch. The frontend calls it on every Summary change, so the
 // title tracks branch changes.
-func (s *AppService) UpdateWindowTitle(ctx context.Context, path, branch string) error {
-	w, ok := callingWindowFrom(ctx)
-	if !ok {
-		return nil // a windowless/background call: nothing to title, not an error
+func (s *AppService) UpdateWindowTitle(ctx context.Context, path, branch string) {
+	if w, ok := callingWindowFrom(ctx); ok { // a windowless/background call has nothing to title
+		w.SetTitle(windowTitle(path, branch))
 	}
-	w.SetTitle(windowTitle(path, branch))
-	return nil
 }
 
-// PickAndOpen shows the native folder picker and opens the choice;
-// cancelling returns nil.
+// PickAndOpen shows the native folder picker and switches the calling
+// window to the choice, or brings forward another window already showing
+// it, leaving this one unchanged; cancelling does nothing.
 func (s *AppService) PickAndOpen(ctx context.Context) error {
-	return s.pickAndOpen(ctx, "")
+	w, ok := callingWindowFrom(ctx)
+	if !ok {
+		return core.Errorf(core.Internal, "no calling window for this call")
+	}
+	path, ok := s.PickFolder("")
+	if !ok {
+		return nil
+	}
+	return s.switchOrFocus(ctx, w, path)
+}
+
+// NewWindow opens a main window with no worktree selected: the repo
+// picker's "New window" and Ctrl+Shift+N.
+func (s *AppService) NewWindow() {
+	s.reg.NewWindow()
 }
 
 // RecentRepos lists the remembered repos, most-recently-opened first.
-func (s *AppService) RecentRepos(ctx context.Context) ([]settings.RecentRepo, error) {
-	return s.store.Get().RecentRepos, nil
+func (s *AppService) RecentRepos() []settings.RecentRepo {
+	return s.store.Get().RecentRepos
 }
 
-// ListWSLDistros lists installed distros for the "Open WSL folder" picker.
-// A host without WSL has none; that is an answer, not an error.
-func (s *AppService) ListWSLDistros(ctx context.Context) ([]remote.Distro, error) {
+// ListWSLDistros names the installed distros for Settings' per-distro
+// editor profiles. A host without WSL has none; that is an answer, not an
+// error.
+func (s *AppService) ListWSLDistros(ctx context.Context) ([]string, error) {
 	distros, err := remote.ListDistros(ctx)
 	if ce, ok := errors.AsType[*core.Error](err); ok && ce.Code == core.WslNotFound {
 		return nil, nil
 	}
-	return distros, err
-}
-
-// PickAndOpenWSL is PickAndOpen seeded at distro's UNC root.
-func (s *AppService) PickAndOpenWSL(ctx context.Context, distro string) error {
-	return s.pickAndOpen(ctx, remote.BuildWSLPath(distro, ""))
+	names := make([]string, len(distros))
+	for i, d := range distros {
+		names[i] = d.Name
+	}
+	return names, err
 }
 
 // OpenPath opens or focuses path's window.
-func (s *AppService) OpenPath(ctx context.Context, path string) error {
+func (s *AppService) OpenPath(ctx context.Context, path string) {
 	s.open(ctx, path)
-	return nil
 }
 
 // OpenDiff opens the calling window's diff window on wt's target, or
 // focuses it and shows the target there. A call from no window uses wt's
 // diff window.
-func (s *AppService) OpenDiff(ctx context.Context, wt core.WorktreeID, target DiffTarget) error {
+func (s *AppService) OpenDiff(ctx context.Context, wt core.WorktreeID, target DiffTarget) {
 	key := diffWindowKey{wt: wt}
 	if w, ok := callingWindowFrom(ctx); ok {
 		key = diffWindowKey{mainWindow: w.ID()}
 	}
 	s.reg.OpenOrFocusDiff(key, wt, target)
-	return nil
-}
-
-// InstallWSLLauncher makes `nebegit <path>` work inside distro's shell; the
-// launcher hands off to this process's executable.
-func (s *AppService) InstallWSLLauncher(ctx context.Context, distro string) error {
-	guiExe, err := os.Executable()
-	if err != nil {
-		return core.Errorf(core.Internal, "could not determine nebegit's own path: %v", err)
-	}
-	return s.reg.distroCore(distro).InstallLauncher(ctx, guiExe)
 }
 
 // LogPathInfo is LogPath's result: where the app log is, or why it could
@@ -185,6 +176,6 @@ type LogPathInfo struct {
 }
 
 // LogPath is Settings' read-only "App log: <path>" line.
-func (s *AppService) LogPath(ctx context.Context) (LogPathInfo, error) {
-	return LogPathInfo{Path: s.logPath, Error: s.logErr}, nil
+func (s *AppService) LogPath() LogPathInfo {
+	return LogPathInfo{Path: s.logPath, Error: s.logErr}
 }

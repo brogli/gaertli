@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '../i18n'
-import { onKeyStroke, useLocalStorage } from '@vueuse/core'
+import { onKeyStroke } from '@vueuse/core'
 import Button from 'openvue/button'
 import SplitButton from 'openvue/splitbutton'
 import Select from 'openvue/select'
@@ -12,7 +12,11 @@ import { useConfirmAction } from '../composables/useConfirmAction'
 import { useCoreCall } from '../composables/useCoreCall'
 import { useJobNotices } from '../composables/useJobNotices'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { PullMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  JobKind,
+  PullMode,
+  type JobInfo,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { iconClass } from '../lib/icons'
 import { useLayout, useToolbarButton } from '../lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
@@ -46,35 +50,14 @@ const disabledReason = computed(() => {
   return ''
 })
 
-// The mode git config names for the current branch, "" if none. An answer
-// that arrives after the branch changed again is dropped.
-const configuredPullMode = ref<PullMode>(PullMode.$zero)
-watch(
-  () => refs.current?.name,
-  async (branch, _, onCleanup) => {
-    if (!branch) return
-    let stale = false
-    onCleanup(() => (stale = true))
-    const mode = await run(() => Facade.ConfiguredPullMode(props.wt))
-    if (!stale) configuredPullMode.value = mode ?? PullMode.$zero
-  },
-  { immediate: true },
+// The button's own mode: Settings' default pull mode. Live in every
+// window: settings.settings follows a save in any window
+// (stores/settings.ts).
+const pullMode = computed<PullMode>(() =>
+  settings.settings?.defaultPullMode === PullMode.PullRebase
+    ? PullMode.PullRebase
+    : PullMode.PullMerge,
 )
-
-// The last pull mode chosen, kept across reloads and restarts; until one
-// is chosen, the configured mode, else the default pull-mode setting.
-const lastPullMode = useLocalStorage<PullMode | ''>('nebegit.pullMode', '')
-const pullMode = computed<PullMode>({
-  get: () =>
-    lastPullMode.value ||
-    configuredPullMode.value ||
-    (settings.settings?.defaultPullMode === PullMode.PullRebase
-      ? PullMode.PullRebase
-      : PullMode.PullMerge),
-  set: (mode) => {
-    lastPullMode.value = mode
-  },
-})
 const pullLabel = computed(() =>
   pullMode.value === PullMode.PullRebase ? t('toolbar.pullRebase') : t('toolbar.pullMerge'),
 )
@@ -100,7 +83,6 @@ function onFetch(): void {
   void run(() => Facade.Fetch(props.wt, ''))
 }
 function runPull(mode: PullMode): void {
-  pullMode.value = mode
   void run(() => Facade.Pull(props.wt, mode))
 }
 function onPull(): void {
@@ -125,6 +107,19 @@ function onStashPull(): void {
   void run(() => Facade.PullWithStash(props.wt, pullMode.value))
 }
 
+// onRetryJob starts a fresh job the same way job's own kind started.
+const JOB_RETRIES: Partial<Record<JobKind, (job: JobInfo) => void>> = {
+  [JobKind.FetchJob]: onFetch,
+  [JobKind.PullJob]: onPull,
+  [JobKind.PushJob]: onPush,
+  [JobKind.ForcePushJob]: onForcePush,
+  [JobKind.UpdateBranchJob]: (job) =>
+    void run(() => Facade.UpdateBranch(props.wt, job.branch ?? '')),
+}
+function onRetryJob(job: JobInfo): void {
+  JOB_RETRIES[job.kind]?.(job)
+}
+
 // Gated the same as the Pull/Push buttons: a shortcut is never a bypass of
 // their own visibility (no upstream means no plain Pull/Push here).
 onKeyStroke(
@@ -142,7 +137,7 @@ onKeyStroke(
   },
 )
 
-useJobNotices({ onPull, onForcePush, onStashPull })
+useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
 </script>
 
 <template>

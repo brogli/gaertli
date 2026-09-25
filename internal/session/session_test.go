@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -165,6 +166,56 @@ func TestRepoLogSnapshotClampsWindowAndReportsState(t *testing.T) {
 	}
 }
 
+func TestFR_LOG_05_RepoLogIndicesOfMapsSHAsToRowIndices(t *testing.T) {
+	r := &Repo{}
+	gen, _ := r.LogBeginLoad()
+	r.LogAppend(gen, core.LogCommit{SHA: "a"}, core.LogCommit{SHA: "b"}, core.LogCommit{SHA: "c"})
+
+	indices, resultGen := r.LogIndicesOf(map[string]bool{"c": true, "a": true, "z": true})
+
+	if !slices.Equal(indices, []int{0, 2}) {
+		t.Errorf("indices = %v, want [0 2] (a and c, in row order; z absent)", indices)
+	}
+	if resultGen != gen {
+		t.Errorf("generation = %d, want %d", resultGen, gen)
+	}
+}
+
+func TestFR_LOG_05_WorktreeLogIndicesOfPrefersTheFilteredViewWhenActive(t *testing.T) {
+	w := &Worktree{Repo: &Repo{}}
+	baseGen, _ := w.Repo.LogBeginLoad()
+	w.Repo.LogAppend(baseGen, core.LogCommit{SHA: "base"})
+	filterGen := w.FilterBegin(core.LogFilter{Path: "x"}, func() {})
+	w.FilterAppend(filterGen, core.LogCommit{SHA: "filtered"})
+
+	indices, gen, filtered := w.LogIndicesOf(map[string]bool{"filtered": true, "base": true})
+
+	if !filtered {
+		t.Error("filtered = false, want true: a filter is active")
+	}
+	if !slices.Equal(indices, []int{0}) {
+		t.Errorf("indices = %v, want [0]: the filtered view's own row, base's sha is invisible to it", indices)
+	}
+	if gen != filterGen {
+		t.Errorf("generation = %d, want the filtered view's %d", gen, filterGen)
+	}
+}
+
+func TestFR_LOG_05_WorktreeLogIndicesOfFallsBackToTheBaseLogWithNoFilterActive(t *testing.T) {
+	w := &Worktree{Repo: &Repo{}}
+	gen, _ := w.Repo.LogBeginLoad()
+	w.Repo.LogAppend(gen, core.LogCommit{SHA: "a"})
+
+	indices, resultGen, filtered := w.LogIndicesOf(map[string]bool{"a": true})
+
+	if filtered {
+		t.Error("filtered = true, want false: no filter active")
+	}
+	if !slices.Equal(indices, []int{0}) || resultGen != gen {
+		t.Errorf("indices = %v, generation = %d, want [0], %d", indices, resultGen, gen)
+	}
+}
+
 func TestFR_REPO_04_LogBeginReloadFailsWhileALoadIsInFlight(t *testing.T) {
 	r := &Repo{}
 	gen, ok := r.LogBeginLoad()
@@ -226,18 +277,10 @@ func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
 
 	// above FallbackPollInterval: still passes when fsnotify cannot start and
 	// only the fallback poll reports.
-	deadline := time.After(watch.FallbackPollInterval + 2*time.Second)
-	for {
-		select {
-		case e := <-events:
-			// a real commit also touches the index; only the refs scope matters here.
-			if e.Name == "repo:changed" && e.Repo == wt.Repo.Key && string(e.Payload) == `{"scope":"refs"}` {
-				return
-			}
-		case <-deadline:
-			t.Fatal("no repo:changed(refs) event within the deadline")
-		}
-	}
+	waitForEvent(t, events, watch.FallbackPollInterval+2*time.Second, "repo:changed(refs)", func(e core.Event) bool {
+		// a real commit also touches the index; only the refs scope matters here.
+		return e.Name == "repo:changed" && e.Repo == wt.Repo.Key && string(e.Payload) == `{"scope":"refs"}`
+	})
 }
 
 func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
@@ -257,19 +300,27 @@ func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	deadline := time.After(2 * time.Second)
+	e := waitForEvent(t, events, 2*time.Second, "repo:changed(index)", func(e core.Event) bool {
+		return e.Name == "repo:changed" && e.Worktree == wt.ID && string(e.Payload) == `{"scope":"index"}`
+	})
+	if e.Repo != "" {
+		t.Errorf("Repo = %q, want empty (worktree-targeted)", e.Repo)
+	}
+}
+
+// waitForEvent returns the first event on events matching cond within
+// timeout, or fails the test naming desc.
+func waitForEvent(t *testing.T, events chan core.Event, timeout time.Duration, desc string, cond func(core.Event) bool) core.Event {
+	t.Helper()
+	deadline := time.After(timeout)
 	for {
 		select {
 		case e := <-events:
-			if e.Name != "repo:changed" || e.Worktree != wt.ID || string(e.Payload) != `{"scope":"index"}` {
-				continue
+			if cond(e) {
+				return e
 			}
-			if e.Repo != "" {
-				t.Errorf("Repo = %q, want empty (worktree-targeted)", e.Repo)
-			}
-			return
 		case <-deadline:
-			t.Fatal("no repo:changed(index) event within 2s")
+			t.Fatalf("no %s event within %s", desc, timeout)
 		}
 	}
 }
@@ -296,8 +347,8 @@ func TestQA_PERF_06_ManagerCloseTearsDownThePollerAndTheLastWorktreesWatcher(t *
 	repoWatcherFake := &fakeRepoWatcher{}
 	var pollers []*fakeWorktreePoller
 	m := NewManager(func(core.Event) {})
-	m.newWatcher = func(string, func(watch.Scope)) (repoWatcher, error) { return repoWatcherFake, nil }
-	m.newPoller = func(git.Runner, string, func(watch.Scope)) worktreePoller {
+	m.newWatcher = func(string, func(core.ChangeScope)) (repoWatcher, error) { return repoWatcherFake, nil }
+	m.newPoller = func(git.Runner, string, func(core.ChangeScope)) worktreePoller {
 		p := &fakeWorktreePoller{}
 		pollers = append(pollers, p)
 		return p

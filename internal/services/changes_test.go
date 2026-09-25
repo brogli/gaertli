@@ -75,6 +75,16 @@ func openOn(t *testing.T, c *Core, dir string) core.WorktreeInfo {
 	return wt
 }
 
+// statusOf is id's Status; the test fails on an error.
+func statusOf(t *testing.T, c *Core, id core.WorktreeID) core.ChangedFiles {
+	t.Helper()
+	status, err := c.Status(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return status
+}
+
 func writeFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
@@ -107,10 +117,7 @@ func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflict(t *testing.T) 
 	writeFile(t, repo.Dir, "untracked.txt", "new")
 
 	c, id := openWorktree(t, repo.Dir)
-	got, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := statusOf(t, c, id)
 
 	if want := (core.ChangedFile{Status: "A", Path: "staged.txt"}); !reflect.DeepEqual(got.Staged, []core.ChangedFile{want}) {
 		t.Errorf("Staged = %+v, want [%+v]", got.Staged, want)
@@ -134,10 +141,7 @@ func TestFR_CHG_01_StatusListsAFileChangedBothWaysOnce(t *testing.T) {
 	writeFile(t, repo.Dir, "a.txt", "staged\nmore\n")
 
 	c, id := openWorktree(t, repo.Dir)
-	got, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := statusOf(t, c, id)
 
 	if want := (core.ChangedFile{Status: "M", Path: "a.txt"}); !reflect.DeepEqual(got.Staged, []core.ChangedFile{want}) {
 		t.Errorf("Staged = %+v, want [%+v]", got.Staged, want)
@@ -153,10 +157,7 @@ func TestFR_CHG_01_StatusListsAStagedRenameWithOldPath(t *testing.T) {
 	gittest.Run(t, repo.Dir, "mv", "old.txt", "new.txt")
 
 	c, id := openWorktree(t, repo.Dir)
-	got, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := statusOf(t, c, id)
 
 	if want := (core.ChangedFile{Status: "R", Path: "new.txt", OldPath: "old.txt"}); !reflect.DeepEqual(got.Staged, []core.ChangedFile{want}) {
 		t.Errorf("Staged = %+v, want [%+v]", got.Staged, want)
@@ -178,10 +179,7 @@ func TestFR_CHG_02_StageFileStagesAnUntrackedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := statusOf(t, c, id)
 	if want := (core.ChangedFile{Status: "A", Path: "b.txt"}); !reflect.DeepEqual(got.Staged, []core.ChangedFile{want}) {
 		t.Errorf("Staged = %+v, want [%+v]", got.Staged, want)
 	}
@@ -201,10 +199,7 @@ func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T)
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := statusOf(t, c, id)
 	if len(got.Staged) != 0 {
 		t.Errorf("Staged = %+v, want none", got.Staged)
 	}
@@ -246,10 +241,7 @@ func TestFR_CHG_02_StageAllStagesEveryChangeAtOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := statusOf(t, c, id)
 	wantStaged := []core.ChangedFile{{Status: "M", Path: "tracked.txt"}, {Status: "A", Path: "untracked.txt"}}
 	if !reflect.DeepEqual(got.Staged, wantStaged) {
 		t.Errorf("Staged = %+v, want %+v", got.Staged, wantStaged)
@@ -273,10 +265,7 @@ func TestFR_CHG_02_UnstageAllReturnsEveryFileToItsOwnGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := statusOf(t, c, id)
 	if len(got.Staged) != 0 {
 		t.Errorf("Staged = %+v, want none", got.Staged)
 	}

@@ -1,23 +1,23 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 )
 
-func main() {
-	root := flag.String("root", "../..", "repo root, relative to the package being generated")
-	flag.Parse()
+// repoRoot is the repo root, relative to internal/core, where go:generate
+// runs this.
+const repoRoot = "../.."
 
+func main() {
 	files, err := Generate(".")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "gencore:", err)
 		os.Exit(1)
 	}
 	for _, out := range outputs {
-		if err := os.WriteFile(filepath.Join(*root, out.path), files[out.name], 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(repoRoot, out.path), files[out.path], 0o644); err != nil {
 			fmt.Fprintln(os.Stderr, "gencore:", err)
 			os.Exit(1)
 		}

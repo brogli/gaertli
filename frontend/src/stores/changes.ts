@@ -5,10 +5,12 @@ import type { ChangedFiles } from '../../bindings/github.com/brogli/nebegit/inte
 
 // changes holds a worktree's current uncommitted changes, kept current by
 // the repo:changed{scope:"index"} listener of the view showing them
-// (WorktreeContent.vue, DiffWindowView.vue).
+// (WorktreeContent.vue, DiffWindowView.vue), and the commit message being
+// typed in the commit box.
 export const useChangesStore = defineStore('changes', () => {
   const files = ref<ChangedFiles | null>(null)
   const loading = ref(false)
+  const message = ref('')
 
   async function load(wt: string): Promise<void> {
     loading.value = true
@@ -19,5 +21,5 @@ export const useChangesStore = defineStore('changes', () => {
     }
   }
 
-  return { files, loading, load }
+  return { files, loading, message, load }
 })

@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import Toast from 'openvue/toast'
+import Button from 'openvue/button'
 import { useI18n } from '../i18n'
-import { NOTICE_GROUP, type NoticeAction } from '../lib/notice'
-import type { CoreError } from '../composables/useCoreCall'
-import ErrorBanner from './ErrorBanner.vue'
+import { NOTICE_GROUP, type AppNotice } from '../lib/notice'
+import { noticeIconClass } from '../lib/icons'
+import ErrorDetails from './ErrorDetails.vue'
 
-// NoticeArea is the app's one notice area, bottom-right so it never covers
-// the toolbar. It renders an AppNotice's extras.
+// NoticeArea is the app's one notice area: OpenVue's Toast in its default
+// position and look. The message slot renders what the Toast's own content
+// does (severity icon, summary) with its classes, plus an AppNotice's
+// extras.
 const { t } = useI18n()
 
 function copyToClipboard(text: string): void {
@@ -15,44 +18,29 @@ function copyToClipboard(text: string): void {
 </script>
 
 <template>
-  <Toast :group="NOTICE_GROUP" position="bottom-right">
-    <template #container="{ message, closeCallback }">
-      <div class="notice">
-        <ErrorBanner v-if="message.data?.error" :error="message.data.error as CoreError" />
-        <span v-else>{{ message.summary }}</span>
-        <button
-          v-for="action in (message.data?.actions as NoticeAction[] | undefined) ?? []"
-          :key="action.label"
-          type="button"
-          @click="action.run()"
-        >
-          {{ action.label }}
-        </button>
-        <button
-          v-if="message.data?.copyText"
-          type="button"
-          data-test="notice-copy"
-          @click="copyToClipboard(message.data.copyText)"
-        >
-          {{ t('notices.copyHash') }}
-        </button>
-        <button type="button" data-test="notice-close" @click="closeCallback">
-          {{ t('notices.close') }}
-        </button>
+  <Toast :group="NOTICE_GROUP">
+    <template #message="{ message }: { message: AppNotice }">
+      <i :class="['p-toast-message-icon', noticeIconClass(message.severity)]" aria-hidden="true" />
+      <div class="p-toast-message-text">
+        <span class="p-toast-summary">{{ message.summary }}</span>
+        <div v-if="message.data" class="p-toast-detail action-row">
+          <Button
+            v-for="action in message.data.actions ?? []"
+            :key="action.label"
+            :label="action.label"
+            size="small"
+            @click="action.run()"
+          />
+          <Button
+            v-if="message.data.copyText"
+            :label="t('notices.copyHash')"
+            size="small"
+            data-test="notice-copy"
+            @click="copyToClipboard(message.data.copyText)"
+          />
+          <ErrorDetails v-if="message.data.error" :error="message.data.error" />
+        </div>
       </div>
     </template>
   </Toast>
 </template>
-
-<style scoped>
-.notice {
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
-  padding: 0.5em 0.8em;
-  border-radius: 4px;
-  background: var(--p-content-background);
-  border: 1px solid var(--p-content-border-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-</style>

@@ -43,7 +43,6 @@ const ICON = {
   unstage: 'minus',
   discard: 'undo',
   markResolved: 'check',
-  rowMenu: 'ellipsis-h',
   close: 'times',
   clear: 'times',
   settings: 'cog',
@@ -51,6 +50,9 @@ const ICON = {
   removeWorktree: 'trash',
   repo: 'book',
   worktree: 'folder',
+  folder: 'folder',
+  fileList: 'list',
+  fileTree: 'sitemap',
   branch: 'code-branch',
   dropdown: 'chevron-down',
   fetch: 'cloud-download',
@@ -91,4 +93,18 @@ export function iconClass(name: IconName): string {
 // progress.
 export function spinClass(name: IconName): string {
   return `${iconClass(name)} oi-spin`
+}
+
+// NOTICE_ICON is each notice severity's icon: the ones OpenVue's Toast
+// draws itself.
+const NOTICE_ICON: Record<string, string> = {
+  error: 'times-circle',
+  warn: 'exclamation-triangle',
+  info: 'info-circle',
+  success: 'check',
+}
+
+// noticeIconClass is a notice severity's icon class, info's when unset.
+export function noticeIconClass(severity: string | undefined): string {
+  return oiClass(NOTICE_ICON[severity ?? ''] ?? NOTICE_ICON.info!)
 }

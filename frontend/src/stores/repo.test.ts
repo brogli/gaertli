@@ -1,6 +1,7 @@
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 const { Facade, AppService } = vi.hoisted(() => ({
   Facade: { Summary: vi.fn() },
@@ -37,26 +38,15 @@ describe('repo store', () => {
     await repo.loadSummary('/repo')
     Facade.Summary.mockClear()
 
-    emit('repo:changed', { data: { scope: 'state' } })
-    emit('repo:changed', { data: { scope: 'refs' } })
+    emit('repo:changed', { data: { scope: ChangeScope.StateChanged } })
+    emit('repo:changed', { data: { scope: ChangeScope.RefsChanged } })
     await flushPromises()
 
     expect(Facade.Summary).toHaveBeenCalledTimes(2)
 
-    emit('repo:changed', { data: { scope: 'index' } })
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
 
     expect(Facade.Summary).toHaveBeenCalledTimes(2)
-  })
-
-  it('ADR-4 reloads Summary on a core:reconnected event', async () => {
-    const repo = useRepoStore()
-    await repo.loadSummary('/repo')
-    Facade.Summary.mockClear()
-
-    emit('core:reconnected')
-    await flushPromises()
-
-    expect(Facade.Summary).toHaveBeenCalledTimes(1)
   })
 })

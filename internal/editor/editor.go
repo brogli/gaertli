@@ -24,22 +24,26 @@ func OrDefault(profile core.EditorProfile) core.EditorProfile {
 	return Default()
 }
 
-// OpenFolder starts profile's folder command for path, detached.
-func OpenFolder(profile core.EditorProfile, path string) error {
-	argv, err := buildCommand(profile.FolderCmd, path, 0)
+// OpenFolder starts profile's folder command for path, detached. argv is
+// the resolved command, for the caller's own log record; nil if it could
+// not be built (err is then EditorNotFound, and nothing started).
+func OpenFolder(profile core.EditorProfile, path string) (argv []string, err error) {
+	argv, err = buildCommand(profile.FolderCmd, path, 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return start(argv)
+	return argv, start(argv)
 }
 
 // OpenFile starts profile's file command for path, at line if line > 0.
-func OpenFile(profile core.EditorProfile, path string, line int) error {
-	argv, err := buildCommand(fileTemplate(profile, line), path, line)
+// argv is the resolved command, for the caller's own log record; nil if it
+// could not be built (err is then EditorNotFound, and nothing started).
+func OpenFile(profile core.EditorProfile, path string, line int) (argv []string, err error) {
+	argv, err = buildCommand(fileTemplate(profile, line), path, line)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return start(argv)
+	return argv, start(argv)
 }
 
 // fileTemplate picks OpenFile's command template: FileAtLineCmd when line >

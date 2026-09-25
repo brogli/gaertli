@@ -35,25 +35,40 @@ func TestFR_CP_01_ParseCandidatesReadsDateAndMergeFromEachRecord(t *testing.T) {
 	}
 }
 
-func TestFR_CP_02_OrderedSHAsSortsByCommitDateBothDirectionsWithTieBreak(t *testing.T) {
+func TestFR_CP_02_OrderedSHAsSortsByCommitDateBothDirections(t *testing.T) {
 	byDate := []pickCandidate{
 		{SHA: "c30", CommitAt: 30}, {SHA: "c10", CommitAt: 10}, {SHA: "c20", CommitAt: 20},
 	}
-	if got := orderedSHAs(byDate, true); !slices.Equal(got, []string{"c10", "c20", "c30"}) {
+	got, err := orderedSHAs(t.Context(), git.Runner{}, "", byDate, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []string{"c10", "c20", "c30"}) {
 		t.Errorf("oldest-first = %v, want [c10 c20 c30]", got)
 	}
-	if got := orderedSHAs(byDate, false); !slices.Equal(got, []string{"c30", "c20", "c10"}) {
+
+	got, err = orderedSHAs(t.Context(), git.Runner{}, "", byDate, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []string{"c30", "c20", "c10"}) {
 		t.Errorf("newest-first = %v, want [c30 c20 c10]", got)
 	}
+}
 
-	tied := []pickCandidate{
-		{SHA: "n3", CommitAt: 5}, {SHA: "n2", CommitAt: 5}, {SHA: "n1", CommitAt: 5},
+func TestFR_CP_02_TiedSHAsFindsCandidatesSharingACommitterDate(t *testing.T) {
+	candidates := []pickCandidate{
+		{SHA: "a", CommitAt: 10}, {SHA: "b", CommitAt: 20}, {SHA: "c", CommitAt: 20}, {SHA: "d", CommitAt: 30},
 	}
-	if got := orderedSHAs(tied, true); !slices.Equal(got, []string{"n1", "n2", "n3"}) {
-		t.Errorf("tied oldest-first = %v, want [n1 n2 n3] (given order reversed)", got)
+	got := tiedSHAs(candidates)
+	slices.Sort(got)
+	if !slices.Equal(got, []string{"b", "c"}) {
+		t.Errorf("tiedSHAs = %v, want [b c]", got)
 	}
-	if got := orderedSHAs(tied, false); !slices.Equal(got, []string{"n3", "n2", "n1"}) {
-		t.Errorf("tied newest-first = %v, want [n3 n2 n1] (given order kept)", got)
+
+	none := []pickCandidate{{SHA: "a", CommitAt: 1}, {SHA: "b", CommitAt: 2}}
+	if got := tiedSHAs(none); len(got) != 0 {
+		t.Errorf("tiedSHAs with no shared date = %v, want empty", got)
 	}
 }
 
@@ -238,6 +253,41 @@ func TestFR_CP_02_CherryPickAppliesOldestFirstRegardlessOfCallOrder(t *testing.T
 	}
 }
 
+func TestFR_CP_02_CherryPickAppliesParentBeforeChildWhenCommitterDatesTie(t *testing.T) {
+	repo := gittest.New(t)
+	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	gittest.Commit(t, repo.Dir, "seed.txt", "r", "root")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	gittest.Run(t, repo.Dir, "checkout", "feature")
+	commitDated(t, repo.Dir, "chain.txt", "A\n", "A", base)
+	aSHA := gittest.HeadSHA(t, repo.Dir)
+	commitDated(t, repo.Dir, "chain.txt", "A\nB\n", "B", base)
+	bSHA := gittest.HeadSHA(t, repo.Dir)
+	commitDated(t, repo.Dir, "chain.txt", "A\nB\nC\n", "C", base)
+	cSHA := gittest.HeadSHA(t, repo.Dir)
+	commitDated(t, repo.Dir, "chain.txt", "A\nB\nC\nD\n", "D", base)
+	dSHA := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "checkout", "master")
+	gittest.Run(t, repo.Dir, "branch", "fresh")
+	gittest.Run(t, repo.Dir, "checkout", "fresh")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	// All four share a committer date: only topological order, not the
+	// scrambled call order, applies this chain cleanly.
+	if err := c.CherryPick(t.Context(), wt, []string{cSHA, aSHA, dSHA, bSHA}, core.PickOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := commitSubjects(t, repo.Dir, "master", "fresh"); !slices.Equal(got, []string{"A", "B", "C", "D"}) {
+		t.Errorf("commit order on fresh = %v, want [A B C D] (parent before child)", got)
+	}
+	content := readFile(t, repo.Dir, "chain.txt")
+	if content != "A\nB\nC\nD\n" {
+		t.Errorf("chain.txt = %q, want the cumulative A\\nB\\nC\\nD\\n", content)
+	}
+}
+
 func TestFR_CP_05_CherryPickRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t *testing.T) {
 	repo := gittest.New(t)
 	x1SHA, mSHA, x2SHA := mergeCommitFixture(t, repo.Dir)
@@ -295,6 +345,33 @@ func TestFR_RV_02_RevertAppliesNewestFirstRegardlessOfCallOrder(t *testing.T) {
 	content := readFile(t, repo.Dir, "chain.txt")
 	if content != "A\n" {
 		t.Errorf("chain.txt = %q, want exactly A's own line", content)
+	}
+}
+
+func TestFR_RV_02_RevertAppliesChildBeforeParentWhenCommitterDatesTie(t *testing.T) {
+	repo := gittest.New(t)
+	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	gittest.Commit(t, repo.Dir, "chain.txt", "A\n", "A")
+	commitDated(t, repo.Dir, "chain.txt", "A\nB\n", "B", base)
+	bSHA := gittest.HeadSHA(t, repo.Dir)
+	commitDated(t, repo.Dir, "chain.txt", "A\nB\nC\n", "C", base)
+	cSHA := gittest.HeadSHA(t, repo.Dir)
+	commitDated(t, repo.Dir, "chain.txt", "A\nB\nC\nD\n", "D", base)
+	dSHA := gittest.HeadSHA(t, repo.Dir)
+	commitDated(t, repo.Dir, "chain.txt", "A\nB\nC\nD\nE\n", "E", base)
+	eSHA := gittest.HeadSHA(t, repo.Dir)
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	// B, C, D, E share a committer date: only topological order, not the
+	// scrambled call order, reverts this chain cleanly.
+	if err := c.Revert(t.Context(), wt, []string{dSHA, bSHA, eSHA, cSHA}, core.PickOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	content := readFile(t, repo.Dir, "chain.txt")
+	if content != "A\n" {
+		t.Errorf("chain.txt = %q, want back to A's own line", content)
 	}
 }
 
@@ -410,10 +487,7 @@ func TestFR_CP_06_CherryPickWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T)
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
 	}
-	status, err := c.Status(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
+	status := statusOf(t, c, wt)
 	if len(status.Staged) != 1 || status.Staged[0].Path != "b.txt" {
 		t.Errorf("Staged = %+v, want one entry for b.txt", status.Staged)
 	}
@@ -435,10 +509,7 @@ func TestFR_RV_04_RevertWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T) {
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
 		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
 	}
-	status, err := c.Status(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
+	status := statusOf(t, c, wt)
 	if len(status.Staged) != 1 || status.Staged[0].Path != "b.txt" {
 		t.Errorf("Staged = %+v, want one entry for b.txt (the revert's own removal)", status.Staged)
 	}

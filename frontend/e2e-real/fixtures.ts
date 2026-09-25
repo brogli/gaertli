@@ -3,7 +3,11 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
-import type { Settings } from '../bindings/github.com/brogli/nebegit/internal/settings/models'
+import { ChangeScope, PullMode } from '../bindings/github.com/brogli/nebegit/internal/core/models'
+import {
+  DiffMode,
+  type Preferences,
+} from '../bindings/github.com/brogli/nebegit/internal/settings/models'
 import { switchToChanges } from './helpers'
 import { createRepos, gitWith, type Git, type Repos } from './repos'
 import { createSandbox, editorCalls, type Sandbox } from './sandbox'
@@ -22,7 +26,7 @@ interface Options {
   // be shown in a page.
   open: (keyof Repos)[]
   // settings overrides the seeded settings file's fields.
-  settings: Partial<Settings>
+  settings: Partial<Preferences>
 }
 
 interface Fixtures {
@@ -134,14 +138,14 @@ function isRefusedCall(message: string): boolean {
   return message.includes('the server responded with a status of 422')
 }
 
-// seedSettings is a fresh install's settings plus the stand-in editor and
-// the worktrees to restore.
+// seedSettings is a fresh install's settings plus the stand-in editor, main
+// and master as protected branches, and the worktrees to restore.
 function seedSettings(
   sandbox: Sandbox,
   repos: Repos,
   open: (keyof Repos)[],
-  overrides: Partial<Settings>,
-): Partial<Settings> {
+  overrides: Partial<Preferences>,
+): Partial<Preferences> & { openWorktrees: string[]; recentRepos: [] } {
   const editor = path.join(sandbox.dir, 'bin', 'stand-in-editor')
   return {
     openWorktrees: open.map((name) => repos[name]),
@@ -155,8 +159,8 @@ function seedSettings(
       },
     },
     protectedBranches: ['main', 'master'],
-    defaultPullMode: 'merge',
-    diffMode: 'unified',
+    defaultPullMode: PullMode.PullMerge,
+    diffMode: DiffMode.UnifiedDiff,
     autoFetchIntervalMinutes: 0,
     ...overrides,
   }
@@ -193,7 +197,7 @@ async function waitForEvents(page: Page): Promise<void> {
 
 interface WailsEvent {
   name?: string
-  data?: { scope?: string; done?: boolean; filtered?: boolean }
+  data?: { scope?: ChangeScope; done?: boolean; filtered?: boolean }
 }
 
 async function changeRefsAndWaitForReload(events: WailsEvent[], change: () => void): Promise<void> {
@@ -205,7 +209,9 @@ async function changeRefsAndWaitForReload(events: WailsEvent[], change: () => vo
 // reloadedAfterRefsChange: a refs change arrived, and after it the full
 // log finished loading.
 function reloadedAfterRefsChange(events: WailsEvent[]): boolean {
-  const changed = events.findIndex((e) => e.name === 'repo:changed' && e.data?.scope === 'refs')
+  const changed = events.findIndex(
+    (e) => e.name === 'repo:changed' && e.data?.scope === ChangeScope.RefsChanged,
+  )
   return (
     changed >= 0 &&
     events

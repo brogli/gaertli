@@ -8,6 +8,7 @@ import {
   commitFiles,
   confirmDialog,
   diffRow,
+  diffText,
   fileGroup,
   fileRow,
   fileText,
@@ -19,7 +20,6 @@ import {
 // files and discards; and the working tree's diff window: diffs, hunks and
 // lines, outside edits.
 
-const diffText = (page: Page) => page.locator('.diff-view .cm-content')
 const stageHunk = (page: Page) => page.locator('[data-test=stage-hunk]')
 
 // hunksWith returns hunks.txt (line 1 … line 30) with the given lines
@@ -93,15 +93,15 @@ test('FR-CHG-02 staging and unstaging a file moves it between the groups and the
 }) => {
   changeEveryKind(repos.work, git)
   const app = await openApp(repos.work)
-  const staged = () => git(repos.work, 'diff', '--cached', '--name-only')
+  const stagedNames = () => git(repos.work, 'diff', '--cached', '--name-only')
 
   await fileRow(app, 'Unstaged', 'nonl.txt').locator('[data-test=action]').click()
   await expect(fileRow(app, 'Staged', 'nonl.txt')).toBeVisible()
-  expect(staged()).toContain('nonl.txt')
+  expect(stagedNames()).toContain('nonl.txt')
 
   await fileRow(app, 'Staged', 'nonl.txt').locator('[data-test=action]').click()
   await expect(fileRow(app, 'Unstaged', 'nonl.txt')).toBeVisible()
-  expect(staged()).not.toContain('nonl.txt')
+  expect(stagedNames()).not.toContain('nonl.txt')
 })
 
 test('FR-CHG-02 Stage all and Unstage all move every change at once', async ({
@@ -229,8 +229,8 @@ test("FR-CHG-03 under diff.algorithm=histogram the view shows git's hunks and St
   await stageHunk(diff).first().click()
 
   await expect.poll(() => git(repos.work, 'show', ':moved.txt')).toBe('alpha\nbeta\ngamma\ndelta\n')
-  const staged = git(repos.work, 'diff', '--cached', '-U0', 'moved.txt')
-  expect(staged.match(/^@@.*?@@/gm)).toEqual(['@@ -4,3 +3,0 @@'])
+  const cached = git(repos.work, 'diff', '--cached', '-U0', 'moved.txt')
+  expect(cached.match(/^@@.*?@@/gm)).toEqual(['@@ -4,3 +3,0 @@'])
 })
 
 test('QA-COMP-01 a file behind a clean filter shows in the clean form git diffs', async ({

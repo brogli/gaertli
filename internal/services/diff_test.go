@@ -284,18 +284,17 @@ func TestFR_DIFF_03_DiffCallsTreatFilesGitCallsBinaryAsBinary(t *testing.T) {
 	}
 }
 
-func TestADR_7_ParseCatFileBatchSplitsFoundAndMissingObjectsInOrder(t *testing.T) {
-	data := []byte("aaaa111 blob 5\x00hello\x00sha^:missing.txt missing\x00bbbb222 blob 3\x00bye\x00")
-
-	blobs, err := parseCatFileBatch(data, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	want := [][]byte{[]byte("hello"), nil, []byte("bye")}
-	for i := range want {
-		if !bytes.Equal(blobs[i], want[i]) {
-			t.Errorf("blobs[%d] = %q, want %q", i, blobs[i], want[i])
+func TestADR_7_ParseCatFileBatchReadsAFoundOrAMissingObject(t *testing.T) {
+	for _, tc := range []struct {
+		data string
+		want []byte
+	}{
+		{"aaaa111 blob 6\x00he\x00llo\x00", []byte("he\x00llo")},
+		{"sha^:missing.txt missing\x00", nil},
+	} {
+		got, err := parseCatFileBatch([]byte(tc.data))
+		if err != nil || !bytes.Equal(got, tc.want) {
+			t.Errorf("parseCatFileBatch(%q) = %q, %v; want %q", tc.data, got, err, tc.want)
 		}
 	}
 }

@@ -7,36 +7,38 @@ import MultiSelect from 'openvue/multiselect'
 import ClearableInput from './ClearableInput.vue'
 import { useLogStore } from '../stores/log'
 import { useRefsStore } from '../stores/refs'
+import { refGroups } from '../lib/refOptions'
 import type { LogFilter } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// FilterBar is the log filter: free-text query/author/path (debounced
-// 300ms) and branches. Each field carries its own clear icon and applies at
-// once when cleared; there is no active-filter list or clear-all.
+// FilterBar is the log filter: free-text author/path (debounced 300ms) and
+// branches or tags narrow the log; the search field highlights matches
+// instead (debounced in the store) and steps through them with
+// Enter/Shift+Enter. Each field carries its own clear icon and applies at
+// once when cleared; there is no active-filter list or clear-all. The
+// branch field shows the log store's own filter, which the branch picker's
+// Show history also sets.
 const log = useLogStore()
 const refs = useRefsStore()
 const { t } = useI18n()
 
-const query = ref(log.filter.query ?? '')
 const author = ref(log.filter.author ?? '')
 const path = ref(log.filter.path ?? '')
-const branches = ref<string[]>(log.filter.branches ?? [])
 const authorSuggestions = ref<string[]>([])
 
-// Branch options: local branch names, plus "<remote>/<name>" for each
-// remote branch.
-const branchOptions = computed(() => {
-  const local = (refs.refs?.branches ?? []).map((b) => b.name)
-  const remote = (refs.refs?.remotes ?? []).flatMap((r) =>
-    (r.branches ?? []).map((b) => `${r.name}/${b.name}`),
-  )
-  return [...local, ...remote]
+const branchOptions = computed(() => refGroups(refs.refs, t))
+
+// matchLabel is "n of m" once the search resolved, "No match" once it
+// resolved to nothing, empty while the query field is itself empty.
+const matchLabel = computed(() => {
+  if (!log.query) return ''
+  if (log.matches.length === 0) return t('filterBar.noMatch')
+  return t('filterBar.matchPosition', { current: log.current + 1, total: log.matches.length })
 })
 
-function currentFilter(): LogFilter {
+function currentFilter(branches = log.filter.branches ?? []): LogFilter {
   const f: LogFilter = {}
-  if (query.value) f.query = query.value
   if (author.value) f.author = author.value
-  if (branches.value.length > 0) f.branches = branches.value
+  if (branches.length > 0) f.branches = branches
   if (path.value) f.path = path.value
   return f
 }
@@ -47,6 +49,10 @@ const applyDebounced = useDebounceFn(() => void log.applyFilter(currentFilter())
 // waiting on the debounce a keystroke stream needs.
 function applyNow(): void {
   void log.applyFilter(currentFilter())
+}
+
+function filterBranches(branches: string[]): void {
+  void log.applyFilter(currentFilter(branches))
 }
 
 function search(event: { query: string }): void {
@@ -62,13 +68,18 @@ function clearAuthor(): void {
 
 <template>
   <div class="filter-bar">
-    <ClearableInput
-      v-model="query"
-      :placeholder="t('filterBar.searchMessage')"
-      test-id="clear-query"
-      @update:model-value="applyDebounced"
-      @clear="applyNow"
-    />
+    <div class="search-field">
+      <ClearableInput
+        v-model="log.query"
+        :placeholder="t('filterBar.searchMessage')"
+        test-id="clear-query"
+        @clear="log.clearQuery"
+        @keydown.enter.exact.prevent="log.nextMatch"
+        @keydown.shift.enter.prevent="log.prevMatch"
+        @keydown.esc="log.clearQuery"
+      />
+      <span v-if="matchLabel" class="match-label" data-test="match-label">{{ matchLabel }}</span>
+    </div>
     <AutoComplete
       v-model="author"
       :suggestions="authorSuggestions"
@@ -79,14 +90,18 @@ function clearAuthor(): void {
       @clear="clearAuthor"
     />
     <MultiSelect
-      v-model="branches"
+      :model-value="log.filter.branches ?? []"
       :options="branchOptions"
+      option-label="label"
+      option-value="value"
+      option-group-label="label"
+      option-group-children="items"
       filter
       show-clear
       :show-toggle-all="false"
       :filter-placeholder="t('filterBar.searchBranches')"
       :placeholder="t('filterBar.branches')"
-      @update:model-value="applyNow"
+      @update:model-value="filterBranches"
     />
     <ClearableInput
       v-model="path"
@@ -121,5 +136,19 @@ function clearAuthor(): void {
 .filter-bar :deep(.p-inputtext) {
   width: 100%;
   min-width: 0;
+}
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.search-field > :deep(.p-iconfield) {
+  flex: 1 1 0;
+}
+.match-label {
+  flex: none;
+  color: var(--p-text-muted-color);
+  font-size: 0.9em;
+  white-space: nowrap;
 }
 </style>

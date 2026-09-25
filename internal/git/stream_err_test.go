@@ -67,16 +67,16 @@ func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
 	assertStopped(t, heartbeat)
 }
 
-// A grandchild that inherited git's stderr, e.g. a stalled ssh transport,
-// keeps the pipe open after git itself is killed.
+// A grandchild that inherited git's stderr and outlives the interrupt,
+// e.g. a stalled ssh transport, keeps the pipe open after git itself is gone.
 func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsStderr(t *testing.T) {
-	assertCancelReturnsDespiteGrandchild(t, "sleep 6 & wait")
+	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6) & wait")
 }
 
 // The shape of a delayed transport: the grandchild holds git's stderr but
-// not its stdout, so stdout ends as soon as git is killed.
+// not its stdout, so stdout ends as soon as git is gone.
 func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsOnlyStderr(t *testing.T) {
-	assertCancelReturnsDespiteGrandchild(t, "sleep 6 >/dev/null & wait")
+	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6 >/dev/null) & wait")
 }
 
 func assertCancelReturnsDespiteGrandchild(t *testing.T, script string) {

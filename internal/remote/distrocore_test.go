@@ -3,11 +3,16 @@ package remote_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,14 +24,16 @@ import (
 )
 
 // coreBin is the real nebegit-core; badBin reports a wrong protocol version;
-// stderrBin also writes to stderr, including a line with a credential.
-var coreBin, badBin, stderrBin string
+// stderrBin also writes to stderr, including a line with a credential;
+// exitBin writes a burst of events and stderr lines, then exits.
+var coreBin, badBin, stderrBin, exitBin string
 
 func TestMain(m *testing.M) {
 	testbin.Main(m,
 		testbin.Bin{Path: &coreBin, Pkg: "../../cmd/nebegit-core"},
 		testbin.Bin{Path: &badBin, Pkg: "./testdata/badcore"},
 		testbin.Bin{Path: &stderrBin, Pkg: "./testdata/stderrcore"},
+		testbin.Bin{Path: &exitBin, Pkg: "./testdata/exitcore"},
 	)
 }
 
@@ -59,21 +66,41 @@ func bufLogger() (logger *slog.Logger, text func() string) {
 // acceptConsent always accepts; deploy_test.go covers consent behaviour.
 type acceptConsent struct{}
 
-func (acceptConsent) Ask(string, string) bool { return true }
+func (acceptConsent) Ask(string) bool { return true }
+
+// failConsent fails the test if asked.
+type failConsent struct{ t *testing.T }
+
+func (c failConsent) Ask(string) bool {
+	c.t.Error("consent asked, want none")
+	return false
+}
+
+// toggleConsent answers accept, changeable between calls: it tests that a
+// declined consent is not remembered and the next open asks again.
+type toggleConsent struct{ accept bool }
+
+func (c *toggleConsent) Ask(string) bool { return c.accept }
+
+// guiExe is the Windows app the test distro cores set the command up for.
+const guiExe = `C:\nebegit\nebegit.exe`
 
 // fakeWSL intercepts the "sh -c '<target> --stdio'" spawn call to run bin
 // locally instead of a real wsl.exe child; every other call (deploy's
-// stat/cat dance) runs the given shell command for real against a
-// test-sandboxed $HOME. It counts every call, and keeps each spawn cmd so a
-// test can kill the live process without DistroCore exposing it.
+// stat/cat dance, the command setup) runs the given shell command for real
+// against a test-sandboxed $HOME. It counts every call, records each
+// script, and keeps each spawn cmd so a test can kill the live process
+// without DistroCore exposing it.
 type fakeWSL struct {
-	bin    string
-	calls  int
-	spawns []*exec.Cmd
+	bin     string
+	calls   int
+	scripts []string
+	spawns  []*exec.Cmd
 }
 
 func (f *fakeWSL) run(ctx context.Context, distro string, args ...string) (*exec.Cmd, error) {
 	f.calls++
+	f.scripts = append(f.scripts, strings.Join(args, " "))
 	if len(args) == 3 && strings.HasSuffix(args[2], "--stdio") {
 		cmd := exec.CommandContext(ctx, f.bin, "--stdio")
 		f.spawns = append(f.spawns, cmd)
@@ -88,7 +115,95 @@ func newDistroCore(t *testing.T, bin string, log *slog.Logger) (*remote.DistroCo
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 	wsl := &fakeWSL{bin: bin}
-	return remote.NewDistroCore("Ubuntu-22.04", "1.0.0", wsl.run, acceptConsent{}, nil, log), wsl
+	return remote.NewDistroCore("Ubuntu-22.04", "1.0.0", guiExe, wsl.run, acceptConsent{}, nil, log), wsl
+}
+
+// commandSetUp reads what the command setup left in $HOME: the link's
+// target and the recorded app path.
+func commandSetUp(t *testing.T) (link, gui string) {
+	t.Helper()
+	home := os.Getenv("HOME")
+	link, err := os.Readlink(filepath.Join(home, ".local/bin/nebegit"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".cache/nebegit/1.0.0/gui-path"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return link, string(data)
+}
+
+func TestFR_REPO_06_EveryFreshConnectSetsUpTheCommandInOneWSLStart(t *testing.T) {
+	dc, wsl := newDistroCore(t, coreBin, slog.Default())
+	if _, _, err := dc.Ensure(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	link, gui := commandSetUp(t)
+	if want := filepath.Join(os.Getenv("HOME"), ".cache/nebegit/1.0.0/nebegit-core"); link != want {
+		t.Errorf("~/.local/bin/nebegit -> %q, want %q", link, want)
+	}
+	if want := "/mnt/c/nebegit/nebegit.exe"; gui != want {
+		t.Errorf("gui-path = %q, want %q", gui, want)
+	}
+	setups := slices.DeleteFunc(slices.Clone(wsl.scripts), func(s string) bool { return !strings.Contains(s, "gui-path") })
+	if len(setups) != 1 || !strings.Contains(setups[0], "ln -sf") {
+		t.Errorf("setup scripts = %q, want one that links and records", setups)
+	}
+
+	if err := os.Remove(filepath.Join(os.Getenv("HOME"), ".cache/nebegit/1.0.0/gui-path")); err != nil {
+		t.Fatal(err)
+	}
+	if err := wsl.spawns[len(wsl.spawns)-1].Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	waitForRespawn(t, dc)
+
+	if _, gui := commandSetUp(t); gui != "/mnt/c/nebegit/nebegit.exe" {
+		t.Errorf("gui-path after a respawn = %q, want it written again", gui)
+	}
+}
+
+func TestFR_REPO_06_AMovedAppTakesOverTheCommandOnItsConnect(t *testing.T) {
+	dc, wsl := newDistroCore(t, coreBin, slog.Default())
+	if _, _, err := dc.Ensure(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	moved := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", `D:\tools\nebegit.exe`, wsl.run, failConsent{t}, nil, slog.Default())
+	if _, _, err := moved.Ensure(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, gui := commandSetUp(t); gui != "/mnt/d/tools/nebegit.exe" {
+		t.Errorf("gui-path = %q, want the moved app's", gui)
+	}
+}
+
+// A declined consent is not remembered: the next open asks again, and
+// accepting then deploys, spawns and sets up the command as any other
+// first open would.
+func TestQA_PORT_02_ADeclinedConsentAsksAgainOnTheNextOpen(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	wsl := &fakeWSL{bin: coreBin}
+	consent := &toggleConsent{accept: false}
+	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", guiExe, wsl.run, consent, nil, slog.Default())
+
+	_, _, err := dc.Ensure(t.Context())
+	coretest.AssertCode(t, err, core.DeployRefused)
+
+	consent.accept = true
+	client, respawned, err := dc.Ensure(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !respawned || client == nil {
+		t.Errorf("Ensure after accepting = (%v, %v), want a freshly spawned live client", client, respawned)
+	}
+	if _, gui := commandSetUp(t); gui == "" {
+		t.Error("command not set up after accepting on the second open")
+	}
 }
 
 func TestADR_3_EnsureSpawnsOnceThenReusesTheLiveClient(t *testing.T) {
@@ -382,19 +497,93 @@ func TestFR_UX_02_TheCoresStderrReachesTheLogAtWarnMasked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	deadline := time.Now().Add(2 * time.Second)
-	var got string
-	for time.Now().Before(deadline) {
-		got = text()
-		if strings.Contains(got, "https://***@host/repo") {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	waitFor(func() bool { return strings.Contains(text(), "https://***@host/repo") })
+	got := text()
 	if !strings.Contains(got, "level=WARN") || !strings.Contains(got, "https://***@host/repo") {
 		t.Errorf("log = %q, want the masked stderr line at Warn", got)
 	}
 	if strings.Contains(got, "secret") {
 		t.Errorf("log = %q, want no credential", got)
+	}
+}
+
+// exitBurst is how many events and stderr lines exitcore writes before it
+// exits.
+const exitBurst = 2000
+
+// exitingCore connects to exitcore and makes it write its burst and exit.
+func exitingCore(t *testing.T, sink core.EventSink, log *slog.Logger) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	wsl := &fakeWSL{bin: exitBin}
+	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", guiExe, wsl.run, acceptConsent{}, sink, log)
+	client, _, err := dc.Ensure(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Jobs(t.Context(), "any"); err == nil {
+		t.Fatal("Jobs answered, want the core gone")
+	}
+}
+
+// Output the client cannot read ends its reading; the rest of the core's
+// output must not keep the core's exit from being noticed.
+func TestADR_4_ACoreThatExitsAfterUnreadableOutputIsRespawned(t *testing.T) {
+	dc, _ := newDistroCore(t, exitBin, slog.Default())
+	client, _, err := dc.Ensure(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := client.Summary(t.Context(), "any"); err == nil {
+		t.Fatal("Summary answered, want the core gone")
+	}
+
+	waitForRespawn(t, dc)
+}
+
+// A stderr line too long to log ends the logging; the rest of the core's
+// stderr must not keep the core's exit from being noticed.
+func TestADR_4_ACoreThatExitsAfterAnOverlongStderrLineIsRespawned(t *testing.T) {
+	dc, _ := newDistroCore(t, exitBin, slog.Default())
+	client, _, err := dc.Ensure(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := client.Refs(t.Context(), "any"); err == nil {
+		t.Fatal("Refs answered, want the core gone")
+	}
+
+	waitForRespawn(t, dc)
+}
+
+// waitFor polls done for up to 3s and reports its last answer.
+func waitFor(done func() bool) bool {
+	deadline := time.Now().Add(3 * time.Second)
+	for !done() && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	return done()
+}
+
+func TestADR_3_EveryEventACoreSendsBeforeItExitsArrives(t *testing.T) {
+	var events atomic.Int64
+
+	exitingCore(t, func(core.Event) { events.Add(1) }, slog.Default())
+
+	if !waitFor(func() bool { return events.Load() == exitBurst }) {
+		t.Errorf("%d events arrived, want %d", events.Load(), exitBurst)
+	}
+}
+
+func TestFR_UX_02_EveryStderrLineACoreWritesBeforeItExitsReachesTheLog(t *testing.T) {
+	logger, text := bufLogger()
+
+	exitingCore(t, nil, logger)
+
+	last := fmt.Sprintf("line %d", exitBurst-1)
+	if !waitFor(func() bool { return strings.Contains(text(), last) }) {
+		t.Errorf("log lacks %q, the core's last stderr line", last)
 	}
 }

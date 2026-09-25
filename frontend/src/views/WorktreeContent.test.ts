@@ -3,43 +3,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '../testing/mountInBody'
 import NoticeArea from '../components/NoticeArea.vue'
+import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-const { Facade, AppService, SettingsService } = vi.hoisted(() => ({
-  Facade: {
-    Summary: vi.fn(),
-    LoadLog: vi.fn(),
-    LogRows: vi.fn(),
-    CommitDetails: vi.fn(),
-    Commit: vi.fn(),
-    SetMessageDraft: vi.fn(),
-    Refresh: vi.fn(),
-    Refs: vi.fn(),
-    CheckoutCommit: vi.fn(),
-    UncommittedCount: vi.fn(),
-    OpenFolder: vi.fn(),
-    ListBranches: vi.fn(),
-    ListWorktrees: vi.fn(),
-    Jobs: vi.fn(),
-    CancelJob: vi.fn(),
-    Status: vi.fn(),
-    ConfiguredPullMode: vi.fn().mockResolvedValue(''),
-    CompareCommits: vi.fn(),
-    LogIndexOf: vi.fn().mockResolvedValue({ index: 0, found: false }),
-  },
-  AppService: {
-    UpdateWindowTitle: vi.fn(),
-    OpenDiff: vi.fn(),
-    RecentRepos: vi.fn().mockResolvedValue([]),
-    ListWSLDistros: vi.fn().mockResolvedValue([]),
-  },
-  SettingsService: { Get: vi.fn(), Set: vi.fn() },
-}))
-
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade,
-  AppService,
-  SettingsService,
-}))
+vi.mock(
+  '../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('../testing/mainWindowApp'),
+)
+import { AppService, Facade, resetMainWindowApp } from '../testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
 import { Events, emit } from '../testing/runtime'
@@ -58,13 +28,13 @@ import BranchPicker from '../components/BranchPicker.vue'
 import RepoPicker from '../components/RepoPicker.vue'
 import WorktreePicker from '../components/WorktreePicker.vue'
 import DetachWarningDialog from '../components/DetachWarningDialog.vue'
+import BranchInWorktreeDialog from '../components/BranchInWorktreeDialog.vue'
 import DiffView from '../components/DiffView.vue'
 import SyncControls from '../components/SyncControls.vue'
 import { useLogStore } from '../stores/log'
 import { useChangesStore } from '../stores/changes'
-import { useCompareStore } from '../stores/compare'
 import { commitRow } from '../testing/fixtures/log-rows'
-import { defaultSettingsFixture } from '../testing/fixtures/settings'
+import { commitDetailsFixture } from '../testing/fixtures/commitDetails'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 import { branchFixture } from '../testing/fixtures/branch'
 import { summaryFixture } from '../testing/fixtures/summary'
@@ -100,21 +70,7 @@ async function mountAndPickRowMenuItem(
 describe('WorktreeContent', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    Facade.Summary.mockReset().mockResolvedValue(summaryFixture())
-    Facade.LoadLog.mockReset().mockResolvedValue(undefined)
-    Facade.LogRows.mockReset().mockResolvedValue({ rows: [], loaded: 0, done: true })
-    Facade.Refresh.mockReset().mockResolvedValue(undefined)
-    Facade.Refs.mockReset().mockResolvedValue({ branches: [], remotes: [], tags: [] })
-    Facade.CheckoutCommit.mockReset().mockResolvedValue(undefined)
-    Facade.UncommittedCount.mockReset().mockResolvedValue(0)
-    Facade.OpenFolder.mockReset().mockResolvedValue(undefined)
-    SettingsService.Get.mockReset().mockResolvedValue(defaultSettingsFixture())
-    AppService.UpdateWindowTitle.mockReset().mockResolvedValue(undefined)
-    Facade.ListBranches.mockReset().mockResolvedValue([{ name: 'feature', checkedOutIn: '' }])
-    Facade.ListWorktrees.mockReset().mockResolvedValue([])
-    Facade.Jobs.mockReset().mockResolvedValue([])
-    Facade.Status.mockReset().mockResolvedValue(changedFilesFixture())
-    AppService.OpenDiff.mockReset()
+    resetMainWindowApp()
     Events.On.mockReset()
   })
 
@@ -152,9 +108,7 @@ describe('WorktreeContent', () => {
 
   it('FR-ED-06 Open in editor failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
     Facade.OpenFolder.mockRejectedValueOnce(
-      Object.assign(new Error('boom'), {
-        cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' },
-      }),
+      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
     )
     const wrapper = mountView({ path: '/repo' })
     const { body: notice } = await mountInBody(NoticeArea)
@@ -217,7 +171,7 @@ describe('WorktreeContent', () => {
 
   it('FR-UX-01 shows the error message and reveals gitStderr behind show details', async () => {
     Facade.Summary.mockRejectedValueOnce(
-      Object.assign(new Error('boom'), {
+      new Error('boom', {
         cause: { message: 'not a git repository', gitStderr: 'fatal: not a git repository' },
       }),
     )
@@ -273,7 +227,7 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-REPO-03 shows no ahead/behind indicator without an upstream', async () => {
-    Facade.Refs.mockResolvedValue({ branches: [branchFixture({})], remotes: [], tags: [] })
+    Facade.Refs.mockResolvedValue({ branches: [branchFixture()], remotes: [], tags: [] })
 
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
@@ -314,7 +268,7 @@ describe('WorktreeContent', () => {
 
     const dialog = wrapper.findComponent(CreateBranchDialog)
     expect(dialog.exists()).toBe(true)
-    expect(dialog.props('sha')).toBe('abc123')
+    expect(dialog.props('start')).toEqual({ rev: 'abc123', label: 'abc123' })
 
     wrapper.unmount()
   })
@@ -388,38 +342,37 @@ describe('WorktreeContent', () => {
     expect(findButton(wrapper, 'Open in another editor')).toBeTruthy()
   })
 
+  it('FR-BR-01, FR-LOG-11 "New branch from here…" from the log opens the dialog fixed at that commit', async () => {
+    const { wrapper } = await mountAndPickRowMenuItem('New branch from here…')
+
+    const dialog = wrapper.findComponent(CreateBranchDialog)
+    expect(dialog.props('start')).toEqual({ rev: 'abc123', label: 'abc123' })
+
+    wrapper.unmount()
+  })
+
   it('FR-WT-06, FR-LOG-11 "Create worktree here…" from the log opens the dialog pre-filled at that commit', async () => {
     const { wrapper } = await mountAndPickRowMenuItem('Create worktree here…')
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
     expect(dialog.exists()).toBe(true)
-    expect(dialog.props('start')).toEqual({ newBranch: true, start: 'abc123' })
+    expect(dialog.props('start')).toEqual({
+      newBranch: true,
+      start: { rev: 'abc123', label: 'abc123' },
+    })
 
     wrapper.unmount()
   })
 
-  it('FR-REPO-07 a WSL worktree\'s "Create worktree here…" calls ListBranches with the UNC path and opens the dialog with repo path and distro', async () => {
+  it('FR-REPO-07 a WSL worktree\'s "Create worktree here…" opens the dialog with repo path and distro', async () => {
     const { wrapper } = await mountAndPickRowMenuItem('Create worktree here…', {
       path: '/home/u/r',
       distro: 'Ubuntu',
     })
 
-    expect(Facade.ListBranches).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\home\\u\\r')
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
     expect(dialog.props('repoPath')).toBe('/home/u/r')
     expect(dialog.props('distro')).toBe('Ubuntu')
-
-    wrapper.unmount()
-  })
-
-  it('FR-UX-01 a rejected ListBranches for "Create worktree here…" renders ErrorBanner with the error', async () => {
-    Facade.ListBranches.mockRejectedValueOnce(
-      Object.assign(new Error('boom'), { cause: { message: 'list branches failed' } }),
-    )
-    const { wrapper } = await mountAndPickRowMenuItem('Create worktree here…')
-
-    expect(wrapper.findComponent(CreateWorktreeDialog).exists()).toBe(false)
-    expect(wrapper.get('.error-banner').text()).toContain('list branches failed')
 
     wrapper.unmount()
   })
@@ -430,22 +383,26 @@ describe('WorktreeContent', () => {
 
     wrapper
       .findComponent(BranchPicker)
-      .vm.$emit('create-worktree', { newBranch: true, start: 'origin/x' })
+      .vm.$emit('create-worktree', { newBranch: true, start: { ref: 'refs/remotes/origin/x' } })
     await flushPromises()
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
-    expect(dialog.props('start')).toEqual({ newBranch: true, start: 'origin/x' })
-    expect(dialog.props('branches')).toEqual([{ name: 'feature', checkedOutIn: '' }])
+    expect(dialog.props('start')).toEqual({
+      newBranch: true,
+      start: { ref: 'refs/remotes/origin/x' },
+    })
   })
 
   it('FR-BR-01 "New branch from here…" in the branch picker opens the dialog at that start point', async () => {
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    wrapper.findComponent(BranchPicker).vm.$emit('create-branch', 'origin/x')
+    wrapper.findComponent(BranchPicker).vm.$emit('create-branch', { ref: 'refs/remotes/origin/x' })
     await flushPromises()
 
-    expect(wrapper.findComponent(CreateBranchDialog).props('sha')).toBe('origin/x')
+    expect(wrapper.findComponent(CreateBranchDialog).props('start')).toEqual({
+      ref: 'refs/remotes/origin/x',
+    })
   })
 
   it('FR-BR-09 a tag picked in the branch picker warns, then checks out detached', async () => {
@@ -463,21 +420,20 @@ describe('WorktreeContent', () => {
     wrapper.unmount()
   })
 
-  // detailsWithFile seeds the log store's selected commit, one changed file.
-  function detailsWithFile(path: string) {
-    return {
-      sha: 'abc123',
-      parents: [],
-      author: '',
-      authorEmail: '',
-      authorAt: 0,
-      committer: '',
-      committerEmail: '',
-      committerAt: 0,
-      body: '',
-      files: [{ path, status: 'M' }],
-    }
-  }
+  it('FR-BR-05 a branch picked that is checked out elsewhere shows the dialog with that branch and path', async () => {
+    const { wrapper, body } = await mountInBody(WorktreeContent, {
+      props: { path: '/home/user/project' },
+    })
+
+    wrapper.findComponent(BranchPicker).vm.$emit('checkout-elsewhere', 'side', '/repo-side')
+    await flushPromises()
+
+    const dialog = wrapper.findComponent(BranchInWorktreeDialog)
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.props()).toMatchObject({ branch: 'side', path: '/repo-side' })
+    expect(body.get('.p-dialog').text()).toContain('side')
+    wrapper.unmount()
+  })
 
   it('FR-DIFF-07 the main window shows no diff: a commit file and a changed file open in the diff window', async () => {
     Facade.Status.mockResolvedValue(
@@ -485,7 +441,7 @@ describe('WorktreeContent', () => {
     )
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
-    useLogStore().details = detailsWithFile('x.txt')
+    useLogStore().details = commitDetailsFixture({ files: [{ path: 'x.txt', status: 'M' }] })
     await flushPromises()
     const commitFile = wrapper.get('.commit-details li')
     const changedFile = wrapper.get('.changes-body li')
@@ -508,9 +464,7 @@ describe('WorktreeContent', () => {
       { path: 'a.txt', status: 'M' },
       { path: 'b.txt', status: 'A' },
     ])
-    const compare = useCompareStore()
-    compare.toggleSelect('/home/user/project', commitRow({ sha: 'sha-a' }), 7)
-    compare.toggleSelect('/home/user/project', commitRow({ sha: 'sha-b' }), 2)
+    useLogStore().selection = [commitRow({ sha: 'sha-a' }), commitRow({ sha: 'sha-b' })]
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
     const file = wrapper.findAll('.compare-view .files li')[1]!
@@ -549,7 +503,7 @@ describe('WorktreeContent', () => {
     await flushPromises()
     expect(loadSpy).toHaveBeenCalledTimes(1)
 
-    emit('repo:changed', { data: { scope: 'index' } })
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
 
     expect(loadSpy).toHaveBeenCalledTimes(2)
@@ -562,12 +516,31 @@ describe('WorktreeContent', () => {
     await flushPromises()
     Facade.Status.mockClear()
 
-    emit('repo:changed', { sender: 'window-2', data: { scope: 'index' } })
+    emit('repo:changed', { sender: 'window-2', data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
     expect(Facade.Status).not.toHaveBeenCalled()
 
-    emit('repo:changed', { data: { scope: 'index' } })
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
     expect(Facade.Status).toHaveBeenCalledWith('/repo')
+  })
+
+  it('ADR-4 after a WSL core restart the typed commit message goes to the new core, then the window reloads', async () => {
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {})
+    let draftSaved!: () => void
+    mountView({ path: '/repo' })
+    await flushPromises()
+    Facade.SetMessageDraft.mockReturnValue(new Promise<void>((r) => (draftSaved = r)))
+    useChangesStore().message = 'half-typed'
+
+    emit('core:reconnected')
+    await flushPromises()
+
+    expect(Facade.SetMessageDraft).toHaveBeenCalledWith('/repo', 'half-typed')
+    expect(reload).not.toHaveBeenCalled()
+    draftSaved()
+    await flushPromises()
+    expect(reload).toHaveBeenCalledTimes(1)
+    reload.mockRestore()
   })
 })

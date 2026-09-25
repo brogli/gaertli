@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { basename, parentPath, repoPath } from './path'
+import { basename, joinPath, lastSegment, parentPath, repoPath, withLastSegment } from './path'
 
 describe('basename and parentPath', () => {
   it.each([
@@ -33,4 +33,35 @@ describe('repoPath', () => {
     const unc = '\\\\wsl.localhost\\Ubuntu\\home\\u\\r'
     expect(repoPath(unc, 'Ubuntu')).toBe(unc)
   })
+})
+
+describe('joinPath', () => {
+  it.each([
+    ['POSIX', '/home/u', 'wt', '/home/u/wt'],
+    ['POSIX trailing separator', '/home/u/', 'wt', '/home/u/wt'],
+    ['POSIX root', '/', 'wt', '/wt'],
+    ['Windows', 'C:\\Users\\u', 'wt', 'C:\\Users\\u\\wt'],
+    ['drive root', 'C:\\', 'wt', 'C:\\wt'],
+    ['UNC', '\\\\wsl.localhost\\Ubuntu\\home', 'wt', '\\\\wsl.localhost\\Ubuntu\\home\\wt'],
+    ['no folder', '', 'wt', 'wt'],
+  ])("FR-WT-02 joins a %s folder and a name in the folder's style", (_, folder, name, joined) => {
+    expect(joinPath(folder, name)).toBe(joined)
+  })
+})
+
+describe('lastSegment and withLastSegment', () => {
+  it.each([
+    ['POSIX', '/home/u/wt', 'wt', '/home/u/x'],
+    ['Windows', 'C:\\Users\\wt', 'wt', 'C:\\Users\\x'],
+    ['trailing separator', '/home/u/', '', '/home/u/x'],
+    ['no separator', 'wt', 'wt', 'x'],
+    ['empty', '', '', 'x'],
+  ])(
+    'FR-WT-02 reads and replaces the raw text after the last separator of a %s path',
+    (_, path, last, replaced) => {
+      expect(lastSegment(path)).toBe(last)
+      expect(withLastSegment(path, 'x')).toBe(replaced)
+      expect(withLastSegment(path, lastSegment(path))).toBe(path)
+    },
+  )
 })

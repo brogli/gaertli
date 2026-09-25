@@ -1,0 +1,11 @@
+# Diff
+
+| ID | Prio | Requirement |
+|---|---|---|
+| FR-DIFF-01 | MUST | Show git's own diff, side by side or unified: the user's git config (diff algorithm, attributes, filters, line endings) decides which lines changed, and changed lines are marked whole. The user switches between the two; the choice is remembered. |
+| FR-DIFF-02 | MUST | Jump to next/previous change and next/previous file. |
+| FR-DIFF-03 | MUST | Binary files are shown as "binary", without content. |
+| FR-DIFF-04 | MUST | Very large files do not freeze the app. Warn and load on demand. |
+| FR-DIFF-05 | SHOULD | Syntax highlighting. |
+| FR-DIFF-06 | SHOULD | Ignore whitespace on demand: the diff is then git's whitespace-ignoring diff, for reading only. The control names the diff's state: "Showing whitespace" or "Ignoring whitespace". Hunk and line actions are offered only with whitespace shown; the view says so. |
+| FR-DIFF-07 | MUST | Diffs are read in a window of their own, the diff window: every file diff opens there by double-clicking the file or pressing Enter on it, and the main window shows no diff. The diff window lists the changed files of what it shows (a commit, a comparison or the working tree) and shows the chosen file's diff; for a working-tree file it offers hunk and line staging and discard (FR-CHG-03, FR-CHG-10). One diff window per main window; opening another diff reuses it. Escape or its close button closes it; the main window stays usable while it is open. |

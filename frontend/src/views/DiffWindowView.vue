@@ -4,10 +4,14 @@ import { Window } from '@wailsio/runtime'
 import { useEventListener } from '@vueuse/core'
 import { useI18n } from '../i18n'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { DiffKind, type DiffTarget } from '../lib/diffTarget'
-import { useWindowEvent } from '../lib/windowEvents'
+import {
+  ChangeScope,
+  type ChangedFile,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '../lib/diffTarget'
+import { useRepoChanged, useWindowEvent } from '../lib/windowEvents'
 import { useChangesStore } from '../stores/changes'
+import { useDiffStore } from '../stores/diff'
 import { useCoreCall } from '../composables/useCoreCall'
 import { useOpenInEditor } from '../composables/useOpenInEditor'
 import ErrorBanner from '../components/ErrorBanner.vue'
@@ -24,6 +28,7 @@ const wt = ref(props.wt)
 const target = ref(props.target)
 const files = ref<ChangedFile[]>([])
 const changes = useChangesStore()
+const diff = useDiffStore()
 const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(wt, run)
 const { t } = useI18n()
@@ -60,7 +65,7 @@ const currentIndex = computed(() =>
 const current = computed(() => entries.value[currentIndex.value])
 
 function show(file: ChangedFile, staged: boolean): void {
-  target.value = { ...target.value, path: file.path, oldPath: file.oldPath ?? '', staged }
+  target.value = fileTarget(file, { ...target.value, staged })
 }
 
 // stepFile shows the next or previous file of the list; a no-op past
@@ -70,33 +75,17 @@ function stepFile(step: 1 | -1): void {
   if (currentIndex.value >= 0 && next) show(next.file, next.staged)
 }
 
-// diffProps is DiffView's prop for the target's kind.
-const diffProps = computed(() => {
-  const t = target.value
-  const file = { path: t.path, oldPath: t.oldPath ?? '' }
-  switch (t.kind) {
-    case DiffKind.CommitDiff:
-      return { commit: { sha: t.sha ?? '', ...file } }
-    case DiffKind.RangeDiff:
-      return { range: { from: t.from ?? '', to: t.to ?? '', ...file } }
-    case DiffKind.AgainstWorkingDiff:
-      return { workingCompare: { sha: t.sha ?? '', ...file } }
-    default:
-      return { working: { ...file, staged: !!t.staged, status: current.value?.file.status ?? '' } }
-  }
-})
-
 async function loadFiles(): Promise<void> {
-  const t = target.value
-  switch (t.kind) {
+  const { kind, sha = '', from = '', to = '' } = target.value
+  switch (kind) {
     case DiffKind.CommitDiff:
-      files.value = (await Facade.CommitDetails(wt.value, t.sha ?? '')).files ?? []
+      files.value = (await Facade.CommitDetails(wt.value, sha)).files ?? []
       return
     case DiffKind.RangeDiff:
-      files.value = (await Facade.CompareCommits(wt.value, t.from ?? '', t.to ?? '')) ?? []
+      files.value = (await Facade.CompareCommits(wt.value, from, to)) ?? []
       return
     case DiffKind.AgainstWorkingDiff:
-      files.value = (await Facade.CompareWithWorking(wt.value, t.sha ?? '')) ?? []
+      files.value = (await Facade.CompareWithWorking(wt.value, sha)) ?? []
       return
     default:
       await changes.load(wt.value)
@@ -113,14 +102,16 @@ watch(listSource, () => void run(loadFiles), { immediate: true })
 
 // repo:changed{scope:"index"} covers staging and outside edits, which
 // change the working tree's lists.
-useWindowEvent('repo:changed', (ev) => {
-  const kind = target.value.kind
-  if (
-    ev.data.scope === 'index' &&
-    (kind === DiffKind.WorkingDiff || kind === DiffKind.AgainstWorkingDiff)
-  ) {
-    void run(loadFiles)
-  }
+useRepoChanged([ChangeScope.IndexChanged], () => {
+  if (readsWorkingTree(target.value)) void run(loadFiles)
+})
+
+// A restarted WSL core may see a changed repo: the list and the diff reload.
+// Not a page reload: the URL names the window's first target, not its
+// current one.
+useWindowEvent('core:reconnected', () => {
+  void run(loadFiles)
+  void run(() => diff.refetch())
 })
 
 // diff:show turns this window to what its main window opened.
@@ -163,7 +154,12 @@ useEventListener(
         <ChangedFileList :files="conflicted" @open="openEditor" @open-editor="openEditor" />
       </template>
     </aside>
-    <DiffView :wt="wt" v-bind="diffProps" @step-file="stepFile" />
+    <DiffView
+      :wt="wt"
+      :target="target"
+      :status="current?.file.status ?? ''"
+      @step-file="stepFile"
+    />
   </div>
 </template>
 
@@ -178,6 +174,7 @@ useEventListener(
   overflow: auto;
   flex: 0 0 auto;
   max-width: 35%;
+  padding-left: 0.6rem;
 }
 .file-list h3 {
   margin: 0.5rem 0 0.2rem;

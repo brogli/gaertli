@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -51,11 +52,6 @@ func (f *fake) ListWorktrees(_ context.Context, path core.RepoPath) ([]core.Work
 	return nil, nil
 }
 
-func (f *fake) ListBranches(_ context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
-	f.recordPath("ListBranches", string(path))
-	return nil, nil
-}
-
 func (f *fake) AddWorktree(_ context.Context, path core.RepoPath, target, _, _ string, _ bool) (core.Worktree, error) {
 	f.recordPath("AddWorktree", string(path))
 	f.recordPath("AddWorktree:target", target)
@@ -85,6 +81,21 @@ func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {
 		f.sink = sink
 		return f
 	}, sink)
+}
+
+func TestADR_3_ClosingAClientDoesNotWaitForTheCoresOutputToEnd(t *testing.T) {
+	r, w := io.Pipe()
+	t.Cleanup(func() { _ = w.Close() })
+	client := remote.NewClient(r, io.Discard, nil)
+
+	closed := make(chan struct{})
+	go func() { _ = client.Close(); close(closed) }()
+
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close still waits 1s later for the core's output to end")
+	}
 }
 
 func TestADR_3_VersionCallCrossesThePipe(t *testing.T) {

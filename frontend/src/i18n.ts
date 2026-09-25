@@ -3,8 +3,8 @@ import en from './locales/en.json'
 
 type MessageSchema = typeof en
 
-// Module augmentation, so a raw `t()` typed through Composer (as
-// commitMenu.ts's Translate does) infers this schema.
+// Module augmentation, so a raw `t()` typed through Composer (as this
+// file's own Translate, below, does) infers this schema.
 declare module 'vue-i18n' {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- declaration merging needs this exact shape
   export interface DefineLocaleMessage extends MessageSchema {}

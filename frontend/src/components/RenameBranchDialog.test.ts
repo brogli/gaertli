@@ -7,6 +7,7 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade
 
 import RenameBranchDialog from './RenameBranchDialog.vue'
 import { mountInBody } from '../testing/mountInBody'
+import { fieldLabels, footerButtons } from '../testing/dialog'
 
 describe('RenameBranchDialog', () => {
   beforeEach(() => {
@@ -19,7 +20,7 @@ describe('RenameBranchDialog', () => {
       props: { wt: '/repo', name: 'feature' },
     })
 
-    const input = body.get('input').element as HTMLInputElement
+    const input = body.get('input').element
     expect(input.value).toBe('feature')
 
     await body.get('input').setValue('renamed')
@@ -32,7 +33,7 @@ describe('RenameBranchDialog', () => {
 
   it('FR-BR-06 shows the rejection message and keeps the dialog open on failure', async () => {
     Facade.RenameBranch.mockRejectedValueOnce(
-      Object.assign(new Error('boom'), { cause: { message: '"-bad" is not a valid branch name' } }),
+      new Error('boom', { cause: { message: '"-bad" is not a valid branch name' } }),
     )
     const { wrapper, body } = await mountInBody(RenameBranchDialog, {
       props: { wt: '/repo', name: 'feature' },
@@ -44,5 +45,16 @@ describe('RenameBranchDialog', () => {
 
     expect(body.text()).toContain('is not a valid branch name')
     expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  it('FR-UX-17 the name has its own label; Cancel and Rename sit together at the bottom', async () => {
+    const { wrapper, body } = await mountInBody(RenameBranchDialog, {
+      props: { wt: '/repo', name: 'feature' },
+    })
+
+    expect(fieldLabels(body)).toEqual(['Branch name'])
+    expect(footerButtons(body)).toEqual(['Cancel', 'Rename'])
+    await body.get('[data-test="dialog-cancel"]').trigger('click')
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 })

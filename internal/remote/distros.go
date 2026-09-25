@@ -2,7 +2,6 @@ package remote
 
 import (
 	"encoding/binary"
-	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -15,49 +14,45 @@ func wslPresent() bool {
 	return err == nil
 }
 
-// parseDistroList parses `wsl --list --verbose`'s output, UTF-16LE when
-// piped. It skips the header line by position, not by its localized text,
-// and reads each row from the end: VERSION last, STATE (localized, unused)
-// second-last, the rest re-joined as NAME, so a name with spaces parses. The
-// default distro's leading '*' is skipped.
-func parseDistroList(raw []byte) ([]Distro, error) {
-	var rows []string
-	for line := range strings.Lines(decodeWSLText(raw)) {
-		if line = strings.TrimSpace(line); line != "" {
-			rows = append(rows, line)
-		}
+// distrosOf lists the distros `wsl --list --quiet` names, one per line,
+// each with the WSL version `wsl --list --verbose` prints on the row that
+// starts with its name: the row's last field. Nothing else of the verbose
+// table is read, so its localized titles and states, the default marker
+// and any other line do not matter. A name with no such row, or no number
+// there, has Version 0. Both outputs are UTF-16LE when piped from an old
+// wsl.exe.
+func distrosOf(quiet, verbose []byte) []Distro {
+	rows := lines(verbose)
+	var distros []Distro
+	for _, name := range lines(quiet) {
+		distros = append(distros, Distro{Name: name, Version: versionOf(name, rows)})
 	}
-	if len(rows) == 0 {
-		return nil, nil
-	}
-	rows = rows[1:] // drop the header
-
-	distros := make([]Distro, 0, len(rows))
-	for _, row := range rows {
-		d, err := parseDistroRow(row)
-		if err != nil {
-			return nil, err
-		}
-		distros = append(distros, d)
-	}
-	return distros, nil
+	return distros
 }
 
-func parseDistroRow(row string) (Distro, error) {
-	fields := strings.Fields(row)
-	if len(fields) > 0 && fields[0] == "*" {
-		fields = fields[1:]
+// versionOf is the last field of the first of rows that holds name and then
+// more, 0 if none or not a number.
+func versionOf(name string, rows []string) int {
+	for _, row := range rows {
+		rest, ok := strings.CutPrefix(strings.TrimLeft(row, "* "), name)
+		fields := strings.Fields(rest)
+		if ok && len(fields) > 0 && strings.TrimLeft(rest, " \t") != rest {
+			version, _ := strconv.Atoi(fields[len(fields)-1])
+			return version
+		}
 	}
-	if len(fields) < 3 {
-		return Distro{}, fmt.Errorf("parseDistroList: bad row %q", row)
-	}
+	return 0
+}
 
-	version, err := strconv.Atoi(fields[len(fields)-1])
-	if err != nil {
-		return Distro{}, fmt.Errorf("parseDistroList: bad row %q: %w", row, err)
+// lines is raw's non-blank lines, trimmed.
+func lines(raw []byte) []string {
+	var out []string
+	for line := range strings.Lines(decodeWSLText(raw)) {
+		if line = strings.TrimSpace(line); line != "" {
+			out = append(out, line)
+		}
 	}
-	name := strings.Join(fields[:len(fields)-2], " ")
-	return Distro{Name: name, Version: version}, nil
+	return out
 }
 
 // decodeWSLText undoes wsl.exe's own UTF-16LE-when-piped behaviour: a BOM

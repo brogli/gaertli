@@ -44,9 +44,6 @@ func handlers(api core.API) handler.Map {
 		"CompareWithWorking": handler.New(func(ctx context.Context, p compareWithWorkingParams) ([]core.ChangedFile, error) {
 			return api.CompareWithWorking(ctx, p.Wt, p.Sha)
 		}),
-		"ConfiguredPullMode": handler.New(func(ctx context.Context, p configuredPullModeParams) (core.PullMode, error) {
-			return api.ConfiguredPullMode(ctx, p.Wt)
-		}),
 		"ContinueOperation": handler.New(func(ctx context.Context, p continueOperationParams) error {
 			return api.ContinueOperation(ctx, p.Wt)
 		}),
@@ -80,14 +77,14 @@ func handlers(api core.API) handler.Map {
 		"Fetch": handler.New(func(ctx context.Context, p fetchParams) (string, error) {
 			return api.Fetch(ctx, p.Wt, p.Remote)
 		}),
+		"Fixup": handler.New(func(ctx context.Context, p fixupParams) (core.SquashResult, error) {
+			return api.Fixup(ctx, p.Wt, p.Shas)
+		}),
 		"ForcePush": handler.New(func(ctx context.Context, p forcePushParams) (string, error) {
 			return api.ForcePush(ctx, p.Wt)
 		}),
 		"Jobs": handler.New(func(ctx context.Context, p jobsParams) ([]core.JobInfo, error) {
 			return api.Jobs(ctx, p.Wt)
-		}),
-		"ListBranches": handler.New(func(ctx context.Context, p listBranchesParams) ([]core.BranchSummary, error) {
-			return api.ListBranches(ctx, p.Path)
 		}),
 		"ListWorktrees": handler.New(func(ctx context.Context, p listWorktreesParams) ([]core.Worktree, error) {
 			return api.ListWorktrees(ctx, p.Path)
@@ -152,6 +149,9 @@ func handlers(api core.API) handler.Map {
 		"Revert": handler.New(func(ctx context.Context, p revertParams) error {
 			return api.Revert(ctx, p.Wt, p.Shas, p.Opts)
 		}),
+		"SearchLog": handler.New(func(ctx context.Context, p searchLogParams) (core.LogSearchResult, error) {
+			return api.SearchLog(ctx, p.Wt, p.Query)
+		}),
 		"SetEditorProfile": handler.New(func(ctx context.Context, p setEditorProfileParams) error {
 			return api.SetEditorProfile(ctx, p.Profile)
 		}),
@@ -166,6 +166,12 @@ func handlers(api core.API) handler.Map {
 		}),
 		"SkipOperation": handler.New(func(ctx context.Context, p skipOperationParams) error {
 			return api.SkipOperation(ctx, p.Wt)
+		}),
+		"Squash": handler.New(func(ctx context.Context, p squashParams) (core.SquashResult, error) {
+			return api.Squash(ctx, p.Wt, p.Shas, p.Message)
+		}),
+		"SquashCheck": handler.New(func(ctx context.Context, p squashCheckParams) (core.SquashCheck, error) {
+			return api.SquashCheck(ctx, p.Wt, p.Shas)
 		}),
 		"StageAll": handler.New(func(ctx context.Context, p stageAllParams) error {
 			return api.StageAll(ctx, p.Wt)

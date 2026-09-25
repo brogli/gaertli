@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,10 +13,24 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_LOG_05_BuildFilterArgsQuery(t *testing.T) {
-	args := LogArgs(core.LogFilter{Query: "bug"})
+func TestFR_LOG_05_LogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
+	args := LogArgs(core.LogFilter{Author: "a", Branches: []string{"main"}, Path: "p"})
+	if slices.ContainsFunc(args, func(a string) bool { return strings.HasPrefix(a, "--grep") }) {
+		t.Errorf("args = %v, want no --grep: LogArgs does not search", args)
+	}
 
-	for _, want := range []string{"--grep=bug", "--regexp-ignore-case", "--fixed-strings", "--exclude=refs/stash", "--all"} {
+	if !(core.LogFilter{Author: "a"}).Flat() {
+		t.Error("Flat() = false for an Author filter, want true")
+	}
+	if (core.LogFilter{Branches: []string{"main"}}).Flat() || (core.LogFilter{Path: "p"}).Flat() {
+		t.Error("Flat() = true for Branches or Path alone, want false")
+	}
+}
+
+func TestFR_LOG_05_SearchArgsBuildsAGrepPass(t *testing.T) {
+	args := searchArgs(core.LogFilter{}, "bug")
+
+	for _, want := range []string{"--grep=bug", "--regexp-ignore-case", "--fixed-strings", "--exclude=refs/stash", "--all", "--format=%H"} {
 		if !slices.Contains(args, want) {
 			t.Errorf("args = %v, want to contain %q", args, want)
 		}
@@ -50,9 +65,9 @@ func TestFR_LOG_07_BuildFilterArgsPath(t *testing.T) {
 }
 
 func TestFR_LOG_08_BuildFilterArgsCombined(t *testing.T) {
-	args := LogArgs(core.LogFilter{Query: "q", Author: "a", Branches: []string{"main"}, Path: "p"})
+	args := LogArgs(core.LogFilter{Author: "a", Branches: []string{"main"}, Path: "p"})
 
-	for _, want := range []string{"--grep=q", "--author=a", "--regexp-ignore-case", "--fixed-strings"} {
+	for _, want := range []string{"--author=a", "--regexp-ignore-case", "--fixed-strings"} {
 		if !slices.Contains(args, want) {
 			t.Errorf("args = %v, want to contain %q", args, want)
 		}
@@ -91,88 +106,124 @@ func TestFR_LOG_05_HashPatternMatchesHexOnly(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_05_SetLogFilterByTextNarrowsAndIsFlat(t *testing.T) {
+func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first commit")
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "urgent fix")
-	gittest.Commit(t, repo.Dir, "c.txt", "c", "third commit")
+	gittest.Commit(t, repo.Dir, "c.txt", "c", "another Fix here")
+	gittest.Commit(t, repo.Dir, "d.txt", "d", "unrelated")
 
 	c, wt := openWorktree(t, repo.Dir)
-	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: "urgent"}); err != nil {
+	if err := c.LoadLog(t.Context(), wt); err != nil {
 		t.Fatal(err)
 	}
-	res := waitForLogRows(t, c, wt)
+	loaded := waitForLogRows(t, c, wt)
 
-	if len(res.Rows) != 1 || res.Rows[0].Subject != "urgent fix" {
-		t.Fatalf("Rows = %+v, want exactly the matching commit", res.Rows)
+	res, err := c.SearchLog(t.Context(), wt, "fix")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if edges := res.Rows[0].Graph.Edges; len(edges) != 0 {
-		t.Errorf("Graph.Edges = %+v, want no graph for a text query", edges)
+	if res.Generation != loaded.Generation {
+		t.Errorf("Generation = %d, want the loaded view's %d", res.Generation, loaded.Generation)
+	}
+	if res.Filtered {
+		t.Error("Filtered = true, want false: no filter active, this is the base log")
+	}
+
+	var subjects []string
+	for _, i := range res.Indices {
+		subjects = append(subjects, loaded.Rows[i].Subject)
+	}
+	if !slices.Equal(subjects, []string{"another Fix here", "urgent fix"}) { // newest first, log order
+		t.Errorf("matched subjects = %v, want the two case-insensitive matches in log order", subjects)
 	}
 }
 
-func TestFR_LOG_05_SetLogFilterCombinesQueryAndAuthorWithAND(t *testing.T) {
+func TestFR_LOG_05_SearchLogHexShapedNonexistentQueryFallsBackToMessageSearch(t *testing.T) {
 	repo := gittest.New(t)
-	commitAs(t, repo.Dir, "a.txt", "a", "alpha urgent", "Alice", "alice@example.com")
-	commitAs(t, repo.Dir, "b.txt", "b", "beta calm", "Bob", "bob@example.com")
-	commitAs(t, repo.Dir, "c.txt", "c", "gamma urgent", "Bob", "bob@example.com") // matches Query, wrong Author
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "mentions deadbeef in passing")
 
 	c, wt := openWorktree(t, repo.Dir)
+	rows := loadLog(t, c, wt)
 
-	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: "urgent", Author: "Alice"}); err != nil {
+	res, err := c.SearchLog(t.Context(), wt, "deadbeef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Indices) != 1 || rows[res.Indices[0]].Subject != "mentions deadbeef in passing" {
+		t.Fatalf("Indices = %v, want the one matching commit (a hex-shaped but nonexistent hash is not an error)", res.Indices)
+	}
+}
+
+func TestFR_LOG_05_SearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
+	repo := gittest.New(t)
+	commitAs(t, repo.Dir, "a.txt", "a", "ann's change", "Ann", "ann@example.com")
+	commitAs(t, repo.Dir, "b.txt", "b", "bob's change", "Bob", "bob@example.com")
+	commitAs(t, repo.Dir, "c.txt", "c", "ann again, unrelated", "Ann", "ann@example.com")
+
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Author: "Ann"}); err != nil {
 		t.Fatal(err)
 	}
 	res := waitForLogRows(t, c, wt)
-	if len(res.Rows) != 1 || res.Rows[0].Subject != "alpha urgent" {
-		t.Fatalf("Rows = %+v, want exactly Alice's matching commit (AND, not OR)", res.Rows)
-	}
-
-	// Control: Author alone returns every one of Bob's commits regardless
-	// of message, proving the narrowing above came from the AND, not from
-	// Author alone happening to match one commit.
-	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Author: "Bob"}); err != nil {
-		t.Fatal(err)
-	}
-	res = waitForLogRows(t, c, wt)
 	if len(res.Rows) != 2 {
-		t.Fatalf("Author-only Rows = %+v, want Bob's 2 commits regardless of message", res.Rows)
+		t.Fatalf("filtered Rows = %+v, want exactly Ann's 2 commits", res.Rows)
+	}
+
+	search, err := c.SearchLog(t.Context(), wt, "change")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(search.Indices) != 1 || res.Rows[search.Indices[0]].Subject != "ann's change" {
+		t.Fatalf("Indices = %v (rows %+v), want exactly Ann's matching commit, Bob's excluded by the active filter", search.Indices, res.Rows)
+	}
+	if !search.Filtered {
+		t.Error("Filtered = false, want true: the Author filter is active")
 	}
 }
 
-func TestFR_LOG_05_SetLogFilterByHashResolvesAndPopulatesCheckedOutIn(t *testing.T) {
+func TestFR_LOG_05_SearchLogByHashOutsideFilteredViewReturnsNoIndices(t *testing.T) {
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "base")
-	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
-	sha := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "branch", "feature")
-	linked := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
-	gittest.Run(t, repo.Dir, "switch", "--detach", "HEAD~1") // move the main worktree off "second": linked is now the only one there
+	_, _ = branchAndTagNamedV1(t, repo.Dir)
+	outsideSHA := gittest.HeadSHA(t, repo.Dir) // "third", past v1's history
 
 	c, wt := openWorktree(t, repo.Dir)
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"refs/tags/v1"}}); err != nil {
+		t.Fatal(err)
+	}
+	waitForLogRows(t, c, wt)
 
-	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: sha[:4]}); err != nil {
+	res, err := c.SearchLog(t.Context(), wt, outsideSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Indices) != 0 {
+		t.Errorf("Indices = %v, want none: %s is outside v1's history", res.Indices, outsideSHA)
+	}
+	if !res.Filtered {
+		t.Error("Filtered = false, want true: the tag filter is active")
+	}
+}
+
+func TestFR_LOG_05_SearchLogByHashInsideFilteredViewReturnsItsIndex(t *testing.T) {
+	repo := gittest.New(t)
+	_, tagSHA := branchAndTagNamedV1(t, repo.Dir)
+
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"refs/tags/v1"}}); err != nil {
 		t.Fatal(err)
 	}
 	res := waitForLogRows(t, c, wt)
-	if len(res.Rows) != 1 || res.Rows[0].SHA != sha {
-		t.Fatalf("Rows = %+v, want exactly sha %s", res.Rows, sha)
-	}
-	if got := res.Rows[0].CheckedOutIn; len(got) != 1 || got[0] != linked {
-		t.Errorf("CheckedOutIn = %v, want [%s]", got, linked)
-	}
 
-	// A hex-shaped but non-existent query falls through to an ordinary
-	// (zero-result) --grep search, not an error.
-	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Query: "deadbeef"}); err != nil {
+	search, err := c.SearchLog(t.Context(), wt, tagSHA)
+	if err != nil {
 		t.Fatal(err)
 	}
-	res = waitForLogRows(t, c, wt)
-	if res.Error != nil {
-		t.Fatalf("Error = %v, want nil (zero-result search, not an error)", res.Error)
+	if len(search.Indices) != 1 || res.Rows[search.Indices[0]].SHA != tagSHA {
+		t.Fatalf("Indices = %v, want exactly tagSHA %s's row in the filtered view", search.Indices, tagSHA)
 	}
-	if len(res.Rows) != 0 {
-		t.Errorf("Rows = %+v, want zero results", res.Rows)
+	if !search.Filtered {
+		t.Error("Filtered = false, want true: the tag filter is active")
 	}
 }
 
@@ -181,13 +232,14 @@ func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "root.txt", "r", "root")
 	gittest.Run(t, repo.Dir, "branch", "feature")
 	gittest.Commit(t, repo.Dir, "main.txt", "m", "on main")
+	gittest.Run(t, repo.Dir, "tag", "feature") // named like the branch, on another commit
 	gittest.Run(t, repo.Dir, "switch", "feature")
 	gittest.Commit(t, repo.Dir, "feature.txt", "f", "on feature")
 	gittest.Run(t, repo.Dir, "switch", "master")
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"feature"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"refs/heads/feature"}}); err != nil {
 		t.Fatal(err)
 	}
 	res := waitForLogRows(t, c, wt)
@@ -204,6 +256,26 @@ func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 	}
 	if len(res.Rows) != 2 || !subjects["root"] || !subjects["on feature"] {
 		t.Fatalf("Rows = %+v, want exactly feature's own history (root, on feature)", res.Rows)
+	}
+}
+
+func TestFR_LOG_06_SetLogFilterByTagShowsTheHistoryLeadingToIt(t *testing.T) {
+	repo := gittest.New(t)
+	branchAndTagNamedV1(t, repo.Dir) // v1: a branch at "first", an annotated tag at "second"
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"refs/tags/v1"}}); err != nil {
+		t.Fatal(err)
+	}
+	res := waitForLogRows(t, c, wt)
+
+	var subjects []string
+	for _, r := range res.Rows {
+		subjects = append(subjects, r.Subject)
+	}
+	if !slices.Equal(subjects, []string{"second", "first"}) {
+		t.Errorf("subjects = %q, want the tag's history [second first]", subjects)
 	}
 }
 
@@ -248,7 +320,7 @@ func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) 
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	filter := core.LogFilter{Author: "Alice", Branches: []string{"feature"}, Path: "target.txt"}
+	filter := core.LogFilter{Author: "Alice", Branches: []string{"refs/heads/feature"}, Path: "target.txt"}
 	if err := c.SetLogFilter(t.Context(), wt, filter); err != nil {
 		t.Fatal(err)
 	}
@@ -266,12 +338,9 @@ func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T
 
 	c, id := openWorktree(t, repo.Dir)
 	rec := recordCommands(t, c, id)
-	if err := c.LoadLog(t.Context(), id); err != nil {
-		t.Fatal(err)
-	}
-	waitForLog(t, c, id)
+	loadLog(t, c, id)
 
-	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Query: "second"}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Path: "b.txt"}); err != nil {
 		t.Fatal(err)
 	}
 	waitForLogRows(t, c, id)

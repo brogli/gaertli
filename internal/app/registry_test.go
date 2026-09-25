@@ -297,7 +297,7 @@ func TestADR_9_OpenOrFocusReopensTheEmptySelectionAfterItIsClosed(t *testing.T) 
 	}
 }
 
-func TestOpenWorktreePathsListsOpenWindows(t *testing.T) {
+func TestFR_REPO_02_OpenWorktreePathsListsOpenWindows(t *testing.T) {
 	r, _ := newTestRegistry()
 
 	r.OpenOrFocus("a", "/a", "")
@@ -347,7 +347,7 @@ func TestQA_PERF_06_ClosingAWindowCallsCloseWorktreeOnTheLocalCore(t *testing.T)
 	}
 }
 
-func TestOpenWorktreePathsDropsAClosedWindow(t *testing.T) {
+func TestFR_REPO_02_OpenWorktreePathsDropsAClosedWindow(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("a", "/a", "")
@@ -417,14 +417,22 @@ func pipeAPIClient(t *testing.T, api core.API) *remote.Client {
 	return remotetest.NewPipeClient(t, func(core.EventSink) core.API { return api }, nil)
 }
 
+// serveDistroCores makes every distro core r creates serve api over one
+// pipe, and returns that pipe's client.
+func serveDistroCores(t *testing.T, r *Registry, api core.API) *remote.Client {
+	t.Helper()
+	client := pipeAPIClient(t, api)
+	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: client} }
+	return client
+}
+
 // fakeDistroCore is a distroCorer that always returns client, reporting
 // respawned only on its first Ensure call, and calling onConnect on that
 // same first call, the way the real DistroCore.Ensure fires it.
 type fakeDistroCore struct {
-	client               *remote.Client
-	calls                int
-	installLauncherCalls []string // guiExePath values passed to InstallLauncher
-	onConnect            func(context.Context, *remote.Client)
+	client    *remote.Client
+	calls     int
+	onConnect func(context.Context, *remote.Client)
 }
 
 func (f *fakeDistroCore) Ensure(ctx context.Context) (*remote.Client, bool, error) {
@@ -433,11 +441,6 @@ func (f *fakeDistroCore) Ensure(ctx context.Context) (*remote.Client, bool, erro
 		f.onConnect(ctx, f.client)
 	}
 	return f.client, f.calls == 1, nil
-}
-
-func (f *fakeDistroCore) InstallLauncher(_ context.Context, guiExePath string) error {
-	f.installLauncherCalls = append(f.installLauncherCalls, guiExePath)
-	return nil
 }
 
 func (f *fakeDistroCore) OnConnect(fn func(context.Context, *remote.Client)) { f.onConnect = fn }
@@ -450,8 +453,7 @@ func (f *fakeDistroCore) LiveClient() (*remote.Client, bool) {
 
 func TestADR_3_CoreForRoutesAWSLPathToItsDistro(t *testing.T) {
 	r, _ := newTestRegistry()
-	distroClient := pipeAPIClient(t, fakeAPI{})
-	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
+	serveDistroCores(t, r, fakeAPI{})
 
 	got, err := r.CoreFor(core.RepoPath(`\\wsl.localhost\Ubuntu-22.04\home\user\project`))
 	if err != nil {
@@ -472,8 +474,7 @@ func TestADR_3_CoreForRoutesAWSLPathToItsDistro(t *testing.T) {
 
 func TestADR_3_CoreOfRoutesByTheIDAlone(t *testing.T) {
 	r, _ := newTestRegistry()
-	distroClient := pipeAPIClient(t, fakeAPI{})
-	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
+	distroClient := serveDistroCores(t, r, fakeAPI{})
 
 	local, localID, err := r.CoreOf(t.Context(), "/local/r")
 	if err != nil {
@@ -624,6 +625,35 @@ func TestADR_4_CoreOfReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
 	}
 }
 
+// A path call (opening another folder of the distro) can be the first to
+// find the core dead; the distro's windows are reopened and told all the
+// same.
+func TestADR_4_CoreForReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
+	r, opener := newTestRegistry()
+	var mu sync.Mutex
+	var opened []string
+	serveDistroCores(t, r, fakeAPI{openWorktree: func(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		opened = append(opened, string(path))
+		return core.WorktreeInfo{Path: string(path)}, nil
+	}})
+	r.OpenOrFocus(`\\wsl.localhost\Ubuntu-22.04\a`, "/a", "Ubuntu-22.04")
+
+	if _, err := r.CoreFor(`\\wsl.localhost\Ubuntu-22.04\other`); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []string{"/a"}; !slices.Equal(opened, want) {
+		t.Errorf("reopened paths = %v, want %v", opened, want)
+	}
+	if got := eventNames(opener.windows[0]); !slices.Equal(got, []string{"core:reconnected"}) {
+		t.Errorf("events = %v, want [core:reconnected]", got)
+	}
+}
+
 func TestADR_9_SelectInWindowMovesTheWindowsSelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
@@ -641,8 +671,7 @@ func TestADR_9_SelectInWindowMovesTheWindowsSelection(t *testing.T) {
 func TestADR_9_SwitchingReleasesThePreviousSelectionThroughItsOwnCore(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
-	distroClient := pipeAPIClient(t, fakeAPI{closed: &closed})
-	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
+	serveDistroCores(t, r, fakeAPI{closed: &closed})
 
 	r.OpenOrFocus(`\\wsl.localhost\Ubuntu-22.04\a`, "/a", "Ubuntu-22.04")
 	previous, ok := r.SelectInWindow(opener.windows[0].ID(), "B", "/b", "")
@@ -697,8 +726,7 @@ func TestADR_9_InUseIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
 func TestADR_9_ClosingAWindowClosesItsSelectionThroughTheRealCore(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
-	distroClient := pipeAPIClient(t, fakeAPI{closed: &closed})
-	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
+	serveDistroCores(t, r, fakeAPI{closed: &closed})
 
 	r.OpenOrFocus(`\\wsl.localhost\Ubuntu-22.04\a`, "/a", "Ubuntu-22.04")
 	opener.windows[0].close()
@@ -745,9 +773,7 @@ func newLocalShell(t *testing.T, closed *[]core.WorktreeID, calls chan<- routedC
 func openDiffFrom(t *testing.T, sh shell, mainWindow *fakeWindow, wt core.WorktreeID) {
 	t.Helper()
 	s := &AppService{shell: sh}
-	if err := s.OpenDiff(callFrom(mainWindow.ID()), wt, DiffTarget{Kind: WorkingDiff, Path: "f"}); err != nil {
-		t.Fatal(err)
-	}
+	s.OpenDiff(callFrom(mainWindow.ID()), wt, DiffTarget{Kind: WorkingDiff, Path: "f"})
 }
 
 func TestFR_DIFF_07_ADiffWindowOutlivesItsMainWindowAndGetsItsWorktreesEvents(t *testing.T) {
@@ -765,8 +791,8 @@ func TestFR_DIFF_07_ADiffWindowOutlivesItsMainWindowAndGetsItsWorktreesEvents(t 
 	sh.reg.Dispatch(core.Event{Name: "repo:changed", Worktree: "/wt", Payload: index})
 
 	want := []emittedEvent{
-		{"repo:changed", core.RepoChanged{Scope: "index"}},
-		{"repo:changed", core.RepoChanged{Scope: "index"}},
+		{"repo:changed", core.RepoChanged{Scope: core.IndexChanged}},
+		{"repo:changed", core.RepoChanged{Scope: core.IndexChanged}},
 	}
 	if !slices.Equal(diffWindow.emitted, want) {
 		t.Errorf("diff window received %+v, want %+v", diffWindow.emitted, want)
@@ -866,8 +892,7 @@ func TestTR_13_PushEditorProfilesPushesTheLocalCoresProfile(t *testing.T) {
 func TestFR_ED_11_CoreForPushesTheDistrosOwnProfileOnFirstConnect(t *testing.T) {
 	r, _ := newTestRegistry()
 	var pushed []core.EditorProfile
-	distroClient := pipeAPIClient(t, fakeAPI{editorProfiles: &pushed})
-	r.newDistroCore = func(string, core.EventSink) distroCorer { return &fakeDistroCore{client: distroClient} }
+	serveDistroCores(t, r, fakeAPI{editorProfiles: &pushed})
 	store := newTestStore(t)
 	setEditorProfiles(t, store, map[string]core.EditorProfile{
 		"":             {Name: "the editor", FolderCmd: "editor {path}"},

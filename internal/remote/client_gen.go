@@ -121,16 +121,6 @@ func (c *Client) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha
 	return result, err
 }
 
-type configuredPullModeParams struct {
-	Wt core.WorktreeID `json:"wt"`
-}
-
-func (c *Client) ConfiguredPullMode(ctx context.Context, wt core.WorktreeID) (core.PullMode, error) {
-	var result core.PullMode
-	err := c.call(ctx, "ConfiguredPullMode", configuredPullModeParams{Wt: wt}, &result)
-	return result, err
-}
-
 type continueOperationParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -257,6 +247,17 @@ func (c *Client) Fetch(ctx context.Context, wt core.WorktreeID, remote string) (
 	return result, err
 }
 
+type fixupParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Shas []string        `json:"shas"`
+}
+
+func (c *Client) Fixup(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashResult, error) {
+	var result core.SquashResult
+	err := c.call(ctx, "Fixup", fixupParams{Wt: wt, Shas: shas}, &result)
+	return result, err
+}
+
 type forcePushParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -274,16 +275,6 @@ type jobsParams struct {
 func (c *Client) Jobs(ctx context.Context, wt core.WorktreeID) ([]core.JobInfo, error) {
 	var result []core.JobInfo
 	err := c.call(ctx, "Jobs", jobsParams{Wt: wt}, &result)
-	return result, err
-}
-
-type listBranchesParams struct {
-	Path core.RepoPath `json:"path"`
-}
-
-func (c *Client) ListBranches(ctx context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
-	var result []core.BranchSummary
-	err := c.call(ctx, "ListBranches", listBranchesParams{Path: path}, &result)
 	return result, err
 }
 
@@ -492,6 +483,17 @@ func (c *Client) Revert(ctx context.Context, wt core.WorktreeID, shas []string, 
 	return c.call(ctx, "Revert", revertParams{Wt: wt, Shas: shas, Opts: opts}, nil)
 }
 
+type searchLogParams struct {
+	Wt    core.WorktreeID `json:"wt"`
+	Query string          `json:"query"`
+}
+
+func (c *Client) SearchLog(ctx context.Context, wt core.WorktreeID, query string) (core.LogSearchResult, error) {
+	var result core.LogSearchResult
+	err := c.call(ctx, "SearchLog", searchLogParams{Wt: wt, Query: query}, &result)
+	return result, err
+}
+
 type setEditorProfileParams struct {
 	Profile core.EditorProfile `json:"profile"`
 }
@@ -533,6 +535,29 @@ type skipOperationParams struct {
 
 func (c *Client) SkipOperation(ctx context.Context, wt core.WorktreeID) error {
 	return c.call(ctx, "SkipOperation", skipOperationParams{Wt: wt}, nil)
+}
+
+type squashParams struct {
+	Wt      core.WorktreeID `json:"wt"`
+	Shas    []string        `json:"shas"`
+	Message string          `json:"message"`
+}
+
+func (c *Client) Squash(ctx context.Context, wt core.WorktreeID, shas []string, message string) (core.SquashResult, error) {
+	var result core.SquashResult
+	err := c.call(ctx, "Squash", squashParams{Wt: wt, Shas: shas, Message: message}, &result)
+	return result, err
+}
+
+type squashCheckParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Shas []string        `json:"shas"`
+}
+
+func (c *Client) SquashCheck(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashCheck, error) {
+	var result core.SquashCheck
+	err := c.call(ctx, "SquashCheck", squashCheckParams{Wt: wt, Shas: shas}, &result)
+	return result, err
 }
 
 type stageAllParams struct {

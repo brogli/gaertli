@@ -1,8 +1,2 @@
 # IDs whose tests are still owed. The change that adds an ID's test removes
 # its line in the same commit; task trace fails otherwise.
-FR-UX-16
-QA-COMP-03
-FR-LOG-13
-FR-LOG-14
-FR-UX-17
-FR-UX-18

@@ -1,21 +1,15 @@
 import { i18n } from '../i18n'
 import { useJobsStore } from '../stores/jobs'
-import { Code, type JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { useNotices, type AppNotice, type NoticeAction } from '../lib/notice'
-import { shortSha } from '../lib/format'
+import {
+  Code,
+  JobKind,
+  JobState,
+  UpdateOutcome,
+  type JobInfo,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import type { CoreError } from './useCoreCall'
-
-// UpdateBranchResult is core.UpdateBranchResult, UpdateBranch's
-// JobInfo.result; the bindings type JobInfo.result as `any`.
-interface UpdateBranchResult {
-  outcome: 'updated' | 'upToDate'
-  from: string
-  to: string
-  commits: number
-}
-
-// A success notice closes itself; a failure or offer stays until closed.
-const SUCCESS_LIFE = 8000
+import { errorNotice, useNotices, type AppNotice } from '../lib/notice'
+import { shortSha } from '../lib/format'
 
 // EXPLAINED_ELSEWHERE are the job failures another part of the UI already
 // shows: the rejection and blocked-pull notices below, ConflictBanner, and
@@ -28,12 +22,15 @@ const EXPLAINED_ELSEWHERE: Code[] = [
   Code.Cancelled,
 ]
 
-const ENDED = ['done', 'failed', 'cancelled']
+const ENDED = [JobState.JobDone, JobState.JobFailed, JobState.JobCancelled]
 
 interface JobNoticeActions {
   onPull: () => void
   onForcePush: () => void
   onStashPull: () => void
+  // onRetryJob starts a new job like the one that just failed: the job
+  // itself carries no closure to call again.
+  onRetryJob: (job: JobInfo) => void
 }
 
 // useJobNotices shows the result a sync or branch-update job ends with as a
@@ -50,16 +47,19 @@ export function useJobNotices(actions: JobNoticeActions): void {
     const [job] = args
     staleNotices(job).forEach(clear)
     if (!ENDED.includes(job.state)) return
+    // error.retry, once set, becomes the notice's "Try again" (lib/notice.ts).
+    const error: CoreError | null | undefined = job.error
+    if (error?.code === Code.Locked) error.retry = () => actions.onRetryJob(job)
     const ended = endNotice(job)
     if (ended) show(...ended)
   })
 
   // endNotice is the notice job ended with and its kind, or null for none.
   function endNotice(job: JobInfo): [kind: string, notice: AppNotice] | null {
-    if (job.kind === 'update-branch') return updateNotice(job)
+    if (job.kind === JobKind.UpdateBranchJob) return updateNotice(job)
     const error = job.error
-    if (job.state !== 'failed' || !error) return null
-    const push = job.kind === 'push' || job.kind === 'force-push'
+    if (job.state !== JobState.JobFailed || !error) return null
+    const push = job.kind === JobKind.PushJob || job.kind === JobKind.ForcePushJob
     if (push && (error.code === Code.PushRejected || error.code === Code.NotFastForward)) {
       return [
         'rejection',
@@ -69,7 +69,7 @@ export function useJobNotices(actions: JobNoticeActions): void {
         ]),
       ]
     }
-    if (job.kind === 'pull' && error.code === Code.DirtyWorktree) {
+    if (job.kind === JobKind.PullJob && error.code === Code.DirtyWorktree) {
       return [
         'pull-blocked',
         errorNotice(error, [{ label: t('notices.stashAndPull'), run: actions.onStashPull }]),
@@ -84,16 +84,16 @@ export function useJobNotices(actions: JobNoticeActions): void {
   function updateNotice(job: JobInfo): [kind: string, notice: AppNotice] | null {
     const branch = job.branch ?? ''
     const kind = updateBranchKind(job)
-    if (job.state === 'failed') {
+    if (job.state === JobState.JobFailed) {
       return [
         kind,
         errorNotice(job.error ?? { message: t('notices.updateBranchFailed', { branch }) }),
       ]
     }
-    if (job.state !== 'done') return null
-    const result = job.result as UpdateBranchResult
+    if (job.state !== JobState.JobDone) return null
+    const result = job.result!
     const summary =
-      result.outcome === 'updated'
+      result.outcome === UpdateOutcome.BranchUpdated
         ? t(
             'notices.branchUpdated',
             {
@@ -105,33 +105,24 @@ export function useJobNotices(actions: JobNoticeActions): void {
             result.commits,
           )
         : t('notices.branchUpToDate', { branch })
-    return [kind, { severity: 'success', summary, life: SUCCESS_LIFE }]
-  }
-
-  // errorNotice renders its body as an ErrorBanner (the message plus its
-  // details toggle for git's command and stderr), actions adding recovery
-  // buttons beside it.
-  function errorNotice(error: CoreError, actions?: NoticeAction[]): AppNotice {
-    return {
-      severity: 'error',
-      summary: error.message,
-      data: { error, ...(actions && { actions }) },
-    }
+    return [kind, { severity: 'success', summary }]
   }
 }
 
 // STALE_NOTICES are the kinds of notice an update of a sync job makes
 // stale, by the job's kind.
-const STALE_NOTICES: Record<string, string[]> = {
-  fetch: ['sync-failure'],
-  push: ['rejection', 'sync-failure'],
-  'force-push': ['rejection', 'sync-failure'],
-  pull: ['rejection', 'pull-blocked', 'sync-failure'],
+const STALE_NOTICES: Partial<Record<JobKind, string[]>> = {
+  [JobKind.FetchJob]: ['sync-failure'],
+  [JobKind.PushJob]: ['rejection', 'sync-failure'],
+  [JobKind.ForcePushJob]: ['rejection', 'sync-failure'],
+  [JobKind.PullJob]: ['rejection', 'pull-blocked', 'sync-failure'],
 }
 
 // staleNotices are the kinds of notice an update of job makes stale.
 function staleNotices(job: JobInfo): string[] {
-  return job.kind === 'update-branch' ? [updateBranchKind(job)] : (STALE_NOTICES[job.kind] ?? [])
+  return job.kind === JobKind.UpdateBranchJob
+    ? [updateBranchKind(job)]
+    : (STALE_NOTICES[job.kind] ?? [])
 }
 
 // updateBranchKind is the notice kind of a branch update: one per branch.

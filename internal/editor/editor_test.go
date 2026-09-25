@@ -91,7 +91,7 @@ func TestFR_ED_06_OpenFolderReturnsEditorNotFoundWhenNotOnPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // empty: nothing resolves
 	profile := core.EditorProfile{FolderCmd: "definitely-not-a-real-editor {path}"}
 
-	err := OpenFolder(profile, "/tmp/x")
+	_, err := OpenFolder(profile, "/tmp/x")
 
 	coretest.AssertCode(t, err, core.EditorNotFound)
 }
@@ -100,7 +100,7 @@ func TestFR_UX_11_OpenFolderNamesTheFailedCommandInArgs(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // empty: nothing resolves
 	profile := core.EditorProfile{FolderCmd: "definitely-not-a-real-editor {path}"}
 
-	err := OpenFolder(profile, "/tmp/x")
+	_, err := OpenFolder(profile, "/tmp/x")
 
 	ce := coretest.AsError(t, err, core.EditorNotFound)
 	if want := "definitely-not-a-real-editor"; ce.Args["command"] != want {
@@ -115,7 +115,7 @@ func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	profile := core.EditorProfile{FolderCmd: argvWriterBin + " {path}"}
 
 	start := time.Now()
-	if err := OpenFolder(profile, "/tmp/x"); err != nil {
+	if _, err := OpenFolder(profile, "/tmp/x"); err != nil {
 		t.Fatal(err)
 	}
 	if elapsed := time.Since(start); elapsed > 250*time.Millisecond {
@@ -126,10 +126,24 @@ func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	}
 }
 
+func TestFR_UX_02_OpenFileReturnsTheResolvedArgv(t *testing.T) {
+	profile := core.EditorProfile{FileCmd: argvWriterBin + " {path}"}
+
+	argv, err := OpenFile(profile, "/tmp/x", 0)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{argvWriterBin, "/tmp/x"}; !slices.Equal(argv, want) {
+		t.Errorf("argv = %v, want %v", argv, want)
+	}
+	awaitArgv(t)
+}
+
 func TestFR_ED_01_ALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
 	profile := core.EditorProfile{FileCmd: argvWriterBin + " {path}"}
 
-	if err := OpenFile(profile, "/tmp/x", 0); err != nil {
+	if _, err := OpenFile(profile, "/tmp/x", 0); err != nil {
 		t.Fatalf("OpenFile = %v, want nil: argvwriter exits 1 like explorer.exe after a successful open", err)
 	}
 	awaitArgv(t)

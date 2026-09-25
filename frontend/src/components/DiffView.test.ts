@@ -31,17 +31,24 @@ vi.mock('@wailsio/runtime', () => import('../testing/runtime'))
 import { Events, emit } from '../testing/runtime'
 
 import DiffView from './DiffView.vue'
+import { DiffKind } from '../lib/diffTarget'
+import { useSettingsStore } from '../stores/settings'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
+import { DiffMode } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import { changedFilesFixture } from '../testing/fixtures/changes'
 import { findButton } from '../testing/findButton'
 import { diffFileFixture, hunk } from '../testing/fixtures/diff'
-import type { DiffFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  ChangeScope,
+  Code,
+  type DiffFile,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 const settings = defaultSettingsFixture()
 
 // editorOf is the mounted unified view.
 function editorOf(wrapper: VueWrapper): EditorView {
-  const view = EditorView.findFromDOM(wrapper.get('.cm-editor').element as HTMLElement)
+  const view = EditorView.findFromDOM(wrapper.get<HTMLElement>('.cm-editor').element)
   if (!view) throw new Error('no EditorView mounted')
   return view
 }
@@ -59,10 +66,21 @@ function chunkLines(wrapper: VueWrapper): [number, number][] {
 const base = { wt: '/repo' }
 
 // props mounts commit abc123's file, a.txt unless open picks another.
-let props = { ...base, commit: { sha: 'abc123', path: 'a.txt', oldPath: '' } }
+let props = commitProps('a.txt')
 
 function open(path: string): void {
-  props = { ...base, commit: { sha: 'abc123', path, oldPath: '' } }
+  props = commitProps(path)
+}
+
+function commitProps(path: string) {
+  return { ...base, target: { kind: DiffKind.CommitDiff, sha: 'abc123', path, oldPath: '' } }
+}
+
+// mountCommit mounts props' commit diff and waits for it to load.
+async function mountCommit(): Promise<VueWrapper> {
+  const wrapper = mount(DiffView, { props })
+  await flushPromises()
+  return wrapper
 }
 
 // mountWorking mounts a.txt's working diff with fingerprint "fp", unstaged
@@ -75,28 +93,37 @@ async function mountWorking(
   const wrapper = mount(DiffView, {
     props: {
       ...base,
-      working: { path: 'a.txt', oldPath: '', staged: false, status: 'M', ...working },
+      ...workingProps(working),
     },
   })
   await flushPromises()
   return wrapper
 }
 
+// workingProps are a.txt's working-tree diff, unstaged and modified unless
+// working says otherwise.
+function workingProps({
+  status = 'M',
+  ...target
+}: Partial<{ oldPath: string; staged: boolean; status: string }> = {}) {
+  return {
+    target: { kind: DiffKind.WorkingDiff, path: 'a.txt', oldPath: '', staged: false, ...target },
+    status,
+  }
+}
+
 describe('DiffView', () => {
-  beforeEach(() => {
+  // App.vue loads the settings store once for every view; DiffView reads
+  // it rather than loading it itself, so its tests preload it too.
+  beforeEach(async () => {
     setActivePinia(createPinia())
-    Facade.DiffFile.mockReset()
-    Facade.DiffRange.mockReset()
-    Facade.DiffAgainstWorking.mockReset()
-    Facade.DiffWorking.mockReset()
+    for (const fn of Object.values(Facade)) fn.mockReset().mockResolvedValue(undefined)
+    Facade.Status.mockResolvedValue(changedFilesFixture())
     SettingsService.Get.mockReset().mockResolvedValue(settings)
     SettingsService.Set.mockReset().mockResolvedValue(undefined)
-    Facade.OpenFile.mockReset().mockResolvedValue(undefined)
-    Facade.StageLines.mockReset().mockResolvedValue(undefined)
-    Facade.DiscardLines.mockReset().mockResolvedValue(undefined)
     confirmRequire.mockReset()
-    Facade.Status.mockReset().mockResolvedValue(changedFilesFixture())
     open('a.txt')
+    await useSettingsStore().load()
   })
 
   it('FR-DIFF-05 a .ts path gets syntax highlighting: a keyword token class appears', async () => {
@@ -110,8 +137,7 @@ describe('DiffView', () => {
     )
     open('a.ts')
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
     await flushPromises() // the language extension's own async load()
 
     expect(wrapper.find('.tok-keyword').exists()).toBe(true)
@@ -128,8 +154,7 @@ describe('DiffView', () => {
     )
     open('Makefile')
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
     await flushPromises()
 
     expect(wrapper.text()).toContain('old target')
@@ -148,8 +173,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
     expect(chunkLines(wrapper)).toEqual([[2, 3]])
 
     await wrapper.get('[data-test="ignore-whitespace-toggle"]').trigger('click')
@@ -160,6 +184,27 @@ describe('DiffView', () => {
       ignoreWhitespace: true,
     })
     expect(chunkLines(wrapper)).toEqual([[3, 3]])
+  })
+
+  it('FR-DIFF-06 the whitespace toggle reads "Showing whitespace" while whitespace is shown', async () => {
+    Facade.DiffFile.mockResolvedValue(diffFileFixture({ hunks: [hunk(1, 1, 1, 1)] }))
+
+    const wrapper = await mountCommit()
+
+    expect(wrapper.get('[data-test="ignore-whitespace-toggle"]').text()).toBe('Showing whitespace')
+  })
+
+  it('FR-DIFF-06 clicking the whitespace toggle saves ignore and it reads "Ignoring whitespace"', async () => {
+    Facade.DiffFile.mockResolvedValue(diffFileFixture({ hunks: [hunk(1, 1, 1, 1)] }))
+    const wrapper = await mountCommit()
+
+    await wrapper.get('[data-test="ignore-whitespace-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(SettingsService.Set).toHaveBeenCalledWith(
+      expect.objectContaining({ ignoreWhitespace: true }),
+    )
+    expect(wrapper.get('[data-test="ignore-whitespace-toggle"]').text()).toBe('Ignoring whitespace')
   })
 
   // loneCR is a diff whose line 3 holds a lone "\r"; git changes lines 5-6.
@@ -192,14 +237,16 @@ describe('DiffView', () => {
   })
 
   it('QA-COMP-01 side by side, a line holding a lone \\r stays one line on both sides', async () => {
-    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ diffMode: 'side-by-side' }))
+    SettingsService.Get.mockResolvedValue(
+      defaultSettingsFixture({ diffMode: DiffMode.SideBySideDiff }),
+    )
+    await useSettingsStore().load()
     Facade.DiffFile.mockResolvedValue(loneCR)
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
-    for (const editor of wrapper.findAll('.cm-editor')) {
-      const doc = EditorView.findFromDOM(editor.element as HTMLElement)?.state.doc
+    for (const editor of wrapper.findAll<HTMLElement>('.cm-editor')) {
+      const doc = EditorView.findFromDOM(editor.element)?.state.doc
       expect(doc?.line(3).text).toBe('th\rree')
       expect(doc?.lines).toBe(7)
     }
@@ -214,8 +261,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
     await wrapper.get('[data-test="ignore-whitespace-toggle"]').trigger('click')
     await flushPromises()
 
@@ -227,10 +273,45 @@ describe('DiffView', () => {
     Events.On.mockClear()
     await mountWorking({ oldContent: 'a\n', newContent: 'b\n' })
 
-    emit('repo:changed', { data: { scope: 'index' } })
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
 
     expect(Facade.DiffWorking).toHaveBeenCalledTimes(2)
+  })
+
+  it('FR-CHG-03 a selection survives an outside-change refetch, then the diff window handing back the same target', async () => {
+    // Same shape as the diff window: an outside-change refetch (fetch
+    // returns a new but equal DiffFile) followed by the window handing
+    // DiffView a new but equal target (a diff:show for the file already
+    // shown), which reruns the target watch and reads the diff store's cache.
+    const wrapper = await mountWorking({
+      oldContent: 'line1\nA\nB\nC\nline5\n',
+      newContent: 'line1\nX\nY\nZ\nline5\n',
+      hunks: [hunk(2, 3, 2, 3)],
+    })
+    Facade.DiffWorking.mockImplementation(() =>
+      Promise.resolve(
+        diffFileFixture({
+          fingerprint: 'fp',
+          oldContent: 'line1\nA\nB\nC\nline5\n',
+          newContent: 'line1\nX\nY\nZ\nline5\n',
+          hunks: [hunk(2, 3, 2, 3)],
+        }),
+      ),
+    )
+
+    const view = editorOf(wrapper)
+    // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10): inside the chunk.
+    view.dispatch({ selection: EditorSelection.range(8, 10) })
+    await flushPromises()
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeUndefined()
+
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+    await flushPromises()
+    await wrapper.setProps(workingProps())
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeUndefined()
   })
 
   it("FR-REPO-04 a commit's diff does not refetch on a working-tree change", async () => {
@@ -244,7 +325,7 @@ describe('DiffView', () => {
     mount(DiffView, { props })
     await flushPromises()
 
-    emit('repo:changed', { data: { scope: 'index' } })
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
 
     expect(Facade.DiffFile).toHaveBeenCalledTimes(1)
@@ -259,8 +340,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     expect(wrapper.text()).toContain('old only line')
     expect(wrapper.text()).toContain('new only line')
@@ -275,29 +355,29 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
     expect(wrapper.findAll('.cm-editor')).toHaveLength(1)
 
     await wrapper.get('[data-test="mode-toggle"]').trigger('click')
     await flushPromises()
 
     expect(SettingsService.Set).toHaveBeenCalledTimes(1)
-    expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({ diffMode: 'side-by-side' })
+    expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({
+      diffMode: DiffMode.SideBySideDiff,
+    })
     expect(wrapper.findAll('.cm-editor')).toHaveLength(2)
   })
 
   it.each([
-    ['binary', { binary: true, tooLarge: false }],
-    ['too large', { binary: false, tooLarge: true }],
+    ['binary', { binary: true }],
+    ['too large', { tooLarge: true }],
   ])(
     'FR-DIFF-02 a %s file keeps Previous/Next file, so stepping through files goes on past it',
     async (_, flags) => {
-      Facade.DiffFile.mockResolvedValue({ path: 'img.png', ...flags })
+      Facade.DiffFile.mockResolvedValue(diffFileFixture({ path: 'img.png', ...flags }))
       open('img.png')
 
-      const wrapper = mount(DiffView, { props })
-      await flushPromises()
+      const wrapper = await mountCommit()
 
       expect(wrapper.find('[data-test="prev-file"]').exists()).toBe(true)
       expect(wrapper.find('[data-test="next-file"]').exists()).toBe(true)
@@ -306,20 +386,18 @@ describe('DiffView', () => {
   )
 
   it('FR-DIFF-03 shows a binary placeholder and mounts no CodeMirror container', async () => {
-    Facade.DiffFile.mockResolvedValue({ path: 'img.png', binary: true, tooLarge: false })
+    Facade.DiffFile.mockResolvedValue(diffFileFixture({ path: 'img.png', binary: true }))
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     expect(wrapper.text().toLowerCase()).toContain('binary')
     expect(wrapper.find('.cm-editor').exists()).toBe(false)
   })
 
   it('FR-DIFF-04 shows a too-large placeholder, then loads the full diff on "Load anyway"', async () => {
-    Facade.DiffFile.mockResolvedValueOnce({ path: 'big.txt', binary: false, tooLarge: true })
+    Facade.DiffFile.mockResolvedValueOnce(diffFileFixture({ path: 'big.txt', tooLarge: true }))
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     expect(wrapper.text().toLowerCase()).toContain('too large')
     expect(wrapper.find('.cm-editor').exists()).toBe(false)
@@ -352,8 +430,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     const view = editorOf(wrapper)
     const chunks = getChunks(view.state)?.chunks ?? []
@@ -384,15 +461,14 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
     await wrapper.get('[data-test="next-file"]').trigger('click')
     await wrapper.get('[data-test="prev-file"]').trigger('click')
 
     expect(wrapper.emitted('step-file')).toEqual([[1], [-1]])
   })
 
-  it('FR-CMP-02 with a range prop, loads via DiffRange', async () => {
+  it('FR-CMP-02 a range target loads via DiffRange', async () => {
     Facade.DiffRange.mockResolvedValue(
       diffFileFixture({
         oldContent: 'old\n',
@@ -402,7 +478,16 @@ describe('DiffView', () => {
     )
 
     mount(DiffView, {
-      props: { ...base, range: { from: 'sha-a', to: 'sha-b', path: 'a.txt', oldPath: '' } },
+      props: {
+        ...base,
+        target: {
+          kind: DiffKind.RangeDiff,
+          from: 'sha-a',
+          to: 'sha-b',
+          path: 'a.txt',
+          oldPath: '',
+        },
+      },
     })
     await flushPromises()
 
@@ -421,8 +506,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     const view = editorOf(wrapper)
     view.dispatch({ selection: EditorSelection.cursor(view.state.doc.line(5).from) })
@@ -441,14 +525,13 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
     await wrapper.get('[data-test="mode-toggle"]').trigger('click')
     await flushPromises()
 
-    const editors = wrapper.findAll('.cm-editor')
+    const editors = wrapper.findAll<HTMLElement>('.cm-editor')
     expect(editors).toHaveLength(2)
-    const newView = EditorView.findFromDOM(editors[1]!.element as HTMLElement)
+    const newView = EditorView.findFromDOM(editors[1]!.element)
     if (!newView) throw new Error('no new-side EditorView mounted')
     newView.dispatch({ selection: EditorSelection.cursor(newView.state.doc.line(4).from) })
 
@@ -466,8 +549,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     const view = editorOf(wrapper)
     // The line right after the deleted block: doc has no line for the
@@ -481,10 +563,9 @@ describe('DiffView', () => {
 
   it('FR-ED-09 "Open in editor" with nothing mounted (too-large placeholder) opens at line 0', async () => {
     open('big.txt')
-    Facade.DiffFile.mockResolvedValue({ path: 'big.txt', binary: false, tooLarge: true })
+    Facade.DiffFile.mockResolvedValue(diffFileFixture({ path: 'big.txt', tooLarge: true }))
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')
 
@@ -500,8 +581,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')
 
@@ -520,7 +600,16 @@ describe('DiffView', () => {
     )
 
     const wrapper = mount(DiffView, {
-      props: { ...base, range: { from: 'sha-a', to: 'sha-b', path: 'a.txt', oldPath: '' } },
+      props: {
+        ...base,
+        target: {
+          kind: DiffKind.RangeDiff,
+          from: 'sha-a',
+          to: 'sha-b',
+          path: 'a.txt',
+          oldPath: '',
+        },
+      },
     })
     await flushPromises()
 
@@ -530,7 +619,7 @@ describe('DiffView', () => {
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 1)
   })
 
-  it('FR-CMP-04 with a workingCompare prop, loads via DiffAgainstWorking', async () => {
+  it('FR-CMP-04 an against-working target loads via DiffAgainstWorking', async () => {
     Facade.DiffAgainstWorking.mockResolvedValue(
       diffFileFixture({
         oldContent: 'old\n',
@@ -540,7 +629,10 @@ describe('DiffView', () => {
     )
 
     mount(DiffView, {
-      props: { ...base, workingCompare: { sha: 'sha-a', path: 'a.txt', oldPath: '' } },
+      props: {
+        ...base,
+        target: { kind: DiffKind.AgainstWorkingDiff, sha: 'sha-a', path: 'a.txt', oldPath: '' },
+      },
     })
     await flushPromises()
 
@@ -551,7 +643,7 @@ describe('DiffView', () => {
     expect(Facade.DiffFile).not.toHaveBeenCalled()
   })
 
-  it('FR-CHG-04 with a working prop, loads via DiffWorking and renders the fetched content', async () => {
+  it('FR-CHG-04 a working-tree target loads via DiffWorking and renders the fetched content', async () => {
     const wrapper = await mountWorking(
       {
         oldContent: 'shared line\nold only line\n',
@@ -571,7 +663,45 @@ describe('DiffView', () => {
     expect(wrapper.text()).toContain('new only line')
   })
 
-  it('FR-CHG-03 with an unstaged working prop, clicking a hunk\'s "Stage hunk" button stages it and reloads', async () => {
+  it('FR-UX-16 an outside change refetches the diff but keeps a LOCKED "Stage hunk"\'s Try again', async () => {
+    const wrapper = await mountWorking({
+      oldContent: 'a\nold\nb\n',
+      newContent: 'a\nnew\nb\n',
+      hunks: [hunk(2, 1, 2, 1)],
+    })
+    Facade.StageLines.mockRejectedValueOnce({ cause: { code: Code.Locked, message: 'locked' } })
+    await wrapper.get('[data-test="stage-hunk"]').trigger('click')
+    await flushPromises()
+    expect(findButton(wrapper, 'Try again')).toBeTruthy()
+
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+    await flushPromises()
+
+    expect(Facade.DiffWorking).toHaveBeenCalledTimes(2)
+    expect(findButton(wrapper, 'Try again')).toBeTruthy()
+  })
+
+  it("FR-REPO-04 an outside change clears a line action's error that offers no retry, showing the diff again", async () => {
+    const wrapper = await mountWorking({
+      oldContent: 'a\nold\nb\n',
+      newContent: 'a\nnew\nb\n',
+      hunks: [hunk(2, 1, 2, 1)],
+    })
+    Facade.StageLines.mockRejectedValueOnce({
+      cause: { code: Code.Internal, message: 'a.txt changed since it was shown' },
+    })
+    await wrapper.get('[data-test="stage-hunk"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="stage-hunk"]').exists()).toBe(false)
+
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('changed since it was shown')
+    expect(wrapper.find('[data-test="stage-hunk"]').exists()).toBe(true)
+  })
+
+  it('FR-CHG-03 with an unstaged working-tree target, clicking a hunk\'s "Stage hunk" button stages it and reloads', async () => {
     const wrapper = await mountWorking({
       oldContent: 'line1\nline2 old\nline3\nline4\nline5\nline6 old\nline7\n',
       newContent: 'line1\nline2 new\nline3\nline4\nline5\nline6 new\nline7\n',
@@ -661,6 +791,7 @@ describe('DiffView', () => {
 
   it('FR-DIFF-06 ignoring whitespace offers no hunk or line actions, only a hint; showing whitespace brings them back', async () => {
     SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ ignoreWhitespace: true }))
+    await useSettingsStore().load()
     const wrapper = await mountWorking({
       oldContent: 'int a = 1;\n\nint b = 2;\nrest\n',
       newContent: 'int a = 10;\n        \nint b = 20;\nrest\n',
@@ -854,7 +985,7 @@ describe('DiffView', () => {
     )
   })
 
-  it('FR-CHG-03 with a staged working prop, a hunk button reads "Unstage hunk" and calls StageLines reversed', async () => {
+  it('FR-CHG-03 with a staged working-tree target, a hunk button reads "Unstage hunk" and calls StageLines reversed', async () => {
     const wrapper = await mountWorking(
       {
         oldContent: 'line1\nline2 old\nline3\nline4\nline5\nline6 old\nline7\n',
@@ -985,7 +1116,7 @@ describe('DiffView', () => {
     expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
   })
 
-  it('FR-CHG-10 with an unstaged working prop, "Discard hunk" confirms then calls Facade.DiscardLines and reloads', async () => {
+  it('FR-CHG-10 with an unstaged working-tree target, "Discard hunk" confirms then calls Facade.DiscardLines and reloads', async () => {
     const wrapper = await mountWorking({
       oldContent: 'line1\nline2 old\nline3\nline4\nline5\nline6 old\nline7\n',
       newContent: 'line1\nline2 new\nline3\nline4\nline5\nline6 new\nline7\n',
@@ -1017,7 +1148,7 @@ describe('DiffView', () => {
     expect(Facade.DiffWorking).toHaveBeenCalledTimes(2)
   })
 
-  it('FR-CHG-10 with a staged working prop, no discard button renders', async () => {
+  it('FR-CHG-10 with a staged working-tree target, no discard button renders', async () => {
     const wrapper = await mountWorking(
       {
         oldContent: 'line1\nline2 old\nline3\n',
@@ -1040,8 +1171,7 @@ describe('DiffView', () => {
       }),
     )
 
-    const wrapper = mount(DiffView, { props })
-    await flushPromises()
+    const wrapper = await mountCommit()
 
     for (const selector of [
       'mode-toggle',

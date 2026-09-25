@@ -109,10 +109,8 @@ func lineSet(nums []int) map[int]bool {
 //
 // The header counts the body's lines. git apply looks for a hunk near the
 // start of the side it produces (the new side; the old side under
-// --reverse), so that start is the other side's start moved by shift, the
-// net line change of the hunks written before this one, as git add -p
-// writes it. net is this hunk's own change, in the same direction.
-func buildPartialPatch(frag *gitdiff.TextFragment, selected map[int]bool, reverse bool, shift int) (patch []byte, net int) {
+// --reverse), which in a one-hunk patch is where the other side starts.
+func buildPartialPatch(frag *gitdiff.TextFragment, selected map[int]bool, reverse bool) []byte {
 	body := hunkBody{produced: '+'}
 	if reverse {
 		body.produced = '-'
@@ -139,15 +137,12 @@ func buildPartialPatch(frag *gitdiff.TextFragment, selected map[int]bool, revers
 		i = addEnd
 	}
 	body.close()
-	oldStart, newStart := int(frag.OldPosition), int(frag.NewPosition)
-	net = body.newLines - body.oldLines
+	start := frag.OldPosition
 	if reverse {
-		oldStart, net = newStart+shift, -net
-	} else {
-		newStart = oldStart + shift
+		start = frag.NewPosition
 	}
-	header := fmt.Sprintf("@@ -%d,%d +%d,%d @@\n", oldStart, body.oldLines, newStart, body.newLines)
-	return append([]byte(header), body.Bytes()...), net
+	header := fmt.Sprintf("@@ -%d,%d +%d,%d @@\n", start, body.oldLines, start, body.newLines)
+	return append([]byte(header), body.Bytes()...)
 }
 
 // hunkBody is a hunk's body being written, with its line count per side.
@@ -333,22 +328,11 @@ func selectionPatch(ctx context.Context, r git.Runner, dir, path string, sel cor
 	if len(frags) != 1 || fingerprint(sides(frags[0])) != sel.Fingerprint {
 		return nil, core.Errorf(core.Internal, "%s changed since it was shown", path)
 	}
-	patch := append([]byte{}, header...)
-	changes, shift := 0, 0
-	for _, frag := range frags {
-		selected := selectLines(frag, sel)
-		if len(selected) == 0 {
-			continue
-		}
-		changes += len(selected)
-		hunk, net := buildPartialPatch(frag, selected, reverse, shift)
-		patch = append(patch, hunk...)
-		shift += net
-	}
-	if changes == 0 {
+	selected := selectLines(frags[0], sel)
+	if len(selected) == 0 {
 		return nil, core.Errorf(core.Internal, "line selection matches no changed line of %s's current diff", path)
 	}
-	return patch, nil
+	return append(header, buildPartialPatch(frags[0], selected, reverse)...), nil
 }
 
 // StageLines implements core.API: it applies selectionPatch to the index

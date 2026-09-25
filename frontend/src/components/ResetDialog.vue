@@ -10,13 +10,14 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ResetMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { shortSha } from '../lib/format'
 import { useNotices } from '../lib/notice'
+import { DIALOG } from '../lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 
 // ResetDialog is the reset mode picker (soft/mixed/hard/keep). Every mode
 // but hard runs immediately; hard asks for confirmation, naming how many
 // uncommitted changes would be lost. A successful reset closes the dialog
-// and leaves a notice naming the previous commit, so the user
-// can still copy its hash or reset back to it.
+// and leaves a notice naming the previous commit, so the user can still
+// copy its hash or reset back to it.
 const props = defineProps<{ wt: string; branch: string; sha: string; subject: string }>()
 const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
@@ -90,7 +91,12 @@ function onResetClick(): void {
 </script>
 
 <template>
-  <Dialog visible :header="t('dialogs.reset.header')" modal @update:visible="emit('close')">
+  <Dialog
+    visible
+    v-bind="DIALOG"
+    :header="t('dialogs.reset.header')"
+    @update:visible="emit('close')"
+  >
     <ErrorBanner v-if="error" :error="error" />
     <p>
       {{ t('dialogs.reset.resetTo', { branch: branchLabel }) }}
@@ -112,6 +118,12 @@ function onResetClick(): void {
     </div>
     <template #footer>
       <Button
+        :label="t('common.cancel')"
+        severity="secondary"
+        data-test="dialog-cancel"
+        @click="emit('close')"
+      />
+      <Button
         :label="t('dialogs.reset.reset')"
         data-test="reset-submit"
         :disabled="mode === ResetMode.ResetHard && uncommittedCount === null"
@@ -123,12 +135,12 @@ function onResetClick(): void {
 
 <style scoped>
 .hash {
-  font-family: monospace;
+  font-family: var(--nb-font-mono);
 }
 .reset-modes {
   display: flex;
   flex-direction: column;
-  gap: 0.5em;
+  gap: 0.75rem;
 }
 .reset-mode {
   display: flex;

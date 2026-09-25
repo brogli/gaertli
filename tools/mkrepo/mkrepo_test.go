@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
 // smallConfig is a fast-to-build stand-in for Params, big enough to exercise
@@ -27,7 +28,7 @@ func TestBuildIsDeterministicGivenTheSameConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if headSHA(t, dirA) != headSHA(t, dirB) {
+	if gittest.HeadSHA(t, dirA) != gittest.HeadSHA(t, dirB) {
 		t.Errorf("HEAD SHA differs between builds")
 	}
 	if got, want := refSHAs(t, dirA), refSHAs(t, dirB); got != want {
@@ -58,7 +59,7 @@ func TestBuildProducesAWellFormedRepoMatchingConfig(t *testing.T) {
 		t.Errorf("worktrees = %d, want %d extra + the primary one", got, cfg.Worktrees)
 	}
 
-	run(t, dir, "fsck")
+	gittest.Run(t, dir, "fsck")
 }
 
 func TestBuildIsACacheHitWhenTheConfigIsUnchanged(t *testing.T) {
@@ -102,20 +103,15 @@ func TestBuildRebuildsWhenTheConfigChanges(t *testing.T) {
 	}
 }
 
-func headSHA(t *testing.T, dir string) string {
-	t.Helper()
-	return strings.TrimSpace(runOut(t, dir, "rev-parse", "HEAD"))
-}
-
 // refSHAs lists every ref with its object, sorted by refname.
 func refSHAs(t *testing.T, dir string) string {
 	t.Helper()
-	return runOut(t, dir, "for-each-ref", "--format=%(refname) %(objectname)")
+	return gittest.Out(t, dir, "for-each-ref", "--format=%(refname) %(objectname)")
 }
 
 func commitCount(t *testing.T, dir string) int {
 	t.Helper()
-	n, err := strconv.Atoi(strings.TrimSpace(runOut(t, dir, "rev-list", "--all", "--count")))
+	n, err := strconv.Atoi(gittest.Out(t, dir, "rev-list", "--all", "--count"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,13 +120,13 @@ func commitCount(t *testing.T, dir string) int {
 
 func refNames(t *testing.T, dir, prefix string) []string {
 	t.Helper()
-	return nonEmptyLines(runOut(t, dir, "for-each-ref", "--format=%(refname)", prefix))
+	return nonEmptyLines(gittest.Out(t, dir, "for-each-ref", "--format=%(refname)", prefix))
 }
 
 func worktrees(t *testing.T, dir string) []string {
 	t.Helper()
 	var paths []string
-	for _, l := range nonEmptyLines(runOut(t, dir, "worktree", "list", "--porcelain")) {
+	for _, l := range nonEmptyLines(gittest.Out(t, dir, "worktree", "list", "--porcelain")) {
 		if p, ok := strings.CutPrefix(l, "worktree "); ok {
 			paths = append(paths, p)
 		}
@@ -140,26 +136,10 @@ func worktrees(t *testing.T, dir string) []string {
 
 func nonEmptyLines(s string) []string {
 	var lines []string
-	for l := range strings.SplitSeq(strings.TrimSpace(s), "\n") {
+	for l := range strings.SplitSeq(s, "\n") {
 		if l != "" {
 			lines = append(lines, l)
 		}
 	}
 	return lines
-}
-
-func runOut(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	result, err := runner.Run(t.Context(), git.Call{Dir: dir, ReadOnly: true, Args: args})
-	if err != nil {
-		t.Fatalf("git %s: %v", strings.Join(args, " "), err)
-	}
-	return string(result.Stdout)
-}
-
-func run(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	if _, err := runner.Run(t.Context(), git.Call{Dir: dir, Args: args}); err != nil {
-		t.Fatalf("git %s: %v", strings.Join(args, " "), err)
-	}
 }

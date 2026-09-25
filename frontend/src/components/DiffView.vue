@@ -14,6 +14,8 @@ import {
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { classHighlighter } from '@lezer/highlight'
+import Button from 'openvue/button'
+import ToggleButton from 'openvue/togglebutton'
 import { useI18n } from '../i18n'
 import { useDiffStore } from '../stores/diff'
 import { useSettingsStore } from '../stores/settings'
@@ -23,36 +25,35 @@ import { useConfirmAction } from '../composables/useConfirmAction'
 import { hunkChanges, hunksIn } from '../lib/gitHunks'
 import { basename } from '../lib/path'
 import { iconClass, type IconName } from '../lib/icons'
-import { useWindowEvent } from '../lib/windowEvents'
+import { ICON_BUTTON, SECONDARY_BUTTON } from '../lib/layout'
+import { useRepoChanged } from '../lib/windowEvents'
+import { DiffKind, readsWorkingTree, type DiffTarget } from '../lib/diffTarget'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { DiffMode } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import ErrorBanner from './ErrorBanner.vue'
-import type {
-  DiffHunk,
-  LineSelection,
+import {
+  ChangeScope,
+  type DiffHunk,
+  type LineSelection,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
-// DiffView shows one file's diff, read-only: a file of a commit, a file
-// between two commits (range), a commit against the working tree
-// (workingCompare), or an uncommitted change (working). git computes the
-// diff; CodeMirror draws its hunks. Previous/next file ask the parent,
-// which holds the file list, with step-file.
-type CommitTarget = { sha: string; path: string; oldPath: string }
-type DiffRange = { from: string; to: string; path: string; oldPath: string }
-type WorkingTarget = { path: string; oldPath: string; staged: boolean; status: string }
-
-const props = defineProps<{
-  wt: string
-  commit?: CommitTarget | null
-  range?: DiffRange | null
-  workingCompare?: CommitTarget | null
-  working?: WorkingTarget | null
-}>()
+// DiffView shows target's file diff, read-only: a file of a commit, a file
+// between two commits, a commit against the working tree, or an
+// uncommitted change. status is a working-tree file's status: line actions
+// need it. git computes the diff; CodeMirror draws its hunks.
+// Previous/next file ask the parent, which holds the file list, with
+// step-file.
+const props = defineProps<{ wt: string; target: DiffTarget; status?: string }>()
 const emit = defineEmits<{ 'step-file': [step: 1 | -1] }>()
 
 const diff = useDiffStore()
 const settings = useSettingsStore()
 const changes = useChangesStore()
 const { error, run, runAndClose } = useCoreCall()
+// An outside change's refetch reports through its own call, so the user's
+// last action keeps a retryable error and its Try again.
+const refetchCall = useCoreCall()
+const shownError = computed(() => error.value ?? refetchCall.error.value)
 const { confirmAction } = useConfirmAction()
 const { t } = useI18n()
 
@@ -64,64 +65,42 @@ let view: EditorView | MergeView | null = null
 const chunks = ref<readonly Chunk[]>([])
 const selectedLinesEnabled = ref(false)
 
-type Target =
-  | { kind: 'commit'; sha: string; path: string; oldPath: string }
-  | { kind: 'range'; from: string; to: string; path: string; oldPath: string }
-  | { kind: 'againstWorking'; sha: string; path: string; oldPath: string }
-  | ({ kind: 'working' } & WorkingTarget)
+const working = computed(() => props.target.kind === DiffKind.WorkingDiff)
+const staged = computed(() => !!props.target.staged)
 
-const target = computed<Target | null>(() => {
-  if (props.commit) return { kind: 'commit', ...props.commit }
-  if (props.range) return { kind: 'range', ...props.range }
-  if (props.workingCompare) return { kind: 'againstWorking', ...props.workingCompare }
-  if (props.working) return { kind: 'working', ...props.working }
-  return null
-})
-
-const mode = computed(() => settings.settings?.diffMode ?? 'unified')
+const mode = computed(() => settings.settings?.diffMode ?? DiffMode.UnifiedDiff)
 const ignoreWhitespace = computed(() => settings.settings?.ignoreWhitespace ?? false)
-if (!settings.settings) void settings.load()
 
 function load(force = false): void {
-  const tgt = target.value
-  if (!tgt) return
+  refetchCall.error.value = null
   const opts = { force, ignoreWhitespace: ignoreWhitespace.value }
-  if (tgt.kind === 'range') {
-    void run(() => diff.loadRange(props.wt, tgt.from, tgt.to, tgt.path, tgt.oldPath, opts))
-  } else if (tgt.kind === 'againstWorking') {
-    void run(() => diff.loadAgainstWorking(props.wt, tgt.sha, tgt.path, tgt.oldPath, opts))
-  } else if (tgt.kind === 'working') {
-    void run(() => diff.loadWorking(props.wt, tgt.path, tgt.oldPath, tgt.staged, opts))
-  } else {
-    void run(() => diff.load(props.wt, tgt.sha, tgt.path, tgt.oldPath, opts))
-  }
+  void run(() => diff.load(props.wt, props.target, opts))
 }
 
-watch([target, ignoreWhitespace], () => load(), { immediate: true })
+watch([() => props.target, ignoreWhitespace], () => load(), { immediate: true })
 
 // repo:changed{scope:"index"} fires on any change to this worktree's files
-// or index.
-useWindowEvent('repo:changed', (ev) => {
-  const kind = target.value?.kind
-  if (ev.data.scope === 'index' && (kind === 'working' || kind === 'againstWorking'))
-    void run(() => diff.refetch())
+// or index. An action's error without a retry is stale once the diff
+// reloads.
+useRepoChanged([ChangeScope.IndexChanged], () => {
+  if (!readsWorkingTree(props.target)) return
+  if (!error.value?.retry) error.value = null
+  void refetchCall.run(() => diff.refetch())
 })
 
 // openEditor opens the file shown at the cursor's line on the new side;
 // line 0 when no editor is mounted (a binary or too-large file).
 function openEditor(): void {
-  const tgt = target.value
-  if (!tgt) return
   const cm = changeTarget()
   const line = cm ? cm.state.doc.lineAt(cm.state.selection.main.head).number : 0
-  void run(() => Facade.OpenFile(props.wt, tgt.path, line))
+  void run(() => Facade.OpenFile(props.wt, props.target.path, line))
 }
 
 // A binary or too-large file shows only its placeholder.
 const showsContent = computed(() => !!diff.file && !diff.file.binary && !diff.file.tooLarge)
 
 function toggleMode(): void {
-  const next = mode.value === 'unified' ? 'side-by-side' : 'unified'
+  const next = mode.value === DiffMode.UnifiedDiff ? DiffMode.SideBySideDiff : DiffMode.UnifiedDiff
   if (settings.settings) void settings.save({ ...settings.settings, diffMode: next })
 }
 
@@ -130,6 +109,12 @@ function toggleIgnoreWhitespace(): void {
   if (settings.settings)
     void settings.save({ ...settings.settings, ignoreWhitespace: !ignoreWhitespace.value })
 }
+
+// whitespaceLabel names the diff's current whitespace state: the toggle's
+// label, title and accessible name.
+const whitespaceLabel = computed(() =>
+  ignoreWhitespace.value ? t('diffWindow.ignoringWhitespace') : t('diffWindow.showingWhitespace'),
+)
 
 function destroyView(): void {
   view?.destroy()
@@ -149,6 +134,10 @@ async function languageExtensionFor(path: string): Promise<Extension | null> {
   return lang ? await lang.load() : null
 }
 
+// FIXED_WIDTH_FONT sets the diff text in the app's fixed-width font, in
+// place of CodeMirror's default system monospace.
+const FIXED_WIDTH_FONT = EditorView.theme({ '.cm-scroller': { fontFamily: 'var(--nb-font-mono)' } })
+
 // loadSeq drops a language load that resolves after a newer file started.
 let loadSeq = 0
 
@@ -159,21 +148,26 @@ async function mountView(): Promise<void> {
   const el = container.value
   if (!el || !file || file.binary || file.tooLarge) return
 
-  const language = await languageExtensionFor(target.value?.path ?? '')
+  const language = await languageExtensionFor(props.target.path)
   if (seq !== loadSeq) return
 
   // classHighlighter emits plain "tok-*" classes, themed below.
   const lang = language ? [language, syntaxHighlighting(classHighlighter)] : []
   // Lines split at "\n" only, as git splits them: a lone "\r" stays in its
   // line, so git's hunks sit on git's lines.
-  const docExtensions = [EditorState.readOnly.of(true), EditorState.lineSeparator.of('\n'), ...lang]
+  const docExtensions = [
+    EditorState.readOnly.of(true),
+    EditorState.lineSeparator.of('\n'),
+    FIXED_WIDTH_FONT,
+    ...lang,
+  ]
   // git's diff is line-based, so changed lines are marked whole.
   const gitDiff = {
     diffConfig: { override: hunkChanges(file.hunks ?? []) },
     highlightChanges: false,
   }
   view =
-    mode.value === 'unified'
+    mode.value === DiffMode.UnifiedDiff
       ? new EditorView({
           parent: el,
           state: EditorState.create({
@@ -219,18 +213,20 @@ function stepChange(go: Command): void {
   if (cm) go(cm)
 }
 
-// stageLines stages sel, or unstages it on the staged side.
+// stageLines stages sel, or unstages it on the staged side. The file and
+// side are read at the click: a retry after a lock stages what was clicked.
 function stageLines(sel: LineSelection | null): void {
-  if (!sel || !props.working) return
-  const { path, staged } = props.working
-  void runAndClose(() => Facade.StageLines(props.wt, path, sel, staged), reloadNow)
+  if (!sel || !working.value) return
+  const { path } = props.target
+  const unstage = staged.value
+  void runAndClose(() => Facade.StageLines(props.wt, path, sel, unstage), reloadNow)
 }
 
 // discardLines is offered on the unstaged side only; it confirms first,
 // naming what is lost.
 function discardLines(sel: LineSelection | null): void {
-  if (!sel || !props.working) return
-  const { path } = props.working
+  if (!sel || !working.value) return
+  const { path } = props.target
   confirmAction(
     t('diffWindow.discardChangesTitle'),
     t('diffWindow.discardLineConfirm', { path }),
@@ -269,7 +265,9 @@ function chunkDocs(): { old: Text; new: Text } | null {
 // header would need rewriting. Those are staged whole from the changes
 // view. The ignore-whitespace diff is for reading: its hunks are not git's
 // patch, so the template holds the actions back until whitespace is shown.
-const offersLineActions = computed(() => showsContent.value && props.working?.status === 'M')
+const offersLineActions = computed(
+  () => showsContent.value && working.value && props.status === 'M',
+)
 
 // selection names lines of the shown diff. Its fingerprint lets Go refuse
 // the selection if the file changed since it was shown.
@@ -322,6 +320,7 @@ function selectedLines(): LineSelection | null {
   return added.size ? selection([...old], [...added]) : null
 }
 
+// A toolbar toggle shows pressed by dropping ICON_BUTTON's text look.
 interface ToolbarButton {
   test: string
   label: string
@@ -337,20 +336,12 @@ const toolbar = computed<ToolbarButton[]>(() => {
       {
         test: 'mode-toggle',
         label:
-          mode.value === 'unified'
+          mode.value === DiffMode.UnifiedDiff
             ? t('diffWindow.switchToSideBySide')
             : t('diffWindow.switchToUnified'),
-        icon: mode.value === 'unified' ? 'unifiedDiff' : 'sideBySideDiff',
-        pressed: mode.value === 'side-by-side',
+        icon: mode.value === DiffMode.UnifiedDiff ? 'unifiedDiff' : 'sideBySideDiff',
+        pressed: mode.value === DiffMode.SideBySideDiff,
         action: toggleMode,
-      },
-      {
-        test: 'ignore-whitespace-toggle',
-        label: ignoreWhitespace.value
-          ? t('diffWindow.showWhitespaceChanges')
-          : t('diffWindow.ignoreWhitespace'),
-        pressed: ignoreWhitespace.value,
-        action: toggleIgnoreWhitespace,
       },
       {
         test: 'prev-change',
@@ -392,78 +383,82 @@ const toolbar = computed<ToolbarButton[]>(() => {
 
 <template>
   <section class="diff-view">
-    <ErrorBanner v-if="error" :error="error" />
+    <ErrorBanner v-if="shownError" :error="shownError" />
     <p v-else-if="diff.loading">{{ t('diffWindow.loading') }}</p>
     <template v-else-if="diff.file">
       <div class="diff-toolbar">
-        <button
+        <ToggleButton
+          v-if="showsContent"
+          :model-value="ignoreWhitespace"
+          :on-label="t('diffWindow.ignoringWhitespace')"
+          :off-label="t('diffWindow.showingWhitespace')"
+          size="small"
+          data-test="ignore-whitespace-toggle"
+          :title="whitespaceLabel"
+          :aria-label="whitespaceLabel"
+          @update:model-value="toggleIgnoreWhitespace"
+        />
+        <Button
           v-for="b in toolbar"
           :key="b.test"
-          type="button"
-          :class="{ 'glyph-btn': b.icon }"
+          v-bind="ICON_BUTTON"
+          :text="!b.pressed"
+          :icon="b.icon && iconClass(b.icon)"
+          :label="b.icon ? undefined : b.label"
           :data-test="b.test"
           :title="b.label"
           :aria-label="b.label"
           :aria-pressed="b.pressed"
           @click="b.action"
-        >
-          <i v-if="b.icon" :class="iconClass(b.icon)" aria-hidden="true"></i>
-          <template v-else>{{ b.label }}</template>
-        </button>
+        />
       </div>
       <p v-if="diff.file.binary">{{ t('diffWindow.binaryFile') }}</p>
       <template v-else-if="diff.file.tooLarge">
         <p>{{ t('diffWindow.tooLarge') }}</p>
-        <button type="button" @click="load(true)">{{ t('diffWindow.loadAnyway') }}</button>
+        <Button :label="t('diffWindow.loadAnyway')" size="small" @click="load(true)" />
       </template>
-      <template v-if="offersLineActions && working">
+      <template v-if="offersLineActions">
         <p v-if="ignoreWhitespace" data-test="whitespace-hint">
           {{
-            working.staged
+            staged
               ? t('diffWindow.showWhitespaceToUnstageHint')
               : t('diffWindow.showWhitespaceToStageHint')
           }}
         </p>
-        <div v-else class="hunk-actions">
-          <button
+        <div v-else class="action-row">
+          <Button
             v-for="(chunk, i) in chunks"
             :key="i"
-            type="button"
+            v-bind="SECONDARY_BUTTON"
+            :label="staged ? t('diffWindow.unstageHunk') : t('diffWindow.stageHunk')"
             data-test="stage-hunk"
             @click="stageLines(hunkSelection(chunk))"
-          >
-            {{ working.staged ? t('diffWindow.unstageHunk') : t('diffWindow.stageHunk') }}
-          </button>
-          <button
-            type="button"
+          />
+          <Button
+            v-bind="SECONDARY_BUTTON"
+            :label="
+              staged ? t('diffWindow.unstageSelectedLines') : t('diffWindow.stageSelectedLines')
+            "
             data-test="stage-selected-lines"
             :disabled="!selectedLinesEnabled"
             @click="stageLines(selectedLines())"
-          >
-            {{
-              working.staged
-                ? t('diffWindow.unstageSelectedLines')
-                : t('diffWindow.stageSelectedLines')
-            }}
-          </button>
-          <template v-if="!working.staged">
-            <button
+          />
+          <template v-if="!staged">
+            <Button
               v-for="(chunk, i) in chunks"
               :key="'discard-' + i"
-              type="button"
+              v-bind="SECONDARY_BUTTON"
+              :label="t('diffWindow.discardHunk')"
               data-test="discard-hunk"
               @click="discardLines(hunkSelection(chunk))"
-            >
-              {{ t('diffWindow.discardHunk') }}
-            </button>
-            <button
-              type="button"
+            />
+            <Button
+              v-bind="SECONDARY_BUTTON"
+              :label="t('diffWindow.discardSelectedLines')"
               data-test="discard-selected-lines"
               :disabled="!selectedLinesEnabled"
               @click="discardLines(selectedLines())"
-            >
-              {{ t('diffWindow.discardSelectedLines') }}
-            </button>
+            />
           </template>
         </div>
       </template>
@@ -473,14 +468,13 @@ const toolbar = computed<ToolbarButton[]>(() => {
 </template>
 
 <style scoped>
-/* Sticky: the side column scrolls as a whole, and next/previous change
-   must stay clickable wherever a jump lands. */
+/* Sticky: the diff view scrolls as a whole (DiffWindowView.vue), and
+   next/previous change must stay clickable wherever a jump lands. */
 .diff-toolbar {
   position: sticky;
   top: 0;
   z-index: 1;
   display: flex;
-  flex-wrap: nowrap;
   align-items: center;
   gap: 0.3em;
   background: var(--p-content-background);

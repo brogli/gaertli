@@ -103,35 +103,37 @@ tasks:
     deps:
       - task: build
     cmds:
-      - task: create:appimage
       - task: create:deb
       - task: create:rpm
-      - task: create:aur
+      - task: create:tarball
 
   package:dryrun:
-    summary: Builds the AppImage into dist/, mirroring release.yml's linux job
-    deps:
-      - task: create:appimage
+    summary: Builds the deb, rpm and tar.gz into dist/, mirroring release.yml's linux job
     cmds:
+      - task: create:deb
+      - task: create:rpm
+      - task: create:tarball
       - mkdir -p dist
-      - sh -c 'mv {{.BIN_DIR}}/{{.APP_NAME}}-*.AppImage dist/{{.APP_NAME}}-linux-amd64.AppImage'
+      - mv {{.BIN_DIR}}/{{.APP_NAME}}.deb dist/{{.APP_NAME}}-linux-amd64.deb
+      - mv {{.BIN_DIR}}/{{.APP_NAME}}.rpm dist/{{.APP_NAME}}-linux-amd64.rpm
+      - mv {{.BIN_DIR}}/{{.APP_NAME}}.tar.gz dist/{{.APP_NAME}}-linux-amd64.tar.gz
 
-  create:appimage:
-    summary: Creates an AppImage
-    dir: build/linux/appimage
+  create:tarball:
+    summary: Creates a self-contained tar.gz (binary, LICENSE, THIRD-PARTY-NOTICES.txt) for distributions without a deb/rpm package manager
     deps:
       - task: build
-      - task: generate:dotdesktop
     cmds:
-      - cp "{{.APP_BINARY}}" "{{.APP_NAME}}"
-      - cp ../../appicon.png "{{.APP_NAME}}.png"
-      - wails3 generate appimage -binary "{{.APP_NAME}}" -icon {{.ICON}} -desktopfile {{.DESKTOP_FILE}} -outputdir {{.OUTPUT_DIR}} -builddir {{.ROOT_DIR}}/build/linux/appimage/build
+      - rm -rf {{.STAGE_DIR}}
+      - mkdir -p {{.STAGE_DIR}}
+      - cp {{.BIN_DIR}}/{{.APP_NAME}} {{.ROOT_DIR}}/LICENSE {{.STAGE_DIR}}/
+      - task: :licence-check
+        vars: { OUT: '{{.STAGE_DIR}}/THIRD-PARTY-NOTICES.txt' }
+      - tar -C {{.STAGE_ROOT}} -czf {{.OUTPUT}} {{.APP_NAME}}
     vars:
-      APP_NAME: '{{.APP_NAME}}'
-      APP_BINARY: '../../../bin/{{.APP_NAME}}'
-      ICON: '{{.APP_NAME}}.png'
-      DESKTOP_FILE: '../{{.APP_NAME}}.desktop'
-      OUTPUT_DIR: '../../../bin'
+      STAGE_ROOT: '{{.ROOT_DIR}}/bin/tarball'
+      STAGE_DIR: '{{.ROOT_DIR}}/bin/tarball/{{.APP_NAME}}'
+      DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}.tar.gz'
+      OUTPUT: '{{.OUTPUT | default .DEFAULT_OUTPUT}}'
 
   create:deb:
     summary: Creates a deb package

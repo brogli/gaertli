@@ -44,10 +44,10 @@ func TestTR_28_DispatchEmitsEachEventsRegisteredPayloadType(t *testing.T) {
 	// "command" is not sampled here: dispatch logs it instead of emitting it
 	// to a window (see applog_test.go).
 	samples := map[string]any{
-		"repo:changed": core.RepoChanged{Scope: "refs"},
+		"repo:changed": core.RepoChanged{Scope: core.RefsChanged},
 		"log:progress": core.LogProgress{Loaded: 5, Done: true, Filtered: true, Generation: 2},
 		"job:update": core.JobInfo{
-			ID: "j1", Kind: "fetch", State: "failed", Progress: -1, Message: "m",
+			ID: "j1", Kind: core.FetchJob, State: core.JobFailed, Progress: -1, Message: "m",
 			Error: &core.Error{Code: core.AuthFailed, Message: "no", GitStderr: "fatal", Command: "git fetch"},
 		},
 		"core:reconnected": nil,

@@ -38,7 +38,7 @@ type Worktree struct {
 	Repo   *Repo
 	Runner git.Runner // Log emits a "command" event scoped to ID
 
-	poller worktreePoller // the working-file half of outside-change detection, focused while the window is
+	poller worktreePoller // the working-file half of outside-change detection, focused while any window on this worktree is
 
 	// writeMu serialises everything that writes this worktree's index or
 	// files: stage, commit, reset, checkout, cherry-pick, revert,
@@ -50,7 +50,7 @@ type Worktree struct {
 	messageMu    sync.Mutex
 	messageDraft string
 
-	// The window's own filtered log view, apart from the repo's shared log.
+	// This worktree's filtered log view, apart from the repo's shared log.
 	filterMu     sync.Mutex
 	filterActive bool
 	filter       core.LogFilter
@@ -190,7 +190,7 @@ func (r *Repo) LogReady() bool {
 }
 
 // LogView is one snapshot of a log's rows: Repo's own shared cache
-// (Repo.LogSnapshot) or a window's filtered view (Worktree.FilterSnapshot).
+// (Repo.LogSnapshot) or a worktree's filtered view (Worktree.FilterSnapshot).
 // Generation bumps whenever that view restarts from row 0 (a reload, a new
 // filter).
 type LogView struct {
@@ -222,6 +222,15 @@ func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
 		}
 	}
 	return 0, false
+}
+
+// LogIndicesOf returns, in row order, the indices of every row whose SHA is
+// in shas, and the log's current generation. Reads r.log.rows in place
+// under the lock: no copy, unlike LogSnapshot.
+func (r *Repo) LogIndicesOf(shas map[string]bool) (indices []int, generation int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.log.indicesOf(shas)
 }
 
 // FilterBegin starts a new filtered load for filter, cancelling whatever
@@ -274,8 +283,8 @@ func (w *Worktree) FilterFinish(gen int, err *core.Error) {
 	w.filtered.finish(gen, err)
 }
 
-// LogSnapshot is what this window shows: its own filtered view while a
-// filter is active, the repo's shared log otherwise.
+// LogSnapshot is what windows on this worktree show: its filtered view
+// while a filter is active, the repo's shared log otherwise.
 func (w *Worktree) LogSnapshot(from, to int) LogView {
 	if view, ok := w.FilterSnapshot(from, to); ok {
 		return view
@@ -283,7 +292,7 @@ func (w *Worktree) LogSnapshot(from, to int) LogView {
 	return w.Repo.LogSnapshot(from, to)
 }
 
-// FilterSnapshot mirrors Repo.LogSnapshot, scoped to this window's own
+// FilterSnapshot mirrors Repo.LogSnapshot, scoped to this worktree's
 // filtered view. ok is false when no filter is active.
 func (w *Worktree) FilterSnapshot(from, to int) (view LogView, ok bool) {
 	w.filterMu.Lock()
@@ -292,6 +301,37 @@ func (w *Worktree) FilterSnapshot(from, to int) (view LogView, ok bool) {
 		return LogView{}, false
 	}
 	return w.filtered.view(from, to), true
+}
+
+// ActiveFilter returns the filtered view's own filter; ok is false while no
+// filter is active, filter the zero value.
+func (w *Worktree) ActiveFilter() (filter core.LogFilter, ok bool) {
+	w.filterMu.Lock()
+	defer w.filterMu.Unlock()
+	return w.filter, w.filterActive
+}
+
+// LogIndicesOf mirrors LogSnapshot: it maps shas to their row indices in
+// this worktree's current view (its filtered view while one is active,
+// else the repo's shared log), without copying that view's rows. filtered
+// says which view answered.
+func (w *Worktree) LogIndicesOf(shas map[string]bool) (indices []int, generation int, filtered bool) {
+	if indices, generation, ok := w.filteredIndicesOf(shas); ok {
+		return indices, generation, true
+	}
+	indices, generation = w.Repo.LogIndicesOf(shas)
+	return indices, generation, false
+}
+
+// filteredIndicesOf mirrors FilterSnapshot, scoped to LogIndicesOf.
+func (w *Worktree) filteredIndicesOf(shas map[string]bool) (indices []int, generation int, ok bool) {
+	w.filterMu.Lock()
+	defer w.filterMu.Unlock()
+	if !w.filterActive {
+		return nil, 0, false
+	}
+	indices, generation = w.filtered.indicesOf(shas)
+	return indices, generation, true
 }
 
 // FilterClear cancels any running filtered stream and reverts LogRows to
@@ -352,6 +392,20 @@ func (s *logState) view(from, to int) LogView {
 	}
 }
 
+// indicesOf returns, in row order, the indices of every row whose SHA is in
+// shas, and the stream's current generation; no row is copied. An empty
+// shas skips the scan.
+func (s *logState) indicesOf(shas map[string]bool) (indices []int, generation int) {
+	if len(shas) > 0 {
+		for i, c := range s.rows {
+			if shas[c.SHA] {
+				indices = append(indices, i)
+			}
+		}
+	}
+	return indices, s.gen
+}
+
 // Manager mints and reuses sessions: opening the same worktree twice (by
 // any path that resolves to it) returns the same *Worktree, and worktrees
 // sharing a repo share one *Repo.
@@ -359,8 +413,8 @@ type Manager struct {
 	sink     core.EventSink
 	discover git.Runner // no Log: discovery calls predate any session
 
-	newWatcher func(commonDir string, onChange func(watch.Scope)) (repoWatcher, error)
-	newPoller  func(runner git.Runner, dir string, onChange func(watch.Scope)) worktreePoller
+	newWatcher func(commonDir string, onChange func(core.ChangeScope)) (repoWatcher, error)
+	newPoller  func(runner git.Runner, dir string, onChange func(core.ChangeScope)) worktreePoller
 
 	mu        sync.Mutex
 	worktrees map[core.WorktreeID]*Worktree
@@ -373,10 +427,10 @@ func NewManager(sink core.EventSink) *Manager {
 		sink:      sink,
 		worktrees: make(map[core.WorktreeID]*Worktree),
 		repos:     make(map[string]*Repo),
-		newWatcher: func(commonDir string, onChange func(watch.Scope)) (repoWatcher, error) {
+		newWatcher: func(commonDir string, onChange func(core.ChangeScope)) (repoWatcher, error) {
 			return watch.NewRepoWatcher(commonDir, onChange)
 		},
-		newPoller: func(runner git.Runner, dir string, onChange func(watch.Scope)) worktreePoller {
+		newPoller: func(runner git.Runner, dir string, onChange func(core.ChangeScope)) worktreePoller {
 			return watch.NewWorktreePoller(runner, dir, onChange)
 		},
 	}
@@ -384,9 +438,8 @@ func NewManager(sink core.EventSink) *Manager {
 
 // Resolve validates path and returns its worktree's identity (toplevel, git
 // dir, repo key) without minting or reusing any session: Open's stateless
-// half, so listing a repo's worktrees or branches never starts a poller or
-// watcher for a repo no window has selected. Errors are
-// exactly Open's own:
+// half, so listing a repo's worktrees never starts a poller or watcher for
+// a repo no window has selected. Errors are exactly Open's own:
 //   - Code GitTooOld: from Runner.CheckVersion (git absent, unparsable, or
 //     older than MinVersion)
 //   - Code NotARepo: rev-parse failed (bad Dir, or not inside a work tree)
@@ -402,7 +455,7 @@ func (m *Manager) Resolve(ctx context.Context, path core.RepoPath) (toplevel, gi
 		Args:     []string{"rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir", "--is-inside-work-tree"},
 	})
 	if err != nil {
-		return "", "", "", remapNotARepo(err, path)
+		return "", "", "", RemapNotARepo(err, path)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(result.Stdout)), "\n")
@@ -421,8 +474,7 @@ func (m *Manager) Open(ctx context.Context, path core.RepoPath) (*Worktree, erro
 	return m.session(toplevel, gitDir, repoKey), nil
 }
 
-// Get returns an already-open session. core.Errorf(core.Internal, ...) for
-// an unknown id.
+// Get returns an already-open session; Code Internal for an unknown id.
 func (m *Manager) Get(wt core.WorktreeID) (*Worktree, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -462,7 +514,7 @@ func (m *Manager) session(toplevel, gitDir, repoKey string) *Worktree {
 // fails to start still runs on its fallback poll.
 func (m *Manager) newRepo(key string) *Repo {
 	repo := &Repo{Key: key}
-	repo.watcher, _ = m.newWatcher(key, func(scope watch.Scope) {
+	repo.watcher, _ = m.newWatcher(key, func(scope core.ChangeScope) {
 		m.sink(core.Event{Name: "repo:changed", Repo: key, Payload: changedPayload(scope)})
 	})
 	repo.jobs = jobs.NewManager(func(j jobs.Job) {
@@ -478,7 +530,7 @@ func (m *Manager) newWorktree(id core.WorktreeID, toplevel, gitDir string, repo 
 	wt.Runner = git.Runner{Log: func(e git.Entry) {
 		m.sink(core.Event{Name: "command", Worktree: id, Payload: payload(toCommandRecord(e))})
 	}}
-	wt.poller = m.newPoller(wt.Runner, toplevel, func(scope watch.Scope) {
+	wt.poller = m.newPoller(wt.Runner, toplevel, func(scope core.ChangeScope) {
 		m.sink(core.Event{Name: "repo:changed", Worktree: id, Payload: changedPayload(scope)})
 	})
 	wt.poller.Focus()
@@ -486,8 +538,8 @@ func (m *Manager) newWorktree(id core.WorktreeID, toplevel, gitDir string, repo 
 }
 
 // changedPayload is a "repo:changed" event's payload.
-func changedPayload(scope watch.Scope) json.RawMessage {
-	return payload(core.RepoChanged{Scope: string(scope)})
+func changedPayload(scope core.ChangeScope) json.RawMessage {
+	return payload(core.RepoChanged{Scope: scope})
 }
 
 // payload marshals an event's payload; nil if v cannot be marshalled.
@@ -518,9 +570,9 @@ func (m *Manager) Close(id core.WorktreeID) {
 	}
 }
 
-// remapNotARepo turns a discovery failure into Code NotARepo with
+// RemapNotARepo turns a discovery failure into Code NotARepo with
 // notARepo's own message, keeping GitStderr/Command for the details.
-func remapNotARepo(err error, path core.RepoPath) error {
+func RemapNotARepo(err error, path core.RepoPath) error {
 	if src, ok := errors.AsType[*core.Error](err); ok {
 		want := notARepo(path)
 		src.Retag(want.Code, want.Key, want.Args, "%s", want.Message)

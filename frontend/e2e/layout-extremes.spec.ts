@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { expectNoOverlap } from './boxes'
+import { expectNoOverlap, openMockRepo } from './helpers'
 
 // happy-dom computes no layout, so these width extremes need a real
 // browser: wide's changes view scrolling, and the toolbar at each layout's
@@ -9,7 +9,7 @@ test('FR-CHG-11 wide (1600), 60 changed files: scrolling the change list never m
   page,
 }) => {
   await page.setViewportSize({ width: 1600, height: 900 })
-  await page.goto('/?path=/mock/repo&changedFiles=60')
+  await openMockRepo(page, '&changedFiles=60')
   await page.waitForSelector('.changes-column .files li')
 
   const commitButton = page.locator('[data-test="commit-submit"]')
@@ -22,13 +22,12 @@ test('FR-CHG-11 wide (1600), 60 changed files: scrolling the change list never m
   expect(after!.y + after!.height).toBeLessThanOrEqual(900)
 })
 
-// assertToolbarFitsOneRow loads path at width x 800 and checks every
-// toolbar control shares one row, none overlapping another, with no
-// horizontal overflow.
-async function assertToolbarFitsOneRow(page: Page, path: string, width: number): Promise<void> {
+// assertToolbarFitsOneRow opens the mock repo (with query) at width x 800
+// and checks every toolbar control shares one row, none overlapping
+// another, with no horizontal overflow.
+async function assertToolbarFitsOneRow(page: Page, width: number, query = ''): Promise<void> {
   await page.setViewportSize({ width, height: 800 })
-  await page.goto(path)
-  await page.waitForSelector('.row')
+  await openMockRepo(page, query)
 
   const toolbar = page.locator('.toolbar')
   const controls = await toolbar.locator('button, select').all()
@@ -46,23 +45,23 @@ async function assertToolbarFitsOneRow(page: Page, path: string, width: number):
 test('FR-UX-09 narrow (400 x 800, the window minimum): the toolbar stays one row, a branch without an upstream ("Push and set upstream")', async ({
   page,
 }) => {
-  await assertToolbarFitsOneRow(page, '/?path=/mock/repo', 400)
+  await assertToolbarFitsOneRow(page, 400)
 })
 
 test('FR-UX-09 narrow (400 x 800, the window minimum): the toolbar stays one row, a branch with an upstream (Pull/Push)', async ({
   page,
 }) => {
-  await assertToolbarFitsOneRow(page, '/?path=/mock/repo&upstream=1', 400)
+  await assertToolbarFitsOneRow(page, 400, '&upstream=1')
 })
 
 test('FR-UX-09 medium (900 x 800): the toolbar still stays one row, no overlap', async ({
   page,
 }) => {
-  await assertToolbarFitsOneRow(page, '/?path=/mock/repo&upstream=1', 900)
+  await assertToolbarFitsOneRow(page, 900, '&upstream=1')
 })
 
 test('FR-UX-09 wide (1400 x 800): the toolbar still stays one row, no overlap', async ({
   page,
 }) => {
-  await assertToolbarFitsOneRow(page, '/?path=/mock/repo&upstream=1', 1400)
+  await assertToolbarFitsOneRow(page, 1400, '&upstream=1')
 })

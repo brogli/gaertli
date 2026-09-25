@@ -80,8 +80,18 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: nebegit-linux-amd64.AppImage
-          path: dist/nebegit-linux-amd64.AppImage
+          name: nebegit-linux-amd64.deb
+          path: dist/nebegit-linux-amd64.deb
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nebegit-linux-amd64.rpm
+          path: dist/nebegit-linux-amd64.rpm
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nebegit-linux-amd64.tar.gz
+          path: dist/nebegit-linux-amd64.tar.gz
 
   darwin:
     runs-on: macos-latest

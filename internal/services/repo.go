@@ -40,22 +40,23 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 		return core.Summary{}, err
 	}
 	return core.Summary{
-		Branch: branch, Detached: detached, Operation: operation(wt.GitDir), SHA: sha,
+		Branch: branch, Detached: detached, Operation: core.Operation(operation(wt.GitDir)), SHA: sha,
 		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(), PullStash: stash,
 	}, nil
 }
 
 // headBranch returns HEAD's branch name, or detached if HEAD is not a
-// symbolic ref.
+// symbolic ref. The prefix is cut here: --short prints heads/<name> when a
+// tag has the same name.
 func headBranch(ctx context.Context, r git.Runner, dir string) (branch string, detached bool, err error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
-		Args: []string{"symbolic-ref", "--short", "-q", "HEAD"},
+		Args: []string{"symbolic-ref", "-q", "HEAD"},
 	})
 	if quietFailure(err, result) {
 		return "", true, nil
 	}
-	return strings.TrimSpace(string(result.Stdout)), false, err
+	return strings.TrimPrefix(strings.TrimSpace(string(result.Stdout)), "refs/heads/"), false, err
 }
 
 // verifyRev resolves rev to its object name, "" if rev does not exist (an

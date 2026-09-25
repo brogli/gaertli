@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -208,9 +207,9 @@ func TestFR_REPO_02_RestoreOpensAWindowForEachRememberedSelection(t *testing.T) 
 		t.Fatal(err)
 	}
 	opened := map[core.RepoPath]bool{}
-	api := fakeAPI{openWorktree: func(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+	api := fakeAPI{openWorktree: func(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 		opened[path] = true
-		return core.WorktreeInfo{ID: core.WorktreeID(path), Path: string(path)}, nil
+		return openAsIs(ctx, path)
 	}}
 
 	shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}.restore(t.Context())
@@ -422,27 +421,5 @@ func TestFR_REPO_05_OpenWorktreePathNotifiesAndOpensNoWindowOnFailure(t *testing
 	}
 	if len(opener.windows) != 0 {
 		t.Errorf("windows opened = %d, want 0", len(opener.windows))
-	}
-}
-
-// The WSL failures need no bespoke handling: openFailedMessage's generic
-// *core.Error path already names each situation.
-func TestOpenFailedMessageNamesWSLFailures(t *testing.T) {
-	cases := []struct {
-		name string
-		err  *core.Error
-		want string
-	}{
-		{"wsl not found", core.Errorf(core.WslNotFound, "WSL is not installed (wsl.exe not found on PATH)"), "WSL is not installed"},
-		{"distro not found", core.Errorf(core.DistroNotFound, "distro %q not found", "bogus"), `distro "bogus" not found`},
-		{"deploy refused", core.Errorf(core.DeployRefused, "copying nebegit's helper into %s was declined", "Ubuntu-22.04"), "declined"},
-	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			got := openFailedMessage(tt.err)
-			if !strings.Contains(got, tt.want) {
-				t.Errorf("openFailedMessage(%v) = %q, want to contain %q", tt.err, got, tt.want)
-			}
-		})
 	}
 }

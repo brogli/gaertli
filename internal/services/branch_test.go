@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,11 +25,7 @@ func TestFR_BR_05_RemapDirtyClassifiesByExitCodeNotText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := remapDirty(tt.err, git.Result{ExitCode: tt.exit})
-
-			if ce, ok := errors.AsType[*core.Error](got); !ok || ce.Code != tt.want {
-				t.Errorf("remapDirty(...) Code = %v, want %s", got, tt.want)
-			}
+			coretest.AssertCode(t, remapDirty(tt.err, git.Result{ExitCode: tt.exit}), tt.want)
 		})
 	}
 }
@@ -309,6 +304,46 @@ func TestFR_BR_01_CreateBranchWithCheckoutIsAtomicOnADirtyConflict(t *testing.T)
 	}
 }
 
+func TestFR_BR_01_CreateBranchStartsAtTheFullRefNamedWhenATagAndABranchShareItsName(t *testing.T) {
+	repo := gittest.New(t)
+	branchSHA, tagSHA := branchAndTagNamedV1(t, repo.Dir)
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	for _, tc := range []struct {
+		name, start, want string
+		checkout          bool
+	}{
+		{"from-branch", "refs/heads/v1", branchSHA, false},
+		{"from-tag", "refs/tags/v1", tagSHA, false},
+		{"from-branch-switched", "refs/heads/v1", branchSHA, true},
+		{"from-tag-switched", "refs/tags/v1", tagSHA, true},
+	} {
+		if err := c.CreateBranch(t.Context(), wt, tc.name, tc.start, tc.checkout); err != nil {
+			t.Fatalf("CreateBranch(%s, %s, checkout %v): %v", tc.name, tc.start, tc.checkout, err)
+		}
+		if got := branchTip(t, repo.Dir, tc.name); got != tc.want {
+			t.Errorf("%s = %s, want %s's commit %s", tc.name, got, tc.start, tc.want)
+		}
+	}
+}
+
+func TestFR_BR_01_CreateBranchFromARemoteBranchsFullRefTracksIt(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	withOrigin(t, repo.Dir, "feature")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.CreateBranch(t.Context(), wt, "feature", "refs/remotes/origin/feature", false); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := upstreamOf(t, repo.Dir, "feature"); got != "origin/feature" {
+		t.Errorf("upstream = %q, want origin/feature", got)
+	}
+}
+
 func TestFR_BR_05_CheckoutSwitchesToAnExistingLocalBranch(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -331,11 +366,7 @@ func TestFR_BR_05_CheckoutSwitchesToAnExistingLocalBranch(t *testing.T) {
 func TestFR_BR_05_CheckoutDWIMsARemoteTrackingBranchIntoALocalOne(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	bareDir := t.TempDir()
-	gittest.Run(t, bareDir, "init", "--bare")
-	gittest.Run(t, repo.Dir, "remote", "add", "origin", bareDir)
-	gittest.Run(t, repo.Dir, "push", "origin", "master:shared")
-	gittest.Run(t, repo.Dir, "fetch", "origin")
+	withOrigin(t, repo.Dir, "shared")
 
 	c, wt := openWorktree(t, repo.Dir)
 
@@ -346,7 +377,27 @@ func TestFR_BR_05_CheckoutDWIMsARemoteTrackingBranchIntoALocalOne(t *testing.T) 
 	if got := currentBranch(t, repo.Dir); got != "shared" {
 		t.Errorf("current branch = %s, want shared", got)
 	}
-	if got := gittest.Out(t, repo.Dir, "for-each-ref", "--format=%(upstream:short)", "refs/heads/shared"); got != "origin/shared" {
+	if got := upstreamOf(t, repo.Dir, "shared"); got != "origin/shared" {
+		t.Errorf("upstream = %q, want origin/shared", got)
+	}
+}
+
+func TestFR_BR_09_CheckoutOfARemoteBranchsFullRefTracksItDespiteATagOfItsName(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	withOrigin(t, repo.Dir, "shared")
+	gittest.Run(t, repo.Dir, "tag", "shared")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.Checkout(t.Context(), wt, "refs/remotes/origin/shared"); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := gittest.Out(t, repo.Dir, "symbolic-ref", "HEAD"); got != "refs/heads/shared" {
+		t.Errorf("HEAD = %s, want refs/heads/shared", got) // the short form is ambiguous here
+	}
+	if got := upstreamOf(t, repo.Dir, "shared"); got != "origin/shared" {
 		t.Errorf("upstream = %q, want origin/shared", got)
 	}
 }
@@ -855,4 +906,36 @@ func currentBranch(t *testing.T, dir string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(result.Stdout))
+}
+
+// branchAndTagNamedV1 makes a branch v1 at the first commit and an
+// annotated tag v1 at the second, then commits past both: the bare name v1
+// is ambiguous.
+func branchAndTagNamedV1(t *testing.T, dir string) (branchSHA, tagSHA string) {
+	t.Helper()
+	gittest.Commit(t, dir, "seed.txt", "a", "first")
+	branchSHA = gittest.HeadSHA(t, dir)
+	gittest.Run(t, dir, "branch", "v1")
+	gittest.Commit(t, dir, "seed.txt", "b", "second")
+	tagSHA = gittest.HeadSHA(t, dir)
+	gittest.Run(t, dir, "tag", "-a", "-m", "release", "v1")
+	gittest.Commit(t, dir, "seed.txt", "c", "third")
+	return branchSHA, tagSHA
+}
+
+// withOrigin adds a bare remote origin holding dir's master as branch, and
+// fetches it.
+func withOrigin(t *testing.T, dir, branch string) {
+	t.Helper()
+	bareDir := t.TempDir()
+	gittest.Run(t, bareDir, "init", "--bare")
+	gittest.Run(t, dir, "remote", "add", "origin", bareDir)
+	gittest.Run(t, dir, "push", "origin", "master:"+branch)
+	gittest.Run(t, dir, "fetch", "origin")
+}
+
+// upstreamOf returns local branch name's upstream in short form.
+func upstreamOf(t *testing.T, dir, name string) string {
+	t.Helper()
+	return gittest.Out(t, dir, "for-each-ref", "--format=%(upstream:short)", "refs/heads/"+name)
 }

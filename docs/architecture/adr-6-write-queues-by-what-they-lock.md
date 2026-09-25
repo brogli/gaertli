@@ -13,7 +13,7 @@ Writes are serialised per scope, matching what git itself locks:
 | Scope | Serialised | Examples |
 |---|---|---|
 | Reads | never, they run in parallel | status, log, diff |
-| Worktree | one at a time per worktree | stage, commit, reset, checkout, cherry-pick, revert, merge/rebase steps, discard |
+| Worktree | one at a time per worktree | stage, commit, reset, checkout, cherry-pick, revert, squash and fixup, merge/rebase steps, discard |
 | Repo | one at a time per repo | `worktree add/remove/prune`, branch delete/rename |
 | Refs and objects only | not queued; git's ref locks suffice | fetch, push, updating a branch that is not checked out |
 

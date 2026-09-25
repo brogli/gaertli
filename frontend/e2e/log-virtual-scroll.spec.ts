@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { openMockRepo } from './helpers'
 
 // happy-dom has no real layout or scrolling, so a component test cannot
 // exercise the virtual list. This drives the rendered app instead: only
@@ -7,8 +8,7 @@ import { test, expect } from '@playwright/test'
 test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful', async ({
   page,
 }) => {
-  await page.goto('/?path=/mock/repo')
-  await page.waitForSelector('.row')
+  await openMockRepo(page)
 
   // Let the initial load settle: wait until no new LogRows call has fired
   // for a full polling interval.
@@ -24,26 +24,13 @@ test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful'
     { polling: 200, timeout: 5000 },
   )
 
-  const baseline = await page.evaluate(() =>
-    Math.max(...window.__e2eLogRowsCalls.map((c) => c.from)),
-  )
+  const furthestFrom = () =>
+    page.evaluate(() => Math.max(...window.__e2eLogRowsCalls.map((c) => c.from)))
+  const baseline = await furthestFrom()
 
-  await page.locator('.log-list').evaluate((el) => {
-    el.scrollTop = el.scrollHeight
-  })
+  await page.locator('.log-list').evaluate((el) => (el.scrollTop = el.scrollHeight))
 
-  await page.waitForFunction(
-    (base) => window.__e2eLogRowsCalls.some((c) => c.from > base),
-    baseline,
-    {
-      timeout: 5000,
-    },
-  )
-
-  const afterScroll = await page.evaluate(() =>
-    Math.max(...window.__e2eLogRowsCalls.map((c) => c.from)),
-  )
-  expect(afterScroll).toBeGreaterThan(baseline)
+  await expect.poll(furthestFrom).toBeGreaterThan(baseline)
 })
 
 // A streamed load must leave the list at its top, newest commit first: the
@@ -51,8 +38,7 @@ test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful'
 test('FR-LOG-01 after a streamed load the list is still at the top with row 0 visible', async ({
   page,
 }) => {
-  await page.goto('/?path=/mock/repo')
-  await page.waitForSelector('.row')
+  await openMockRepo(page)
   await page.waitForFunction(() => window.__e2eLogRowsCalls.length > 0)
   await page.waitForTimeout(1000) // let every progress step and row fetch land
 

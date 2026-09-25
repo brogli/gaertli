@@ -9,6 +9,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/brogli/nebegit/internal/core"
 )
 
 // updateLog collects onUpdate calls (with arrival time) from whatever
@@ -83,7 +85,7 @@ func TestQA_RESP_01_StartReturnsImmediatelyWithARunningJobRecorded(t *testing.T)
 
 	waitFor(t, func() bool { return len(log.snapshot()) >= 1 }, time.Second)
 	first := log.snapshot()[0]
-	if first.State != Running || first.Percent != -1 {
+	if first.State != core.JobRunning || first.Percent != -1 {
 		t.Errorf("first update = %+v, want State Running, Percent -1", first)
 	}
 
@@ -133,7 +135,7 @@ func TestFR_SYNC_07_ProgressEmitsImmediatelyThenThrottled(t *testing.T) {
 		}
 
 		last := timed[len(timed)-1]
-		if last.State != Done || last.Percent != 100 {
+		if last.State != core.JobDone || last.Percent != 100 {
 			t.Errorf("last update = %+v, want the terminal Done at 100 regardless of throttle", last.Job)
 		}
 	})
@@ -167,12 +169,12 @@ func TestFR_SYNC_07_CancelledJobEndsInCancelledNotFailed(t *testing.T) {
 	if terminals != 1 {
 		t.Fatalf("got %d terminal updates, want exactly 1", terminals)
 	}
-	if last.State != Cancelled {
-		t.Errorf("final State = %s, want %s", last.State, Cancelled)
+	if last.State != core.JobCancelled {
+		t.Errorf("final State = %s, want %s", last.State, core.JobCancelled)
 	}
 }
 
-func TestQA_RESP_02_CancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
+func TestFR_SYNC_07_CancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
 	calls := 0
 	m := NewManager(func(Job) { calls++ })
 
@@ -198,7 +200,7 @@ func TestFR_SYNC_07_FnErrorEndsFailedFnNilEndsDone(t *testing.T) {
 	waitFor(t, func() bool {
 		f, fok := log.terminalFor(failID)
 		o, ook := log.terminalFor(okID)
-		return fok && f.State == Failed && ook && o.State == Done
+		return fok && f.State == core.JobFailed && ook && o.State == core.JobDone
 	}, 2*time.Second)
 
 	f, _ := log.terminalFor(failID)
@@ -222,7 +224,7 @@ func TestTR_29_AJobOutlivesItsRequestContextAndKeepsItsValues(t *testing.T) {
 	close(release)
 
 	waitFor(t, func() bool { _, ok := log.terminalFor(id); return ok }, 2*time.Second)
-	if job, _ := log.terminalFor(id); job.State != Done || job.Result != "request value" {
+	if job, _ := log.terminalFor(id); job.State != core.JobDone || job.Result != "request value" {
 		t.Errorf("job = %+v, want State Done with Result \"request value\"", job)
 	}
 }
@@ -246,17 +248,17 @@ func TestQA_RESP_01_NoManagerImposedConcurrencyCap(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("second job never ran while the first was still blocked (a concurrency cap?)")
 	}
-	waitFor(t, func() bool { return findKind(m.List(), "second").State == Done }, time.Second)
-	waitFor(t, func() bool { return findKind(m.List(), "first").State == Running }, time.Second)
+	waitFor(t, func() bool { return findKind(m.List(), "second").State == core.JobDone }, time.Second)
+	waitFor(t, func() bool { return findKind(m.List(), "first").State == core.JobRunning }, time.Second)
 
 	close(block)
 }
 
-func TestFR_SYNC_07_StartDedupesAKindAlreadyQueuedOrRunning(t *testing.T) {
+func TestFR_SYNC_07_StartDedupesAKindAlreadyRunning(t *testing.T) {
 	var calls atomic.Int32
 	done := make(chan Job, 1)
 	m := NewManager(func(j Job) {
-		if j.State == Done {
+		if j.State == core.JobDone {
 			done <- j
 		}
 	})
@@ -313,7 +315,7 @@ func TestFR_UPD_01_StartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
 	}
 }
 
-func TestQA_RESP_02_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing.T) {
+func TestFR_SYNC_07_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing.T) {
 	m := NewManager(func(Job) {})
 
 	for range historyCap + 3 {
@@ -323,7 +325,7 @@ func TestQA_RESP_02_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing
 			return nil, nil
 		})
 		<-done
-		waitFor(t, func() bool { return findID(m.List(), id).State == Done }, time.Second)
+		waitFor(t, func() bool { return findID(m.List(), id).State == core.JobDone }, time.Second)
 	}
 
 	block := make(chan struct{})
@@ -331,7 +333,7 @@ func TestQA_RESP_02_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing
 		<-block
 		return nil, nil
 	})
-	waitFor(t, func() bool { return findID(m.List(), blockedID).State == Running }, time.Second)
+	waitFor(t, func() bool { return findID(m.List(), blockedID).State == core.JobRunning }, time.Second)
 
 	list := m.List()
 	finished := 0
@@ -364,7 +366,7 @@ func findID(list []Job, id ID) Job {
 	return Job{}
 }
 
-func findKind(list []Job, kind string) Job {
+func findKind(list []Job, kind core.JobKind) Job {
 	for _, j := range list {
 		if j.Kind == kind {
 			return j

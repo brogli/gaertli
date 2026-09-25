@@ -13,3 +13,10 @@ import (
 func showFatal(title, msg string) {
 	fmt.Fprintf(os.Stderr, "%s: %s\n", title, msg)
 }
+
+// askYesNo has nothing to ask: WSL, and so a distro deploy consent, exists
+// only on Windows.
+func askYesNo(title, msg string) bool {
+	fmt.Fprintf(os.Stderr, "%s: %s\n", title, msg)
+	return false
+}

@@ -12,21 +12,50 @@
     "worktreeExists": "'{path}' already exists",
     "mergeCommitNotPickable": "{sha} is a merge commit; {verb} does not support a merge commit",
     "gitTooOld": "git {version} is older than the minimum {minVersion}",
-    "deployRefused": "copying nebegit's helper into {distro} was declined",
+    "deployNeeded": "Repos in {distro} need nebegit's helper. Open the folder again to install it.",
+    "distroNotFound": "WSL distro {distro} is not installed",
+    "wsl1Unsupported": "WSL distro {distro} runs on WSL 1; nebegit needs WSL 2.",
     "pushFetchFirst": "The remote has commits you don't have yet (fetch first). Pull first, or force push.",
     "pushNotFastForward": "Your branch isn't a fast-forward of the remote (non-fast-forward). Pull first, or force push.",
     "pushStaleInfo": "The remote moved since your last fetch (stale info). Pull first, or force push.",
     "pushRefUpdatedSinceCheckout": "The remote has commits you fetched but haven't integrated (remote ref updated since checkout). Pull first, or force push.",
     "pushRejected": "The remote refused the push ({reason}).",
     "branchDiverged": "\"{branch}\" has diverged from its upstream and can't be fast-forwarded.",
+    "branchNoLongerCheckedOut": "\"{branch}\" is no longer checked out in {path}. Try the update again.",
     "authFailed": "Could not sign in to the remote. Sign in once from a terminal (credential helper, SSH agent or cached login), then try again; nebegit never asks for, stores or sees credentials.",
-    "invalidBranchName": "\"{name}\" is not a valid branch name"
+    "invalidBranchName": "\"{name}\" is not a valid branch name",
+    "locked": "Another program is using the repo (holding {lock}).",
+    "squashOperationInProgress": "a {operation} is in progress",
+    "squashDetached": "HEAD is detached; squash and fixup need the current branch",
+    "squashNotOnBranch": "a selected commit is not on the current branch",
+    "squashMergeInTheWay": "the merge commit {sha} is in the way",
+    "squashUncommittedChanges": "there are uncommitted changes; commit or stash them first",
+    "pullBlockedByChanges": "Local changes are in the way of the pull.",
+    "worktreeDirty": "{path} has uncommitted changes.",
+    "noOperation": "No merge, rebase, cherry-pick or revert is in progress.",
+    "operationNotSkippable": "A {operation} can't be skipped; only a cherry-pick or revert can."
+  },
+  "openvue": {
+    "accept": "Yes",
+    "reject": "No",
+    "emptyFilterMessage": "No matches",
+    "emptyMessage": "Nothing to choose from",
+    "emptySearchMessage": "No matches",
+    "emptySelectionMessage": "Nothing selected",
+    "searchMessage": "{count} matches",
+    "selectionMessage": "{count} selected",
+    "close": "Close",
+    "listLabel": "Options",
+    "allSelected": "All selected",
+    "noneSelected": "None selected"
   },
   "common": {
     "cancel": "Cancel",
     "confirm": "Confirm",
     "clear": "Clear",
+    "tryAgain": "Try again",
     "openInEditor": "Open in editor",
+    "justNow": "just now",
     "fileStatus": {
       "added": "Added",
       "modified": "Modified",
@@ -40,9 +69,11 @@
   },
   "filterBar": {
     "searchMessage": "Search message",
+    "matchPosition": "{current} of {total}",
+    "noMatch": "No match",
     "author": "Author",
-    "searchBranches": "Search branches",
-    "branches": "Branches",
+    "searchBranches": "Search branches and tags",
+    "branches": "Branches and tags",
     "path": "Path"
   },
   "changesView": {
@@ -91,18 +122,16 @@
     "dropStashTitle": "Drop stashed changes",
     "dropStashConfirm": "Drop the stashed changes? They will be lost.",
     "copyHash": "Copy hash",
-    "close": "Close",
     "showDetails": "show details"
   },
   "settings": {
-    "openInEditor": "Open in editor",
-    "openInEditorWsl": "Open in editor in WSL: {name}",
+    "editorLocal": "Open in editor: {os}",
+    "openInEditorWsl": "Open in editor: WSL {name}",
     "nameLabel": "Name (shown as \"Open in {name}\")",
     "folderCommand": "Folder command",
     "fileCommand": "File command",
     "fileAtLineCommand": "File-at-line command",
     "preset": "Preset:",
-    "addWslProfile": "Add \"Open in editor\" for a WSL distro:",
     "protectedBranches": "Protected branches",
     "defaultPullMode": "Default pull mode",
     "pullModeMerge": "merge",
@@ -111,23 +140,33 @@
     "diffModeUnified": "unified",
     "diffModeSideBySide": "side-by-side",
     "autoFetchInterval": "Auto-fetch interval (minutes)",
+    "worktreeFolder": "Base folder for new worktrees",
+    "worktreeFolderWsl": "Base folder for new worktrees in WSL: {name}",
+    "worktreeFolderDefault": "The repo's parent folder",
     "ignoreWhitespace": "Ignore whitespace in diffs",
+    "debugMode": "Debug mode",
     "theme": "Theme",
     "themeSystem": "System",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "wslCommand": "WSL command",
-    "installLauncher": "Install nebegit command",
     "appLogError": "App log could not be opened: {error}",
     "appLog": "App log: {path}",
     "save": "Save"
+  },
+  "debugArea": {
+    "error": "Error",
+    "errorSample": "Sample error notice",
+    "warning": "Warning",
+    "warningSample": "Sample warning notice",
+    "success": "Success",
+    "successSample": "Sample success notice"
   },
   "diffWindow": {
     "loading": "Loading…",
     "switchToSideBySide": "Switch to side-by-side",
     "switchToUnified": "Switch to unified",
-    "showWhitespaceChanges": "Show whitespace changes",
-    "ignoreWhitespace": "Ignore whitespace",
+    "showingWhitespace": "Showing whitespace",
+    "ignoringWhitespace": "Ignoring whitespace",
     "previousChange": "Previous change",
     "nextChange": "Next change",
     "previousFile": "Previous file",
@@ -147,9 +186,12 @@
     "discardLineConfirm": "Discard this change to \"{path}\"? This cannot be undone."
   },
   "dialogs": {
+    "branchName": "Branch name",
+    "startPoint": "Start point",
+    "pickBranch": "Pick a branch",
+    "pickStart": "Pick a branch or tag",
     "createBranch": {
       "header": "New branch",
-      "namePlaceholder": "Branch name",
       "checkoutAfter": "Check out after creation",
       "create": "Create"
     },
@@ -157,9 +199,9 @@
       "header": "New worktree",
       "created": "Worktree created at {path}.",
       "newBranch": "New branch",
-      "namePlaceholder": "Branch name",
-      "startPlaceholder": "Start point (branch or commit)",
-      "targetPlaceholder": "Target folder",
+      "branch": "Branch",
+      "folderName": "Folder name",
+      "location": "Location",
       "browse": "Browse…",
       "create": "Create",
       "openInWindow": "Open in app window",
@@ -172,12 +214,10 @@
       "message": "Checking out this commit detaches HEAD. Commits made in this state belong to no branch.",
       "checkOut": "Check out"
     },
-    "openWSLFolder": {
-      "header": "Open WSL folder",
-      "wsl1Unsupported": "WSL 1 is not supported",
-      "folderPlaceholder": "Folder inside the distro",
-      "browse": "Browse…",
-      "open": "Open"
+    "branchInWorktree": {
+      "header": "Branch checked out elsewhere",
+      "message": "{branch} is checked out in the worktree {folder}.",
+      "switch": "Switch to worktree"
     },
     "pick": {
       "cherryPick": "Cherry-pick",
@@ -187,9 +227,20 @@
       "pickAgainstParent": "Pick against parent",
       "confirm": "Confirm"
     },
+    "squash": {
+      "squashHeader": "Squash {n} commit | Squash {n} commits",
+      "fixupHeader": "Fixup {n} commit | Fixup {n} commits",
+      "message": "Message of the new commit",
+      "fixupText": "The commits become one, with the message of the oldest.",
+      "pushedWarning": "A selected commit is already pushed: afterwards the branch needs a force push.",
+      "protectedWarning": "\"{branch}\" is a protected branch.",
+      "squash": "Squash",
+      "fixup": "Fixup",
+      "squashedNotice": "Squashed {n} commits on {branch}. Previous commit: {previousSha}",
+      "fixedUpNotice": "Fixed up {n} commits on {branch}. Previous commit: {previousSha}"
+    },
     "renameBranch": {
       "header": "Rename branch",
-      "namePlaceholder": "Branch name",
       "rename": "Rename"
     },
     "reset": {
@@ -213,11 +264,13 @@
     "commit": "Commit",
     "author": "Author",
     "committer": "Committer",
-    "parents": "Parents"
+    "parents": "Parents",
+    "selectedCount": "{n} commit selected | {n} commits selected",
+    "changedFiles": "{n} changed file | {n} changed files",
+    "showAsTree": "Show as folder tree",
+    "showAsList": "Show as flat list"
   },
   "compareView": {
-    "older": "older",
-    "newer": "newer",
     "swap": "Swap",
     "stopComparing": "Stop comparing",
     "toWorkingTree": "working tree",
@@ -245,7 +298,9 @@
       "copyHashesCount": "Copy {n} hash | Copy {n} hashes",
       "swap": "Swap",
       "stopComparing": "Stop comparing",
-      "copyBothHashes": "Copy both hashes"
+      "squashCount": "Squash {n} commit… | Squash {n} commits…",
+      "fixupCount": "Fixup {n} commit… | Fixup {n} commits…",
+      "squashBlocked": "Squash and fixup not possible: {reason}"
     }
   },
   "layout": {
@@ -282,7 +337,7 @@
   },
   "repoPicker": {
     "openFolder": "Open folder…",
-    "openWslFolder": "Open WSL folder…",
+    "newWindow": "New window",
     "searchPlaceholder": "Search repos",
     "wsl": "WSL",
     "wslTitle": "WSL: {distro}",
@@ -298,6 +353,7 @@
     "uncommittedChanges": "Uncommitted changes",
     "locked": "Locked",
     "main": "main",
+    "bareRepo": "bare repository",
     "missing": "missing",
     "removeConfirmDirty": "Remove the worktree at {path}? It has uncommitted changes that will be lost.",
     "removeConfirmClean": "Remove the worktree at {path}?",
@@ -308,9 +364,6 @@
     "searchPlaceholder": "Search branches and tags",
     "newBranch": "New branch…",
     "updateChecked": "Update {n} branches",
-    "local": "Local",
-    "remote": "Remote",
-    "tags": "Tags",
     "checkOut": "Check out",
     "newBranchFromHere": "New branch from here…",
     "newWorktreeFromHere": "New worktree from here…",
@@ -318,12 +371,17 @@
     "rename": "Rename…",
     "delete": "Delete",
     "showInLog": "Show in log",
+    "showHistory": "Show history",
     "selectToUpdate": "Select {name} to update",
-    "actionsFor": "Actions for {name}",
     "currentBranch": "Current branch",
     "deleteUnmergedTitle": "Delete unmerged branch",
     "deleteUnmergedConfirm": "{reason} Delete anyway? Its commits will become unreachable.",
     "detachedLabel": "{sha} (detached)",
     "operationLabel": "{head} ({operation})"
+  },
+  "refs": {
+    "local": "Local",
+    "remote": "Remote",
+    "tags": "Tags"
   }
 }

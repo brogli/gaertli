@@ -8,7 +8,7 @@ import (
 
 func main() {
 	var cfg Config
-	flag.StringVar(&cfg.FunctionalPath, "functional", "docs/requirements/functional.md", "functional requirements")
+	flag.StringVar(&cfg.FunctionalDir, "functional", "docs/requirements/functional", "folder of functional requirement files")
 	flag.StringVar(&cfg.QualityPath, "quality", "docs/requirements/quality.md", "quality requirements")
 	flag.StringVar(&cfg.TestingPath, "testing", "docs/architecture/testing.md", "manual checklist")
 	flag.StringVar(&cfg.GoRoot, "go", ".", "root of the Go test walk")

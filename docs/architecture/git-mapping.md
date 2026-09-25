@@ -1,85 +1,99 @@
 # How features map to git
 
-Every feature is a small number of git calls, made by the rules of TR-08 to TR-10: machine-readable formats, a fixed environment, arguments as a list. Failures are classified as `errors-security.md` describes. Beyond that:
+Every feature is a small number of git calls, made by the rules of TR-08 to TR-10: machine-readable output only, a fixed environment, arguments as a list. Failures are classified as `errors-security.md` describes. Beyond that:
 
-- Read-only calls run with `GIT_OPTIONAL_LOCKS=0`, so polling never takes the index lock away from the user's own commands.
-- Every patch the app parses overrides the config that only changes its framing: `--no-color --no-ext-diff --no-textconv`, fixed `a/`/`b/` prefixes, `--no-relative`, `diff.suppressBlankEmpty=false`. Config that changes the edit itself, such as `diff.algorithm`, attributes and filters, stays in effect (ADR-7).
-- Nothing is reimplemented that git already does: checkout of a remote branch uses git's own DWIM, branch names are validated by `git check-ref-format`, and pull is git's own fetch and merge/rebase.
+- Every patch the app parses overrides the config that changes only its framing (colour, external diff tools, textconv, path prefixes). Config that changes the edit itself, such as the diff algorithm, attributes and filters, stays in effect (ADR-7).
+- Nothing is reimplemented that git already does: checkout of a remote branch lets git derive the local branch and its upstream, git validates branch names, and pull is git's own fetch and merge or rebase.
+- A ref the user picked reaches git by its full name (`refs/heads/x`, `refs/remotes/o/x`, `refs/tags/x`) wherever git reads it as a revision: a bare name that is both a branch and a tag is refused as a start point and read as the tag by `log`. Only a local branch to check out keeps its bare name: `switch` and `worktree add` would detach at a full ref.
 
 | Feature | Git |
 |---|---|
 | Open repo | `rev-parse --show-toplevel --git-dir --git-common-dir` |
-| Summary | `symbolic-ref HEAD`, `rev-parse HEAD`; operation state from files in the git dir (below) |
+| Summary | `symbolic-ref HEAD`, `rev-parse HEAD`; operation state from files in the git dir |
 | Refs | `for-each-ref` over heads, remotes and tags, with upstream and ahead/behind |
 | Log | `log --topo-order --parents --decorate=full --all`, streamed (below) |
-| Search and filters | the same `log` with `--grep`, `--author`, branches and `-- <path>` |
-| A commit's details | `show --name-status -z -M --first-parent` |
-| Diff content | both sides from a full-context `diff` (`show --first-parent --root` for a commit), in the form git diffed them; git's hunks from the same diff with `-U0 --inter-hunk-context=0`, `-w` when whitespace is ignored; binary from git's own marker (attributes) |
-| Compare commits | `diff --name-status -z -M <a> <b>`, the two-revision form, so swapping mirrors the result |
-| Compare with working tree | `diff --name-status -z -M <sha>` |
-| Status | `status --porcelain=v2 -z --branch --untracked-files=all` |
+| Filters | the same `log` with `--author`, branches or tags and `-- <path>` |
+| Search | a hash resolves with `rev-parse`; otherwise `log --grep=<q>` over the active filter's revisions, author and path, mapped onto the loaded rows |
+| A commit's details | `show --name-status -M --first-parent` |
+| Diff content | both sides from a full-context `diff` (`show --first-parent --root` for a commit); git's hunks from a zero-context diff of the same pair, with `-w` when whitespace is ignored; binary as git's attributes decide |
+| Compare commits | `diff --name-status -M <a> <b>`, the two-revision form, so swapping mirrors the result |
+| Compare with working tree | `diff --name-status -M <sha>` |
+| Status | `status --porcelain=v2 --branch --untracked-files=all` |
 | Stage, unstage | `add`, `restore --staged` |
-| Stage lines | re-diff the path at full context, refuse if its sides differ from those shown, build a partial patch of the selected lines, `apply --cached --recount` (ADR-7) |
+| Stage lines | `apply --cached --recount` of a partial patch built from a fresh full-context diff (ADR-7) |
 | Discard | `restore --worktree`, `clean -f` for untracked files, `apply --reverse` for lines |
 | Commit, amend | `commit [--amend] -F -`, the message on stdin; hooks run as usual |
 | Create branch | `branch`, or `switch -c` when it is checked out at once |
-| Checkout | `switch`, `switch --detach` for a commit |
+| Checkout | `switch`; `switch --track <remote-tracking ref>` for a remote branch; `switch --detach` for a commit |
 | Reset | `reset --soft/--mixed/--hard/--keep` |
 | Rename, delete branch | `branch -m`, `branch -d/-D` |
 | Cherry-pick, revert | `cherry-pick`, `revert`, several commits in one call, in the order FR-CP-02/FR-RV-02 require |
 | Continue, abort, skip | `<operation> --continue/--abort/--skip` |
-| Worktrees | `worktree list --porcelain -z`, `worktree add/remove/prune` |
-| Fetch | `fetch --prune --progress` |
-| Pull | `fetch`, then `merge [--ff/--no-ff from pull.ff] @{upstream}` or `rebase --fork-point @{upstream}` in the worktree queue (ADR-6), as `git pull --no-rebase`/`--rebase` would |
+| Squash, fixup | `merge-base --octopus` and `rev-list` to find the commits' line, then `rebase -i` with a prepared todo (below) |
+| Worktrees | `worktree list --porcelain`, `worktree add/remove/prune` |
+| Fetch | `fetch --prune` |
+| Pull | `fetch`, then the merge or rebase onto `@{upstream}` that `git pull --no-rebase`/`--rebase` would run, in the worktree queue (ADR-6) |
 | Stash and pull | `stash push`, pull, `stash pop` of exactly that entry, only after a clean integrate |
-| Push | `push --progress --porcelain`; the porcelain summary classifies rejections |
+| Push | `push --porcelain`; its summary classifies rejections |
 | Force push | `push --force-with-lease --force-if-includes`, never plain `--force` |
 | Commit-graph | `commit-graph write --reachable` once, on first open of a large repo (ADR-4) |
 
 ## Update another branch in the background (FR-UPD)
 
-Updating a branch `B` from its upstream, without checking it out:
+Updating a branch `B` from its upstream without checking it out:
 
 1. `B` is not checked out anywhere: `git fetch <remote> <upstream-ref>:refs/heads/B`. Git allows this only as a fast-forward and refuses it for a branch checked out in any worktree, so git itself is the safety net.
-2. `B` is checked out in another worktree: that worktree must be clean. Fetch the remote-tracking ref only, then run `git merge --ff-only @{upstream}` in that worktree under its own write lock.
+2. `B` is checked out in another worktree: that worktree must be clean. Fetch the remote-tracking ref only, then, under that worktree's write lock, confirm it still has `B` checked out and run `git merge --ff-only @{upstream}` there.
 3. `B` is the current branch: that is Pull, not this feature.
 
-Each update is its own job, so several branches can update at once. The result compares `B` before and after: updated by *n* commits, or already up to date.
+In cases 1 and 2 a diverged branch is reported as `NOT_FAST_FORWARD`. Each update is its own job, so several branches can update at once. The result compares `refs/heads/B` before and after: updated by *n* commits, or up to date.
+
+## Squash and fixup (FR-LOG-14)
+
+Folding selected commits of the current branch is git's own interactive rebase, run without an editor:
+
+1. The selection is checked first, read-only: the selected commits must lie on one line from the oldest of them to HEAD, with no merge on it; FR-LOG-14 lists the other blockers. There is no autostash: a hidden stash entry would be a second thing to resolve when a move conflicts.
+2. The core writes the whole todo: `pick` the oldest selected commit, `fixup` the others in their order, `exec git commit --amend --cleanup=verbatim -C <source>`, then `pick` the rest. `GIT_SEQUENCE_EDITOR` copies that todo over git's own, using only builtins of the shell git runs hooks in, so it works on every platform.
+3. The amend sets the message whatever `commit.cleanup` or the git version would make of a fixup chain, and it runs after a stop and `--continue` too, since it is part of the todo. Its source is the oldest commit for fixup; for squash, a commit made with `commit-tree` that carries the edited message and the oldest commit's author.
+4. The rebase runs in the worktree queue. It overrides the user's autostash setting (step 1) and update-refs setting, so other branches stay where they are; a commit that joined the branch after the check stops the rebase instead of being dropped. A rebase that stops is left for continue or abort, reported as `CONFLICTS` or `STOPPED`.
+
+Whether the branch then needs a force push is `merge-base --is-ancestor <oldest> @{upstream}`.
 
 ## Log loading and graph
 
 1. One `git log` process; records are read as they stream.
-2. Lane assignment follows lazygit's streaming model, ported into `internal/graph`. It needs only the previous row's lanes and the current commit. Lanes are capped; rows beyond the cap show a "+k" marker.
-3. Rows are appended to an in-memory list and the UI is told through `log:progress`. The first rows show at once (FR-LOG-09, QA-PERF-02).
+2. Lane assignment follows lazygit's streaming model, ported into `internal/graph`. It needs only the previous row's lanes and the current commit. Lanes are capped; rows beyond the cap show a "+k" marker. Each lane gets a colour number when it opens, not reused while it stays open; the UI maps that number onto its own small palette (FR-LOG-02).
+3. Rows are appended to an in-memory list and the UI is told through `log:progress`, so the first rows show at once (FR-LOG-09, QA-PERF-02). A failed load ends with a progress event carrying git's error.
 4. The UI requests row windows by index.
-5. A path filter keeps the graph valid, because `--parents` rewrites parents across filtered-out commits. Text and author search show a flat list without graph lines.
+5. A path filter keeps the graph valid, because `--parents` rewrites parents across filtered-out commits. An author filter shows a flat list without graph lines. A search only highlights rows of the loaded view.
 6. A new filter kills the running filtered `git log` and starts a new one.
-7. A `refs` change (below) re-reads the ref tips (one `for-each-ref`) and restarts the log only if they differ from the snapshot taken when the log last finished.
+7. A `refs` change (below) re-reads the ref tips and restarts the log only if they differ from the snapshot taken when the log last finished.
 
 ## Noticing outside changes (FR-REPO-04)
 
-The common git dir is watched with file-system notifications: `HEAD`, `refs/`, `packed-refs`, `index`, `worktrees/`, and the operation state files `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-merge/`, `rebase-apply/`, `sequencer/`. Per-worktree files live under `<git dir>/worktrees/<name>/`, so one watch covers all worktrees of a repo. Lock files are ignored, because git writes a lock file and renames it into place. A 5 s poll backs up the watcher for missed events and file systems without notifications. Events are debounced (~300 ms) and reported as one of four scopes:
+The common git dir is watched with file-system notifications, backed by a slow poll for missed events and file systems without notifications. Per-worktree files live under `<git dir>/worktrees/<name>/`, so one watch covers all worktrees of a repo. Lock files are ignored, because git writes a lock file and renames it into place. Events are debounced and reported as one of four scopes:
 
 | Changed | Scope |
 |---|---|
 | `HEAD`, `packed-refs`, anything under `refs/` | `refs` |
 | `index` | `index` |
-| operation state files | `state` |
+| operation state: `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-merge/`, `rebase-apply/`, `sequencer/` | `state` |
 | `worktrees/` or a direct child | `worktrees` |
 
-Working files are not watched recursively. Instead, status runs on window focus, after every own action, and on a timer while the window is focused. The timer starts at 1 s, so an outside edit shows within 3 s, and backs off when status gets slow. A poll compares the status output plus the size and modification time of every changed file, because a further edit to a file already listed leaves the status output unchanged; a difference is reported as scope `index`. Polls are logged at debug level (FR-UX-02).
+Working files are not watched recursively. Instead, status runs on window focus, after every own action, and on a timer while the window is focused. The timer starts at 1 s, so an outside edit shows within 3 s, and backs off when status gets slow. A poll compares the status output plus the size and modification time of every changed file, because a further edit to a file already listed leaves the status output unchanged; a difference is reported as scope `index`.
 
 The app's own writes also trigger the watcher. Debounce plus reload-after-write makes that harmless.
 
 ## Jobs, progress, cancel
 
 - Every remote or slow action is a job with an id: fetch, pull, push, force push, branch updates.
-- Progress comes from git's `--progress` output on stderr. Git only reports progress to a terminal unless asked, so every job passes `--progress` explicitly. Parsing it is best effort: unknown wording shows as a plain status line.
-- Cancel cancels the context and kills the process, then re-reads repo state. If git left a lock or a half-done operation behind, the UI says so and offers to abort (QA-SAFE-04).
+- Progress comes from git's `--progress` output on stderr. Git reports progress only to a terminal unless asked, so every job passes `--progress`. Parsing it is best effort: unknown wording shows as a plain status line.
+- Cancel stops git the way an interrupt in a terminal does. Every git call runs in a process group of its own; the group (git, its hooks, its transport helpers) gets SIGTERM, on Windows a CTRL_BREAK event, and git removes its lock files and exits. What still runs after a grace period is killed; on Windows only git itself, since reaching the rest of the group would take a job object. A call's timeout stops git the same way.
+- The repo is left as git leaves it when interrupted (QA-SAFE-04): an operation git stopped mid-way (a pull's rebase) shows in the operation banner for continue or abort. The app never deletes a lock file: git's locks carry no owner, so a lock left by a git that had to be killed is reported like any other held lock (FR-UX-16).
 
 ## Auth
 
-- Git uses whatever the user has set up. `GIT_TERMINAL_PROMPT=0` makes it fail fast instead of waiting for input.
+- Git uses whatever the user has set up. With terminal prompts off (TR-09) it fails fast instead of waiting for input.
 - A sign-in failure is shown as `AUTH_FAILED` with git's text and the hint to log in once from a terminal.
 - SSH keys with a passphrase and no agent fail. This is a documented limit.
 
@@ -89,4 +103,4 @@ The app's own writes also trigger the watcher. Debounce plus reload-after-write 
 - A profile is `{name, folderCmd, fileCmd, fileAtLineCmd?}` with the placeholders `{path}` and `{line}`. Without `fileAtLineCmd`, `fileCmd` is used.
 - The template is split into arguments first, then the placeholders are filled in. No shell (TR-10).
 - The editor starts detached (TR-12); only start errors are reported, as `EDITOR_NOT_FOUND` naming the command.
-- Presets (FR-ED-07) are data in the settings panel.
+- Presets (FR-ED-07) are data in Settings.

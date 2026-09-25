@@ -1,11 +1,19 @@
-import { formatTimeAgo } from '@vueuse/core'
+import { formatTimeAgoIntl } from '@vueuse/core'
+import { i18n } from '../i18n'
 
 // shortSha is a commit hash's first 7 characters, as git abbreviates it.
 export function shortSha(sha: string): string {
   return sha.slice(0, 7)
 }
 
-// timeAgo is a git timestamp (Unix seconds) relative to now, e.g. "3 days ago".
+const MINUTE_MS = 60_000
+
+// timeAgo is a git timestamp (Unix seconds) relative to now in the UI's
+// language, e.g. "3 days ago"; "just now" under a minute.
 export function timeAgo(unixSeconds: number): string {
-  return formatTimeAgo(new Date(unixSeconds * 1000))
+  const date = new Date(unixSeconds * 1000)
+  const { t, locale } = i18n.global
+  return Date.now() - date.getTime() < MINUTE_MS
+    ? t('common.justNow')
+    : formatTimeAgoIntl(date, { locale: locale.value })
 }

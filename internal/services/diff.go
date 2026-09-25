@@ -153,11 +153,11 @@ func (d fileDiff) patch(ctx context.Context, r git.Runner, dir string, opts ...s
 // the old side's object.
 func (d fileDiff) contents(ctx context.Context, r git.Runner, dir string, file *gitdiff.File) (oldContent, newContent []byte, err error) {
 	if file == nil || len(file.TextFragments) == 0 {
-		blobs, err := objectContents(ctx, r, dir, d.oldRev)
+		blob, err := objectContent(ctx, r, dir, d.oldRev)
 		if err != nil {
 			return nil, nil, err
 		}
-		return blobs[0], blobs[0], nil
+		return blob, blob, nil
 	}
 	if n := len(file.TextFragments); n > 1 {
 		return nil, nil, core.Errorf(core.Internal, "full-context diff of %s has %d hunks", d.path, n)
@@ -272,48 +272,36 @@ func workingFileSize(full string) (int64, error) {
 	return info.Size(), nil
 }
 
-// objectContents fetches revs' raw bytes in one cat-file --batch call. A
-// missing object yields nil, not an error.
-func objectContents(ctx context.Context, r git.Runner, dir string, revs ...string) ([][]byte, error) {
+// objectContent fetches rev's raw bytes with cat-file --batch, which reads
+// a missing object back as nil, not an error.
+func objectContent(ctx context.Context, r git.Runner, dir, rev string) ([]byte, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
 		Args:  []string{"cat-file", "--batch", "-Z"},
-		Stdin: batchStdin(revs),
+		Stdin: batchStdin([]string{rev}),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return parseCatFileBatch(result.Stdout, len(revs))
+	return parseCatFileBatch(result.Stdout)
 }
 
-// parseCatFileBatch reads cat-file --batch -Z's framing: per object,
+// parseCatFileBatch reads cat-file --batch -Z's framing for one object:
 // "<oid> <type> <size>\x00<size bytes of content>\x00", or a missing entry.
-// want is the number of objects requested, a length sanity check.
-func parseCatFileBatch(data []byte, want int) ([][]byte, error) {
-	var blobs [][]byte
-	for len(data) > 0 {
-		end := bytes.IndexByte(data, 0)
-		if end < 0 {
-			return nil, core.Errorf(core.Internal, "cat-file --batch: unterminated header")
-		}
-		header := string(data[:end])
-		data = data[end+1:]
-		if missing(header) {
-			blobs = append(blobs, nil)
-			continue
-		}
-		parts := strings.SplitN(header, " ", 3)
-		size, err := strconv.ParseInt(parts[len(parts)-1], 10, 64)
-		if len(parts) != 3 || err != nil || int64(len(data)) < size+1 {
-			return nil, core.Errorf(core.Internal, "cat-file --batch: bad header %q", header)
-		}
-		blobs = append(blobs, data[:size])
-		data = data[size+1:] // the NUL after the content
+func parseCatFileBatch(data []byte) ([]byte, error) {
+	header, content, ok := bytes.Cut(data, []byte{0})
+	if !ok {
+		return nil, core.Errorf(core.Internal, "cat-file --batch: unterminated header")
 	}
-	if len(blobs) != want {
-		return nil, core.Errorf(core.Internal, "cat-file --batch: %d objects, want %d", len(blobs), want)
+	if missing(string(header)) {
+		return nil, nil
 	}
-	return blobs, nil
+	parts := strings.SplitN(string(header), " ", 3)
+	size, err := strconv.ParseInt(parts[len(parts)-1], 10, 64)
+	if len(parts) != 3 || err != nil || int64(len(content)) != size+1 { // the content, then its NUL
+		return nil, core.Errorf(core.Internal, "cat-file --batch: bad header %q", header)
+	}
+	return content[:size], nil
 }
 
 // batchStdin is cat-file -Z's input: object specs, each ended by a NUL, so a

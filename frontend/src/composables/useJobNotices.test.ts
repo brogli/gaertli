@@ -8,8 +8,13 @@ vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade
 
 import { useJobNotices } from './useJobNotices'
 import { useJobsStore } from '../stores/jobs'
-import { Code } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import type { JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  Code,
+  JobKind,
+  JobState,
+  UpdateOutcome,
+  type JobInfo,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import NoticeArea from '../components/NoticeArea.vue'
 import { mountInBody } from '../testing/mountInBody'
 import { findButton } from '../testing/findButton'
@@ -17,30 +22,35 @@ import { jobFixture } from '../testing/fixtures/job'
 
 function rejectedPushJob(code: Code): JobInfo {
   return jobFixture({
-    kind: 'push',
-    state: 'failed',
+    kind: JobKind.PushJob,
+    state: JobState.JobFailed,
     message: 'Updates were rejected',
     error: { code, message: 'Updates were rejected' },
   })
 }
 
 const blockedPullJob = jobFixture({
-  kind: 'pull',
-  state: 'failed',
+  kind: JobKind.PullJob,
+  state: JobState.JobFailed,
   error: { code: Code.DirtyWorktree, message: 'local changes in the way' },
 })
 const failedFetchJob = jobFixture({
-  state: 'failed',
+  state: JobState.JobFailed,
   error: { code: Code.AuthFailed, message: 'Could not sign in to the remote.' },
 })
-const upToDate = { outcome: 'upToDate', from: 'abc1234full', to: 'abc1234full', commits: 0 }
+const upToDate = {
+  outcome: UpdateOutcome.BranchUpToDate,
+  from: 'abc1234full',
+  to: 'abc1234full',
+  commits: 0,
+}
 
 // branchUpdateJob is a branch update of feature that ended up to date.
 function branchUpdateJob(overrides: Partial<JobInfo> = {}): JobInfo {
   return jobFixture({
-    kind: 'update-branch',
+    kind: JobKind.UpdateBranchJob,
     branch: 'feature',
-    state: 'done',
+    state: JobState.JobDone,
     progress: 100,
     result: upToDate,
     ...overrides,
@@ -53,10 +63,11 @@ function branchUpdateJob(overrides: Partial<JobInfo> = {}): JobInfo {
 const onPull = vi.fn()
 const onForcePush = vi.fn()
 const onStashPull = vi.fn()
+const onRetryJob = vi.fn()
 
 const Host = defineComponent({
   setup() {
-    useJobNotices({ onPull, onForcePush, onStashPull })
+    useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
     return () => null
   },
 })
@@ -74,6 +85,7 @@ describe('useJobNotices', () => {
     onPull.mockReset()
     onForcePush.mockReset()
     onStashPull.mockReset()
+    onRetryJob.mockReset()
   })
 
   it('FR-SYNC-04 a failed push job shows a notice with the reason and Pull/Force push, running the actions', async () => {
@@ -103,12 +115,14 @@ describe('useJobNotices', () => {
 
     jobs.upsert(rejectedPushJob(Code.NotFastForward))
     await nextTick()
-    expect(notice.find('.notice').exists()).toBe(true)
+    expect(notice.find('.p-toast-message').exists()).toBe(true)
 
-    jobs.upsert(jobFixture({ id: 'j2', kind: 'pull', state: 'done', progress: 100 }))
+    jobs.upsert(
+      jobFixture({ id: 'j2', kind: JobKind.PullJob, state: JobState.JobDone, progress: 100 }),
+    )
     await nextTick()
 
-    expect(notice.find('.notice').exists()).toBe(false)
+    expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
   it('FR-SYNC-09 a pull job failed DIRTY_WORKTREE shows "Stash and pull", running PullWithStash', async () => {
@@ -136,7 +150,7 @@ describe('useJobNotices', () => {
 
     useJobsStore().upsert(
       jobFixture({
-        state: 'failed',
+        state: JobState.JobFailed,
         error: {
           code: Code.AuthFailed,
           message: 'Could not sign in to the remote.',
@@ -162,14 +176,32 @@ describe('useJobNotices', () => {
 
     jobs.upsert(
       jobFixture({
-        kind: 'pull',
-        state: 'failed',
+        kind: JobKind.PullJob,
+        state: JobState.JobFailed,
         error: { code: Code.Conflicts, message: Code.Conflicts },
       }),
     )
     await nextTick()
 
-    expect(notice.find('.notice').exists()).toBe(false)
+    expect(notice.find('.p-toast-message').exists()).toBe(false)
+  })
+
+  it('FR-UX-16 a job failed LOCKED shows "Try again", running onRetryJob with the job', async () => {
+    const notice = await mountNotices()
+    const job = jobFixture({
+      state: JobState.JobFailed,
+      error: {
+        code: Code.Locked,
+        message: 'Another program is using the repo (holding index.lock).',
+      },
+    })
+
+    useJobsStore().upsert(job)
+    await nextTick()
+
+    await findButton(notice, 'Try again')!.trigger('click')
+    expect(onRetryJob).toHaveBeenCalledTimes(1)
+    expect(onRetryJob).toHaveBeenCalledWith(job)
   })
 
   it('FR-UX-12 an update-branch job ends updated: notice names the branch, commit count, from and to', async () => {
@@ -177,7 +209,12 @@ describe('useJobNotices', () => {
 
     useJobsStore().upsert(
       branchUpdateJob({
-        result: { outcome: 'updated', from: 'abc1234full', to: 'def5678full', commits: 3 },
+        result: {
+          outcome: UpdateOutcome.BranchUpdated,
+          from: 'abc1234full',
+          to: 'def5678full',
+          commits: 3,
+        },
       }),
     )
     await nextTick()
@@ -199,7 +236,7 @@ describe('useJobNotices', () => {
 
     useJobsStore().upsert(
       branchUpdateJob({
-        state: 'failed',
+        state: JobState.JobFailed,
         progress: 0,
         error: { code: Code.GitFailed, message: 'could not update' },
       }),
@@ -223,15 +260,17 @@ describe('useJobNotices', () => {
       const jobs = useJobsStore()
       jobs.upsert(job)
       await flushPromises()
-      await notice.get('[data-test="notice-close"]').trigger('click')
+      await notice.get('.p-toast-close-button').trigger('click')
       await flushPromises()
 
-      jobs.upsert(jobFixture({ id: 'j2', kind: 'update-branch', branch: 'other', progress: 10 }))
+      jobs.upsert(
+        jobFixture({ id: 'j2', kind: JobKind.UpdateBranchJob, branch: 'other', progress: 10 }),
+      )
       Facade.Jobs.mockResolvedValue([structuredClone(job)])
       await jobs.load('/repo')
       await flushPromises()
 
-      expect(notice.find('.notice').exists()).toBe(false)
+      expect(notice.find('.p-toast-message').exists()).toBe(false)
     },
   )
 
@@ -242,7 +281,7 @@ describe('useJobNotices', () => {
     await useJobsStore().load('/repo')
     await flushPromises()
 
-    expect(notice.find('.notice').exists()).toBe(false)
+    expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
   it("FR-UX-15 one branch's update result leaves another branch's open", async () => {

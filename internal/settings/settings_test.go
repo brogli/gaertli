@@ -31,28 +31,53 @@ func TestTR_13_PathIsUnderTheOSUserConfigDir(t *testing.T) {
 	}
 }
 
-func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
+// saveAndLoad saves s to a fresh settings file and loads it back.
+func saveAndLoad(t *testing.T, s settings.Settings) settings.Settings {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "settings.json")
-	want := settings.Settings{
-		RecentRepos:              []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
-		OpenWorktrees:            []string{"/a", "/b"},
-		EditorProfiles:           map[string]core.EditorProfile{"": {Name: "the editor", FolderCmd: "editor {path}"}},
-		ProtectedBranches:        []string{"main"},
-		DefaultPullMode:          "rebase",
-		DiffMode:                 "side-by-side",
-		AutoFetchIntervalMinutes: 5,
-		Theme:                    "dark",
-		IgnoreWhitespace:         true,
-	}
-
-	if err := settings.Save(path, want); err != nil {
+	if err := settings.Save(path, s); err != nil {
 		t.Fatal(err)
 	}
-	got, err := settings.Load(path)
+	return load(t, path)
+}
+
+// loadJSON loads a settings file that holds raw.
+func loadJSON(t *testing.T, raw string) settings.Settings {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return load(t, path)
+}
+
+func load(t *testing.T, path string) settings.Settings {
+	t.Helper()
+	s, err := settings.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(got, want) {
+	return s
+}
+
+func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
+	want := settings.Settings{
+		RecentRepos:   []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
+		OpenWorktrees: []string{"/a", "/b"},
+		Preferences: settings.Preferences{
+			EditorProfiles:           map[string]core.EditorProfile{"": {Name: "the editor", FolderCmd: "editor {path}"}},
+			ProtectedBranches:        []string{"main"},
+			DefaultPullMode:          core.PullRebase,
+			DiffMode:                 settings.SideBySideDiff,
+			AutoFetchIntervalMinutes: 5,
+			Theme:                    settings.DarkTheme,
+			IgnoreWhitespace:         true,
+			DebugMode:                true,
+			WorktreeFolders:          map[string]string{"": "/wt", "Ubuntu": "/home/u/wt"},
+		},
+	}
+
+	if got := saveAndLoad(t, want); !reflect.DeepEqual(got, want) {
 		t.Errorf("Load() = %+v, want %+v", got, want)
 	}
 }
@@ -96,44 +121,40 @@ func TestTR_29_ASavedStoreHasAFileAndDirectoryOnlyItsOwnerCanRead(t *testing.T) 
 }
 
 func TestFR_UX_04_LoadOnMissingFileReturnsDefault(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "does-not-exist.json")
+	got := load(t, filepath.Join(t.TempDir(), "does-not-exist.json"))
 
-	got, err := settings.Load(path)
-
-	if err != nil {
-		t.Fatal(err)
-	}
 	if !reflect.DeepEqual(got, settings.Default()) {
 		t.Errorf("Load() = %+v, want Default() %+v", got, settings.Default())
 	}
 }
 
-func TestFR_UX_06_ThemeRoundTrips(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "settings.json")
-	want := settings.Settings{Theme: "dark"}
+func TestFR_SYNC_06_AFreshInstallProtectsMainAndMaster(t *testing.T) {
+	got := load(t, filepath.Join(t.TempDir(), "does-not-exist.json"))
 
-	if err := settings.Save(path, want); err != nil {
-		t.Fatal(err)
+	if want := []string{"main", "master"}; !slices.Equal(got.ProtectedBranches, want) {
+		t.Errorf("ProtectedBranches = %q, want %q", got.ProtectedBranches, want)
 	}
-	got, err := settings.Load(path)
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestFR_SYNC_06_AnExistingFileKeepsTheProtectedBranchesItStores(t *testing.T) {
+	got := loadJSON(t, `{"protectedBranches": null}`)
+
+	if len(got.ProtectedBranches) != 0 {
+		t.Errorf("ProtectedBranches = %q, want none, as stored", got.ProtectedBranches)
 	}
-	if got.Theme != "dark" {
+}
+
+func TestFR_UX_06_ThemeRoundTrips(t *testing.T) {
+	got := saveAndLoad(t, settings.Settings{Preferences: settings.Preferences{Theme: settings.DarkTheme}})
+
+	if got.Theme != settings.DarkTheme {
 		t.Errorf("Theme = %q, want %q", got.Theme, "dark")
 	}
 }
 
 func TestFR_UX_06_LoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "settings.json")
-	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	got := loadJSON(t, `{}`)
 
-	got, err := settings.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if got.Theme != "" {
 		t.Errorf("Theme = %q, want empty (follow the OS)", got.Theme)
 	}
@@ -232,10 +253,7 @@ func TestFR_REPO_07_AddRecentRoundTripsDistroOmittingItForLocal(t *testing.T) {
 		t.Errorf("local entry's JSON has a \"distro\" key, want it omitted: %+v", onDisk.RecentRepos[0])
 	}
 
-	got, err := settings.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := load(t, path)
 	want := []settings.RecentRepo{
 		{Path: "/local/path", LastOpened: now.Format(time.RFC3339)},
 		{Path: "/wsl/path", LastOpened: now.Format(time.RFC3339), Distro: "Ubuntu-22.04"},
@@ -259,11 +277,7 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 	if got := st.Get().DefaultPullMode; got != "rebase" {
 		t.Errorf("Get().DefaultPullMode = %q, want %q", got, "rebase")
 	}
-	onDisk, err := settings.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if onDisk.DefaultPullMode != "rebase" {
+	if onDisk := load(t, path); onDisk.DefaultPullMode != "rebase" {
 		t.Errorf("on-disk DefaultPullMode = %q, want %q", onDisk.DefaultPullMode, "rebase")
 	}
 }
@@ -271,22 +285,14 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 // TestFR_ED_11_EditorProfilesRoundTripPerEnvironment round-trips one
 // profile for local ("") and one for a WSL distro.
 func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "settings.json")
-	want := settings.Settings{
+	want := settings.Settings{Preferences: settings.Preferences{
 		EditorProfiles: map[string]core.EditorProfile{
 			"":             {Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"},
 			"Ubuntu-22.04": {Name: "another editor", FolderCmd: "other {path}", FileCmd: "other {path}"},
 		},
-	}
+	}}
 
-	if err := settings.Save(path, want); err != nil {
-		t.Fatal(err)
-	}
-	got, err := settings.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !maps.Equal(got.EditorProfiles, want.EditorProfiles) {
+	if got := saveAndLoad(t, want); !maps.Equal(got.EditorProfiles, want.EditorProfiles) {
 		t.Errorf("EditorProfiles = %+v, want %+v", got.EditorProfiles, want.EditorProfiles)
 	}
 }
@@ -295,16 +301,7 @@ func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
 // file's bare "editor" key is ignored by encoding/json's unknown-field
 // handling, with no migration to write.
 func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "settings.json")
-	if err := os.WriteFile(path, []byte(`{"editor": "editor"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := settings.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.EditorProfiles) != 0 {
+	if got := loadJSON(t, `{"editor": "editor"}`); len(got.EditorProfiles) != 0 {
 		t.Errorf("EditorProfiles = %+v, want empty", got.EditorProfiles)
 	}
 }

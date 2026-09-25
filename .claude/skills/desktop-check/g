@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Desktop GUI driver for the checks server mode cannot run (native windows).
+# Tools: nix shell nixpkgs#xdotool nixpkgs#xorg.xwd nixpkgs#xorg.xwininfo nixpkgs#imagemagick nixpkgs#xclip
+# SP must name a scratch dir; the build is this checkout's bin/nebegit unless NEBEGIT_BIN names another. Coordinates are window-relative; clicks go to
+# absolute screen positions (WSLg ignores xdotool's --window offsets).
+set -eu
+: "${SP:?set SP to a scratch dir}"
+export DISPLAY=${DISPLAY:-:0}
+W=${W:-$(cat "$SP/.win" 2>/dev/null || true)}
+REPO=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
+
+origin() { xwininfo -id "$W" | awk '/Absolute upper-left X/{x=$4} /Absolute upper-left Y/{y=$4} END{print x, y}'; }
+at() { read -r ox oy < <(origin); xdotool mousemove $((ox + $1)) $((oy + $2)); }
+windows() { xwininfo -root -tree | grep '("nebegit" "nebegit")' | grep -v ' 1x1+' || true; }
+
+case "${1:-}" in
+  start) # start [path] [cwd]: the desktop app with a scratch config, git's editor unresolved
+    if pgrep -x nebegit >/dev/null; then echo "nebegit already running"; exit 1; fi
+    mkdir -p "$SP/cfg" "$SP/shots"
+    # every stream redirected: the app must not hold the caller's stdout open
+    (cd "$REPO" && nix develop --command bash -c "unset GIT_EDITOR; export XDG_CONFIG_HOME='$SP/cfg' XDG_STATE_HOME='$SP/state'; cd '${3:-$HOME}' && nohup ${NEBEGIT_BIN:-$REPO/bin/nebegit} ${2:+\"$2\"} < /dev/null > '$SP/gui.log' 2>&1 &") > /dev/null 2>&1
+    for _ in $(seq 1 40); do
+      id=$(windows | awk '{print $1}' | head -1)
+      [ -n "$id" ] && break
+      sleep 0.5
+    done
+    echo "$id" > "$SP/.win"; sleep 1.5; echo "win=$id"; windows ;;
+  wins) windows ;;
+  use) echo "$2" > "$SP/.win" ;;
+  move) xdotool windowmove "$W" "${2:-100}" "${3:-100}" ;; # a new window can open off-screen
+  click) at "$2" "$3"; xdotool click 1; sleep "${4:-0.8}" ;;
+  dclick) at "$2" "$3"; xdotool click --repeat 2 --delay 80 1; sleep "${4:-0.8}" ;;
+  rclick) at "$2" "$3"; xdotool click 3; sleep "${4:-0.8}" ;;
+  key) shift; xdotool key "$@"; sleep 0.8 ;;
+  type) xdotool type --delay 30 "$2"; sleep 0.8 ;;
+  shot) xwd -id "$W" -silent | magick xwd:- ${3:+-crop $3 +repage} "$SP/shots/$2.png"; echo "$SP/shots/$2.png" ;;
+  clip) xclip -o -selection clipboard ;;
+  stop) pkill -x nebegit || true; sleep 1; pgrep -x nebegit || echo stopped ;;
+  *) echo "usage: g start [path] [cwd] | wins | use <id> | move [x y] | click|dclick|rclick x y | key k.. | type text | shot name [WxH+X+Y] | clip | stop" >&2; exit 2 ;;
+esac

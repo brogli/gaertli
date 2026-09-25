@@ -4,6 +4,7 @@ import Button from 'openvue/button'
 import { useI18n } from '../i18n'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { DIALOG } from '../lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 
 // DetachWarningDialog confirms "Check out commit". A warning, not a hard
@@ -23,7 +24,12 @@ async function confirm(): Promise<void> {
 </script>
 
 <template>
-  <Dialog visible :header="t('dialogs.detachWarning.header')" modal @update:visible="emit('close')">
+  <Dialog
+    visible
+    v-bind="DIALOG"
+    :header="t('dialogs.detachWarning.header')"
+    @update:visible="emit('close')"
+  >
     <ErrorBanner v-if="error" :error="error" />
     <p>{{ t('dialogs.detachWarning.message') }}</p>
     <template #footer>

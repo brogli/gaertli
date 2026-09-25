@@ -1,11 +1,8 @@
 package core
 
-//go:generate go run ../../tools/errorkeysgen
-
 // ErrorKeys lists every message key an ErrorfArgs or Retag call can
-// produce, with the names of that message's args. en.json needs one
-// errors.* entry per key; frontend/src/locales/errorKeys.generated.json
-// mirrors this table for the frontend's tests.
+// produce, with the names of that message's args. The frontend's en.json
+// needs one errors.* entry per key, using exactly those args.
 var ErrorKeys = map[string][]string{
 	"notARepo":                    {"path"},
 	"noWorktreeLeft":              {"path"},
@@ -18,13 +15,26 @@ var ErrorKeys = map[string][]string{
 	"worktreeExists":              {"path"},
 	"mergeCommitNotPickable":      {"sha", "verb"},
 	"gitTooOld":                   {"version", "minVersion"},
-	"deployRefused":               {"distro"},
+	"deployNeeded":                {"distro"},
+	"distroNotFound":              {"distro"},
+	"wsl1Unsupported":             {"distro"},
 	"pushFetchFirst":              {},
 	"pushNotFastForward":          {},
 	"pushStaleInfo":               {},
 	"pushRefUpdatedSinceCheckout": {},
 	"pushRejected":                {"reason"},
 	"branchDiverged":              {"branch"},
+	"branchNoLongerCheckedOut":    {"branch", "path"},
 	"authFailed":                  {},
 	"invalidBranchName":           {"name"},
+	"locked":                      {"lock"},
+	"squashOperationInProgress":   {"operation"},
+	"squashDetached":              {},
+	"squashNotOnBranch":           {},
+	"squashMergeInTheWay":         {"sha"},
+	"squashUncommittedChanges":    {},
+	"pullBlockedByChanges":        {},
+	"worktreeDirty":               {"path"},
+	"noOperation":                 {},
+	"operationNotSkippable":       {"operation"},
 }

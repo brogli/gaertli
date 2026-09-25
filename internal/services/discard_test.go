@@ -3,6 +3,7 @@ package services
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -25,10 +26,7 @@ func TestFR_CHG_10_DiscardFileRestoresATrackedFilesWorkingTreeContent(t *testing
 	if content != "base\n" {
 		t.Errorf("f.txt = %q, want restored to %q", content, "base\n")
 	}
-	status, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	status := statusOf(t, c, id)
 	if len(status.Unstaged) != 0 {
 		t.Errorf("Unstaged = %+v, want empty", status.Unstaged)
 	}
@@ -47,10 +45,7 @@ func TestFR_CHG_10_DiscardFileRemovesAnUntrackedFile(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo.Dir, "new.txt")); !os.IsNotExist(err) {
 		t.Errorf("new.txt still exists, want removed (err = %v)", err)
 	}
-	status, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	status := statusOf(t, c, id)
 	if len(status.Untracked) != 0 {
 		t.Errorf("Untracked = %+v, want empty", status.Untracked)
 	}
@@ -80,8 +75,6 @@ func TestFR_CHG_10_DiscardFileRemovesAnUntrackedDirectory(t *testing.T) {
 	}
 }
 
-// twoUnstagedHunksFixture is twoHunksFixture (hunks_test.go), reused here
-// for DiscardLines.
 func TestFR_CHG_10_DiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstagedChangePending(t *testing.T) {
 	repo := gittest.New(t)
 	changed := twoHunksFixture(t, repo.Dir)
@@ -103,17 +96,8 @@ func TestFR_CHG_10_DiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstage
 		t.Error("f.txt unchanged, want the selected hunk discarded")
 	}
 
-	status, err := c.Status(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, f := range status.Unstaged {
-		if f.Path == "f.txt" {
-			found = true
-		}
-	}
-	if !found {
+	status := statusOf(t, c, id)
+	if !slices.ContainsFunc(status.Unstaged, func(f core.ChangedFile) bool { return f.Path == "f.txt" }) {
 		t.Error("f.txt no longer listed Unstaged, want the remaining line15 change still pending")
 	}
 }

@@ -3,12 +3,12 @@
 | Risk | Impact | Plan |
 |---|---|---|
 | Wails v3 is in beta | Blocking bugs on one platform, API changes between betas | Exact version pin; Wails code only in `internal/app`, where its bugs are worked around (ADR-2). |
-| The RPC path drifts from the in-process path | Bugs that only show for WSL repos | The same integration cases run through both (protocol tests). Keep the API coarse. |
-| WSL shuts down or the WSL core dies while a window is open | A dead window | The shell notices the closed pipe and restarts the core (ADR-3); nothing is lost (ADR-4). |
+| The RPC path drifts from the in-process path | Bugs that only show for WSL repos | Protocol tests cover the RPC client, the dispatcher and the connection to a WSL core (`testing.md`). The API stays coarse. |
+| WSL shuts down or the WSL core dies while a window is open | A dead window | The next call to that distro restarts the core (ADR-3); nothing is lost (ADR-4). |
 | Process start cost on Windows | A sluggish UI | Few, large calls (ADR-1). |
 | Partial-patch bugs | Wrong content staged or discarded | lazygit's pattern, heavy tests against real git; destructive paths reviewed against real repos. |
 | Status polling on huge worktrees | CPU use | Poll only while focused, back off when status is slow. Honour the user's `core.fsmonitor` and `core.untrackedCache`, never enable them (QA-SAFE-03). |
-| Parsing breaks on a new git version | Wrong data | Machine formats only (TR-08); CI tests against git 2.40 and the current release. |
-| OpenVue is a young fork | Bugs, slow fixes | Same API as PrimeVue 4; exact pin; wrap components where cheap. |
+| Parsing breaks on a new git version | Wrong data | Machine formats only (TR-08); CI tests against git 2.42 and the runner's own, newer git. |
+| OpenVue is a young fork | Bugs, slow fixes | Same API as PrimeVue 4; exact pin; rely on its standard behaviour and remove what of ours defeats it, never a workaround layer. |
 | Native Go and Nix C libraries do not link cleanly | Friction in the Linux dev setup | gcc comes from Nix. Fallback: distro packages for GTK4/WebKitGTK, Nix only for Node and pnpm. |
 | The macOS build is untested | Broken macOS releases go unnoticed | Labelled untested (QA-PORT-04). |

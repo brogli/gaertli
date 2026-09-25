@@ -8,7 +8,7 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-func TestErrorsSecurity_ErrorCrossesTheBoundaryAsOneType(t *testing.T) {
+func TestFR_UX_01_ErrorCrossesTheBoundaryAsOneType(t *testing.T) {
 	in := &core.Error{Code: core.NotARepo, Message: "not a git repository", GitStderr: "fatal: x", Command: "git rev-parse"}
 
 	b, err := json.Marshal(in)

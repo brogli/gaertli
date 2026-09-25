@@ -14,7 +14,7 @@ import (
 type Version struct{ Major, Minor, Patch int }
 
 // MinVersion is the oldest supported git.
-var MinVersion = Version{Major: 2, Minor: 40, Patch: 0}
+var MinVersion = Version{Major: 2, Minor: 42, Patch: 0}
 
 // Less reports whether v is older than o.
 func (v Version) Less(o Version) bool {

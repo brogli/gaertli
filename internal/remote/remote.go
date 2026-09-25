@@ -23,12 +23,21 @@ const eventMethod = "event"
 const coreErrorCode jrpc2.Code = 1
 
 // Client is core.API over a JSON-RPC connection; methods are generated.
-type Client struct{ c *jrpc2.Client }
+type Client struct {
+	c         *jrpc2.Client
+	closeRead func() // closes the reader NewClient got, if it is an io.Closer
+}
 
 // NewClient speaks to a core served on r/w. Events the core emits arrive on
-// sink, which may be nil.
+// sink, which may be nil. Once the client stops reading (closed, r ended,
+// or a line that is no message), it closes r if r is an io.Closer, so a
+// writer feeding r is not left blocked.
 func NewClient(r io.Reader, w io.Writer, sink core.EventSink) *Client {
-	opts := &jrpc2.ClientOptions{}
+	closeRead := func() {}
+	if closer, ok := r.(io.Closer); ok {
+		closeRead = func() { _ = closer.Close() }
+	}
+	opts := &jrpc2.ClientOptions{OnStop: func(*jrpc2.Client, error) { closeRead() }}
 	if sink != nil {
 		opts.OnNotify = func(req *jrpc2.Request) {
 			var ev core.Event
@@ -37,11 +46,17 @@ func NewClient(r io.Reader, w io.Writer, sink core.EventSink) *Client {
 			}
 		}
 	}
-	return &Client{c: jrpc2.NewClient(channel.Line(r, nopCloser{w}), opts)}
+	return &Client{c: jrpc2.NewClient(channel.Line(r, nopCloser{w}), opts), closeRead: closeRead}
 }
 
-// Close ends the connection.
-func (c *Client) Close() error { return c.c.Close() }
+// Close ends the connection. It closes the reader first, if it can: jrpc2
+// waits for its read loop to end, which it would not while the core runs.
+// The connection's end is not reported as an error.
+func (c *Client) Close() error {
+	c.closeRead()
+	_ = c.c.Close() // the reader's closed error
+	return nil
+}
 
 // call is the wire of every generated method: params in, result out, and
 // the server's core.Error restored from the error data.

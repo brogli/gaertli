@@ -6,14 +6,19 @@ import type { PickerRow } from './pickerRow'
 
 // PickerList is the searchable list of the toolbar pickers: a filter field
 // that has focus, the arrow keys move the active row, Enter or a click
-// activates a row. A header row only labels a group. The parent filters
-// rows by query. Only the rows in view are rendered. The row slot gets
-// activate to wire to its own clickable part; a row's action buttons are
-// siblings of that part, not nested in it, so a button click never reaches
-// it and needs no propagation guard.
+// activates a row. A right-click on a row, or Shift+F10 or the context-menu
+// key in the filter for the active row, asks for the row's menu. A header
+// row only labels a group. The parent filters rows by query. Only the rows
+// in view are rendered. The row slot gets activate to wire to its own
+// clickable part; a row's action buttons are siblings of that part, not
+// nested in it, so a button click never reaches it and needs no
+// propagation guard. A right-button press stops at its row: OpenVue's
+// Popover counts any mousedown in it as a click inside, and a right-click
+// sends no click to reset that, so the next click outside would not close
+// the list.
 const props = defineProps<{ rows: Row[]; placeholder: string }>()
 const query = defineModel<string>('query', { default: '' })
-const emit = defineEmits<{ activate: [row: Row] }>()
+const emit = defineEmits<{ activate: [row: Row]; menu: [row: Row, event: MouseEvent] }>()
 defineSlots<{ row(props: { row: Row; activate: () => void }): unknown }>()
 
 // Every row is one line of this height, so the virtualizer never measures.
@@ -55,17 +60,38 @@ function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'ArrowDown') move(1)
   else if (event.key === 'ArrowUp') move(-1)
   else if (event.key === 'Enter') activateActive()
+  else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) openActiveMenu()
   else return
   event.preventDefault()
 }
 
+function activeRow(): Row | undefined {
+  return props.rows.find((r) => r.key === activeKey.value)
+}
+
 function activateActive(): void {
-  const row = props.rows.find((r) => r.key === activeKey.value)
+  const row = activeRow()
   if (row) emit('activate', row)
 }
 
 function activate(row: Row): void {
   if (!row.header) emit('activate', row)
+}
+
+function openMenu(row: Row, event: MouseEvent): void {
+  if (row.header) return
+  activeKey.value = row.key
+  emit('menu', row, event)
+}
+
+// openActiveMenu asks for the active row's menu at the row's lower left
+// corner, where a platform opens a focused element's menu from the keyboard.
+function openActiveMenu(): void {
+  const row = activeRow()
+  const item = scroller.value?.querySelector('li.active')
+  if (!row || !item) return
+  const { left, bottom } = item.getBoundingClientRect()
+  emit('menu', row, new MouseEvent('contextmenu', { clientX: left, clientY: bottom }))
 }
 
 const root = useTemplateRef<HTMLElement>('root')
@@ -93,6 +119,8 @@ onMounted(() => root.value?.querySelector('input')?.focus())
           :style="{ transform: `translateY(${start}px)` }"
           :role="rows[index]!.header ? 'presentation' : 'option'"
           :aria-selected="rows[index]!.header ? undefined : rows[index]!.key === activeKey"
+          @mousedown.right.stop
+          @contextmenu.prevent="openMenu(rows[index]!, $event)"
         >
           <slot name="row" :row="rows[index]!" :activate="() => activate(rows[index]!)" />
         </li>

@@ -7,11 +7,29 @@ body,
   height: 100%;
 }
 
+/* The page paints its own theme background: a host that shows a plain
+   window colour behind a transparent page (WebView2 on Windows) would
+   otherwise show through wherever nothing else paints, in the theme's
+   own colours or not. */
+body {
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+}
+
 /* A dense, tool-like base size: OpenVue's own component tokens (button and
    form-field padding, tree indents, icon sizes, ...) are rem-based, so this
-   one change tightens paddings and gaps everywhere, not just in app code. */
+   one change tightens paddings and gaps everywhere, not just in app code.
+   The bundled font makes the UI look the same on every system; OpenVue's
+   components inherit it. */
 html {
   font-size: 13px;
+  font-family: 'Inter Variable', sans-serif;
+}
+
+/* Fixed-width text (hashes, paths, diffs) in the bundled fixed-width font,
+   the same on every system. */
+:root {
+  --nb-font-mono: 'JetBrains Mono Variable', monospace;
 }
 
 /* App-wide colour tones (a file's status, a worktree's dirty marker, ...),
@@ -22,6 +40,11 @@ html {
   --nb-tone-red: var(--p-red-500);
   --nb-tone-violet: var(--p-violet-500);
   --nb-tone-orange: var(--p-orange-500);
+  --nb-tone-teal: var(--p-teal-500);
+  --nb-tone-pink: var(--p-pink-500);
+  --nb-tone-cyan: var(--p-cyan-500);
+  --nb-tone-purple: var(--p-purple-500);
+  --nb-tone-indigo: var(--p-indigo-500);
   --nb-tone-muted: var(--p-text-muted-color);
 }
 :root.nebegit-dark {
@@ -30,14 +53,19 @@ html {
   --nb-tone-red: var(--p-red-400);
   --nb-tone-violet: var(--p-violet-400);
   --nb-tone-orange: var(--p-orange-400);
+  --nb-tone-teal: var(--p-teal-400);
+  --nb-tone-pink: var(--p-pink-400);
+  --nb-tone-cyan: var(--p-cyan-400);
+  --nb-tone-purple: var(--p-purple-400);
+  --nb-tone-indigo: var(--p-indigo-400);
 }
 
-/* The two compared commits (log row, comparison header): blue for older,
-   orange for newer, distinct for the common colour-vision deficiencies and
+/* The two compared commits (log row, comparison header): blue for from,
+   orange for to, distinct for the common colour-vision deficiencies and
    neither the green nor the red a diff uses for added/removed lines. */
 :root {
-  --nb-older: var(--nb-tone-blue);
-  --nb-newer: var(--nb-tone-orange);
+  --nb-from: var(--nb-tone-blue);
+  --nb-to: var(--nb-tone-orange);
 }
 
 /* Headings are compact labels, not document titles: h1 is the start page's
@@ -60,68 +88,36 @@ h3 {
   letter-spacing: 0.03em;
 }
 
-/* Native controls get the theme's bordered look instead of OS-default form
-   chrome: every button but OpenVue's Button (a plain button keeps it with
-   classes of its own), and every input and select without a class. */
-button:not(.p-button) {
-  font: inherit;
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--p-content-border-color);
-  border-radius: 4px;
-  background: var(--p-content-background);
-  color: var(--p-text-color);
-  cursor: pointer;
-}
-button:not(.p-button):hover:not(:disabled) {
-  background: var(--p-content-hover-background);
-}
-button:not(.p-button):disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-select:not([class]),
-input:not([class]) {
-  font: inherit;
-  padding: 0.25rem 0.4rem;
-  border: 1px solid var(--p-content-border-color);
-  border-radius: 4px;
-  background: var(--p-content-background);
-  color: var(--p-text-color);
-}
-
-/* Compact icon-only buttons (file actions, diff toolbar): a fixed square
-   holding one icon. The icon carries no readable text of its own, so
-   callers always pair it with title and aria-label naming the action. A
-   toggle sets aria-pressed for its state. */
-button.glyph-btn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  padding: 0;
-  font-size: 0.95rem;
-  line-height: 1;
-}
-button.glyph-btn[aria-pressed='true'] {
-  background: var(--p-highlight-background);
-  color: var(--p-highlight-color);
-  border-color: var(--p-primary-color);
-}
-
 /* A toolbar picker's button. A narrow toolbar shrinks its label to an
    ellipsis before anything else, but keeps a few characters readable. */
 .picker-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
   min-width: 0;
   max-width: 16rem;
 }
 .picker-button .ellipsis {
   flex: 1 1 auto;
   min-width: 2.5rem;
+}
+
+/* A text and its controls in one wrapping row. A child with flex-basis
+   100% (revealed error details) takes a row of its own. */
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* A form's rows (a dialog's body, a group of settings): one below the
+   other, with room between them. */
+.form-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+/* The gap spaces the rows; a paragraph's own margins would add to it. */
+.form-rows > p {
+  margin: 0;
 }
 
 /* Text that may not fit its row ends in an ellipsis; the element carries

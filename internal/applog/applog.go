@@ -11,27 +11,37 @@ import (
 )
 
 // maxSize is how large the log file may grow before Open rotates it.
-const maxSize = 5 * 1024 * 1024 // 5 MiB
+const maxSize = 5 * 1024 * 1024
 
 // Open opens (creating if needed) nebegit's log file at its platform
 // location, rotating an oversized one first, and returns a logger writing
-// to it. NEBEGIT_LOG=debug raises the level from its default, Info, to
-// Debug.
+// to it and the LevelVar controlling its level, set by SetLevel from
+// debugMode. NEBEGIT_LOG=debug forces Debug for the whole run regardless of
+// later SetLevel calls, for problems before Settings load.
 //
 // On failure the returned logger still works, writing to stderr instead;
 // path is "" and closer is nil.
-func Open() (logger *slog.Logger, path string, closer io.Closer, err error) {
-	level := slog.LevelInfo
-	if os.Getenv("NEBEGIT_LOG") == "debug" {
-		level = slog.LevelDebug
-	}
+func Open(debugMode bool) (logger *slog.Logger, path string, closer io.Closer, level *slog.LevelVar, err error) {
+	level = &slog.LevelVar{}
+	SetLevel(level, debugMode)
 	opts := &slog.HandlerOptions{Level: level}
 
 	f, path, err := openFile()
 	if err != nil {
-		return slog.New(slog.NewTextHandler(os.Stderr, opts)), "", nil, err
+		return slog.New(slog.NewTextHandler(os.Stderr, opts)), "", nil, level, err
 	}
-	return slog.New(slog.NewTextHandler(f, opts)), path, f, nil
+	return slog.New(slog.NewTextHandler(f, opts)), path, f, level, nil
+}
+
+// SetLevel sets level to Debug when debugMode is true, or when
+// NEBEGIT_LOG=debug is set (which forces Debug regardless of debugMode),
+// else Info.
+func SetLevel(level *slog.LevelVar, debugMode bool) {
+	if debugMode || os.Getenv("NEBEGIT_LOG") == "debug" {
+		level.Set(slog.LevelDebug)
+		return
+	}
+	level.Set(slog.LevelInfo)
 }
 
 // openFile opens the log file for appending, rotating an oversized one

@@ -42,18 +42,22 @@ function newWorktreeDialog(page: Page): Locator {
 }
 
 // createOnNewBranch submits the picker's New worktree dialog for a new
-// branch at target, from start if given, and returns the dialog.
+// branch at target, starting at the branch start picked from the list if
+// given, else at the current branch, and returns the dialog.
 async function createOnNewBranch(
   page: Page,
-  { branch, start = '', target }: { branch: string; start?: string; target: string },
+  { branch, start, target }: { branch: string; start?: string; target: string },
 ): Promise<Locator> {
   await openWorktreePicker(page)
   await pickerAction(page, 'New worktree…').click()
   const dialog = newWorktreeDialog(page)
   await dialog.getByLabel('New branch').check()
-  await dialog.getByPlaceholder('Branch name').fill(branch)
-  await dialog.getByPlaceholder('Start point (branch or commit)').fill(start)
-  await dialog.getByPlaceholder('Target folder').fill(target)
+  await dialog.getByLabel('Branch name').fill(branch)
+  if (start) {
+    await dialog.locator('[data-test=start-branch]').click()
+    await page.getByRole('option', { name: start, exact: true }).click()
+  }
+  await dialog.getByLabel('Location').fill(target)
   await dialog.getByRole('button', { name: 'Create' }).click()
   return dialog
 }
@@ -154,8 +158,9 @@ test('FR-WT-02 a new worktree on an existing branch is created at the chosen fol
   await openWorktreePicker(app)
   await pickerAction(app, 'New worktree…').click()
   const dialog = newWorktreeDialog(app)
-  await dialog.locator('[data-test=existing-branch]').selectOption('B')
-  await dialog.getByPlaceholder('Target folder').fill(target)
+  await dialog.locator('[data-test=existing-branch]').click()
+  await app.getByRole('option', { name: 'B', exact: true }).click()
+  await dialog.getByLabel('Location').fill(target)
   await dialog.getByRole('button', { name: 'Create' }).click()
 
   await expect.poll(() => worktreePaths(git, repos.work)).toContain(target)
@@ -166,7 +171,7 @@ test('FR-WT-02 a new worktree on an existing branch is created at the chosen fol
   await expect(worktreeRow(app, 'B')).toBeVisible()
 })
 
-test('FR-WT-02 a new worktree on a new branch starts that branch at the given start point', async ({
+test('FR-WT-02 a new worktree on a new branch starts that branch at the branch picked as its start', async ({
   app,
   repos,
   sandbox,
@@ -178,6 +183,24 @@ test('FR-WT-02 a new worktree on a new branch starts that branch at the given st
   await expect.poll(() => worktreePaths(git, repos.work)).toContain(target)
   expect(currentBranch(git, target)).toBe('fresh')
   expect(branchTip(git, repos.work, 'fresh')).toBe(branchTip(git, repos.work, 'feature'))
+})
+
+test("FR-WT-02 with only a new branch's name typed, the worktree lands beside the repo, named after the repo and the branch", async ({
+  app,
+  repos,
+  git,
+}) => {
+  await openWorktreePicker(app)
+  await pickerAction(app, 'New worktree…').click()
+  const dialog = newWorktreeDialog(app)
+  await dialog.getByLabel('New branch').check()
+  await dialog.getByLabel('Branch name').fill('beside/it')
+  await expect(dialog.getByLabel('Folder name')).toHaveValue('work-beside-it')
+  await dialog.getByRole('button', { name: 'Create' }).click()
+
+  const target = path.join(path.dirname(repos.work), 'work-beside-it')
+  await expect.poll(() => worktreePaths(git, repos.work)).toContain(target)
+  expect(currentBranch(git, target)).toBe('beside/it')
 })
 
 test('FR-WT-13 a worktree made with New worktree… opens in its own window, which shows it', async ({
@@ -241,8 +264,8 @@ test('FR-WT-06 Create worktree here… on a log commit makes a worktree on a new
   await pickFromContextMenu(app, logRow(app, 'add logo'), 'Create worktree here…')
   const dialog = newWorktreeDialog(app)
   await expect(dialog.getByLabel('New branch')).toBeChecked()
-  await dialog.getByPlaceholder('Branch name').fill('at-logo')
-  await dialog.getByPlaceholder('Target folder').fill(target)
+  await dialog.getByLabel('Branch name').fill('at-logo')
+  await dialog.getByLabel('Location').fill(target)
   await dialog.getByRole('button', { name: 'Create' }).click()
 
   await expect.poll(() => worktreePaths(git, repos.work)).toContain(target)
@@ -259,8 +282,8 @@ test('FR-WT-06 New worktree from here… on a branch in the branch picker makes 
   const target = path.join(sandbox.dir, 'on-feature')
   await pickRefAction(app, 'feature', 'New worktree from here…')
   const dialog = newWorktreeDialog(app)
-  await expect(dialog.locator('[data-test=existing-branch]')).toHaveValue('feature')
-  await dialog.getByPlaceholder('Target folder').fill(target)
+  await expect(dialog.locator('[data-test=existing-branch]')).toHaveText('feature')
+  await dialog.getByLabel('Location').fill(target)
   await dialog.getByRole('button', { name: 'Create' }).click()
 
   await expect.poll(() => worktreePaths(git, repos.work)).toContain(target)

@@ -19,21 +19,21 @@ func writeFile(t *testing.T, path, content string) {
 }
 
 // newConfig lays out a fixture repo under t.TempDir() with the given
-// functional.md/quality.md/testing.md content, and returns a Config
-// pointing at it. GoRoot and FrontendRoot start out empty; PendingPath
+// functional/area.md, quality.md and testing.md content, and returns a
+// Config pointing at it. GoRoot and FrontendRoot start out empty; PendingPath
 // starts out missing.
 func newConfig(t *testing.T, functional, quality, testing string) Config {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := Config{
-		FunctionalPath: filepath.Join(dir, "functional.md"),
-		QualityPath:    filepath.Join(dir, "quality.md"),
-		TestingPath:    filepath.Join(dir, "testing.md"),
-		GoRoot:         filepath.Join(dir, "go"),
-		FrontendRoot:   filepath.Join(dir, "frontend"),
-		PendingPath:    filepath.Join(dir, "pending.txt"),
+		FunctionalDir: filepath.Join(dir, "functional"),
+		QualityPath:   filepath.Join(dir, "quality.md"),
+		TestingPath:   filepath.Join(dir, "testing.md"),
+		GoRoot:        filepath.Join(dir, "go"),
+		FrontendRoot:  filepath.Join(dir, "frontend"),
+		PendingPath:   filepath.Join(dir, "pending.txt"),
 	}
-	writeFile(t, cfg.FunctionalPath, functional)
+	writeFile(t, filepath.Join(cfg.FunctionalDir, "area.md"), functional)
 	writeFile(t, cfg.QualityPath, quality)
 	writeFile(t, cfg.TestingPath, testing)
 	if err := os.MkdirAll(cfg.GoRoot, 0o755); err != nil {
@@ -76,6 +76,13 @@ const functionalFixture = `# Functional requirements (FR)
 | FR-CD-01 | SHOULD | a should requirement |
 `
 
+const otherFunctionalFixture = `# Other area
+
+| ID | Prio | Requirement |
+|---|---|---|
+| FR-GH-01 | MUST | a must requirement in another file |
+`
+
 const qualityFixture = `# Quality attributes (QA)
 
 | ID | Requirement |
@@ -83,19 +90,21 @@ const qualityFixture = `# Quality attributes (QA)
 | QA-EF-01 | a quality requirement |
 `
 
-func TestQA_MNT_02_RequiredIDsAreMustFRAndAllQA(t *testing.T) {
+func TestQA_MNT_02_RequiredIDsAreMustFRFromEveryFileAndAllQA(t *testing.T) {
 	dir := t.TempDir()
-	functionalPath := filepath.Join(dir, "functional.md")
+	functionalDir := filepath.Join(dir, "functional")
 	qualityPath := filepath.Join(dir, "quality.md")
-	writeFile(t, functionalPath, functionalFixture)
+	writeFile(t, filepath.Join(functionalDir, "ab.md"), functionalFixture)
+	writeFile(t, filepath.Join(functionalDir, "gh.md"), otherFunctionalFixture)
+	writeFile(t, filepath.Join(functionalDir, "notes.txt"), "| FR-XY-01 | MUST | not a requirements file |\n")
 	writeFile(t, qualityPath, qualityFixture)
 
-	required, err := requiredIDs(functionalPath, qualityPath)
+	required, err := requiredIDs(functionalDir, qualityPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := map[string]bool{"FR-AB-01": true, "QA-EF-01": true}
+	want := map[string]bool{"FR-AB-01": true, "FR-GH-01": true, "QA-EF-01": true}
 	if len(required) != len(want) {
 		t.Fatalf("required = %v, want %v", required, want)
 	}
@@ -106,6 +115,16 @@ func TestQA_MNT_02_RequiredIDsAreMustFRAndAllQA(t *testing.T) {
 	}
 	if required["FR-CD-01"] {
 		t.Error("SHOULD requirement FR-CD-01 must be excluded")
+	}
+}
+
+func TestQA_MNT_02_FunctionalDirWithoutRequirementFilesIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	qualityPath := filepath.Join(dir, "quality.md")
+	writeFile(t, qualityPath, qualityFixture)
+
+	if _, err := requiredIDs(filepath.Join(dir, "functional"), qualityPath); err == nil {
+		t.Error("requiredIDs on a folder without .md files: err = nil, want an error")
 	}
 }
 

@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProgressBar from 'openvue/progressbar'
 import Badge from 'openvue/badge'
+import { JobKind, JobState } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 const { Facade } = vi.hoisted(() => ({
   Facade: { Jobs: vi.fn(), CancelJob: vi.fn() },
@@ -61,7 +62,7 @@ describe('JobsMenu', () => {
   it('FR-UX-12 two running jobs: the badge shows 2 and the list has two rows with label, message and a progress bar', async () => {
     Facade.Jobs.mockResolvedValue([
       jobFixture({ message: 'halfway' }),
-      jobFixture({ id: 'j2', kind: 'push', progress: -1 }),
+      jobFixture({ id: 'j2', kind: JobKind.PushJob, progress: -1 }),
     ])
     const { wrapper, body } = await mountMenu()
 
@@ -80,7 +81,7 @@ describe('JobsMenu', () => {
 
   it("FR-UX-12 an update-branch job's row names the branch, not the raw kind", async () => {
     Facade.Jobs.mockResolvedValue([
-      jobFixture({ kind: 'update-branch', branch: 'feature', progress: 40 }),
+      jobFixture({ kind: JobKind.UpdateBranchJob, branch: 'feature', progress: 40 }),
     ])
     const { body } = await mountMenu()
     await body.get('[data-test="jobs-menu"]').trigger('click')
@@ -102,7 +103,7 @@ describe('JobsMenu', () => {
     Facade.Jobs.mockResolvedValue([jobFixture()])
     const { wrapper, body } = await mountMenu()
 
-    emit('job:update', { data: jobFixture({ state: 'cancelled' }) })
+    emit('job:update', { data: jobFixture({ state: JobState.JobCancelled }) })
     await flushPromises()
 
     expect(wrapper.findComponent(Badge).exists()).toBe(false)
@@ -112,7 +113,7 @@ describe('JobsMenu', () => {
   it('FR-UX-01 a rejected cancel renders ErrorBanner with the error, in the list', async () => {
     Facade.Jobs.mockResolvedValue([jobFixture()])
     Facade.CancelJob.mockRejectedValueOnce(
-      Object.assign(new Error('boom'), { cause: { message: 'cancel failed' } }),
+      new Error('boom', { cause: { message: 'cancel failed' } }),
     )
     const { wrapper, body } = await mountMenu()
     await body.get('[data-test="jobs-menu"]').trigger('click')

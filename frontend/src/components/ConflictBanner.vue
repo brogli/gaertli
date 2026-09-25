@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import Button from 'openvue/button'
+import Message from 'openvue/message'
 import { useI18n } from '../i18n'
 import { useRepoStore } from '../stores/repo'
 import { useChangesStore } from '../stores/changes'
 import { useConfirmAction } from '../composables/useConfirmAction'
 import { useCoreCall } from '../composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Operation } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
 // ConflictBanner shows while a merge, rebase, cherry-pick, or revert is
@@ -21,9 +24,10 @@ const { confirmAction } = useConfirmAction()
 const { t } = useI18n()
 
 const unresolvedCount = computed(() => changes.files?.conflicted?.length ?? 0)
-const skippable = computed(
-  () => repo.summary?.operation === 'cherry-pick' || repo.summary?.operation === 'revert',
-)
+const skippable = computed(() => {
+  const operation = repo.summary?.operation
+  return operation === Operation.CherryPickOperation || operation === Operation.RevertOperation
+})
 
 function onContinue(): void {
   void run(() => Facade.ContinueOperation(props.wt))
@@ -43,15 +47,26 @@ function onAbort(): void {
 </script>
 
 <template>
-  <div v-if="repo.summary?.operation" class="conflict-banner" data-test="conflict-banner">
-    <span>{{ t('notices.conflictStopped', { operation: repo.summary.operation }) }}</span>
+  <template v-if="repo.summary?.operation">
+    <Message severity="warn" data-test="conflict-banner">
+      <div class="action-row">
+        <span>{{ t('notices.conflictStopped', { operation: repo.summary.operation }) }}</span>
+        <Button
+          :label="t('notices.continue')"
+          size="small"
+          :disabled="unresolvedCount > 0"
+          @click="onContinue"
+        />
+        <Button
+          v-if="skippable"
+          :label="t('notices.skip')"
+          size="small"
+          data-test="skip-operation"
+          @click="onSkip"
+        />
+        <Button :label="t('notices.abortEllipsis')" size="small" @click="onAbort" />
+      </div>
+    </Message>
     <ErrorBanner v-if="error" :error="error" />
-    <button type="button" :disabled="unresolvedCount > 0" @click="onContinue">
-      {{ t('notices.continue') }}
-    </button>
-    <button v-if="skippable" type="button" data-test="skip-operation" @click="onSkip">
-      {{ t('notices.skip') }}
-    </button>
-    <button type="button" @click="onAbort">{{ t('notices.abortEllipsis') }}</button>
-  </div>
+  </template>
 </template>

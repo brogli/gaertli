@@ -12,7 +12,7 @@ The shell is Wails v3, pinned to an exact version (TR-02). There is no fallback 
 
 What we use:
 
-- Services bound with `application.NewService`: the generated facade and the shell's own services. Bound method types must be JSON-serialisable. Go errors reach TypeScript as rejected promises carrying name, message and cause.
+- Bound services: the generated facade and the shell's own services. Their method types must be JSON-serialisable; a Go error reaches TypeScript as a rejected promise.
 - TypeScript binding generation for the bound services and the registered events.
 - Taskfile-based builds.
 - Multi-window, per-window events and the single-instance callback.

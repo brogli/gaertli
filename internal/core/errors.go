@@ -16,12 +16,16 @@ const (
 	NotFastForward Code = "NOT_FAST_FORWARD"
 	DirtyWorktree  Code = "DIRTY_WORKTREE"
 	Conflicts      Code = "CONFLICTS"
-	Locked         Code = "LOCKED"
-	InvalidName    Code = "INVALID_NAME"
-	NoUpstream     Code = "NO_UPSTREAM"
+	// Stopped: an operation stopped mid-way for another reason than
+	// conflicts (a hook, signing, a file in the way); it is left in
+	// progress for continue or abort.
+	Stopped     Code = "STOPPED"
+	Locked      Code = "LOCKED"
+	InvalidName Code = "INVALID_NAME"
+	NoUpstream  Code = "NO_UPSTREAM"
 	// Unmerged: DeleteBranch without force refused a branch with commits
-	// not merged into HEAD (or its upstream). Force fixes it, unlike a
-	// GitFailed "used by worktree" refusal.
+	// not merged into its upstream, or into HEAD if it has none. Force
+	// fixes it, unlike a GitFailed "used by worktree" refusal.
 	Unmerged       Code = "UNMERGED_BRANCH"
 	EditorNotFound Code = "EDITOR_NOT_FOUND"
 	// FileNotFound: OpenFile's path no longer exists in the worktree (a
@@ -35,12 +39,14 @@ const (
 	// WslNotFound: wsl.exe not on PATH (Windows), or any WSL call attempted
 	// on a non-Windows shell.
 	WslNotFound Code = "WSL_NOT_FOUND"
-	// DistroNotFound: the named distro is not among ListDistros's result, or
-	// wsl.exe -d <name> itself refuses it.
+	// DistroNotFound: wsl.exe failed for a distro that ListDistros does not
+	// list.
 	DistroNotFound Code = "DISTRO_NOT_FOUND"
 	// DeployRefused: the consent dialog to copy the core into a distro was
 	// declined.
 	DeployRefused Code = "DEPLOY_REFUSED"
+	// WslUnsupported: the distro runs on WSL 1.
+	WslUnsupported Code = "WSL_UNSUPPORTED"
 )
 
 // Error is the one error type that crosses the core boundary. GitStderr and
@@ -79,7 +85,8 @@ func ErrorfArgs(code Code, key string, args map[string]string, format string, a 
 
 // Retag reclassifies e in place, as ErrorfArgs builds a fresh Error, once
 // a remapper recognises git's stderr. GitStderr and Command stay for "show
-// details".
+// details". A remapper that keeps git's own message as the headline sets
+// Code alone.
 func (e *Error) Retag(code Code, key string, args map[string]string, format string, a ...any) {
 	e.Code, e.Key, e.Args = code, key, args
 	e.Message = fmt.Sprintf(format, a...)

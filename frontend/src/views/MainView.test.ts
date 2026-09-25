@@ -3,51 +3,23 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '../testing/mountInBody'
 
-const { AppService, Facade, SettingsService } = vi.hoisted(() => ({
-  AppService: {
-    RecentRepos: vi.fn(),
-    UpdateWindowTitle: vi.fn().mockResolvedValue(undefined),
-    ListWSLDistros: vi.fn().mockResolvedValue([]),
-    LogPath: vi.fn().mockResolvedValue({ path: '/mock/nebegit.log', error: '' }),
-  },
-  Facade: {
-    Summary: vi.fn(),
-    LoadLog: vi.fn(),
-    LogRows: vi.fn(),
-    Refs: vi.fn(),
-    UncommittedCount: vi.fn(),
-    Jobs: vi.fn().mockResolvedValue([]),
-    CancelJob: vi.fn(),
-    Status: vi.fn(),
-    SetMessageDraft: vi.fn().mockResolvedValue(undefined),
-    Version: vi.fn().mockResolvedValue({ app: 'dev', protocol: 1 }),
-    ListWorktrees: vi.fn().mockResolvedValue([]),
-  },
-  SettingsService: { Get: vi.fn(), Set: vi.fn().mockResolvedValue(undefined) },
-}))
-
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  AppService,
-  Facade,
-  SettingsService,
-}))
+vi.mock(
+  '../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('../testing/mainWindowApp'),
+)
+import { AppService, SettingsService, resetMainWindowApp } from '../testing/mainWindowApp'
 
 import MainView from './MainView.vue'
 import RepoPicker from '../components/RepoPicker.vue'
+import DebugArea from '../components/DebugArea.vue'
 import WorktreeContent from './WorktreeContent.vue'
-import { changedFilesFixture } from '../testing/fixtures/changes'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
-import { summaryFixture } from '../testing/fixtures/summary'
+import { useSettingsStore } from '../stores/settings'
 
 describe('MainView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    Facade.Summary.mockReset().mockResolvedValue(summaryFixture())
-    Facade.LoadLog.mockReset().mockResolvedValue(undefined)
-    Facade.Refs.mockReset().mockResolvedValue({ branches: [], remotes: [], tags: [] })
-    AppService.RecentRepos.mockReset().mockResolvedValue([])
-    Facade.Status.mockReset().mockResolvedValue(changedFilesFixture())
-    SettingsService.Get.mockReset().mockResolvedValue(defaultSettingsFixture())
+    resetMainWindowApp()
   })
 
   it('FR-WT-13 with no path, the repo list is the page, not WorktreeContent', async () => {
@@ -60,6 +32,15 @@ describe('MainView', () => {
     expect(wrapper.findComponent(RepoPicker).props('asPage')).toBe(true)
     expect(wrapper.find('[data-test="repo-row"]').attributes('title')).toBe('/repoA')
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(false)
+  })
+
+  it('FR-WT-13 Ctrl+Shift+N opens a new window', async () => {
+    mount(MainView, { props: { path: '' } })
+    await flushPromises()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'N', ctrlKey: true, shiftKey: true }))
+
+    expect(AppService.NewWindow).toHaveBeenCalledTimes(1)
   })
 
   it('FR-UX-04 with no path, the gear opens the Settings dialog', async () => {
@@ -114,5 +95,26 @@ describe('MainView', () => {
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(true)
 
     wrapper.unmount()
+  })
+
+  it('FR-UX-19 with debug mode off (the default), no debug strip shows', async () => {
+    const wrapper = mount(MainView, { props: { path: '' } })
+    await flushPromises()
+
+    expect(wrapper.findComponent(DebugArea).exists()).toBe(false)
+  })
+
+  it('FR-UX-19 with debug mode on, the debug strip shows along the bottom, worktree or not', async () => {
+    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ debugMode: true }))
+    // MainView reads the settings store rather than loading it itself: a
+    // real window's App.vue loads it once for every view.
+    await useSettingsStore().load()
+
+    const withoutWorktree = mount(MainView, { props: { path: '' } })
+    const withWorktree = mount(MainView, { props: { path: '/repo' } })
+    await flushPromises()
+
+    expect(withoutWorktree.findComponent(DebugArea).exists()).toBe(true)
+    expect(withWorktree.findComponent(DebugArea).exists()).toBe(true)
   })
 })

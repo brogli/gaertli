@@ -29,9 +29,10 @@ function overlaps(lines: [number, number] | null, start: number, count: number):
 // instead of letting it diff a and b itself. Each hunk becomes one Change
 // over whole lines, from the start of its first line to the start of the
 // line after it; a side with no lines sits at the start of the line after
-// git's start line. CodeMirror's presentation pass slides a pure insert or delete to an
-// equal neighbouring line; a zero-length Change pinned at each edge stops
-// it. It still joins changes fewer than 3 characters apart into one chunk.
+// git's start line. CodeMirror's presentation pass slides a pure insert or
+// delete to an equal neighbouring line; a zero-length Change pinned at each
+// edge stops it. It still joins changes fewer than 3 characters apart into
+// one chunk.
 export function hunkChanges(
   hunks: readonly DiffHunk[],
 ): (a: string, b: string) => readonly Change[] {

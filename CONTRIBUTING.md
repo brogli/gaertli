@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Go 1.26 or newer, installed natively (not through Nix).
-- Git 2.40 or newer.
+- Git 2.42 or newer.
 - Linux or WSL: [Nix](https://nixos.org/download) with flakes enabled, and [direnv](https://direnv.net) (with [nix-direnv](https://github.com/nix-community/nix-direnv) to cache the shell). The shell provides Node 24, pnpm, golangci-lint, GTK4, WebKitGTK and a matching C compiler.
 - Windows without WSL: see below.
 
@@ -47,6 +47,6 @@ task build
 
 Spec-driven and test-driven: every feature has a spec that lists the requirement IDs it covers (`docs/requirements.md`), and every test name carries an ID (`TestFR_LOG_01_...`, `it('FR-LOG-01 ...')`). Read `docs/requirements.md` and `docs/architecture.md` before changing behaviour; `CLAUDE.md` describes the working rules.
 
-Work happens on branch `dev`; `main` receives releases. CI runs `task ci` (lint, test, build) on Linux and Windows and `task build` on macOS, with an offline step that fails if a test or build needs the network.
+Work happens on branches off `main`; `main` receives finished work, releases and dependency updates. CI runs `task ci` (lint, test, build) on Linux and Windows and `task build` on macOS, with an offline step that fails if a test or build needs the network.
 
 Dependencies: anything linked into the app or its tests needs a permissive licence (MIT, BSD, Apache-2.0, MPL-2.0) and a row in `docs/architecture/dependencies.md`. pnpm is the only JS package manager; commit `frontend/pnpm-lock.yaml`, never a `package-lock.json`.

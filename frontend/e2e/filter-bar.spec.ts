@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test'
+import { openMockRepo } from './helpers'
 
 // The MultiSelect's panel teleports into the body, which happy-dom's
 // component test cannot open reliably; a real browser is needed for it.
 test('FR-LOG-06 the branch search narrows the list and hides the select-all checkbox', async ({
   page,
 }) => {
-  await page.goto('/?path=/mock/repo')
-  await page.waitForSelector('.row')
+  await openMockRepo(page)
 
   await page.locator('.filter-bar .p-multiselect').click()
   const overlay = page.locator('.p-multiselect-overlay')

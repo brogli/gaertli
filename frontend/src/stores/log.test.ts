@@ -10,6 +10,7 @@ const { Facade } = vi.hoisted(() => ({
     CommitDetails: vi.fn(),
     LogIndexOf: vi.fn(),
     SetLogFilter: vi.fn().mockResolvedValue(undefined),
+    SearchLog: vi.fn(),
   },
 }))
 
@@ -20,7 +21,11 @@ import { Events, emit } from '../testing/runtime'
 
 import { useLogStore } from './log'
 import { commitRow } from '../testing/fixtures/log-rows'
-import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  ChangeScope,
+  type LogCommit,
+  type LogSearchResult,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 function rowFixture(sha: string) {
   return commitRow({ sha, shortSha: sha, subject: 'x' })
@@ -38,6 +43,7 @@ describe('log store', () => {
     Facade.LogRows.mockReset().mockResolvedValue(rowsResult([rowFixture('a')]))
     Facade.ReloadLog.mockReset().mockResolvedValue(undefined)
     Facade.LogIndexOf.mockReset()
+    Facade.SearchLog.mockReset().mockResolvedValue({ indices: [], generation: 0, filtered: false })
     Events.On.mockReset()
   })
 
@@ -67,23 +73,35 @@ describe('log store', () => {
     expect(Facade.LogRows).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-LOG-09 done becomes true once a log:progress event with done: true arrives', async () => {
+  it("FR-LOG-09 a failed load's error shows for its own view until a newer progress", async () => {
     const log = useLogStore()
     await log.load('/repo')
-    expect(log.done).toBe(false)
+    const failure = { code: 'GIT_FAILED', message: 'bad object HEAD' }
 
-    emit('log:progress', { data: { loaded: 5, done: true } })
+    emit('log:progress', { data: { loaded: 0, done: true, generation: 0, error: failure } })
     await flushPromises()
+    expect(log.error).toEqual(failure)
 
-    expect(log.done).toBe(true)
-    expect(log.loaded).toBe(5)
+    await log.applyFilter({ path: 'x' })
+    expect(log.error).toBeNull()
+    emit('log:progress', {
+      data: { loaded: 0, done: true, filtered: true, generation: 1, error: failure },
+    })
+    await flushPromises()
+    expect(log.error).toEqual(failure)
+
+    await log.applyFilter({})
+    expect(log.error).toEqual(failure)
+    emit('log:progress', { data: { loaded: 3, done: true, generation: 1 } })
+    await flushPromises()
+    expect(log.error).toBeNull()
   })
 
   it("FR-LOG-09 another window's log:progress leaves this window's load as it is", async () => {
     const log = useLogStore()
     await log.load('/repo')
     await log.rows(0, 1)
-    const state = () => ({ loaded: log.loaded, done: log.done, cached: log.rowCache.size })
+    const state = () => ({ loaded: log.loaded, cached: log.rowCache.size })
     const before = state()
 
     emit('log:progress', {
@@ -99,24 +117,12 @@ describe('log store', () => {
     const log = useLogStore()
     await log.load('/repo')
 
-    emit('repo:changed', { data: { scope: 'refs' } })
-    emit('repo:changed', { data: { scope: 'state' } })
+    emit('repo:changed', { data: { scope: ChangeScope.RefsChanged } })
+    emit('repo:changed', { data: { scope: ChangeScope.StateChanged } })
     await flushPromises()
 
     expect(Facade.ReloadLog).toHaveBeenCalledTimes(1)
     expect(Facade.ReloadLog).toHaveBeenCalledWith('/repo')
-  })
-
-  it('ADR-4 calls LoadLog again on a core:reconnected event', async () => {
-    const log = useLogStore()
-    await log.load('/repo')
-    Facade.LoadLog.mockClear()
-
-    emit('core:reconnected')
-    await flushPromises()
-
-    expect(Facade.LoadLog).toHaveBeenCalledTimes(1)
-    expect(Facade.LoadLog).toHaveBeenCalledWith('/repo')
   })
 
   it('FR-REPO-04 drops the row cache when Generation changes', async () => {
@@ -227,11 +233,128 @@ describe('log store', () => {
     await log.load('/repo')
     await log.rows(0, 1)
 
-    await log.applyFilter({ query: 'x' })
+    await log.applyFilter({ path: 'x' })
     await log.rows(0, 1)
     await log.applyFilter({})
     await log.rows(0, 1)
 
     expect(Facade.LogRows).toHaveBeenCalledTimes(2)
+  })
+
+  it('FR-LOG-05 a resolved search selects its first match and scrolls to it', async () => {
+    vi.useFakeTimers()
+    try {
+      const log = useLogStore()
+      await log.load('/repo')
+      Facade.SearchLog.mockResolvedValueOnce({ indices: [9], generation: 0, filtered: false })
+      Facade.LogRows.mockResolvedValueOnce(rowsResult([rowFixture('row9')]))
+
+      log.query = 'fix'
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+
+      expect(Facade.LogRows).toHaveBeenCalledWith('/repo', 9, 10)
+      expect(log.selectedRow?.sha).toBe('row9')
+      expect(log.pendingScrollTo).toBe(9)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('FR-LOG-05 drops a stale search answer whose generation is older than the current view', async () => {
+    vi.useFakeTimers()
+    try {
+      const log = useLogStore()
+      await log.load('/repo')
+
+      let resolveFirst!: (value: LogSearchResult) => void
+      Facade.SearchLog.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        }),
+      )
+
+      log.query = 'fix'
+      await vi.advanceTimersByTimeAsync(250) // fires the debounced search; still pending
+
+      // the view moves on to a newer generation before that search answers
+      Facade.SearchLog.mockResolvedValueOnce({ indices: [5], generation: 1, filtered: false })
+      emit('log:progress', { data: { loaded: 1, done: true, generation: 1 } })
+      await flushPromises()
+      expect(log.matches).toEqual([5])
+
+      // the first (generation 0) search now answers, late: it must not
+      // override the generation-1 result already showing
+      resolveFirst({ indices: [2], generation: 0, filtered: false })
+      await flushPromises()
+
+      expect(log.matches).toEqual([5])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('FR-LOG-05 drops a base-view search answer once a filter is active, even at a higher raw generation number', async () => {
+    vi.useFakeTimers()
+    try {
+      const log = useLogStore()
+      await log.load('/repo')
+
+      // the base view is already well past a few reloads
+      emit('log:progress', { data: { loaded: 1, done: true, filtered: false, generation: 5 } })
+      await flushPromises()
+
+      let resolveBase!: (value: LogSearchResult) => void
+      Facade.SearchLog.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveBase = resolve
+        }),
+      )
+      log.query = 'fix'
+      await vi.advanceTimersByTimeAsync(250) // fires the base-view search; still pending
+
+      // a filter is applied while that search is in flight: its own view
+      // starts at generation 1, a lower number than the base view's 5
+      log.filter = { path: 'x' }
+      Facade.SearchLog.mockResolvedValueOnce({ indices: [3], generation: 1, filtered: true })
+      emit('log:progress', { data: { loaded: 1, done: true, filtered: true, generation: 1 } })
+      await flushPromises()
+      expect(log.matches).toEqual([3])
+
+      // the base-view search now answers, late, with a higher raw
+      // generation number (5) than the filtered view's (1): comparing
+      // generation alone would accept it; it must still be dropped, since
+      // it belongs to the wrong view
+      resolveBase({ indices: [7], generation: 5, filtered: false })
+      await flushPromises()
+
+      expect(log.matches).toEqual([3])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('FR-LOG-05 re-runs the search once the active view finishes loading, catching matches in rows that streamed in after', async () => {
+    vi.useFakeTimers()
+    try {
+      const log = useLogStore()
+      await log.load('/repo')
+
+      Facade.SearchLog.mockResolvedValueOnce({ indices: [], generation: 0, filtered: false })
+      log.query = 'fix'
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+      expect(log.matches).toEqual([])
+
+      // more rows stream in under the same generation, one of them a match
+      Facade.SearchLog.mockResolvedValueOnce({ indices: [3], generation: 0, filtered: false })
+      emit('log:progress', { data: { loaded: 10, done: true, filtered: false, generation: 0 } })
+      await flushPromises()
+
+      expect(Facade.SearchLog).toHaveBeenCalledTimes(2)
+      expect(log.matches).toEqual([3])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

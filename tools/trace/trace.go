@@ -18,9 +18,9 @@ import (
 
 // Config points trace at the files and directories it reads.
 type Config struct {
-	FunctionalPath, QualityPath, TestingPath string
-	GoRoot, FrontendRoot                     string
-	PendingPath                              string
+	FunctionalDir, QualityPath, TestingPath string
+	GoRoot, FrontendRoot                    string
+	PendingPath                             string
 }
 
 // idExpr matches one requirement ID, e.g. FR-LOG-01.
@@ -38,7 +38,7 @@ var (
 // run computes the required IDs and their coverage, and reports the
 // problems (missing or stale) to out.
 func run(cfg Config, out io.Writer) (int, error) {
-	required, err := requiredIDs(cfg.FunctionalPath, cfg.QualityPath)
+	required, err := requiredIDs(cfg.FunctionalDir, cfg.QualityPath)
 	if err != nil {
 		return 0, err
 	}
@@ -53,18 +53,24 @@ func run(cfg Config, out io.Writer) (int, error) {
 	return report(out, required, covered, pending, cfg.PendingPath), nil
 }
 
-// requiredIDs returns every MUST FR id from functionalPath and every QA id
-// from qualityPath.
-func requiredIDs(functionalPath, qualityPath string) (map[string]bool, error) {
+// requiredIDs returns every MUST FR id from the .md files in functionalDir
+// and every QA id from qualityPath.
+func requiredIDs(functionalDir, qualityPath string) (map[string]bool, error) {
 	required := map[string]bool{}
 
-	frRows, err := tableRows(functionalPath)
-	if err != nil {
-		return nil, err
+	functionalPaths, err := filepath.Glob(filepath.Join(functionalDir, "*.md"))
+	if err != nil || len(functionalPaths) == 0 {
+		return nil, fmt.Errorf("no functional requirement files (*.md) in %s", functionalDir)
 	}
-	for _, cells := range frRows {
-		if len(cells) >= 2 && cells[1] == "MUST" && idPattern.MatchString(cells[0]) {
-			required[cells[0]] = true
+	for _, path := range functionalPaths {
+		frRows, err := tableRows(path)
+		if err != nil {
+			return nil, err
+		}
+		for _, cells := range frRows {
+			if len(cells) >= 2 && cells[1] == "MUST" && idPattern.MatchString(cells[0]) {
+				required[cells[0]] = true
+			}
 		}
 	}
 
@@ -168,8 +174,9 @@ func frontendCoverage(root string) (map[string]bool, error) {
 	})
 }
 
-// coverageInFiles walks root, skipping vendor and hidden dirs, and lets
-// collect add the IDs it finds in every file ending in one of suffixes.
+// coverageInFiles walks root, skipping node_modules, bin and hidden dirs,
+// and lets collect add the IDs it finds in every file ending in one of
+// suffixes.
 func coverageInFiles(root string, suffixes []string, collect func(src string, covered map[string]bool)) (map[string]bool, error) {
 	covered := map[string]bool{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {

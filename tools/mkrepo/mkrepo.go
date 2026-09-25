@@ -53,11 +53,12 @@ func Build(ctx context.Context, dir string, cfg Config) error {
 		return nil
 	}
 
-	restore, err := isolateConfig()
+	home, err := os.MkdirTemp("", "mkrepo-home")
 	if err != nil {
 		return err
 	}
-	defer restore()
+	defer func() { _ = os.RemoveAll(home) }()
+	run := isolatedGit(ctx, dir, home)
 
 	if err := wipe(dir, cfg.Worktrees); err != nil {
 		return err
@@ -65,19 +66,19 @@ func Build(ctx context.Context, dir string, cfg Config) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if _, err := runner.Run(ctx, git.Call{Dir: dir, Args: []string{"init", "--quiet", "--initial-branch=main"}}); err != nil {
+	if err := run(nil, "init", "--quiet", "--initial-branch=main"); err != nil {
 		return err
 	}
 
 	var buf bytes.Buffer
 	stream(&buf, cfg)
-	if _, err := runner.Run(ctx, git.Call{Dir: dir, Args: []string{"fast-import", "--quiet"}, Stdin: buf.Bytes()}); err != nil {
+	if err := run(buf.Bytes(), "fast-import", "--quiet"); err != nil {
 		return err
 	}
-	if _, err := runner.Run(ctx, git.Call{Dir: dir, Args: []string{"checkout", "--quiet", "main"}}); err != nil {
+	if err := run(nil, "checkout", "--quiet", "main"); err != nil {
 		return err
 	}
-	if err := addWorktrees(ctx, dir, cfg); err != nil {
+	if err := addWorktrees(run, dir, cfg); err != nil {
 		return err
 	}
 
@@ -104,7 +105,7 @@ func worktreeDir(dir string, n int) string {
 
 // addWorktrees adds cfg.Worktrees sibling worktrees: one on an existing
 // feature branch, the rest detached at an older commit on main.
-func addWorktrees(ctx context.Context, dir string, cfg Config) error {
+func addWorktrees(run gitFunc, dir string, cfg Config) error {
 	for i := 1; i <= cfg.Worktrees; i++ {
 		wt := worktreeDir(dir, i)
 		args := []string{"worktree", "add", "--quiet"}
@@ -113,42 +114,24 @@ func addWorktrees(ctx context.Context, dir string, cfg Config) error {
 		} else {
 			args = append(args, "--detach", wt, fmt.Sprintf("main~%d", i))
 		}
-		if _, err := runner.Run(ctx, git.Call{Dir: dir, Args: args}); err != nil {
+		if err := run(nil, args...); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// isolateConfig points HOME and git's global config at a fresh temp
-// directory and disables the system config, so Build never reads the
-// developer's own git configuration.
-func isolateConfig() (restore func(), err error) {
-	home, err := os.MkdirTemp("", "mkrepo-home")
-	if err != nil {
-		return nil, err
-	}
-	prevHome, hadHome := os.LookupEnv("HOME")
-	prevGlobal, hadGlobal := os.LookupEnv("GIT_CONFIG_GLOBAL")
-	prevNoSystem, hadNoSystem := os.LookupEnv("GIT_CONFIG_NOSYSTEM")
+// gitFunc runs git with args in the repo Build makes, stdin piped to it.
+type gitFunc func(stdin []byte, args ...string) error
 
-	_ = os.Setenv("HOME", home)
-	_ = os.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig"))
-	_ = os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-
-	return func() {
-		restoreEnv("HOME", prevHome, hadHome)
-		restoreEnv("GIT_CONFIG_GLOBAL", prevGlobal, hadGlobal)
-		restoreEnv("GIT_CONFIG_NOSYSTEM", prevNoSystem, hadNoSystem)
-		_ = os.RemoveAll(home)
-	}, nil
-}
-
-func restoreEnv(key, value string, had bool) {
-	if had {
-		_ = os.Setenv(key, value)
-	} else {
-		_ = os.Unsetenv(key)
+// isolatedGit runs git in dir with HOME and git's global config at home and
+// the system config disabled, so Build never reads the developer's own git
+// configuration.
+func isolatedGit(ctx context.Context, dir, home string) gitFunc {
+	env := []string{"HOME=" + home, "GIT_CONFIG_GLOBAL=" + filepath.Join(home, ".gitconfig"), "GIT_CONFIG_NOSYSTEM=1"}
+	return func(stdin []byte, args ...string) error {
+		_, err := runner.Run(ctx, git.Call{Dir: dir, Args: args, Stdin: stdin, Env: env})
+		return err
 	}
 }
 

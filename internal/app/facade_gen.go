@@ -100,15 +100,6 @@ func (f *Facade) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha
 	return c.CompareWithWorking(ctx, coreID, sha)
 }
 
-func (f *Facade) ConfiguredPullMode(ctx context.Context, wt core.WorktreeID) (core.PullMode, error) {
-	c, coreID, err := f.router.CoreOf(ctx, wt)
-	if err != nil {
-		var zero core.PullMode
-		return zero, err
-	}
-	return c.ConfiguredPullMode(ctx, coreID)
-}
-
 func (f *Facade) ContinueOperation(ctx context.Context, wt core.WorktreeID) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
@@ -202,6 +193,15 @@ func (f *Facade) Fetch(ctx context.Context, wt core.WorktreeID, remote string) (
 	return c.Fetch(ctx, coreID, remote)
 }
 
+func (f *Facade) Fixup(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashResult, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.SquashResult
+		return zero, err
+	}
+	return c.Fixup(ctx, coreID, shas)
+}
+
 func (f *Facade) ForcePush(ctx context.Context, wt core.WorktreeID) (string, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
@@ -218,15 +218,6 @@ func (f *Facade) Jobs(ctx context.Context, wt core.WorktreeID) ([]core.JobInfo, 
 		return zero, err
 	}
 	return c.Jobs(ctx, coreID)
-}
-
-func (f *Facade) ListBranches(ctx context.Context, path core.RepoPath) ([]core.BranchSummary, error) {
-	c, err := f.router.CoreFor(path)
-	if err != nil {
-		var zero []core.BranchSummary
-		return zero, err
-	}
-	return c.ListBranches(ctx, path)
 }
 
 func (f *Facade) ListWorktrees(ctx context.Context, path core.RepoPath) ([]core.Worktree, error) {
@@ -407,6 +398,15 @@ func (f *Facade) Revert(ctx context.Context, wt core.WorktreeID, shas []string, 
 	return c.Revert(ctx, coreID, shas, opts)
 }
 
+func (f *Facade) SearchLog(ctx context.Context, wt core.WorktreeID, query string) (core.LogSearchResult, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.LogSearchResult
+		return zero, err
+	}
+	return c.SearchLog(ctx, coreID, query)
+}
+
 func (f *Facade) SetEditorProfile(ctx context.Context, profile core.EditorProfile) error {
 	return f.router.Local().SetEditorProfile(ctx, profile)
 }
@@ -441,6 +441,24 @@ func (f *Facade) SkipOperation(ctx context.Context, wt core.WorktreeID) error {
 		return err
 	}
 	return c.SkipOperation(ctx, coreID)
+}
+
+func (f *Facade) Squash(ctx context.Context, wt core.WorktreeID, shas []string, message string) (core.SquashResult, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.SquashResult
+		return zero, err
+	}
+	return c.Squash(ctx, coreID, shas, message)
+}
+
+func (f *Facade) SquashCheck(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashCheck, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.SquashCheck
+		return zero, err
+	}
+	return c.SquashCheck(ctx, coreID, shas)
 }
 
 func (f *Facade) StageAll(ctx context.Context, wt core.WorktreeID) error {

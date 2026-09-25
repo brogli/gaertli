@@ -26,9 +26,20 @@ type LogCommit struct {
 // display form ("main", "origin/main", "v1.0", "HEAD"); Kind disambiguates
 // what --decorate=full's full ref path said it was.
 type RefLabel struct {
-	Name string `json:"name"`
-	Kind string `json:"kind"` // "head" | "branch" | "remote" | "tag"
+	Name string  `json:"name"`
+	Kind RefKind `json:"kind"`
 }
+
+// RefKind is what a RefLabel names; "" for a ref outside refs/heads,
+// refs/remotes and refs/tags.
+type RefKind string
+
+const (
+	HeadRef   RefKind = "head"
+	BranchRef RefKind = "branch"
+	RemoteRef RefKind = "remote"
+	TagRef    RefKind = "tag"
+)
 
 // GraphRow is a commit's lane data, the JSON shape of graph.Row.
 type GraphRow struct {
@@ -40,9 +51,19 @@ type GraphRow struct {
 
 // GraphEdge is the JSON shape of graph.Edge.
 type GraphEdge struct {
-	Lane int    `json:"lane"`
-	Kind string `json:"kind"` // "start" | "continue" | "end"
+	Lane   int      `json:"lane"`
+	Kind   EdgeKind `json:"kind"`
+	Colour int      `json:"colour"`
 }
+
+// EdgeKind is the JSON shape of graph.EdgeKind.
+type EdgeKind string
+
+const (
+	ThroughEdge EdgeKind = "through"
+	InEdge      EdgeKind = "in"  // from Lane into the commit
+	OutEdge     EdgeKind = "out" // from the commit to Lane
+)
 
 // CommitDetails is one commit's full message, committer, parents, and
 // changed files vs. its first parent.
@@ -71,36 +92,46 @@ type ChangedFile struct {
 }
 
 // LogFilter is the log's combined filter: every non-empty field narrows the
-// result (AND). Query, if it resolves to an existing commit's hash,
-// short-circuits every other field.
+// result (AND).
 type LogFilter struct {
-	Query    string   `json:"query,omitempty"`    // message text (subject+body), or a commit hash
 	Author   string   `json:"author,omitempty"`   // author name or email
-	Branches []string `json:"branches,omitempty"` // short ref names; empty = every branch, like the unfiltered log
+	Branches []string `json:"branches,omitempty"` // full ref names of branches or tags (refs/heads/x, refs/tags/x): a short one can name either; empty = every branch, like the unfiltered log
 	Path     string   `json:"path,omitempty"`     // file or folder path
 }
 
 // Empty reports whether f narrows nothing; SetLogFilter with an empty
 // filter clears the filtered view.
 func (f LogFilter) Empty() bool {
-	return f.Query == "" && f.Author == "" && len(f.Branches) == 0 && f.Path == ""
+	return f.Author == "" && len(f.Branches) == 0 && f.Path == ""
 }
 
-// Flat reports whether f's result has no graph: a text/author search walks
+// Flat reports whether f's result has no graph: an author search walks
 // history out of topological order.
 func (f LogFilter) Flat() bool {
-	return f.Query != "" || f.Author != ""
+	return f.Author != ""
+}
+
+// LogSearchResult is SearchLog's result: the matching rows' indices, in log
+// order, in the view Generation and Filtered identify together (as
+// LogProgress's own Filtered does): the worktree's filtered view, or the
+// repo's shared log. The two views number their generations separately, so
+// a frontend must check both to tell a stale answer from a fresh one.
+type LogSearchResult struct {
+	Indices    []int `json:"indices,omitempty"`
+	Generation int   `json:"generation"`
+	Filtered   bool  `json:"filtered"`
 }
 
 // LogProgress is "log:progress"'s payload. Filtered tells the repo-wide
-// unfiltered log apart from a window's own filtered view: one window can
-// have both streams running at once. Generation is that stream's own
-// LogRowsResult.Generation (the repo-wide log's, or the window's own
-// filtered view's): a reload that keeps the commit count still tells a
-// window its cached rows are stale.
+// unfiltered log apart from a worktree's own filtered view: one worktree
+// can have both streams running at once, and every window on it sees the
+// same progress. Generation is that stream's own LogRowsResult.Generation:
+// a reload that keeps the commit count still tells a window its cached
+// rows are stale. Error is set on the done progress of a load that failed.
 type LogProgress struct {
-	Loaded     int  `json:"loaded"`
-	Done       bool `json:"done"`
-	Filtered   bool `json:"filtered"`
-	Generation int  `json:"generation"`
+	Loaded     int    `json:"loaded"`
+	Done       bool   `json:"done"`
+	Filtered   bool   `json:"filtered"`
+	Generation int    `json:"generation"`
+	Error      *Error `json:"error,omitempty"`
 }

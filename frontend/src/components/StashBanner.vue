@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import Button from 'openvue/button'
+import Message from 'openvue/message'
 import { useI18n } from '../i18n'
 import { useRepoStore } from '../stores/repo'
 import { useChangesStore } from '../stores/changes'
@@ -32,10 +34,14 @@ function onDrop(): void {
 </script>
 
 <template>
-  <div v-if="visible" data-test="stash-banner">
-    <span>{{ t('notices.stashedHint') }}</span>
+  <template v-if="visible">
+    <Message severity="info" data-test="stash-banner">
+      <div class="action-row">
+        <span>{{ t('notices.stashedHint') }}</span>
+        <Button :label="t('notices.restore')" size="small" @click="onRestore" />
+        <Button :label="t('notices.drop')" size="small" @click="onDrop" />
+      </div>
+    </Message>
     <ErrorBanner v-if="error" :error="error" />
-    <button type="button" @click="onRestore">{{ t('notices.restore') }}</button>
-    <button type="button" @click="onDrop">{{ t('notices.drop') }}</button>
-  </div>
+  </template>
 </template>

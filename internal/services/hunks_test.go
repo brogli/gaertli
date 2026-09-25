@@ -96,13 +96,12 @@ func TestFR_CHG_03_StageLinesOfTheSecondHunkAloneChangesItsOwnBlockNotAnIdentica
 	}
 }
 
-// partial is buildPartialPatch of the first hunk written into a patch.
+// partial is buildPartialPatch as text.
 func partial(frag *gitdiff.TextFragment, selected map[int]bool, reverse bool) string {
-	patch, _ := buildPartialPatch(frag, selected, reverse, 0)
-	return string(patch)
+	return string(buildPartialPatch(frag, selected, reverse))
 }
 
-func TestFR_CHG_03_BuildPartialPatchStartsTheProducedSideWhereTheHunksWrittenBeforeLeaveIt(t *testing.T) {
+func TestFR_CHG_03_BuildPartialPatchStartsTheProducedSideWhereTheOtherSideStarts(t *testing.T) {
 	frag := &gitdiff.TextFragment{
 		OldPosition: 10, OldLines: 3,
 		NewPosition: 20, NewLines: 4,
@@ -116,14 +115,14 @@ func TestFR_CHG_03_BuildPartialPatchStartsTheProducedSideWhereTheHunksWrittenBef
 	}
 	selected := selectLines(frag, core.LineSelection{Old: []int{11}, New: []int{21, 22}})
 
-	staging, stagingNet := buildPartialPatch(frag, selected, false, 5)
-	unstaging, unstagingNet := buildPartialPatch(frag, selected, true, -2)
+	staging := partial(frag, selected, false)
+	unstaging := partial(frag, selected, true)
 
-	if header := strings.SplitAfter(string(staging), "\n")[0]; header != "@@ -10,3 +15,4 @@\n" || stagingNet != 1 {
-		t.Errorf("staging header = %q, net %d; want \"@@ -10,3 +15,4 @@\", net 1", header, stagingNet)
+	if header := strings.SplitAfter(staging, "\n")[0]; header != "@@ -10,3 +10,4 @@\n" {
+		t.Errorf("staging header = %q, want \"@@ -10,3 +10,4 @@\"", header)
 	}
-	if header := strings.SplitAfter(string(unstaging), "\n")[0]; header != "@@ -18,3 +20,4 @@\n" || unstagingNet != -1 {
-		t.Errorf("unstaging header = %q, net %d; want \"@@ -18,3 +20,4 @@\", net -1", header, unstagingNet)
+	if header := strings.SplitAfter(unstaging, "\n")[0]; header != "@@ -20,3 +20,4 @@\n" {
+		t.Errorf("unstaging header = %q, want \"@@ -20,3 +20,4 @@\"", header)
 	}
 }
 

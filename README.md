@@ -12,12 +12,16 @@ Status: pre-alpha. Windows and Linux are the targets, including repos inside WSL
 
 ## Install
 
-Download the archive for your platform from the project's GitHub Releases page: `nebegit-windows-amd64.zip`, `nebegit-linux-amd64.AppImage`, or (best-effort, unsigned, untested) `nebegit-darwin-arm64.zip`. `SHA256SUMS` on the same page lets you verify the download. Unzip (Windows) or mark the AppImage executable (`chmod +x`, Linux) and run it — no installer, no auto-update.
+Download from the project's GitHub Releases page: `nebegit-windows-amd64.zip` for Windows; for Linux, a `.deb` or `.rpm` for the common package managers (`nebegit-linux-amd64.deb`, `nebegit-linux-amd64.rpm`) or `nebegit-linux-amd64.tar.gz` for other distributions; or (best-effort, unsigned, untested) `nebegit-darwin-arm64.zip`. `SHA256SUMS` on the same page lets you verify the download.
 
-Two prerequisites, installed separately:
+- **Windows**: unzip and run `nebegit.exe` — no installer, no auto-update.
+- **Linux, deb/rpm**: install with your package manager (e.g. `sudo apt install ./nebegit-linux-amd64.deb`, `sudo dnf install ./nebegit-linux-amd64.rpm`); it also installs the web view. No auto-update — upgrade by installing a newer package.
+- **Linux, other distributions**: unpack the tar.gz and run the `nebegit` binary inside it; see Start from a terminal to put it on `PATH`.
 
-- **git** 2.40 or newer, on `PATH`.
-- **The OS web view**: WebView2 on Windows (preinstalled on Windows 11; a small Microsoft installer on Windows 10), or the `webkitgtk` system package on Linux — the AppImage does not bundle it.
+Two prerequisites, installed separately unless noted above:
+
+- **git** 2.42 or newer, on `PATH`.
+- **The OS web view**: WebView2 on Windows (preinstalled on Windows 11; a small Microsoft installer on Windows 10), or the `webkitgtk` system package on Linux — the deb/rpm install it as a dependency; the tar.gz does not bundle it.
 
 ## First start
 
@@ -27,8 +31,9 @@ nebegit checks both prerequisites at launch. Missing git: a message names it and
 
 `nebegit <path>` opens the window for that repo, or brings it to the front. For the command to exist:
 
-- **WSL**: Settings → "Install nebegit command" next to the distro. `nebegit` in that distro's terminal then opens the Windows app on the WSL repo; without a path it uses the current folder.
-- **Linux**: link the AppImage into a folder on your `PATH`, e.g. `ln -s ~/Downloads/nebegit-linux-amd64.AppImage ~/.local/bin/nebegit`.
+- **WSL**: nebegit sets up `~/.local/bin/nebegit` in a distro when it first opens a repo there (the consent it asks names it). `nebegit` in that distro's terminal then opens the Windows app on the WSL repo; without a path it uses the current folder. If `~/.local/bin` was new, open a new terminal first.
+- **Linux, deb/rpm**: the package already put `nebegit` on `PATH`.
+- **Linux, tar.gz**: put the extracted `nebegit` binary in `~/.local/bin` (or any folder on your `PATH`).
 - **Windows**: add the folder that holds `nebegit.exe` to your user `PATH`.
 
 ## Editor setup
@@ -41,7 +46,8 @@ nebegit writes every git command and its own errors to a log file; Settings name
 
 ## Known limits
 
-- **WSL**: only WSL 2 distros work; a listed WSL 1 distro is shown disabled. Before nebegit places its headless core inside a distro the first time, it asks for consent; declining leaves nothing behind.
+- **WSL**: open a WSL repo with "Open folder…" through the Linux entry (`\\wsl.localhost\<distro>`). Only WSL 2 distros are supported. Before nebegit places its headless core and the `nebegit` command inside a distro the first time, it asks for consent; declining leaves nothing behind.
 - **SSH passphrase**: nebegit runs git with interactive prompting disabled, so a passphrase-protected SSH key needs a running `ssh-agent` with the key already added — otherwise the git call fails instead of prompting for the passphrase.
+- **Windows SmartScreen**: the Windows binary isn't code-signed (no code signing in v1), so Windows SmartScreen warns about it on first run; choose "More info" then "Run anyway".
 
 Licence: BSD-3-Clause.

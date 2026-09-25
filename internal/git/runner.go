@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -22,9 +24,10 @@ type Call struct {
 	Args  []string // git's arguments; "git" itself is not included
 	Stdin []byte   // piped to the process, e.g. "commit -F -"
 
-	ReadOnly   bool // adds GIT_OPTIONAL_LOCKS=0: the call performs no writes
-	Continue   bool // adds GIT_EDITOR=true: a --continue/--abort/--skip call
-	Background bool // logged at Debug, not Info, in the app log
+	ReadOnly   bool     // adds GIT_OPTIONAL_LOCKS=0: the call performs no writes
+	NoEditor   bool     // adds GIT_EDITOR=true: no editor ever waits for input
+	Background bool     // logged at Debug, not Info, in the app log
+	Env        []string // added to the environment as "KEY=value"; never logged
 
 	// Timeout bounds this call when ctx has no deadline. Zero means 30s.
 	Timeout time.Duration
@@ -52,12 +55,17 @@ type Entry struct {
 // PATH with no log.
 type Runner struct {
 	Git string      // git executable; "" resolves "git" via exec.LookPath
-	Log func(Entry) // called once per Run, success or failure; nil is fine
+	Log func(Entry) // called once per call, success or failure; nil is fine
 }
 
 // defaultTimeout bounds a call whose ctx has no deadline and whose
 // Call.Timeout is zero.
 const defaultTimeout = 30 * time.Second
+
+// stopGrace is how long a git interrupted by a done ctx has to exit (git
+// removes its lock files then) before it is killed; also how long its
+// pipes stay open after it exited, for a grandchild that still holds them.
+const stopGrace = 2 * time.Second
 
 // Run executes call and waits for it to finish, ctx to be done, or the
 // effective timeout to expire, whichever comes first.
@@ -100,12 +108,25 @@ func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, command 
 	cmd = exec.CommandContext(ctx, cmp.Or(r.Git, "git"), call.Args...)
 	cmd.Dir = call.Dir
 	cmd.Env = buildEnv(call)
-	cmd.SysProcAttr = proc.HiddenConsole()
-	cmd.WaitDelay = 2 * time.Second
+	cmd.SysProcAttr = proc.Interruptible()
+	cmd.Cancel = func() error { return interrupt(cmd.Process) }
+	cmd.WaitDelay = stopGrace
 	if call.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(call.Stdin)
 	}
 	return cmd, command, nil
+}
+
+// interrupt is a call's Cancel: it interrupts git's process group and kills
+// what of the group still runs stopGrace later, since exec's own kill then
+// reaches git alone, not a hook or transport that ignored the interrupt.
+// A git that ended before its ctx did is neither interrupted nor killed.
+func interrupt(git *os.Process) error {
+	if err := proc.Interrupt(git); err != nil {
+		return err
+	}
+	time.AfterFunc(stopGrace, func() { proc.KillGroup(git) })
+	return nil
 }
 
 // notStarted logs and returns a call that never ran.
@@ -143,8 +164,10 @@ func withTimeout(ctx context.Context, timeout time.Duration) (context.Context, c
 
 // classify turns cmd's outcome into Run's error: Cancelled beats every
 // other cause, a nil ProcessState means git never started, and everything
-// else is a plain exit-code failure. Git's output never changes the code;
-// it only becomes the message.
+// else is a plain exit-code failure, GitFailed unless another process holds
+// one of git's own lock files (Locked). This is the one place every call
+// (Run, Stream, StreamErr) is classified, so every write gets Locked
+// detection without action-specific code.
 func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, command string) error {
 	switch {
 	case ctx.Err() != nil:
@@ -153,13 +176,34 @@ func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, comm
 		return core.Errorf(core.Internal, "%v", err)
 	case err != nil:
 		details := gitDetails(result)
-		gitErr := core.Errorf(core.GitFailed, "%s", gitMessage(details, result.ExitCode))
+		gitErr := lockedError(details)
+		if gitErr == nil {
+			gitErr = core.Errorf(core.GitFailed, "%s", gitMessage(details, result.ExitCode))
+		}
 		gitErr.GitStderr = details
 		gitErr.Command = command
 		return gitErr
 	default:
 		return nil
 	}
+}
+
+// lockPattern is how git's lockfile code reports a lock file another
+// process still holds, whatever the lock (index, HEAD, a ref, config,
+// shallow, …) and whatever command hit it: an "error:" or "fatal:" line
+// ending in this text, sometimes with an explanatory hint below.
+var lockPattern = regexp.MustCompile(`Unable to create '([^']+)': File exists\.`)
+
+// lockedError returns Code Locked with the lock file's base name if details
+// carries lockPattern, else nil.
+func lockedError(details string) *core.Error {
+	m := lockPattern.FindStringSubmatch(details)
+	if m == nil {
+		return nil
+	}
+	lock := filepath.Base(m[1])
+	return core.ErrorfArgs(core.Locked, "locked", map[string]string{"lock": lock},
+		"Another program is using the repo (holding %s).", lock)
 }
 
 // gitMessage is a failure's user-facing message: up to four of git's own
@@ -169,7 +213,7 @@ func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, comm
 func gitMessage(details string, exitCode int) string {
 	var lines []string
 	for line := range strings.Lines(details) {
-		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "hint:") {
+		if line = shownText(line); line != "" && !strings.HasPrefix(line, "hint:") {
 			lines = append(lines, line)
 		}
 	}
@@ -184,6 +228,17 @@ func gitMessage(details string, exitCode int) string {
 		lines[i] = strings.TrimPrefix(strings.TrimPrefix(line, "fatal: "), "error: ")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// shownText is what a terminal would end up showing of line: git redraws
+// progress in place with "\r" (and ESC[K, clear to end of line), so only
+// the text after the last "\r" stays.
+func shownText(line string) string {
+	line = strings.TrimSpace(strings.ReplaceAll(line, "\x1b[K", ""))
+	if i := strings.LastIndexByte(line, '\r'); i >= 0 {
+		line = strings.TrimSpace(line[i+1:])
+	}
+	return line
 }
 
 func isGitReason(line string) bool {
@@ -209,10 +264,10 @@ func buildEnv(call Call) []string {
 	if call.ReadOnly {
 		env = append(env, "GIT_OPTIONAL_LOCKS=0")
 	}
-	if call.Continue {
+	if call.NoEditor {
 		env = append(env, "GIT_EDITOR=true")
 	}
-	return env
+	return append(env, call.Env...)
 }
 
 // formatCommand renders args for the app log, with credentials masked

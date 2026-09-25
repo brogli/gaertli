@@ -5,6 +5,7 @@ import { test, expect } from './fixtures'
 import {
   commitFiles,
   commitSha,
+  diffText,
   dragLogBorder,
   fileRow,
   hunksText,
@@ -70,7 +71,7 @@ test("FR-DIFF-07 the diff window lists what it diffs beside the diff: a commit's
     const diff = await openDiff(repos.work, target)
     await expect(diff.locator('.file-list .path')).toHaveText(files)
     await expect(selectedFile(diff)).toContainText(target.file!)
-    await expect(diffPane(diff).locator('.cm-content')).toContainText(shows)
+    await expect(diffText(diff)).toContainText(shows)
   }
 })
 
@@ -173,7 +174,7 @@ test('FR-UX-06 Light and Dark apply at once; System follows the OS setting', asy
   const dark = () => app.evaluate(() => document.documentElement.classList.contains('nebegit-dark'))
   const setTheme = async (theme: string) => {
     const dialog = await openSettings(app)
-    await dialog.locator('[data-test=theme-select]').selectOption({ label: theme })
+    await dialog.locator('[data-test=theme-select]').getByRole('button', { name: theme }).click()
     await dialog.getByRole('button', { name: 'Save' }).click()
     await expect(dialog).toBeHidden()
   }

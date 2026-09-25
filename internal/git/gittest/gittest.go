@@ -17,11 +17,9 @@ type Repo struct {
 	Dir string // the repo's working directory
 }
 
-// New sets an isolated HOME, GIT_CONFIG_GLOBAL, and GIT_CONFIG_NOSYSTEM=1
-// (no global or system config of the developer is read), runs "git init"
-// and sets user.name/user.email in the isolated global config, and returns
-// the Repo. Calls t.Fatal on any git failure. Must not be used from a
-// parallel subtest (t.Setenv's rule).
+// New inits a repo in a temp dir under isolateConfig, with a test identity
+// in the isolated global config. Must not be used from a parallel subtest
+// (t.Setenv's rule).
 func New(t *testing.T) *Repo {
 	t.Helper()
 	isolateConfig(t)

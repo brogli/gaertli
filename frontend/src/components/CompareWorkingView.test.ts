@@ -79,6 +79,15 @@ describe('CompareWorkingView', () => {
     expect(wrapper.text()).toContain('untracked')
   })
 
+  it("FR-CMP-04 shows the commit's short hash in the from colour box, like the two-commit comparison's", async () => {
+    const { wrapper } = await mountAgainstWorking()
+
+    const fromTag = wrapper.get('[data-test="from-tag"]')
+    expect(fromTag.text()).toBe('aaa1111')
+    expect(fromTag.attributes('title')).toBe('sha-a')
+    expect(fromTag.classes()).toContain('from')
+  })
+
   it('FR-CMP-04 clicking exit leaves the working-tree compare', async () => {
     const { wrapper, compare } = await mountAgainstWorking()
 

@@ -44,6 +44,18 @@ func TestQA_OSS_01_CheckReportsOnlyDisallowedLicences(t *testing.T) {
 	}
 }
 
+func TestFR_UX_18_CheckAllowsOFLForTheBundledFontsOnly(t *testing.T) {
+	text := Dependency{Name: "@fontsource-variable/inter", Version: "5.3.0", Licence: "OFL-1.1"}
+	mono := Dependency{Name: "@fontsource-variable/jetbrains-mono", Version: "5.3.0", Licence: "OFL-1.1"}
+	other := Dependency{Name: "some-lib", Version: "1.0.0", Licence: "OFL-1.1"}
+
+	got := Check([]Dependency{text, mono, other})
+
+	if want := []Dependency{other}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Check() = %+v, want %+v", got, want)
+	}
+}
+
 func TestQA_OSS_01_NoticesRendersOneParagraphPerDependency(t *testing.T) {
 	deps := []Dependency{
 		{Name: "foo", Version: "1.2.0", Licence: "MIT", Text: "Copyright foo authors"},

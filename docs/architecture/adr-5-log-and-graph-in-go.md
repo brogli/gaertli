@@ -15,5 +15,6 @@ The log must stay fast on repos with about 100k commits (G3, QA-PERF-02/03/07), 
 ## Consequences
 
 - The UI never holds the whole history. Scrolling costs one small call per window of rows.
+- A row's lane data describes the lines inside that row only: into its commit from each child, out of it to each parent, and straight down for a lane passing by. Lanes keep their index, so the lanes leaving a row's bottom are the lanes entering the next row's top, and rows drawn one by one join into one graph.
 - Windows that show worktrees of the same repo share one loaded log (ADR-9).
-- Filters run as a separate `git log` per window, beside the shared unfiltered log.
+- Filters run as a separate `git log` per worktree session, beside the repo's shared unfiltered log (ADR-9); every window on that worktree sees the same filtered view.

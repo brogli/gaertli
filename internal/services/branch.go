@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
@@ -49,9 +50,14 @@ func validateBranchName(ctx context.Context, r git.Runner, dir, name string) err
 	return err
 }
 
-// Checkout implements core.API.
+// Checkout implements core.API. A remote-tracking branch goes by its full
+// ref with --track: a bare name's DWIM refuses when a tag has that name.
 func (c *Core) Checkout(ctx context.Context, id core.WorktreeID, branch string) error {
-	result, err := c.runLocked(ctx, id, "switch", "--end-of-options", branch)
+	args := []string{"switch", "--end-of-options", branch}
+	if strings.HasPrefix(branch, "refs/remotes/") {
+		args = []string{"switch", "--track", "--end-of-options", branch}
+	}
+	result, err := c.runLocked(ctx, id, args...)
 	return remapDirty(err, result)
 }
 
@@ -124,7 +130,7 @@ func resetFlag(mode core.ResetMode) (string, error) {
 // remapDirty turns a "would be overwritten" checkout refusal (exit 1) into
 // Code DirtyWorktree: a tracked file's local change, or an untracked file,
 // in the way of a switch. Every other failure (exit 128 "fatal:": bad or
-// duplicate branch name, an ambiguous multi-remote DWIM match, the branch
+// duplicate branch name, a remote branch whose local name is taken, the branch
 // already checked out elsewhere) stays plain GitFailed with git's own
 // message.
 func remapDirty(err error, result git.Result) error {

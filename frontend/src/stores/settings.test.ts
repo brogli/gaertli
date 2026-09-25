@@ -17,22 +17,23 @@ import { Events, emit } from '../testing/runtime'
 
 import { useSettingsStore } from './settings'
 import { defaultSettingsFixture } from '../testing/fixtures/settings'
+import { Theme } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 
 describe('settings store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    AppService.ListWSLDistros.mockReset().mockResolvedValue([{ name: 'Ubuntu-22.04', version: 2 }])
+    AppService.ListWSLDistros.mockReset().mockResolvedValue(['Ubuntu-22.04'])
     SettingsService.Get.mockReset()
     Events.On.mockReset()
   })
 
   it('FR-UX-06 a settings change saved in any window reloads the settings here and applies its theme', async () => {
-    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: 'light' }))
+    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: Theme.LightTheme }))
     const store = useSettingsStore()
     await store.load()
     expect(document.documentElement.classList.contains('nebegit-dark')).toBe(false)
 
-    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: 'dark' }))
+    SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: Theme.DarkTheme }))
     emit('settings:changed')
     await flushPromises()
 
@@ -47,6 +48,6 @@ describe('settings store', () => {
 
     expect(AppService.ListWSLDistros).toHaveBeenCalledTimes(1)
     expect(second).toBe(first)
-    expect(first.map((d) => d.name)).toEqual(['Ubuntu-22.04'])
+    expect(first).toEqual(['Ubuntu-22.04'])
   })
 })

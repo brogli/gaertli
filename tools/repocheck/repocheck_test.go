@@ -183,8 +183,8 @@ func yamlBlock(t *testing.T, text, key string) string {
 func TestQA_MNT_03_TestTaskAndCIRunOffline(t *testing.T) {
 	root := repoRoot(t)
 
-	testTask := yamlBlock(t, readFile(t, root, "Taskfile.yml"), "test")
-	assertContainsAll(t, "Taskfile.yml test task", testTask, offlineEnv...)
+	testTask := yamlBlock(t, readFile(t, root, "Taskfile.yml"), "test:go")
+	assertContainsAll(t, "Taskfile.yml test:go task", testTask, offlineEnv...)
 	assertContainsAll(t, "ci.yml", readFile(t, root, ".github/workflows/ci.yml"), offlineEnv...)
 	assertContainsAll(t, "build/Taskfile.yml", readFile(t, root, "build/Taskfile.yml"), "pnpm install --frozen-lockfile")
 }
@@ -495,6 +495,26 @@ func TestQA_PORT_01_TR_22_CIMatrixCoversSupportedPlatforms(t *testing.T) {
 	}
 }
 
+func TestQA_COMP_03_CIRunsGoTestsOnGit242(t *testing.T) {
+	root := repoRoot(t)
+	taskfile := readFile(t, root, "Taskfile.yml")
+
+	yamlBlock(t, taskfile, "test:go") // fails via t.Fatalf if missing
+
+	// test:go:race skips packages that need a frontend build (this job
+	// builds none): cmd/nebegit (embeds frontend/dist) and tools/repocheck
+	// itself (its own tests shell out to pnpm).
+	raceTask := yamlBlock(t, taskfile, "test:go:race")
+	assertContainsAll(t, "Taskfile.yml test:go:race task", raceTask, "./internal/...", "./cmd/nebegit-core/...")
+	if strings.Contains(raceTask, "./...") {
+		t.Error(`Taskfile.yml test:go:race task must name its packages, not "./..."`)
+	}
+
+	job := yamlBlock(t, readFile(t, root, ".github/workflows/ci.yml"), "git-2-42")
+	assertContainsAll(t, "ci.yml git-2-42 job", job,
+		append([]string{"runs-on: ubuntu-24.04", "git-2.42.4", "actions/cache", "GITHUB_PATH", "task test:go:race"}, offlineEnv...)...)
+}
+
 // TestQA_PORT_04_ReleaseDarwinJobIsBestEffort also checks that each release
 // job runs on a host of its target architecture, so no GOARCH override is
 // needed.
@@ -549,9 +569,11 @@ func TestQA_INST_02_ReleaseWorkflowTriggersOnVersionTagOnly(t *testing.T) {
 }
 
 // forbiddenInstallerTasks are task names release.yml must never invoke: they
-// build an installer or a package format v1 doesn't ship.
+// build an installer or a package format v1 doesn't ship. deb/rpm are
+// shipped, built via linux:package:dryrun, so they're not forbidden;
+// linux:create:aur (Arch) isn't shipped.
 var forbiddenInstallerTasks = []string{
-	"linux:create:deb", "linux:create:rpm", "linux:create:aur",
+	"linux:create:aur",
 	"darwin:package:dmg", "create:nsis:installer", "create:msix:package",
 }
 
@@ -581,7 +603,80 @@ func TestQA_INST_03_ReleaseWorkflowBuildsNoInstaller(t *testing.T) {
 func TestQA_OSS_03_ReadmeDocumentsInstallAndLimits(t *testing.T) {
 	root := repoRoot(t)
 	assertContainsAll(t, "README.md", readFile(t, root, "README.md"),
-		"## Install", "## First start", "## Editor setup", "## Known limits", "WSL", "ssh-agent")
+		"## Install", "## First start", "## Editor setup", "## Known limits", "WSL", "ssh-agent", "SmartScreen")
+}
+
+// nfpmTemplateLeftovers are unedited-Wails-template values that must not
+// survive in the Linux package's nfpm config.
+var nfpmTemplateLeftovers = []string{
+	"My Company", "wails.io", `license: "MIT"`, "/usr/local/bin/nebegit",
+	"GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "128x128",
+	`description: "A nebegit application"`,
+}
+
+func TestQA_INST_01_NfpmPackageIdentity(t *testing.T) {
+	root := repoRoot(t)
+	nfpm := readFile(t, root, "build/linux/nfpm/nfpm.yaml")
+
+	assertContainsAll(t, "nfpm.yaml", nfpm,
+		`name: "nebegit"`,
+		`license: "BSD-3-Clause"`,
+		`homepage: "https://github.com/brogli/nebegit"`,
+		`dst: "/usr/bin/nebegit"`,
+		"hicolor/1024x1024/apps/nebegit.png",
+	)
+	for _, unwanted := range nfpmTemplateLeftovers {
+		if strings.Contains(nfpm, unwanted) {
+			t.Errorf("nfpm.yaml still has the unedited template's %q", unwanted)
+		}
+	}
+}
+
+// nfpmDependsBlock matches one YAML "depends:" list (the top-level block or
+// an override's).
+var nfpmDependsBlock = regexp.MustCompile(`(?m)^depends:\n((?:\s+- .+\n)+)`)
+
+func TestQA_INST_01_NfpmDependsOnUnversionedGit(t *testing.T) {
+	root := repoRoot(t)
+	nfpm := readFile(t, root, "build/linux/nfpm/nfpm.yaml")
+
+	blocks := nfpmDependsBlock.FindAllStringSubmatch(nfpm, -1)
+	if len(blocks) == 0 {
+		t.Fatal("no depends: blocks found")
+	}
+	for _, m := range blocks {
+		if !strings.Contains(m[1], "- git\n") {
+			t.Errorf("depends block missing unversioned git:\n%s", m[1])
+		}
+	}
+}
+
+func TestQA_INST_03_ReleaseWorkflowShipsDebRpmTarball(t *testing.T) {
+	root := repoRoot(t)
+	release := readFile(t, root, ".github/workflows/release.yml")
+
+	linux := yamlBlock(t, release, "linux")
+	assertContainsAll(t, "release.yml linux job", linux,
+		"nebegit-linux-amd64.deb", "nebegit-linux-amd64.rpm", "nebegit-linux-amd64.tar.gz",
+		"linux:package:dryrun")
+	if strings.Contains(release, "AppImage") {
+		t.Error("release.yml still references an AppImage")
+	}
+}
+
+func TestBuildTaskfileDropsUnusedWailsScaffoldTasks(t *testing.T) {
+	root := repoRoot(t)
+	build := readFile(t, root, "build/Taskfile.yml")
+
+	unusedTask := regexp.MustCompile(`(?m)^  (build:server|run:server|build:docker|run:docker):`)
+	if m := unusedTask.FindString(build); m != "" {
+		t.Errorf("build/Taskfile.yml still has unused task %q", strings.TrimSuffix(strings.TrimSpace(m), ":"))
+	}
+
+	rootTaskfile := readFile(t, root, "Taskfile.yml")
+	if !strings.Contains(rootTaskfile, "\n  build:server:\n") {
+		t.Error("root Taskfile.yml lost its own build:server task (used by the real-backend e2e suite)")
+	}
 }
 
 // homePathPattern, remoteURLPattern, and branchFieldPattern flag content
@@ -663,7 +758,7 @@ func TestQA_OSS_04_NoOwnerSpecificDefaults(t *testing.T) {
 	t.Run("real tree", func(t *testing.T) {
 		root := repoRoot(t)
 		var violations []string
-		for _, dir := range []string{"internal", "cmd", "frontend/src"} {
+		for _, dir := range []string{"internal", "cmd", "frontend/src", "build"} {
 			violations = append(violations, findOwnerSpecificDefaults(t, filepath.Join(root, dir))...)
 		}
 		if len(violations) > 0 {
@@ -692,4 +787,79 @@ func TestTR_28_FrontendReadsEventDataWithoutCasts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// replacesToastLook matches a Toast that is moved from its default position
+// or whose container slot replaces the standard message.
+var replacesToastLook = regexp.MustCompile(`#container|\bposition=`)
+
+var (
+	// nativeControl matches a native form control in a template.
+	nativeControl = regexp.MustCompile(`<(button|input|select|textarea)([\s>/]|$)`)
+	styleBlock    = regexp.MustCompile(`(?s)<style[^>]*>(.*?)</style>`)
+	cssComment    = regexp.MustCompile(`(?s)/\*.*?\*/`)
+	cssRule       = regexp.MustCompile(`([^{}]+)\{([^{}]*)\}`)
+	// controlSelector matches a selector naming a native control or one of
+	// OpenVue's own classes.
+	controlSelector = regexp.MustCompile(`(^|[\s,>+~(])(button|input|select|textarea)\b|\.p-[a-z]`)
+	// lookProperty matches a declaration that changes how something looks,
+	// not where it sits.
+	lookProperty = regexp.MustCompile(`(^|;)\s*(color|background[\w-]*|border[\w-]*|padding[\w-]*|font[\w-]*|box-shadow|outline[\w-]*|opacity)\s*:`)
+)
+
+// restyledControls lists the CSS rules in css that change the look of a
+// native control or an OpenVue component.
+func restyledControls(css string) []string {
+	var found []string
+	for _, m := range cssRule.FindAllStringSubmatch(cssComment.ReplaceAllString(css, ""), -1) {
+		selector := strings.TrimSpace(m[1])
+		if controlSelector.MatchString(selector) && lookProperty.MatchString(m[2]) {
+			found = append(found, selector)
+		}
+	}
+	return found
+}
+
+func TestTR_37_ControlsAreOpenVueComponentsInTheirDefaultLook(t *testing.T) {
+	t.Run("fixture", func(t *testing.T) {
+		css := `button:not(.p-button) { padding: 0; } .row { display: flex; }
+			.bar :deep(.p-inputtext) { width: 100%; } .x :deep(.p-button) { color: red; }`
+		got := restyledControls(css)
+		want := []string{"button:not(.p-button)", ".x :deep(.p-button)"}
+		if !slices.Equal(got, want) {
+			t.Errorf("restyledControls(fixture) = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("real tree", func(t *testing.T) {
+		root := repoRoot(t)
+		err := filepath.WalkDir(filepath.Join(root, "frontend/src"), func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			var css strings.Builder
+			switch filepath.Ext(path) {
+			case ".vue":
+				content := readFile(t, "", path)
+				assertNoLineMatches(t, path, content, nativeControl, "native control instead of an OpenVue component")
+				for _, m := range styleBlock.FindAllStringSubmatch(content, -1) {
+					css.WriteString(m[1])
+				}
+			case ".css":
+				css.WriteString(readFile(t, "", path))
+			}
+			for _, selector := range restyledControls(css.String()) {
+				t.Errorf("%s: %s restyles a control", path, selector)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestTR_36_NoticesUseTheStandardToast(t *testing.T) {
+	const noticeArea = "frontend/src/components/NoticeArea.vue"
+	assertNoLineMatches(t, noticeArea, readFile(t, repoRoot(t), noticeArea), replacesToastLook, "replaces the Toast's standard look or position")
 }

@@ -1,4 +1,4 @@
-import { DOMWrapper, flushPromises } from '@vue/test-utils'
+import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '../testing/mountInBody'
@@ -6,6 +6,7 @@ import { mountInBody } from '../testing/mountInBody'
 const { AppService, Facade } = vi.hoisted(() => ({
   AppService: {
     PickAndOpen: vi.fn(),
+    NewWindow: vi.fn(),
     RecentRepos: vi.fn(),
     ListWSLDistros: vi.fn(),
     SelectRecentRepo: vi.fn(),
@@ -53,6 +54,7 @@ describe('RepoPicker', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     AppService.PickAndOpen.mockReset().mockResolvedValue(undefined)
+    AppService.NewWindow.mockReset().mockResolvedValue(undefined)
     AppService.RecentRepos.mockReset().mockResolvedValue([alpha, beta])
     AppService.ListWSLDistros.mockReset().mockResolvedValue([])
     AppService.SelectRecentRepo.mockReset().mockResolvedValue(undefined)
@@ -87,7 +89,7 @@ describe('RepoPicker', () => {
 
   it('FR-WT-13 a failure the core could not recover from shows in the list', async () => {
     AppService.SelectRecentRepo.mockRejectedValue(
-      Object.assign(new Error('boom'), { cause: { code: 'NOT_A_REPO', message: 'still gone' } }),
+      new Error('boom', { cause: { code: 'NOT_A_REPO', message: 'still gone' } }),
     )
     const { wrapper, body } = await openPicker({ path: '/repos/alpha' })
 
@@ -112,11 +114,34 @@ describe('RepoPicker', () => {
     expect(AppService.PickAndOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-REPO-07 "Open WSL folder…" is offered only where WSL has a distro', async () => {
-    AppService.ListWSLDistros.mockResolvedValue([{ name: 'Ubuntu-22.04', version: 2 }])
+  it('FR-WT-13 "New window" follows "Open folder…"; choosing it opens a new window', async () => {
     const { body } = await openPicker({ path: '/repos/alpha' })
 
-    expect(!!actionRow(body, 'Open WSL folder…')).toBe(true)
+    expect(body.findAll('[data-test="picker-action"]').map((r) => r.text())).toEqual([
+      'Open folder…',
+      'New window',
+    ])
+
+    await actionRow(body, 'New window').trigger('click')
+
+    expect(AppService.NewWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-WT-13 "Open folder…" and "New window" are the only actions, also where WSL has distros', async () => {
+    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
+    const { body } = await openPicker({ path: '/repos/alpha' })
+
+    expect(body.findAll('[data-test="picker-action"]').map((r) => r.text())).toEqual([
+      'Open folder…',
+      'New window',
+    ])
+  })
+
+  it('FR-REPO-07 a recent repo inside WSL names its distro; a local one names none', async () => {
+    const { body } = await openPicker({ path: '/repos/other' })
+
+    expect(repoRow(body, beta.path).text()).toContain('WSL: Ubuntu')
+    expect(repoRow(body, alpha.path).text()).not.toContain('WSL')
   })
 
   it('FR-REPO-07 the button of a WSL window marks it as WSL', async () => {

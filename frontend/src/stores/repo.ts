@@ -2,11 +2,11 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { Events } from '@wailsio/runtime'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { Summary } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { onWindowEvent } from '../lib/windowEvents'
+import { ChangeScope, type Summary } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { onRepoChanged } from '../lib/windowEvents'
 
 // scopes that mean the summary might now be stale
-const SUMMARY_SCOPES = new Set(['state', 'refs'])
+const SUMMARY_SCOPES = [ChangeScope.StateChanged, ChangeScope.RefsChanged]
 
 // repo holds the open worktree's summary (branch, detached, operation),
 // refreshed on the worktree's outside-change events.
@@ -26,12 +26,7 @@ export const useRepoStore = defineStore('repo', () => {
 
     unlisten.forEach((off) => off())
     unlisten = [
-      onWindowEvent('repo:changed', (ev) => {
-        const { scope } = ev.data
-        if (SUMMARY_SCOPES.has(scope)) void refresh()
-      }),
-      // the window's distro core respawned: reload as on mount
-      onWindowEvent('core:reconnected', () => void refresh()),
+      onRepoChanged(SUMMARY_SCOPES, () => void refresh()),
       // a saved editor profile renames "Open in …"
       Events.On('settings:changed', () => void refresh()),
     ]

@@ -3,23 +3,22 @@ import { ref, watch } from 'vue'
 import { usePreferredDark } from '@vueuse/core'
 import { Events } from '@wailsio/runtime'
 import { AppService, SettingsService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { Settings } from '../../bindings/github.com/brogli/nebegit/internal/settings'
-import type { Distro } from '../../bindings/github.com/brogli/nebegit/internal/remote'
+import { Theme, type Preferences } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 
 export const useSettingsStore = defineStore('settings', () => {
-  const settings = ref<Settings | null>(null)
+  const settings = ref<Preferences | null>(null)
   // The installed distros do not change while the app runs; listing them
   // spawns wsl.exe, so the first successful answer is kept. A host without
   // WSL has none.
-  let distros: Distro[] | undefined
+  let distros: string[] | undefined
 
-  // Settings.theme applies live, whichever window saved it: "dark"/"light"
-  // force it, "" (the default, System) follows the OS.
+  // Settings.theme applies live, whichever window saved it: dark or light
+  // force it, the default (System) follows the OS.
   const prefersDark = usePreferredDark()
   watch(
     [() => settings.value?.theme, prefersDark],
     ([theme, osPrefersDark]) => {
-      const dark = theme === 'dark' || (theme !== 'light' && osPrefersDark)
+      const dark = theme === Theme.DarkTheme || (theme !== Theme.LightTheme && osPrefersDark)
       document.documentElement.classList.toggle('nebegit-dark', dark)
     },
     { immediate: true },
@@ -32,12 +31,12 @@ export const useSettingsStore = defineStore('settings', () => {
   // A save in any window, this one included, reaches every window.
   Events.On('settings:changed', () => void load())
 
-  async function loadDistros(): Promise<Distro[]> {
+  async function loadDistros(): Promise<string[]> {
     distros ??= (await AppService.ListWSLDistros()) ?? []
     return distros
   }
 
-  async function save(next: Settings): Promise<void> {
+  async function save(next: Preferences): Promise<void> {
     await SettingsService.Set(next)
     settings.value = next
   }

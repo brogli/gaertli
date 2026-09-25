@@ -2,11 +2,10 @@ package remote
 
 import "strings"
 
-// Distro is one installed WSL distro, bound to the frontend by
-// AppService.ListWSLDistros.
+// Distro is one installed WSL distro.
 type Distro struct {
-	Name    string `json:"name"`
-	Version int    `json:"version"` // 1 or 2; WSL 1 is unsupported
+	Name    string
+	Version int // the WSL version it runs on: 1 or 2; 0 when wsl.exe did not say
 }
 
 // wslPrefixes are the two UNC forms a WSL path is found under; neither is

@@ -58,29 +58,69 @@ func firstMerge(candidates []pickCandidate) (pickCandidate, bool) {
 	return pickCandidate{}, false
 }
 
+// tiedSHAs returns the shas of candidates that share their committer date
+// with at least one other candidate.
+func tiedSHAs(candidates []pickCandidate) []string {
+	counts := make(map[int64]int, len(candidates))
+	for _, c := range candidates {
+		counts[c.CommitAt]++
+	}
+	var tied []string
+	for _, c := range candidates {
+		if counts[c.CommitAt] > 1 {
+			tied = append(tied, c.SHA)
+		}
+	}
+	return tied
+}
+
+// topoOrder resolves shas' topological order, children before parents, as
+// "git rev-list --topo-order" reports them.
+func topoOrder(ctx context.Context, r git.Runner, dir string, shas []string) ([]string, error) {
+	args := append([]string{"rev-list", "--topo-order", "--end-of-options"}, shas...)
+	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: args})
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(strings.TrimRight(string(result.Stdout), "\n"), "\n"), nil
+}
+
 // orderedSHAs sorts candidates by committer date — ascending for
 // cherry-pick (oldest first), descending for revert (newest first).
 // Committer date, not author date: it stays monotonic along a branch after
-// a rebase. Ties (same second) fall back to the given order, which the
-// frontend supplies as log order (newest first): kept for revert, reversed
-// for cherry-pick. Git applies the argument order literally, so this is
-// the order the commits are applied in.
-func orderedSHAs(candidates []pickCandidate, oldestFirst bool) []string {
+// a rebase. Ties (same second) are broken by topological order, children
+// before parents, reversed along with the rest for cherry-pick: the
+// selection order the frontend passes carries no ordering guarantee of its
+// own. Git applies the argument order literally, so this is the order the
+// commits are applied in.
+func orderedSHAs(ctx context.Context, r git.Runner, dir string, candidates []pickCandidate, oldestFirst bool) ([]string, error) {
+	rank := map[string]int{}
+	if tied := tiedSHAs(candidates); len(tied) > 0 {
+		order, err := topoOrder(ctx, r, dir, tied)
+		if err != nil {
+			return nil, err
+		}
+		for i, sha := range order {
+			rank[sha] = i
+		}
+	}
+
 	sorted := slices.Clone(candidates)
+	slices.SortStableFunc(sorted, func(a, b pickCandidate) int {
+		if a.CommitAt != b.CommitAt {
+			return cmp.Compare(b.CommitAt, a.CommitAt) // newest first
+		}
+		return cmp.Compare(rank[a.SHA], rank[b.SHA]) // children before parents
+	})
 	if oldestFirst {
 		slices.Reverse(sorted)
 	}
-	slices.SortStableFunc(sorted, func(a, b pickCandidate) int {
-		if oldestFirst {
-			return cmp.Compare(a.CommitAt, b.CommitAt)
-		}
-		return cmp.Compare(b.CommitAt, a.CommitAt)
-	})
+
 	shas := make([]string, len(sorted))
 	for i, c := range sorted {
 		shas[i] = c.SHA
 	}
-	return shas
+	return shas, nil
 }
 
 // resolveCandidates resolves everything CherryPick/Revert need to know
@@ -138,7 +178,11 @@ func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb,
 		}
 	}
 
-	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: append(pickArgs(verb, opts), orderedSHAs(candidates, oldestFirst)...)})
+	shas, err = orderedSHAs(ctx, wt.Runner, wt.Path, candidates, oldestFirst)
+	if err != nil {
+		return err
+	}
+	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: append(pickArgs(verb, opts), shas...)})
 	return remapIfPending(err, fileExists(filepath.Join(wt.GitDir, headFile)))
 }
 

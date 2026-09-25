@@ -13,7 +13,7 @@ import (
 	"github.com/brogli/nebegit/internal/jobs"
 )
 
-func TestFR_SYNC_07_QA_RESP_02_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
+func TestFR_SYNC_07_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	c, wt := openWorktree(t, repo.Dir)
@@ -80,9 +80,22 @@ func waitForJob(t *testing.T, c *Core, id core.WorktreeID, want func(core.JobInf
 }
 
 // waitForJobState waits for job id to reach state.
-func waitForJobState(t *testing.T, c *Core, wt core.WorktreeID, id, state string) core.JobInfo {
+func waitForJobState(t *testing.T, c *Core, wt core.WorktreeID, id string, state core.JobState) core.JobInfo {
 	t.Helper()
 	return waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == id && j.State == state })
+}
+
+// jobID returns a func taking a job start's results: the job's id, or the
+// test fails on the start's error.
+func jobID(t *testing.T) func(string, error) string {
+	t.Helper()
+	return func(id string, err error) string {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
 }
 
 func mtime(t *testing.T, path string) time.Time {
