@@ -99,6 +99,26 @@ func TestFR_REPO_04_WorktreePollerBacksOffAfterASlowPollThenResets(t *testing.T)
 	})
 }
 
+// A test's Cleanup restores PollInterval while a poller it built may still
+// be polling.
+func TestFR_REPO_04_WorktreePollerKeepsTheIntervalItWasBuiltWith(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var count atomic.Int32
+		runner := git.Runner{Git: nonexistentGit, Log: func(git.Entry) { count.Add(1) }}
+		p := NewWorktreePoller(runner, t.TempDir(), func(core.ChangeScope) {})
+		defer p.Close()
+		builtWith := PollInterval
+		setInterval(t, &PollInterval, time.Hour)
+
+		p.Focus()
+		time.Sleep(2*builtWith + builtWith/2)
+
+		if got := count.Load(); got != 3 {
+			t.Errorf("polls = %d, want 3 at the interval the poller was built with", got)
+		}
+	})
+}
+
 func TestQA_PERF_06_BlurStopsPollingAfterTheTimer(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var count atomic.Int32

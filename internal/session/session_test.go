@@ -293,7 +293,7 @@ func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
 
 	events := make(chan core.Event, 16)
 	m := NewManager(func(e core.Event) { events <- e })
-	wt := openSession(t, m, repo.Dir) // its cleanup stops the poller before PollInterval is restored above
+	wt := openSession(t, m, repo.Dir)
 	coretest.DrainEvents(events)
 
 	if err := os.WriteFile(filepath.Join(repo.Dir, "seed.txt"), []byte("changed"), 0o644); err != nil {

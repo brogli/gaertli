@@ -30,6 +30,8 @@ type WorktreePoller struct {
 
 	inFlight atomic.Bool
 
+	baseInterval time.Duration
+
 	mu       sync.Mutex
 	focused  bool
 	interval time.Duration
@@ -38,13 +40,13 @@ type WorktreePoller struct {
 	timer    *time.Timer
 }
 
-// NewWorktreePoller builds a poller for dir, unfocused until Focus is
-// called.
+// NewWorktreePoller builds a poller for dir that polls at the PollInterval
+// of this moment, unfocused until Focus is called.
 func NewWorktreePoller(runner git.Runner, dir string, onChange func(core.ChangeScope)) *WorktreePoller {
-	return &WorktreePoller{runner: runner, dir: dir, onChange: onChange, interval: PollInterval}
+	return &WorktreePoller{runner: runner, dir: dir, onChange: onChange, baseInterval: PollInterval, interval: PollInterval}
 }
 
-// Focus runs one immediate CheckNow and starts a timer at PollInterval.
+// Focus runs one immediate CheckNow and starts the poll timer.
 // The first poll ever only sets the baseline: nothing to compare against
 // yet. Calling Focus while already focused is a no-op.
 func (p *WorktreePoller) Focus() {
@@ -54,7 +56,7 @@ func (p *WorktreePoller) Focus() {
 		return
 	}
 	p.focused = true
-	p.interval = PollInterval
+	p.interval = p.baseInterval
 	p.mu.Unlock()
 
 	p.tick()
@@ -83,7 +85,7 @@ func (p *WorktreePoller) tick() {
 	if elapsed > p.interval {
 		p.interval = min(p.interval*2, MaxPollInterval)
 	} else {
-		p.interval = PollInterval
+		p.interval = p.baseInterval
 	}
 	if p.focused {
 		p.timer = time.AfterFunc(p.interval, p.tick)
