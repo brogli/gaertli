@@ -38,7 +38,7 @@ Recommended: develop inside WSL with the steps above and cross-compile the Windo
 shell:
 
 ```sh
-wails3 build GOOS=windows     # -> bin/nebegit.exe, no Docker, no extra tools
+task windows:build            # -> bin/nebegit.exe, no Docker, no extra tools
 ```
 
 Native Windows without Nix: install Go, Node 24 and pnpm 11 (the
@@ -54,14 +54,15 @@ task build
 
 ## How the project is developed
 
-Spec-driven and test-driven: every feature has a spec that lists the requirement IDs it covers
-(`docs/requirements.md`), and every test name carries an ID (`TestFR_LOG_01_...`,
-`it('FR-LOG-01 ...')`). Read `docs/requirements.md` and `docs/architecture.md` before changing
-behaviour; `CLAUDE.md` describes the working rules.
+Spec-driven and test-driven: every behaviour is a requirement in `docs/requirements/` before it is
+built, and every test name carries the ID it proves (`TestFR_LOG_01_...`, `it('FR-LOG-01 ...')`).
+Read `docs/requirements.md` and `docs/architecture.md` before changing behaviour; `CLAUDE.md`
+describes the working rules.
 
 Work happens on branches off `main`; `main` receives finished work, releases and dependency updates.
-CI runs `task ci` (lint, test, build) on Linux and Windows and `task build` on macOS, with an
-offline step that fails if a test or build needs the network.
+CI runs `task ci` and the real-backend e2e on Linux, the Go tests on Windows and against git 2.42,
+and `task build` on macOS. Every check runs offline after the install step, so it fails if a test or
+build needs the network.
 
 Dependencies: anything linked into the app or its tests needs a permissive licence (MIT, BSD,
 Apache-2.0, MPL-2.0). pnpm is the only JS package manager; commit `frontend/pnpm-lock.yaml`, never a
