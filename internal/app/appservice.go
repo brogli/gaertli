@@ -70,12 +70,21 @@ func callingWindowFrom(ctx context.Context) (callingWindow, bool) {
 	return w, ok
 }
 
+// requireCallingWindow is callingWindowFrom for a call that acts on its
+// window: a windowless call is Code Internal.
+func requireCallingWindow(ctx context.Context) (callingWindow, error) {
+	if w, ok := callingWindowFrom(ctx); ok {
+		return w, nil
+	}
+	return nil, core.Errorf(core.Internal, "no calling window for this call")
+}
+
 // SelectWorktree switches the calling window's selection. "This window"
 // comes from ctx; the frontend never passes a window handle.
 func (s *AppService) SelectWorktree(ctx context.Context, path string) error {
-	w, ok := callingWindowFrom(ctx)
-	if !ok {
-		return core.Errorf(core.Internal, "no calling window for this call")
+	w, err := requireCallingWindow(ctx)
+	if err != nil {
+		return err
 	}
 	return s.switchTo(ctx, w, path)
 }
@@ -86,11 +95,11 @@ func (s *AppService) SelectWorktree(ctx context.Context, path string) error {
 // directly with no worktree of its own needed. A second failure is
 // returned as-is; the repo picker shows it.
 func (s *AppService) SelectRecentRepo(ctx context.Context, repo settings.RecentRepo) error {
-	w, ok := callingWindowFrom(ctx)
-	if !ok {
-		return core.Errorf(core.Internal, "no calling window for this call")
+	w, err := requireCallingWindow(ctx)
+	if err != nil {
+		return err
 	}
-	err := s.switchTo(ctx, w, shellPath(repo.Path, repo.Distro))
+	err = s.switchTo(ctx, w, shellPath(repo.Path, repo.Distro))
 	ce, isCoreError := errors.AsType[*core.Error](err)
 	if !isCoreError || ce.Code != core.NotARepo || repo.RepoKey == "" {
 		return err
@@ -115,9 +124,9 @@ func (s *AppService) UpdateWindowTitle(ctx context.Context, path, branch string)
 // window to the choice, or brings forward another window already showing
 // it, leaving this one unchanged; cancelling does nothing.
 func (s *AppService) PickAndOpen(ctx context.Context) error {
-	w, ok := callingWindowFrom(ctx)
-	if !ok {
-		return core.Errorf(core.Internal, "no calling window for this call")
+	w, err := requireCallingWindow(ctx)
+	if err != nil {
+		return err
 	}
 	path, ok := s.PickFolder("")
 	if !ok {
