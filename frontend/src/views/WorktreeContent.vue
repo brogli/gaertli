@@ -51,6 +51,11 @@ const compare = useCompareStore()
 const changes = useChangesStore()
 const layout = useLayout()
 const toolbarButton = useToolbarButton()
+const narrow = computed(() => layout.value === 'narrow')
+// Below wide, toolbar buttons keep their name in title/aria-label and drop
+// it as visible text, so the toolbar fits down to the window's own
+// minimum width.
+const compact = computed(() => layout.value !== 'wide')
 
 const { error, run } = useCoreCall()
 const { openFolder: openInEditor } = useOpenInEditor(wt, run)
@@ -92,7 +97,8 @@ onKeyStroke('F5', (event) => {
   refresh()
 })
 
-// labelled with the effective editor profile's name once the summary loads
+// The Open in editor button names the effective editor profile once the
+// summary loads.
 const editorLabel = computed(() =>
   t('toolbar.openInEditor', { editor: repo.summary?.editorName || t('toolbar.editorFallback') }),
 )
@@ -110,10 +116,10 @@ function openCreateBranchHere(): void {
 // where only opening it (LogView's open) does. It starts on Details in
 // medium, Log in narrow.
 type ActiveView = 'log' | 'details' | 'changes'
-const view = ref<ActiveView>(layout.value === 'narrow' ? 'log' : 'details')
+const view = ref<ActiveView>(narrow.value ? 'log' : 'details')
 
 watch([() => log.selectedRow, () => compare.active, () => compare.workingCommit], () => {
-  if (layout.value !== 'narrow') view.value = 'details'
+  if (!narrow.value) view.value = 'details'
 })
 
 // LogView's own events, shared by every layout.
@@ -129,7 +135,7 @@ const logViewListeners = {
 // The branch picker's Show in log and Show history: only narrow can hide
 // the log view.
 function showLog(): void {
-  if (layout.value === 'narrow') view.value = 'log'
+  if (narrow.value) view.value = 'log'
 }
 
 // (n) beside "Changes" in the switch: every file the changes view lists,
@@ -163,13 +169,6 @@ const narrowOptions = computed(() => [
 const sideView = computed<'details' | 'changes'>(() =>
   view.value === 'changes' ? 'changes' : 'details',
 )
-
-// Below wide, toolbar buttons keep their name in title/aria-label and drop
-// it as visible text, so the toolbar fits down to the window's own
-// minimum width.
-const compact = computed(() => layout.value !== 'wide')
-
-const narrow = computed(() => layout.value === 'narrow')
 </script>
 
 <template>
