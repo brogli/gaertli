@@ -168,7 +168,7 @@ func TestFR_CHG_07_ASucceedingPreCommitHookRunsAsUsual(t *testing.T) {
 	writeFile(t, repo.Dir, "b.txt", "staged\n")
 	gittest.Run(t, repo.Dir, "add", "--", "b.txt")
 	marker := filepath.Join(repo.Dir, "hook-ran")
-	writeHook(t, repo.Dir, "pre-commit", "touch "+marker+"\nexit 0\n")
+	writeHook(t, repo.Dir, "pre-commit", "touch hook-ran\nexit 0\n")
 
 	c, id := openWorktree(t, repo.Dir)
 	if err := c.Commit(t.Context(), id, "msg", false); err != nil {

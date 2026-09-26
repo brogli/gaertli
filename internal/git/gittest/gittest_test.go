@@ -52,7 +52,7 @@ func TestQA_SEC_03_EndOfOptionsBlocksRevisionInjection(t *testing.T) {
 func TestQA_COMP_01_HooksRunUnmodified(t *testing.T) {
 	repo := New(t)
 	marker := filepath.Join(repo.Dir, "hook-ran")
-	hook := "#!/bin/sh\ntouch " + marker + "\n"
+	hook := "#!/bin/sh\ntouch hook-ran\n"
 	hookPath := filepath.Join(repo.Dir, ".git", "hooks", "pre-commit")
 	if err := os.WriteFile(hookPath, []byte(hook), 0o755); err != nil {
 		t.Fatal(err)
