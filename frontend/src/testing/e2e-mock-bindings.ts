@@ -73,8 +73,26 @@ function statusFixture(): ChangedFiles {
 // one, for the toolbar-fit case that needs the Pull/Push pair instead of
 // "Push and set upstream"), a second branch with an upstream and a long
 // name, a remote branch and a tag, so the branch picker and the sync
-// controls render real content.
+// controls render real content; or, with ?crowdedRefs=1, the picker case's
+// mixed local branches (one with an upstream, one without), a remote branch
+// and a tag, all short, to check where their names line up.
 function refsFixture(): Refs {
+  if (query.has('crowdedRefs')) {
+    return {
+      branches: [
+        branchFixture({ sha: LOG_ROWS_FIXTURE[0]!.sha }),
+        branchFixture({
+          name: 'B',
+          sha: LOG_ROWS_FIXTURE[1]!.sha,
+          current: false,
+          upstream: 'origin/B',
+        }),
+        branchFixture({ name: 'side', sha: LOG_ROWS_FIXTURE[2]!.sha, current: false }),
+      ],
+      remotes: [{ name: 'origin', branches: [{ name: 'B', sha: LOG_ROWS_FIXTURE[1]!.sha }] }],
+      tags: [{ name: 'v1', sha: LOG_ROWS_FIXTURE[0]!.sha }],
+    }
+  }
   const hasUpstream = query.has('upstream')
   return {
     branches: [
@@ -97,7 +115,7 @@ function refsFixture(): Refs {
 }
 
 // WORKTREES_FIXTURE: the mock repo's main worktree and a linked one, for
-// the worktree picker; RECENT_FIXTURE lists the repo and a second one.
+// the worktree picker.
 const WORKTREES_FIXTURE: Worktree[] = [
   worktreeFixture({
     path: '/mock/repo',
@@ -112,6 +130,62 @@ const WORKTREES_FIXTURE: Worktree[] = [
     dirty: true,
   }),
 ]
+
+// worktreesFixture: WORKTREES_FIXTURE, or a picker case's variant asked for
+// by ?worktrees=: "crowded" adds a dirty, a locked and a missing worktree,
+// plus one whose branch name is too long for the picker row, for the case
+// that checks every row still keeps its name, flags and buttons on one
+// line; "wip" is a worktree whose folder ("wip") is short but whose branch
+// name is not, for the case that checks the branch name gives way first.
+function worktreesFixture(): Worktree[] {
+  const variant = query.get('worktrees')
+  if (variant === 'crowded') {
+    const long = 'a-rather-long-branch-name-that-does-not-fit-the-worktree-picker'
+    return [
+      worktreeFixture({
+        path: '/mock/repo',
+        branch: 'main',
+        sha: LOG_ROWS_FIXTURE[0]!.sha,
+        main: true,
+      }),
+      worktreeFixture({ path: '/mock/repo-side', branch: 'side', sha: LOG_ROWS_FIXTURE[1]!.sha }),
+      worktreeFixture({
+        path: '/mock/repo-dirty',
+        branch: 'wt-dirty',
+        sha: LOG_ROWS_FIXTURE[1]!.sha,
+        dirty: true,
+      }),
+      worktreeFixture({
+        path: '/mock/repo-locked',
+        branch: 'wt-locked',
+        sha: LOG_ROWS_FIXTURE[1]!.sha,
+        locked: true,
+      }),
+      worktreeFixture({
+        path: '/mock/repo-missing',
+        branch: 'wt-missing',
+        sha: LOG_ROWS_FIXTURE[1]!.sha,
+        missing: true,
+      }),
+      worktreeFixture({ path: '/mock/repo-long', branch: long, sha: LOG_ROWS_FIXTURE[1]!.sha }),
+    ]
+  }
+  if (variant === 'wip') {
+    const long = 'a-branch-with-a-rather-long-name-that-cannot-fit-in-a-picker-row'
+    return [
+      worktreeFixture({
+        path: '/mock/repo',
+        branch: 'main',
+        sha: LOG_ROWS_FIXTURE[0]!.sha,
+        main: true,
+      }),
+      worktreeFixture({ path: '/mock/wip', branch: long, sha: LOG_ROWS_FIXTURE[1]!.sha }),
+    ]
+  }
+  return WORKTREES_FIXTURE
+}
+
+// RECENT_FIXTURE lists the mock repo and a second one.
 const RECENT_FIXTURE: RecentRepo[] = [
   { path: '/mock/repo', lastOpened: '2026-01-02T00:00:00Z' },
   { path: '/mock/other-repository-with-a-long-name', lastOpened: '2026-01-01T00:00:00Z' },
@@ -287,7 +361,7 @@ export const Facade = {
   },
 
   ListWorktrees(): Promise<Worktree[]> {
-    return delay(WORKTREES_FIXTURE)
+    return delay(worktreesFixture())
   },
 }
 
