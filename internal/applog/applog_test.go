@@ -5,12 +5,31 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
-func TestFR_UX_02_OpenCreatesTheLogUnderXDGStateHome(t *testing.T) {
+// platformStateDir points the current platform's state-directory variable
+// (Linux XDG_STATE_HOME, Windows LocalAppData, macOS HOME) at a fresh temp
+// dir and returns the log path Open should use under it.
+func platformStateDir(t *testing.T) string {
+	t.Helper()
 	tmp := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", tmp)
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("LocalAppData", tmp)
+		return filepath.Join(tmp, "nebegit", "logs", "nebegit.log")
+	case "darwin":
+		t.Setenv("HOME", tmp)
+		return filepath.Join(tmp, "Library", "Logs", "nebegit", "nebegit.log")
+	default:
+		t.Setenv("XDG_STATE_HOME", tmp)
+		return filepath.Join(tmp, "nebegit", "nebegit.log")
+	}
+}
+
+func TestFR_UX_02_OpenCreatesTheLogUnderThePlatformsStateDir(t *testing.T) {
+	want := platformStateDir(t)
 
 	logger, path, closer, _, err := Open(false)
 	if err != nil {
@@ -18,30 +37,32 @@ func TestFR_UX_02_OpenCreatesTheLogUnderXDGStateHome(t *testing.T) {
 	}
 	defer func() { _ = closer.Close() }()
 
-	if want := filepath.Join(tmp, "nebegit", "nebegit.log"); path != want {
+	if path != want {
 		t.Errorf("path = %q, want %q", path, want)
 	}
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("mode = %v, want 0600", info.Mode().Perm())
-	}
+	t.Run("mode", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows has no owner-only mode bits; the folder is per-user by its access list")
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Errorf("mode = %v, want 0600", info.Mode().Perm())
+		}
+	})
 	if logger == nil {
 		t.Fatal("logger is nil")
 	}
 }
 
 func TestFR_UX_02_OpenRotatesAnOversizedLog(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", tmp)
+	path := platformStateDir(t)
 
-	dir := filepath.Join(tmp, "nebegit")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "nebegit.log")
 	old := bytes.Repeat([]byte("x"), maxSize+1)
 	if err := os.WriteFile(path, old, 0o600); err != nil {
 		t.Fatal(err)
@@ -70,8 +91,7 @@ func TestFR_UX_02_OpenRotatesAnOversizedLog(t *testing.T) {
 }
 
 func TestFR_UX_19_OpenStartsAtInfo(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", tmp)
+	platformStateDir(t)
 
 	_, _, closer, level, err := Open(false)
 	if err != nil {
@@ -85,8 +105,7 @@ func TestFR_UX_19_OpenStartsAtInfo(t *testing.T) {
 }
 
 func TestFR_UX_19_OpenStartsAtDebugWhenNebegitLogIsDebug(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", tmp)
+	platformStateDir(t)
 	t.Setenv("NEBEGIT_LOG", "debug")
 
 	_, _, closer, level, err := Open(false)

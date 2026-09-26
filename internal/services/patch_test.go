@@ -3,6 +3,7 @@ package services
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -132,9 +133,14 @@ func TestQA_COMP_01_StageAndDiscardLinesLeaveTheFileModeAlone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Mode().Perm() != 0o755 {
-			t.Errorf("f.txt mode = %v, want 0755 kept", info.Mode().Perm())
-		}
+		t.Run("mode", func(t *testing.T) {
+			if runtime.GOOS == "windows" {
+				t.Skip("Windows files have no executable bit")
+			}
+			if info.Mode().Perm() != 0o755 {
+				t.Errorf("f.txt mode = %v, want 0755 kept", info.Mode().Perm())
+			}
+		})
 		if got := readFile(t, repo.Dir, "f.txt"); got != "a\nb\nc\n" {
 			t.Errorf("f.txt = %q, want line 2 discarded", got)
 		}
