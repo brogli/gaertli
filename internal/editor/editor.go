@@ -4,6 +4,7 @@
 package editor
 
 import (
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -61,7 +62,7 @@ func buildCommand(template, path string, line int) ([]string, error) {
 	if template == "" {
 		return nil, core.Errorf(core.EditorNotFound, "no editor command configured")
 	}
-	argv, err := splitCommand(template)
+	argv, err := splitCommand(template, runtime.GOOS == "windows")
 	if err != nil {
 		return nil, core.ErrorfArgs(core.EditorNotFound, "editorCommandInvalid", map[string]string{"command": template}, "editor command %q: %v", template, err)
 	}
