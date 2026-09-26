@@ -27,7 +27,7 @@ var fakegit string
 var argvWriterBin string
 
 func TestMain(m *testing.M) {
-	testbin.Main(m,
+	gittest.Main(m,
 		testbin.Bin{Path: &fakegit, Pkg: "../git/testdata/fakegit"},
 		testbin.Bin{Path: &argvWriterBin, Pkg: "../editor/testdata/argvwriter"},
 	)

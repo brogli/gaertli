@@ -13,15 +13,15 @@ import (
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/testbin"
 )
 
 // fakegit is testdata/fakegit, built once for every test in this package.
 var fakegit string
 
-func TestMain(m *testing.M) {
-	testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "./testdata/fakegit"})
-}
+// FakegitPath is fakegit's address for the package's TestMain, which lives
+// in the external git_test package (in main_test.go): gittest imports this
+// package, so a TestMain here importing gittest would be a cycle.
+var FakegitPath = &fakegit
 
 func TestTR_09_DefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
 	t.Setenv("NEBEGIT_TEST_MARKER", "present")

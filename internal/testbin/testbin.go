@@ -18,6 +18,26 @@ type Bin struct {
 	Pkg  string // package path, relative to the calling test's directory
 }
 
+// Build builds bins into a temp directory removed by the returned cleanup.
+// Call it before changing HOME: go build finds its module and build caches
+// through it.
+func Build(bins ...Bin) (cleanup func(), err error) {
+	dir, err := os.MkdirTemp("", "testbin")
+	if err != nil {
+		return nil, err
+	}
+	cleanup = func() { _ = os.RemoveAll(dir) }
+
+	for _, bin := range bins {
+		*bin.Path = filepath.Join(dir, Exe(binaryName(bin.Pkg)))
+		if err := build(*bin.Path, bin.Pkg); err != nil {
+			cleanup()
+			return nil, err
+		}
+	}
+	return cleanup, nil
+}
+
 // Main builds bins into a temp directory, runs m and removes the directory.
 // It is a whole TestMain, or part of one:
 //
@@ -25,19 +45,13 @@ type Bin struct {
 //		testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "./testdata/fakegit"})
 //	}
 func Main(m *testing.M, bins ...Bin) {
-	dir, err := os.MkdirTemp("", "testbin")
+	cleanup, err := Build(bins...)
 	if err != nil {
-		panic(err)
-	}
-	for _, bin := range bins {
-		*bin.Path = filepath.Join(dir, Exe(binaryName(bin.Pkg)))
-		if err := build(*bin.Path, bin.Pkg); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	m.Run()
-	_ = os.RemoveAll(dir)
+	cleanup()
 }
 
 // Exe names a binary so exec finds it: on Windows it tries a name only with

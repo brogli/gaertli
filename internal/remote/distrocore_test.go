@@ -29,7 +29,7 @@ import (
 var coreBin, badBin, stderrBin, exitBin string
 
 func TestMain(m *testing.M) {
-	testbin.Main(m,
+	gittest.Main(m,
 		testbin.Bin{Path: &coreBin, Pkg: "../../cmd/nebegit-core"},
 		testbin.Bin{Path: &badBin, Pkg: "./testdata/badcore"},
 		testbin.Bin{Path: &stderrBin, Pkg: "./testdata/stderrcore"},
