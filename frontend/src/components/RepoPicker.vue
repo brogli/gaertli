@@ -13,7 +13,7 @@ import { iconClass } from '@/lib/icons'
 import { useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 import PickerList from './PickerList.vue'
-import type { PickerRow } from './pickerRow'
+import { filterRows, type PickerRow } from './pickerRow'
 
 // RepoPicker is the toolbar button naming this window's repo; it opens a
 // searchable list of the recent repos. asPage shows that list in place
@@ -91,8 +91,7 @@ const rows = computed<Row[]>(() => {
     ...(ownRepo.value ? [repoRow(ownRepo.value, true)] : []),
     ...recents.value.filter((r) => !isOwn(r)).map((r) => repoRow(r, false)),
   ]
-  const q = query.value.trim().toLowerCase()
-  return q ? all.filter((r) => r.text.toLowerCase().includes(q)) : all
+  return filterRows(all, query.value, (r) => r.text)
 })
 
 function onShow(): void {

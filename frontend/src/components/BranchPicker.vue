@@ -20,7 +20,7 @@ import { errorNotice, useNotices } from '@/lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
 import PickerList from './PickerList.vue'
 import RenameBranchDialog from './RenameBranchDialog.vue'
-import type { PickerRow } from './pickerRow'
+import { filterRows, type PickerRow } from './pickerRow'
 import { branchStart, commitStart, type StartPoint, type WorktreeStart } from './startPoint'
 
 // BranchPicker is the toolbar button naming the current branch; it opens a
@@ -142,8 +142,6 @@ function setChecked(name: string, on: boolean): void {
 
 const query = ref('')
 const rows = computed<Row[]>(() => {
-  const q = query.value.trim().toLowerCase()
-  const matches = (text: string) => text.toLowerCase().includes(q)
   const actions = [
     actionRow('new-branch', t('branchPicker.newBranch'), () =>
       closeAnd(() => emit('create-branch', currentStart())),
@@ -159,9 +157,9 @@ const rows = computed<Row[]>(() => {
       : []),
   ]
   return [
-    ...actions.filter((a) => matches(a.label)),
+    ...filterRows(actions, query.value, (a) => a.label),
     ...sections.value.flatMap(({ label, rows }): Row[] => {
-      const kept = rows.filter((r) => matches(r.name))
+      const kept = filterRows(rows, query.value, (r) => r.name)
       return kept.length ? [{ key: label, kind: 'section', label, header: true }, ...kept] : []
     }),
   ]

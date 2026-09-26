@@ -20,7 +20,7 @@ import { ICON_BUTTON, useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
 import PickerList from './PickerList.vue'
-import type { PickerRow } from './pickerRow'
+import { filterRows, type PickerRow } from './pickerRow'
 
 // WorktreePicker is the toolbar button naming this window's worktree; it
 // opens a searchable list of the repo's worktrees. wt is the id every core
@@ -87,8 +87,7 @@ const rows = computed<Row[]>(() => {
       ? [actionRow('prune', t('worktreePicker.cleanUpStale'), () => void prune())]
       : []),
   ]
-  const q = query.value.trim().toLowerCase()
-  return q ? all.filter((r) => r.text.toLowerCase().includes(q)) : all
+  return filterRows(all, query.value, (r) => r.text)
 })
 
 // Each opening starts with an empty filter and this repo's worktrees listed
