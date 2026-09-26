@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Events } from '@wailsio/runtime'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ChangeScope, type Summary } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { onRepoChanged } from '../lib/windowEvents'
+import { onRepoChanged } from '@/lib/windowEvents'
 
 // scopes that mean the summary might now be stale
 const SUMMARY_SCOPES = [ChangeScope.StateChanged, ChangeScope.RefsChanged]

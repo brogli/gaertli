@@ -1,0 +1,122 @@
+@layer theme, base, openvue, components, utilities;
+
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-primeui';
+
+/* dark: follows the class the settings store toggles on <html>. */
+@custom-variant dark (&:where(.nebegit-dark, .nebegit-dark *));
+
+/* The bundled fonts make the UI and fixed-width text (hashes, paths,
+   diffs) look the same on every system; OpenVue's components inherit the
+   sans font. CodeMirror's theme reads --nb-font-mono. */
+@theme {
+  --font-sans: 'Inter Variable', sans-serif;
+}
+
+@theme inline {
+  --font-mono: var(--nb-font-mono);
+}
+
+/* App-wide colour tones (a file's status, a worktree's dirty marker, ...)
+   and the two compared commits' colours, as utilities: text-tone-green,
+   bg-from/15, ... */
+@theme inline {
+  --color-tone-green: var(--nb-tone-green);
+  --color-tone-blue: var(--nb-tone-blue);
+  --color-tone-red: var(--nb-tone-red);
+  --color-tone-violet: var(--nb-tone-violet);
+  --color-tone-orange: var(--nb-tone-orange);
+  --color-tone-teal: var(--nb-tone-teal);
+  --color-tone-pink: var(--nb-tone-pink);
+  --color-tone-cyan: var(--nb-tone-cyan);
+  --color-tone-purple: var(--nb-tone-purple);
+  --color-tone-indigo: var(--nb-tone-indigo);
+  --color-tone-muted: var(--nb-tone-muted);
+  --color-from: var(--nb-from);
+  --color-to: var(--nb-to);
+}
+
+@layer base {
+  /* One height chain from the window down, so a view can fill it and let
+     a child (the virtual-scrolled log) be the only scroll container. */
+  html,
+  body,
+  #app {
+    height: 100%;
+  }
+
+  /* A dense, tool-like base size: OpenVue's own component tokens (button
+     and form-field padding, tree indents, icon sizes, ...) are rem-based,
+     so this one change tightens paddings and gaps everywhere, not just in
+     app code. */
+  html {
+    font-size: 13px;
+  }
+
+  /* The page paints its own theme background: a host that shows a plain
+     window colour behind a transparent page (WebView2 on Windows) would
+     otherwise show through wherever nothing else paints, in the theme's
+     own colours or not. */
+  body {
+    background: var(--p-content-background);
+    color: var(--p-text-color);
+  }
+
+  :root {
+    --nb-font-mono: 'JetBrains Mono Variable', monospace;
+
+    /* Tones, one shade lighter under the dark theme (below). */
+    --nb-tone-green: var(--p-green-500);
+    --nb-tone-blue: var(--p-blue-500);
+    --nb-tone-red: var(--p-red-500);
+    --nb-tone-violet: var(--p-violet-500);
+    --nb-tone-orange: var(--p-orange-500);
+    --nb-tone-teal: var(--p-teal-500);
+    --nb-tone-pink: var(--p-pink-500);
+    --nb-tone-cyan: var(--p-cyan-500);
+    --nb-tone-purple: var(--p-purple-500);
+    --nb-tone-indigo: var(--p-indigo-500);
+    --nb-tone-muted: var(--p-text-muted-color);
+
+    /* The two compared commits (log row, comparison header): blue for from,
+       orange for to, distinct for the common colour-vision deficiencies and
+       neither the green nor the red a diff uses for added/removed lines. */
+    --nb-from: var(--nb-tone-blue);
+    --nb-to: var(--nb-tone-orange);
+  }
+
+  :root.nebegit-dark {
+    --nb-tone-green: var(--p-green-400);
+    --nb-tone-blue: var(--p-blue-400);
+    --nb-tone-red: var(--p-red-400);
+    --nb-tone-violet: var(--p-violet-400);
+    --nb-tone-orange: var(--p-orange-400);
+    --nb-tone-teal: var(--p-teal-400);
+    --nb-tone-pink: var(--p-pink-400);
+    --nb-tone-cyan: var(--p-cyan-400);
+    --nb-tone-purple: var(--p-purple-400);
+    --nb-tone-indigo: var(--p-indigo-400);
+  }
+
+  /* Headings are compact labels, not document titles: h1 is the start
+     page's app name, h2/h3 name a section within a view. */
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  h1 {
+    font-size: 0.95rem;
+  }
+
+  h2,
+  h3 {
+    font-size: 0.78rem;
+    color: var(--p-text-muted-color);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+}

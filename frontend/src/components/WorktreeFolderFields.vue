@@ -3,10 +3,10 @@ import { computed, nextTick, ref, useTemplateRef, watch, type ComponentPublicIns
 import Button from 'openvue/button'
 import InputGroup from 'openvue/inputgroup'
 import InputText from 'openvue/inputtext'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { useSettingsStore } from '../stores/settings'
-import { basename, joinPath, lastSegment, parentPath, repoPath, withLastSegment } from '../lib/path'
+import { useSettingsStore } from '@/stores/settings'
+import { basename, joinPath, lastSegment, parentPath, repoPath, withLastSegment } from '@/lib/path'
 import FormField from './FormField.vue'
 
 // WorktreeFolderFields are a new worktree's folder name and location, kept
@@ -39,8 +39,8 @@ const locationInput = useTemplateRef<ComponentPublicInstance>('locationInput')
 // part that changes) sits.
 function scrollLocationToEnd(): void {
   void nextTick(() => {
-    const el = locationInput.value?.$el as HTMLInputElement | undefined
-    el?.setSelectionRange(el.value.length, el.value.length)
+    const el = locationInput.value?.$el
+    if (el instanceof HTMLInputElement) el.setSelectionRange(el.value.length, el.value.length)
   })
 }
 

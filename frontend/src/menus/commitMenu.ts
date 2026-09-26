@@ -1,8 +1,10 @@
-import type { Translate } from '../i18n'
+import type { Translate } from '@/i18n'
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 export type CommitMenuItem =
-  { label: string; command: () => void } | { label: string; disabled: true } | { separator: true }
+  | { label: string; command: () => void }
+  | { label: string; disabled: true }
+  | { separator: true }
 
 // PickActions are the cherry-pick and revert items the one-commit and range
 // menus share.

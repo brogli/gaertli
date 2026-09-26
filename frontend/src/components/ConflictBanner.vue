@@ -2,11 +2,11 @@
 import { computed } from 'vue'
 import Button from 'openvue/button'
 import Message from 'openvue/message'
-import { useI18n } from '../i18n'
-import { useRepoStore } from '../stores/repo'
-import { useChangesStore } from '../stores/changes'
-import { useConfirmAction } from '../composables/useConfirmAction'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useI18n } from '@/i18n'
+import { useRepoStore } from '@/stores/repo'
+import { useChangesStore } from '@/stores/changes'
+import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Operation } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
@@ -49,7 +49,7 @@ function onAbort(): void {
 <template>
   <template v-if="repo.summary?.operation">
     <Message severity="warn" data-test="conflict-banner">
-      <div class="action-row">
+      <div class="flex flex-wrap items-center gap-2">
         <span>{{ t('notices.conflictStopped', { operation: repo.summary.operation }) }}</span>
         <Button
           :label="t('notices.continue')"

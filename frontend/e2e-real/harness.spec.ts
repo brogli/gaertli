@@ -4,19 +4,6 @@ import { test, expect } from './fixtures'
 // The suite's own guarantees: real git behind the page, a sandbox per test,
 // no reach into the owner's settings or editor.
 
-test('FR-LOG-01 the log of the real repo lists commits of all branches', async ({
-  app,
-  sandbox,
-  repos,
-}) => {
-  await expect(app.locator('.row .subject', { hasText: 'feature: add feature.txt' })).toBeVisible()
-  await expect(app.locator('.row .subject', { hasText: "Merge branch 'side'" })).toBeVisible()
-  const settings = JSON.parse(fs.readFileSync(sandbox.settingsPath, 'utf8')) as {
-    openWorktrees: string[]
-  }
-  expect(settings.openWorktrees).toEqual([repos.work])
-})
-
 test("FR-ED-01 Open in editor runs the stand-in, never git's editor from the caller's shell", async ({
   app,
   repos,

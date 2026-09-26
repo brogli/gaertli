@@ -1,6 +1,5 @@
 import fs from 'node:fs'
 import http from 'node:http'
-import type net from 'node:net'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test as base, expect } from './fixtures'
@@ -44,8 +43,11 @@ const test = base.extend<{ loginProtectedRemote: LoginProtectedRemote }>({
       res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="nebegit-e2e"' }).end()
     })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const { port } = server.address() as net.AddressInfo
-    await use({ url: `http://127.0.0.1:${port}/repo.git`, authorizations })
+    const address = server.address()
+    if (address === null || typeof address === 'string') {
+      throw new Error('login-protected remote server has no port address')
+    }
+    await use({ url: `http://127.0.0.1:${address.port}/repo.git`, authorizations })
     await new Promise((resolve) => server.close(resolve))
   },
 })

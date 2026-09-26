@@ -11,7 +11,10 @@ export function fieldLabels(body: DOMWrapper<Element>): string[] {
 }
 
 // field is the control in root that the label named label points at.
-export function field(root: BaseWrapper<Node>, label: string) {
+export function field(
+  root: BaseWrapper<Node>,
+  label: string,
+): Omit<DOMWrapper<HTMLInputElement>, 'exists'> {
   const found = root.findAll('label[for]').find((l) => l.text() === label)
   expect(found, `a label "${label}"`).toBeTruthy()
   return root.get<HTMLInputElement>(`[id="${found!.attributes('for')}"]`)

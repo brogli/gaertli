@@ -2,15 +2,15 @@
 import { watch } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
-import { useCompareStore } from '../stores/compare'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useOpenInEditor } from '../composables/useOpenInEditor'
+import { useI18n } from '@/i18n'
+import { useCompareStore } from '@/stores/compare'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DiffKind, fileTarget } from '../lib/diffTarget'
+import { DiffKind, fileTarget } from '@/lib/diffTarget'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { iconClass } from '../lib/icons'
-import { ICON_BUTTON } from '../lib/layout'
+import { iconClass } from '@/lib/icons'
+import { ICON_BUTTON } from '@/lib/layout'
 import ChangedFiles from './ChangedFiles.vue'
 import ErrorBanner from './ErrorBanner.vue'
 
@@ -44,11 +44,15 @@ onKeyStroke('Escape', () => compare.exit())
 </script>
 
 <template>
-  <section class="compare-working-view">
+  <section class="compare-working-view flex flex-col gap-1.5 overflow-y-auto px-2.5 py-1.5">
     <header>
-      <span class="from" data-test="from-tag" :title="compare.workingCommit?.sha">{{
-        compare.workingCommit?.shortSha
-      }}</span>
+      <!-- The from box, in the colour of its mark in the log view. -->
+      <span
+        class="from px-1.5 border border-current rounded-sm font-mono text-from"
+        data-test="from-tag"
+        :title="compare.workingCommit?.sha"
+        >{{ compare.workingCommit?.shortSha }}</span
+      >
       {{ compare.workingCommit?.subject }}
       &rarr; {{ t('compareView.toWorkingTree') }}
       <Button
@@ -60,7 +64,7 @@ onKeyStroke('Escape', () => compare.exit())
         @click="compare.exit"
       />
     </header>
-    <p class="hint">{{ t('compareView.untrackedHint') }}</p>
+    <p class="my-1 text-muted-color text-sm">{{ t('compareView.untrackedHint') }}</p>
     <ErrorBanner v-if="error" :error="error" />
     <ChangedFiles
       :files="compare.files"
@@ -71,19 +75,3 @@ onKeyStroke('Escape', () => compare.exit())
     />
   </section>
 </template>
-
-<style scoped>
-.hint {
-  margin: 0.25rem 0;
-  color: var(--p-text-muted-color);
-  font-size: 0.85em;
-}
-/* The from box, in the colour of its mark in the log view. */
-.from {
-  padding: 0 0.4em;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  font-family: var(--nb-font-mono);
-  color: var(--nb-from);
-}
-</style>

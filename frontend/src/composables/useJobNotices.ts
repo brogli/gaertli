@@ -1,5 +1,5 @@
-import { i18n } from '../i18n'
-import { useJobsStore } from '../stores/jobs'
+import { i18n } from '@/i18n'
+import { useJobsStore } from '@/stores/jobs'
 import {
   Code,
   JobKind,
@@ -8,8 +8,8 @@ import {
   type JobInfo,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import type { CoreError } from './useCoreCall'
-import { errorNotice, useNotices, type AppNotice } from '../lib/notice'
-import { shortSha } from '../lib/format'
+import { errorNotice, useNotices, type AppNotice } from '@/lib/notice'
+import { shortSha } from '@/lib/format'
 
 // EXPLAINED_ELSEWHERE are the job failures another part of the UI already
 // shows: the rejection and blocked-pull notices below, ConflictBanner, and
@@ -91,6 +91,7 @@ export function useJobNotices(actions: JobNoticeActions): void {
       ]
     }
     if (job.state !== JobState.JobDone) return null
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- an UpdateBranchJob's result is set whenever state is JobDone
     const result = job.result!
     const summary =
       result.outcome === UpdateOutcome.BranchUpdated

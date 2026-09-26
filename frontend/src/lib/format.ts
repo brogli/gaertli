@@ -1,5 +1,5 @@
 import { formatTimeAgoIntl } from '@vueuse/core'
-import { i18n } from '../i18n'
+import { i18n } from '@/i18n'
 
 // shortSha is a commit hash's first 7 characters, as git abbreviates it.
 export function shortSha(sha: string): string {

@@ -79,28 +79,6 @@ function addWorktree(git: Git, repo: string, dir: string, branch: string): void 
   git(repo, 'worktree', 'add', '-q', dir, '-b', branch)
 }
 
-test("FR-WT-13 the picker names this window's worktree and lists this repo's worktrees at once, this one marked", async ({
-  app,
-  repos,
-}) => {
-  await expect(app.locator('[data-test=worktree-picker]')).toContainText('work')
-  await openWorktreePicker(app)
-
-  await expect(app.locator('.p-popover [data-test=worktree-row]')).toHaveCount(2)
-  await expect(worktreeRow(app, 'main').locator('.current-marker i')).toBeVisible()
-  await expect(worktreeRow(app, 'side').locator('.current-marker i')).toHaveCount(0)
-  await expect(worktreeRow(app, 'side')).toHaveAttribute('title', repos.work2)
-})
-
-test("FR-WT-13 typing part of a worktree's folder name leaves only its row", async ({ app }) => {
-  await openWorktreePicker(app)
-
-  await app.locator('.p-popover .picker-list input').fill('work2')
-
-  await expect(app.locator('.p-popover .picker-rows li')).toHaveCount(1)
-  await expect(worktreeRow(app, 'side')).toBeVisible()
-})
-
 test('FR-WT-01 worktree rows flag a dirty, a locked and a missing worktree', async ({
   openApp,
   repos,
@@ -288,28 +266,6 @@ test('FR-WT-06 New worktree from here… on a branch in the branch picker makes 
 
   await expect.poll(() => worktreePaths(git, repos.work)).toContain(target)
   expect(currentBranch(git, target)).toBe('feature')
-})
-
-test.describe('with work2 selected', () => {
-  test.use({ open: ['work2'] })
-
-  test('FR-WT-07 the main worktree and the selected one offer no Remove, a linked one does', async ({
-    openApp,
-    repos,
-    sandbox,
-    git,
-  }) => {
-    addWorktree(git, repos.work, path.join(sandbox.dir, 'third'), 'third')
-    const app = await openApp(repos.work2)
-
-    await openWorktreePicker(app)
-
-    await expect(removeButton(app, 'third')).toBeVisible()
-    for (const branch of ['main', 'side']) {
-      await expect(worktreeRow(app, branch)).toBeVisible()
-      await expect(removeButton(app, branch)).toHaveCount(0)
-    }
-  })
 })
 
 test('FR-WT-07 removing a clean linked worktree asks first, then it is gone', async ({

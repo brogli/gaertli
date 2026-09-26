@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { basename, parentPath } from '../lib/path'
-import { iconClass } from '../lib/icons'
-import { ICON_BUTTON } from '../lib/layout'
+import { basename, parentPath } from '@/lib/path'
+import { iconClass } from '@/lib/icons'
+import { ICON_BUTTON } from '@/lib/layout'
 import type { ChangedFileAction } from './changedFileAction'
 import FileStatusIcon from './FileStatusIcon.vue'
 
@@ -38,7 +38,11 @@ function actionLabel(kind: ChangedFileAction): string {
 // rows splits each path into its directory (rendered muted) and basename,
 // once per file rather than on every access.
 const rows = computed(() =>
-  props.files.map((file) => ({ file, dir: parentPath(file.path), base: basename(file.path) })),
+  props.files.map((file) => ({
+    file,
+    dir: parentPath(file.path),
+    base: basename(file.path),
+  })),
 )
 </script>
 
@@ -47,7 +51,8 @@ const rows = computed(() =>
     <li
       v-for="{ file, dir, base } in rows"
       :key="file.path"
-      :class="{ selected: file.path === selected?.path }"
+      class="flex items-center gap-1.5 rounded py-0.5 px-1 cursor-pointer"
+      :class="file.path === selected?.path ? 'selected bg-highlight' : 'hover:bg-emphasis'"
       tabindex="0"
       @click="emit('select', file)"
       @dblclick="emit('open', file)"
@@ -63,11 +68,11 @@ const rows = computed(() =>
         @click.stop="emit('action', file)"
       />
       <FileStatusIcon :status="file.status" />
-      <span class="path" :title="file.path">
+      <span class="path flex-1 min-w-0 truncate" :title="file.path">
         <template v-if="file.oldPath">{{ file.oldPath }} &rarr; </template>
-        <span v-if="dir" class="dir">{{ dir }}/</span>{{ base }}
+        <span v-if="dir" class="text-muted-color">{{ dir }}/</span>{{ base }}
       </span>
-      <span class="actions">
+      <span class="actions flex flex-none gap-1">
         <Button
           v-bind="ICON_BUTTON"
           :icon="iconClass('openEditor')"
@@ -89,43 +94,3 @@ const rows = computed(() =>
     </li>
   </ul>
 </template>
-
-<style scoped>
-.files {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.files li {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  padding: 0.15rem 0.3rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.files li:hover {
-  background: var(--p-content-hover-background);
-}
-.files li.selected {
-  background: var(--p-highlight-background);
-  color: var(--p-highlight-color);
-}
-/* The one column that shrinks: actions stay put, ellipsis eats the path. */
-.path {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dir {
-  color: var(--p-text-muted-color);
-}
-.actions {
-  flex: none;
-  display: flex;
-  gap: 0.2em;
-  margin-left: auto;
-}
-</style>

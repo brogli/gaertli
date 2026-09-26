@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import InputText from 'openvue/inputtext'
 import Select from 'openvue/select'
-import { useI18n } from '../i18n'
-import { refGroups } from '../lib/refOptions'
-import { useRefsStore } from '../stores/refs'
+import { useI18n } from '@/i18n'
+import { refGroups } from '@/lib/refOptions'
+import { useRefsStore } from '@/stores/refs'
 import FormField from './FormField.vue'
 import type { StartPoint } from './startPoint'
 

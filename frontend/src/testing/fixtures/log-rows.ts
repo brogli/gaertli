@@ -23,7 +23,6 @@ export const LOG_ROWS_FIXTURE: LogCommit[] = Array.from({ length: ROW_COUNT }, (
     authorAt: NOW - i * i * 600,
     subject: `commit ${i}`,
     graph: sideBranchGraph(i),
-    merge: i % 6 === 0,
     ...(i === 0
       ? {
           refs: [
@@ -69,7 +68,6 @@ export function commitRow(overrides: Partial<LogCommit> = {}): LogCommit {
     authorAt: 0,
     subject: 'Fix the bug',
     graph: { lane: 0, colour: 0, edges: [] },
-    merge: false,
     ...overrides,
   }
 }

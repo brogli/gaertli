@@ -116,25 +116,33 @@ func TestFR_REPO_04_FallbackPollReportsEachKindOfChange(t *testing.T) {
 		change func(gitDir string) error
 		want   core.ChangeScope
 	}{
-		{"deleted state file",
+		{
+			"deleted state file",
 			func(d string) error { return os.WriteFile(filepath.Join(d, "MERGE_HEAD"), nil, 0o644) },
 			func(d string) error { return os.Remove(filepath.Join(d, "MERGE_HEAD")) },
-			core.StateChanged},
-		{"created state dir",
+			core.StateChanged,
+		},
+		{
+			"created state dir",
 			func(string) error { return nil },
 			func(d string) error { return os.Mkdir(filepath.Join(d, "rebase-merge"), 0o755) },
-			core.StateChanged},
-		{"deleted state dir",
+			core.StateChanged,
+		},
+		{
+			"deleted state dir",
 			func(d string) error { return os.Mkdir(filepath.Join(d, "sequencer"), 0o755) },
 			func(d string) error { return os.Remove(filepath.Join(d, "sequencer")) },
-			core.StateChanged},
-		{"removed worktree",
+			core.StateChanged,
+		},
+		{
+			"removed worktree",
 			func(d string) error {
 				wt := filepath.Join(d, "worktrees", "wt")
 				return errors.Join(os.MkdirAll(wt, 0o755), os.WriteFile(filepath.Join(wt, "HEAD"), nil, 0o644))
 			},
 			func(d string) error { return os.RemoveAll(filepath.Join(d, "worktrees", "wt")) },
-			core.WorktreesChanged},
+			core.WorktreesChanged,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			gitDir := t.TempDir()

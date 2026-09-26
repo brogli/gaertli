@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
 import wails from '@wailsio/runtime/plugins/vite'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
@@ -15,6 +16,7 @@ export default defineConfig(({ mode }) => ({
   // string is ever compiled with eval at runtime (CSP-safe).
   plugins: [
     vue(),
+    tailwindcss(),
     wails('./bindings'),
     VueI18nPlugin({
       include: [fileURLToPath(new URL('./src/locales/**', import.meta.url))],
@@ -26,8 +28,9 @@ export default defineConfig(({ mode }) => ({
   // literal path, because the bindings import's `../..` prefix differs by
   // caller depth.
   resolve: {
-    alias:
-      mode === 'e2e'
+    alias: [
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+      ...(mode === 'e2e'
         ? [
             {
               find: /(\.\.\/)+bindings\/github\.com\/brogli\/nebegit\/internal\/app$/,
@@ -36,6 +39,7 @@ export default defineConfig(({ mode }) => ({
               ),
             },
           ]
-        : [],
+        : []),
+    ],
   },
 }))

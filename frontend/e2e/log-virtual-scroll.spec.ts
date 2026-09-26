@@ -1,28 +1,37 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
 // happy-dom has no real layout or scrolling, so a component test cannot
 // exercise the virtual list. This drives the rendered app instead: only
 // the visible window loads up front, and scrolling pulls in further rows
 // (window.__e2eLogRowsCalls, set by src/testing/e2e-mock-bindings.ts).
-test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful', async ({
-  page,
-}) => {
-  await openMockRepo(page)
 
-  // Let the initial load settle: wait until no new LogRows call has fired
-  // for a full polling interval.
+declare global {
+  interface Window {
+    __settleCheck?: number
+  }
+}
+
+// waitForLogRowsSettle waits until no new LogRows call has fired for a full
+// polling interval.
+async function waitForLogRowsSettle(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
-      const w = window as unknown as { __settleCheck?: number }
       const current = window.__e2eLogRowsCalls.length
-      if (w.__settleCheck === current) return true
-      w.__settleCheck = current
+      if (window.__settleCheck === current) return true
+      window.__settleCheck = current
       return false
     },
     undefined,
     { polling: 200, timeout: 5000 },
   )
+}
+
+test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful', async ({
+  page,
+}) => {
+  await openMockRepo(page)
+  await waitForLogRowsSettle(page)
 
   const furthestFrom = () =>
     page.evaluate(() => Math.max(...window.__e2eLogRowsCalls.map((c) => c.from)))
@@ -40,12 +49,12 @@ test('FR-LOG-01 after a streamed load the list is still at the top with row 0 vi
 }) => {
   await openMockRepo(page)
   await page.waitForFunction(() => window.__e2eLogRowsCalls.length > 0)
-  await page.waitForTimeout(1000) // let every progress step and row fetch land
+  await waitForLogRowsSettle(page)
 
   const state = await page.locator('.log-list').evaluate((el) => ({
     scrollTop: el.scrollTop,
     firstIndex: Math.min(
-      ...[...el.querySelectorAll('.row')].map((r) => Number((r as HTMLElement).dataset.index)),
+      ...[...el.querySelectorAll<HTMLElement>('.row')].map((r) => Number(r.dataset.index)),
     ),
     firstTop:
       el.querySelector('.row')!.getBoundingClientRect().top - el.getBoundingClientRect().top,

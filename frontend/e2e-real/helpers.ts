@@ -33,23 +33,10 @@ export function refLi(page: Page, name: string): Locator {
   })
 }
 
-// refActions opens the branch picker and right-clicks name's row, and lists
-// its context menu's items.
-export async function refActions(page: Page, name: string): Promise<string[]> {
-  await openBranchPicker(page)
-  return contextMenuItems(page, refRow(page, name))
-}
-
 // pickRefAction picks item from name's context menu in the branch picker.
 export async function pickRefAction(page: Page, name: string, item: string): Promise<void> {
   await openBranchPicker(page)
   await pickFromContextMenu(page, refRow(page, name), item)
-}
-
-// openRepoPicker opens the toolbar's repo picker.
-export async function openRepoPicker(page: Page): Promise<void> {
-  await page.locator('[data-test=repo-picker]').click()
-  await page.locator('.p-popover .repo-list').waitFor()
 }
 
 // openWorktreePicker opens the toolbar's worktree picker.
@@ -236,7 +223,7 @@ export function fileText(file: string): string | null {
   try {
     return fs.readFileSync(file, 'utf8')
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return null
     throw e
   }
 }

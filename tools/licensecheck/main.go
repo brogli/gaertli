@@ -66,7 +66,7 @@ func collect() ([]Dependency, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(deps, adaptedCode...), nil
+	return append(append(deps, adaptedCode...), themeCredits...), nil
 }
 
 // output runs a command and returns its stdout; its stderr (go-licenses

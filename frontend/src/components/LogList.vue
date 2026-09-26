@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import ContextMenu from 'openvue/contextmenu'
-import { useLogStore } from '../stores/log'
-import { useCompareStore } from '../stores/compare'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useLogStore } from '@/stores/log'
+import { useCompareStore } from '@/stores/compare'
+import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import GraphCell from './GraphCell.vue'
 import ErrorBanner from './ErrorBanner.vue'
@@ -16,10 +16,10 @@ import {
   buildSelectionMenuItems,
   buildSquashMenuItems,
   type CommitMenuItem,
-} from '../menus/commitMenu'
-import { timeAgo } from '../lib/format'
-import { laneSpan } from '../lib/graphLanes'
-import { errorHeadline } from '../lib/errorText'
+} from '@/menus/commitMenu'
+import { timeAgo } from '@/lib/format'
+import { laneSpan } from '@/lib/graphLanes'
+import { errorHeadline } from '@/lib/errorText'
 import type {
   LogCommit,
   PickOptions,
@@ -41,14 +41,8 @@ const compare = useCompareStore()
 const { error, run, runAndClose } = useCoreCall()
 const { t } = useI18n()
 
-// The cherry-pick/revert options dialog: opened by the "…" menu items, and
-// by a plain "Cherry-pick" on a single selected merge commit, which needs a
-// parent choice cherry-pick has no default for.
-const pickDialog = ref<{
-  verb: 'cherry-pick' | 'revert'
-  shas: string[]
-  singleMerge: boolean
-} | null>(null)
+// The cherry-pick/revert options dialog: opened by the "…" menu items only.
+const pickDialog = ref<{ verb: 'cherry-pick' | 'revert'; shas: string[] } | null>(null)
 function closePickDialog(): void {
   pickDialog.value = null
   log.dropSelection()
@@ -103,11 +97,55 @@ const selectedShas = computed(() => {
   return new Set(rows.map((r) => r?.sha))
 })
 
+// A row's marks, strongest first: a search match beats a comparison mark,
+// which beats multi-select, which beats a plain selection. The row takes
+// the strongest mark's background; hover only shows on an unmarked row.
+function rowMarks(sha: string | undefined, index: number): RowMark[] {
+  const has = (shas: Set<string | undefined>) => sha !== undefined && shas.has(sha)
+  const marks: [RowMark, boolean][] = [
+    ['match-current', index === currentMatchIndex.value],
+    ['match', matchedIndices.value.has(index)],
+    ['compare-to', compare.active && sha !== undefined && sha === compare.to?.sha],
+    ['compare-from', compare.active && sha !== undefined && sha === compare.from?.sha],
+    ['multi-selected', multiSelected.value.size > 1 && has(multiSelected.value)],
+    ['selected', has(selectedShas.value)],
+  ]
+  return marks.filter(([, on]) => on).map(([mark]) => mark)
+}
+
+type RowMark = keyof typeof MARK_BACKGROUND
+
+// A search match is yellow, kept apart from selection's blue and the
+// comparison's own colours.
+const MARK_BACKGROUND = {
+  'match-current': 'bg-(--p-yellow-500)/45',
+  match: 'bg-(--p-yellow-500)/20',
+  'compare-to': 'bg-to/15',
+  'compare-from': 'bg-from/15',
+  'multi-selected': 'bg-emphasis',
+  selected: 'bg-highlight',
+}
+
+// A compared row also gets a bar at its left edge, drawn as an inset shadow
+// so it takes no space, whatever its background.
+function rowClasses(sha: string | undefined, index: number): string[] {
+  const on = rowMarks(sha, index)
+  const background = on[0] ? MARK_BACKGROUND[on[0]] : 'hover:bg-emphasis'
+  const bar = on.includes('compare-to')
+    ? 'shadow-[inset_3px_0_var(--nb-to)]'
+    : on.includes('compare-from')
+      ? 'shadow-[inset_3px_0_var(--nb-from)]'
+      : ''
+  return [...on, background, bar]
+}
+
 // One LogRows call per window: from the first visible row not yet cached to
 // the last.
 watchEffect(() => {
   const missing = visibleRows.value.filter(({ row }) => !row).map(({ item }) => item.index)
-  if (missing.length) void log.rows(missing[0]!, missing.at(-1)! + 1)
+  const [first] = missing
+  const last = missing.at(-1)
+  if (first !== undefined && last !== undefined) void log.rows(first, last + 1)
 })
 
 // log.jumpTo sets pendingScrollTo: scroll that row into view and clear it.
@@ -218,13 +256,14 @@ function plainSelectionOtherThan(row: LogCommit): LogCommit | null {
 function pickAndRevertActions() {
   return {
     cherryPick,
-    cherryPickOptions: () => (pickDialog.value = { verb: 'cherry-pick', ...pickTarget() }),
+    cherryPickOptions: () =>
+      (pickDialog.value = { verb: 'cherry-pick', shas: shasOf(log.selection) }),
     revert: () =>
       void runAndClose(
-        () => Facade.Revert(props.wt, pickTarget().shas, gitDefaults),
+        () => Facade.Revert(props.wt, shasOf(log.selection), gitDefaults),
         log.dropSelection,
       ),
-    revertOptions: () => (pickDialog.value = { verb: 'revert', ...pickTarget() }),
+    revertOptions: () => (pickDialog.value = { verb: 'revert', shas: shasOf(log.selection) }),
   }
 }
 
@@ -241,26 +280,16 @@ function shasOf(rows: LogCommit[]): string[] {
   return rows.map((r) => r.sha)
 }
 
-// pickTarget is the selection's shas, and whether they are one merge
-// commit. The selection always holds at least the right-clicked row.
-// CherryPick and Revert do their own ordering, so the shas go as selected.
-function pickTarget(): { shas: string[]; singleMerge: boolean } {
-  return {
-    shas: shasOf(log.selection),
-    singleMerge: log.selection.length === 1 && !!log.selection[0]?.merge,
-  }
-}
-
 // gitDefaults are the plain "Cherry-pick" and "Revert" items' options.
-const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false, mainline: 0 }
+const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
 
-// cherryPick picks with git's defaults, except a single merge commit:
-// PickDialog asks for its parent.
+// cherryPick picks with git's defaults; a selection with a merge commit is
+// refused (FR-CP-05), shown through the error banner.
 function cherryPick(): void {
-  const target = pickTarget()
-  if (target.singleMerge) pickDialog.value = { verb: 'cherry-pick', ...target }
-  else
-    void runAndClose(() => Facade.CherryPick(props.wt, target.shas, gitDefaults), log.dropSelection)
+  void runAndClose(
+    () => Facade.CherryPick(props.wt, shasOf(log.selection), gitDefaults),
+    log.dropSelection,
+  )
 }
 </script>
 
@@ -268,27 +297,20 @@ function cherryPick(): void {
   <ErrorBanner v-if="error" :error="error" />
   <div
     ref="parentRef"
-    class="log-list"
+    class="log-list @container relative flex-1 min-h-0 overflow-auto"
     :style="{
       '--row-height': `${ROW_HEIGHT}px`,
       '--hash-width': hashWidth,
       userSelect: 'none',
     }"
   >
-    <div class="spacer" :style="{ height: `${virtualizer.getTotalSize()}px` }">
+    <div class="relative w-full" :style="{ height: `${virtualizer.getTotalSize()}px` }">
       <div
         v-for="{ item, row } in visibleRows"
         :key="item.index"
         :data-index="item.index"
-        class="row"
-        :class="{
-          selected: selectedShas.has(row?.sha ?? ''),
-          'multi-selected': multiSelected.size > 1 && multiSelected.has(row?.sha ?? ''),
-          'compare-from': compare.active && row?.sha === compare.from?.sha,
-          'compare-to': compare.active && row?.sha === compare.to?.sha,
-          match: matchedIndices.has(item.index),
-          'match-current': item.index === currentMatchIndex,
-        }"
+        class="row absolute top-0 left-0 flex h-(--row-height) w-full cursor-pointer items-center gap-1.5 overflow-hidden px-2 whitespace-nowrap"
+        :class="rowClasses(row?.sha, item.index)"
         :style="{ transform: `translateY(${item.start}px)` }"
         tabindex="0"
         @click="onRowClick(row, item.index, $event)"
@@ -298,12 +320,24 @@ function cherryPick(): void {
       >
         <template v-if="row">
           <GraphCell v-if="!log.flat" :graph="row.graph" :lanes="graphLanes" :height="ROW_HEIGHT" />
-          <span class="message">
-            <span class="subject" :title="row.subject">{{ row.subject }}</span>
+          <!-- The message column takes what the others leave, down to its
+               minimum; below that the author gives way first, then the
+               date, each shrinking to where it could still show a
+               readable value. The row clips what still does not fit, so
+               the list never scrolls sideways. -->
+          <span class="message flex min-w-[13em] flex-1 items-center gap-1.5 overflow-hidden">
+            <!-- The subject takes its whole text first, then the ref
+                 labels. At 6.5em it stops shrinking and the labels shrink
+                 instead, each down to 2em, ending in an ellipsis. -->
+            <span
+              class="subject max-w-max min-w-[6.5em] flex-[1000_1_0] truncate"
+              :title="row.subject"
+              >{{ row.subject }}</span
+            >
             <span
               v-for="label in row.refs?.slice(0, MAX_LABELS)"
               :key="label.name"
-              class="ref-label"
+              class="ref-label min-w-[2em] max-w-[6em] flex-[0_1_auto] truncate rounded-sm bg-emphasis px-1.5 text-sm"
               :class="label.kind"
               :title="label.name"
             >
@@ -311,14 +345,27 @@ function cherryPick(): void {
             </span>
             <span
               v-if="(row.refs?.length ?? 0) > MAX_LABELS"
-              class="ref-more"
+              class="ref-more max-w-[6em] flex-none truncate rounded-sm bg-emphasis px-1.5 text-sm"
               :title="row.refs!.map((r) => r.name).join(', ')"
               >+{{ row.refs!.length - MAX_LABELS }}</span
             >
           </span>
-          <span class="author" :title="row.author">{{ row.author }}</span>
-          <span class="date" :title="timeAgo(row.authorAt)">{{ timeAgo(row.authorAt) }}</span>
-          <span class="hash">{{ row.shortSha }}</span>
+          <!-- Narrower than that, shrinking stops being readable at all:
+               the column hides instead of shrinking to a sliver, author
+               first. -->
+          <span
+            class="author min-w-0 flex-[0_1000_8em] truncate @max-[480px]:hidden"
+            :title="row.author"
+            >{{ row.author }}</span
+          >
+          <span
+            class="date text-muted-color min-w-0 flex-[0_1_7em] truncate @max-[360px]:hidden"
+            :title="timeAgo(row.authorAt)"
+            >{{ timeAgo(row.authorAt) }}</span
+          >
+          <span class="hash text-muted-color w-(--hash-width) flex-none font-mono">{{
+            row.shortSha
+          }}</span>
         </template>
       </div>
     </div>
@@ -329,7 +376,6 @@ function cherryPick(): void {
     :wt="wt"
     :verb="pickDialog.verb"
     :shas="pickDialog.shas"
-    :single-merge="pickDialog.singleMerge"
     @close="closePickDialog"
   />
   <SquashDialog
@@ -340,130 +386,3 @@ function cherryPick(): void {
     @done="onFolded"
   />
 </template>
-
-<style scoped>
-.log-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  position: relative;
-  container-type: inline-size;
-}
-.spacer {
-  position: relative;
-  width: 100%;
-}
-.row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--row-height);
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  padding: 0 0.5em;
-  white-space: nowrap;
-  cursor: pointer;
-  overflow: hidden;
-}
-.row:hover {
-  background: var(--p-content-hover-background);
-}
-/* Aura's highlight tokens, not a literal colour: readable in both themes. */
-.row.selected {
-  background: var(--p-highlight-background);
-  color: var(--p-highlight-color);
-}
-.row.multi-selected {
-  background: var(--p-content-hover-background);
-}
-/* A compared row's own colour replaces the shared .selected look: a bar
-   at its left edge, drawn as an inset shadow so it takes no space, plus a
-   light tint of the row background in that colour. */
-.row.compare-from {
-  box-shadow: inset 3px 0 var(--nb-from);
-  background: color-mix(in srgb, var(--nb-from) 15%, var(--p-content-background));
-}
-.row.compare-to {
-  box-shadow: inset 3px 0 var(--nb-to);
-  background: color-mix(in srgb, var(--nb-to) 15%, var(--p-content-background));
-}
-/* A search match, and the current one stronger: yellow, kept apart from
-   selection's blue and the comparison's own colours. */
-.row.match {
-  background: color-mix(in srgb, var(--p-yellow-500) 20%, var(--p-content-background));
-}
-.row.match-current {
-  background: color-mix(in srgb, var(--p-yellow-500) 45%, var(--p-content-background));
-}
-/* Every row splits its width the same way, whatever its text: the message
-   column takes what the others leave, down to its minimum; below that the
-   author gives way first, then the date, each shrinking down to where it
-   could still show a readable value. The row clips what still does not
-   fit, so the list never scrolls sideways. */
-.message {
-  flex: 1 1 0;
-  min-width: 13em;
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  overflow: hidden;
-}
-.author {
-  flex: 0 1000 8em;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.date {
-  flex: 0 1 7em;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--p-text-muted-color);
-}
-.hash {
-  flex: none;
-  width: var(--hash-width);
-  font-family: var(--nb-font-mono);
-  color: var(--p-text-muted-color);
-}
-/* Narrower than that, shrinking stops being readable at all: the column
-   hides instead of shrinking to a sliver, author first. */
-@container (max-width: 480px) {
-  .author {
-    display: none;
-  }
-}
-@container (max-width: 360px) {
-  .date {
-    display: none;
-  }
-}
-/* Inside the message column the subject takes its whole text first, then
-   the ref labels. At 6.5em the subject stops shrinking and the labels
-   shrink instead, each down to 2em, ending in an ellipsis. */
-.subject {
-  flex: 1000 1 0;
-  min-width: 6.5em;
-  max-width: max-content;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ref-label,
-.ref-more {
-  flex: none;
-  max-width: 6em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 0.4em;
-  border-radius: 3px;
-  background: var(--p-content-hover-background);
-  font-size: 0.85em;
-}
-.ref-label {
-  flex: 0 1 auto;
-  min-width: 2em;
-}
-</style>

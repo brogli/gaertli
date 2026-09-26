@@ -7,9 +7,9 @@ import { openMockRepo } from './helpers'
 // browser's click bubbling and layout; happy-dom does not prove them.
 
 // settledBox is locator's box once the page's animations (the list's and
-// the menu's enter) have ended.
+// the menu's enter) have ended or were cancelled (a cancelled one rejects).
 async function settledBox(page: Page, locator: Locator) {
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)))
+  await page.evaluate(() => Promise.allSettled(document.getAnimations().map((a) => a.finished)))
   return (await locator.boundingBox())!
 }
 
@@ -18,11 +18,13 @@ test('FR-UX-14 a worktree row button click still lets a later outside click clos
 }) => {
   await openMockRepo(page)
 
-  await page.click('[data-test=worktree-picker]')
+  await page.locator('[data-test=worktree-picker]').click()
   await page.locator('.p-popover .picker-list li').first().waitFor()
-  await page.click('[data-test=open-in-editor]')
+  // Any row's button does: this click only needs to stop propagation inside
+  // the popover.
+  await page.locator('[data-test=open-in-editor]').first().click()
 
-  await page.click('.log-column')
+  await page.locator('.log-column').click()
 
   await expect(page.locator('.p-popover')).toBeHidden()
 })
@@ -31,7 +33,7 @@ test('FR-UX-14 a worktree row button click still lets a later outside click clos
 // it stands still.
 async function openBranchList(page: Page): Promise<void> {
   await openMockRepo(page)
-  await page.click('[data-test=branch-picker]')
+  await page.locator('[data-test=branch-picker]').click()
   await settledBox(page, page.locator('.p-popover .branch-list'))
 }
 

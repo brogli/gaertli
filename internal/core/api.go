@@ -190,15 +190,13 @@ type API interface {
 
 	// CherryPick applies shas onto wt's HEAD, oldest first by committer date
 	// (ties: reverse of the given order, so pass log order). A merge commit
-	// among shas refuses the whole call before git runs, unless
-	// opts.Mainline > 0, which needs exactly one sha (else Code Internal).
-	// A stop that leaves CHERRY_PICK_HEAD (a conflict or an empty result) is
-	// Code Conflicts, left in place; any other refusal is GitFailed.
+	// among shas refuses the whole call before git runs. A stop that leaves
+	// CHERRY_PICK_HEAD (a conflict or an empty result) is Code Conflicts,
+	// left in place; any other refusal is GitFailed.
 	CherryPick(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
 
 	// Revert is CherryPick's counterpart, applied newest first, with the
-	// same merge refusal and errors; opts.RecordOrigin and opts.Mainline are
-	// ignored.
+	// same merge refusal and errors; opts.RecordOrigin is ignored.
 	Revert(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
 
 	// SquashCheck tells whether Squash and Fixup can fold shas (two or more
@@ -308,12 +306,12 @@ type API interface {
 	// are classified like Push's.
 	ForcePush(ctx context.Context, wt WorktreeID) (string, error)
 
-	// UpdateBranch fast-forwards branch from its upstream as a job. No
-	// upstream is Code NoUpstream, before any job starts. Checked out
-	// nowhere: fetched straight into the branch. Checked out in a
-	// worktree: DirtyWorktree if that worktree is dirty, else fetch and
-	// merge --ff-only under its lock. Either way a diverged branch is
-	// NotFastForward. The job's Result is an UpdateBranchResult.
+	// UpdateBranch fast-forwards branch from its upstream as a job, before
+	// any job starts refusing branch with no upstream configured (Code
+	// NoUpstream) or checked out in any worktree (Code GitFailed, key
+	// branchCheckedOutElsewhere). Otherwise fetched straight into the
+	// branch; a diverged branch is NotFastForward. The job's Result is an
+	// UpdateBranchResult.
 	UpdateBranch(ctx context.Context, wt WorktreeID, branch string) (string, error)
 
 	// ContinueOperation runs --continue for wt's in-progress merge, rebase,

@@ -157,7 +157,8 @@ func (c *Core) streamLog(ctx context.Context, wt *session.Worktree, gen int) {
 // progressInterval, never with done. Returns the row count and the call's
 // error, if any.
 func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFilter, background bool,
-	appendRow func(core.LogCommit), progress func(loaded int, done bool)) (loaded int, err *core.Error) {
+	appendRow func(core.LogCommit), progress func(loaded int, done bool),
+) (loaded int, err *core.Error) {
 	checkedOut, ckErr := worktreeCheckouts(ctx, wt.Runner, wt.Path, background)
 	if ckErr != nil {
 		return 0, core.ErrorOf(ckErr)
@@ -214,8 +215,10 @@ func writeCommitGraphIfLarge(ctx context.Context, wt *session.Worktree, loaded i
 // "ref:<branch>" if HEAD is on a branch (even unborn), or HEAD's own
 // resolved SHA if detached, so a plain branch switch counts as a change.
 func refTips(ctx context.Context, r git.Runner, dir string) (map[string]string, error) {
-	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Background: true,
-		Args: []string{"for-each-ref", "--format=%(refname)%1f%(objectname)%00", "refs/heads", "refs/tags", "refs/remotes"}})
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true, Background: true,
+		Args: []string{"for-each-ref", "--format=%(refname)%1f%(objectname)%00", "refs/heads", "refs/tags", "refs/remotes"},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +276,6 @@ func parseLogRecord(record []byte) (commit core.LogCommit, parents []string, err
 		AuthorAt: authorAt,
 		Refs:     parseRefs(fields[5]),
 		Subject:  fields[6],
-		Merge:    len(parents) >= 2,
 	}
 	return commit, parents, nil
 }

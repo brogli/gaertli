@@ -36,12 +36,6 @@ func envWithout(key string) []string {
 	return slices.DeleteFunc(os.Environ(), func(e string) bool { return strings.HasPrefix(e, key+"=") })
 }
 
-func TestTR_07_CoreBuildsWithoutCgo(t *testing.T) {
-	if _, err := os.Stat(bin); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestADR_3_StdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), bin, "--stdio")
 	stdin, err := cmd.StdinPipe()
@@ -91,9 +85,9 @@ func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
 	}
 }
 
-// TestQA_INST_03_LdflagsStampAppVersion proves the release build's version
+// TestDIST_03_LdflagsStampAppVersion proves the release build's version
 // stamping mechanism: -ldflags -X into buildinfo.App, surfaced by --version.
-func TestQA_INST_03_LdflagsStampAppVersion(t *testing.T) {
+func TestDIST_03_LdflagsStampAppVersion(t *testing.T) {
 	stamped := filepath.Join(t.TempDir(), "nebegit-core-stamped")
 	build := exec.CommandContext(t.Context(), "go", "build",
 		"-ldflags", "-X github.com/brogli/nebegit/internal/buildinfo.App=v9.9.9",

@@ -15,5 +15,6 @@ export function useConfirm(): { require: Mock; close: Mock } {
 
 // confirmOptions is the options of the n-th confirmation asked for.
 export function confirmOptions(n = 0): ConfirmOptions {
-  return confirmRequire.mock.calls[n]![0] as ConfirmOptions
+  const options: ConfirmOptions = confirmRequire.mock.calls[n]![0]
+  return options
 }

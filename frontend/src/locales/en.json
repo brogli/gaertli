@@ -8,7 +8,7 @@
     "editorCommandInvalid": "Editor command \"{command}\" is invalid.",
     "fileNotFound": "{path} no longer exists in this worktree",
     "noUpstream": "\"{branch}\" has no upstream configured.",
-    "branchCheckedOutDirty": "\"{branch}\" is checked out in {path}, which has uncommitted changes.",
+    "branchCheckedOutElsewhere": "\"{branch}\" is checked out in {path}. Pull it in that worktree.",
     "worktreeExists": "'{path}' already exists",
     "mergeCommitNotPickable": "{sha} is a merge commit; {verb} does not support a merge commit",
     "gitTooOld": "git {version} is older than the minimum {minVersion}",
@@ -21,7 +21,6 @@
     "pushRefUpdatedSinceCheckout": "The remote has commits you fetched but haven't integrated (remote ref updated since checkout). Pull first, or force push.",
     "pushRejected": "The remote refused the push ({reason}).",
     "branchDiverged": "\"{branch}\" has diverged from its upstream and can't be fast-forwarded.",
-    "branchNoLongerCheckedOut": "\"{branch}\" is no longer checked out in {path}. Try the update again.",
     "authFailed": "Could not sign in to the remote. Sign in once from a terminal (credential helper, SSH agent or cached login), then try again; nebegit never asks for, stores or sees credentials.",
     "invalidBranchName": "\"{name}\" is not a valid branch name",
     "locked": "Another program is using the repo (holding {lock}).",
@@ -149,6 +148,7 @@
     "themeSystem": "System",
     "themeLight": "Light",
     "themeDark": "Dark",
+    "themeCredits": "Themes",
     "appLogError": "App log could not be opened: {error}",
     "appLog": "App log: {path}",
     "save": "Save"
@@ -224,7 +224,6 @@
       "revert": "Revert",
       "applyWithoutCommitting": "Apply without committing",
       "recordOrigin": "Add \"cherry picked from\" line",
-      "pickAgainstParent": "Pick against parent",
       "confirm": "Confirm"
     },
     "squash": {
@@ -338,6 +337,7 @@
   "repoPicker": {
     "openFolder": "Open folder…",
     "newWindow": "New window",
+    "newWindowShortcut": "Ctrl+Shift+N",
     "searchPlaceholder": "Search repos",
     "wsl": "WSL",
     "wslTitle": "WSL: {distro}",

@@ -2,15 +2,15 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onKeyStroke, useDebounceFn } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import Textarea from 'openvue/textarea'
 import Checkbox from 'openvue/checkbox'
 import Message from 'openvue/message'
 import Button from 'openvue/button'
-import { useChangesStore } from '../stores/changes'
-import { useRepoStore } from '../stores/repo'
-import { useRefsStore } from '../stores/refs'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useChangesStore } from '@/stores/changes'
+import { useRepoStore } from '@/stores/repo'
+import { useRefsStore } from '@/stores/refs'
+import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
@@ -133,7 +133,7 @@ onKeyStroke(
 </script>
 
 <template>
-  <section class="commit-box">
+  <section class="commit-box flex flex-col gap-2">
     <ErrorBanner v-if="error" :error="error" />
     <Textarea
       v-model="message"
@@ -142,7 +142,7 @@ onKeyStroke(
       auto-resize
       :placeholder="t('changesView.commitBox.messagePlaceholder')"
     />
-    <label>
+    <label class="flex items-center gap-1.5">
       <Checkbox
         v-model="amend"
         binary
@@ -154,7 +154,7 @@ onKeyStroke(
     <Message v-if="pushedWarning" severity="warn">
       {{ t('changesView.commitBox.pushedWarning') }}
     </Message>
-    <label>
+    <label class="flex items-center gap-1.5">
       <Checkbox
         v-model="pushAfterCommit"
         binary
@@ -171,11 +171,3 @@ onKeyStroke(
     />
   </section>
 </template>
-
-<style scoped>
-.commit-box label {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-}
-</style>

@@ -20,8 +20,9 @@ export function fileTree(files: ChangedFile[]): TreeNode[] {
   for (const file of files) {
     let folder = root
     for (const name of file.path.split('/').slice(0, -1)) {
-      if (!folder.folders.has(name)) folder.folders.set(name, newFolder())
-      folder = folder.folders.get(name)!
+      const sub = folder.folders.get(name) ?? newFolder()
+      folder.folders.set(name, sub)
+      folder = sub
     }
     folder.files.push(file)
   }
@@ -55,11 +56,9 @@ function childNodes(folder: Folder, prefix: string): TreeNode[] {
 }
 
 function folderNode(prefix: string, name: string, folder: Folder): TreeNode {
-  while (folder.files.length === 0 && folder.folders.size === 1) {
-    const [child, only] = [...folder.folders][0]!
-    name = `${name}/${child}`
-    folder = only
-  }
+  const only =
+    folder.files.length === 0 && folder.folders.size === 1 ? [...folder.folders][0] : undefined
+  if (only) return folderNode(prefix, `${name}/${only[0]}`, only[1])
   const path = `${prefix}${name}/`
   return { key: path, label: name, children: childNodes(folder, path) }
 }

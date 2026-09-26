@@ -7,12 +7,14 @@ import Checkbox from 'openvue/checkbox'
 import Fieldset from 'openvue/fieldset'
 import InputNumber from 'openvue/inputnumber'
 import InputText from 'openvue/inputtext'
+import Select from 'openvue/select'
 import SelectButton from 'openvue/selectbutton'
-import { useI18n } from '../i18n'
-import { SECONDARY_BUTTON } from '../lib/layout'
-import { useRefsStore } from '../stores/refs'
-import { useSettingsStore } from '../stores/settings'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useI18n } from '@/i18n'
+import { SECONDARY_BUTTON } from '@/lib/layout'
+import { useRefsStore } from '@/stores/refs'
+import { useSettingsStore } from '@/stores/settings'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { darkThemes } from '@/theme/themes'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   PullMode,
@@ -69,8 +71,17 @@ const refs = useRefsStore()
 const { error, run, runAndClose } = useCoreCall()
 const { t } = useI18n()
 
-const form = reactive({
-  protectedBranches: [] as string[],
+interface SettingsForm {
+  protectedBranches: string[]
+  defaultPullMode: PullMode
+  diffMode: DiffMode
+  autoFetchIntervalMinutes: number
+  ignoreWhitespace: boolean
+  debugMode: boolean
+}
+
+const form = reactive<SettingsForm>({
+  protectedBranches: [],
   defaultPullMode: PullMode.PullMerge,
   diffMode: DiffMode.UnifiedDiff,
   autoFetchIntervalMinutes: 0,
@@ -101,10 +112,24 @@ const diffModes = computed<Choice[]>(() => [
 // show no option selected.
 const SYSTEM_THEME = 'system'
 const theme = ref<Theme | typeof SYSTEM_THEME>(Theme.SystemTheme)
-const themes = computed<Choice[]>(() => [
+
+interface ThemeOption {
+  label: string
+  value: Theme | typeof SYSTEM_THEME
+  swatch?: { background: string; accent: string }
+}
+
+// themeOptions lists System, Light, Dark, then the dark themes in the order
+// darkThemes declares them, each carrying its own swatch colours.
+const themeOptions = computed<ThemeOption[]>(() => [
   { label: t('settings.themeSystem'), value: SYSTEM_THEME },
   { label: t('settings.themeLight'), value: Theme.LightTheme },
   { label: t('settings.themeDark'), value: Theme.DarkTheme },
+  ...darkThemes.map((darkTheme) => ({
+    label: darkTheme.label,
+    value: darkTheme.id,
+    swatch: { background: darkTheme.surface[900] ?? '', accent: darkTheme.accent },
+  })),
 ])
 
 // editorProfiles is edited directly, one form per environment, keyed like
@@ -148,6 +173,7 @@ watch(
 // profile reads name's editor form state; the watch above guarantees an
 // entry exists for every name in editorEnvironments before it renders.
 function profile(name: string): EditorProfile {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- the watch above guarantees an entry for every name in editorEnvironments
   return editorProfiles[name]!
 }
 
@@ -237,11 +263,11 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <form v-if="loaded" class="settings-panel form-rows" @submit.prevent="submit">
+  <form v-if="loaded" class="settings-panel flex flex-col gap-4" @submit.prevent="submit">
     <ErrorBanner v-if="error" :error="error" />
 
     <Fieldset v-for="name in editorEnvironments" :key="name" :legend="environmentLabel(name)">
-      <div class="form-rows">
+      <div class="flex flex-col gap-4">
         <FormField
           v-slot="{ id }"
           :label="
@@ -259,7 +285,7 @@ async function submit(): Promise<void> {
         <FormField v-slot="{ id }" :label="t('settings.fileAtLineCommand')">
           <InputText :id="id" v-model="profile(name).fileAtLineCmd" fluid />
         </FormField>
-        <div class="action-row">
+        <div class="flex flex-wrap items-center gap-2">
           {{ t('settings.preset') }}
           <Button
             v-for="(preset, presetName) in EDITOR_PRESETS"
@@ -314,50 +340,62 @@ async function submit(): Promise<void> {
         fluid
       />
     </FormField>
-    <label class="action-row">
+    <label class="flex flex-wrap items-center gap-2">
       <Checkbox v-model="form.ignoreWhitespace" binary data-test="ignore-whitespace" />
       {{ t('settings.ignoreWhitespace') }}
     </label>
-    <label class="action-row">
+    <label class="flex flex-wrap items-center gap-2">
       <Checkbox v-model="form.debugMode" binary data-test="debug-mode" />
       {{ t('settings.debugMode') }}
     </label>
     <FormField v-slot="{ labelId }" :label="t('settings.theme')">
-      <SelectButton
+      <Select
         v-model="theme"
-        v-bind="choices(themes)"
+        :options="themeOptions"
+        option-label="label"
+        option-value="value"
         :aria-labelledby="labelId"
         data-test="theme-select"
-      />
+        fluid
+      >
+        <template #option="{ option }">
+          <span class="flex items-center gap-2">
+            <span
+              v-if="option.swatch"
+              class="inline-block size-3 shrink-0 rounded-full"
+              data-test="theme-swatch"
+              :style="{
+                background: `linear-gradient(135deg, ${option.swatch.background} 50%, ${option.swatch.accent} 50%)`,
+              }"
+            />
+            {{ option.label }}
+          </span>
+        </template>
+      </Select>
     </FormField>
 
     <p v-if="logError" data-test="app-log">{{ t('settings.appLogError', { error: logError }) }}</p>
-    <p v-else-if="logPath" data-test="app-log" class="log-path">
+    <p v-else-if="logPath" data-test="app-log" class="font-mono text-sm text-muted-color">
       {{ t('settings.appLog', { path: logPath }) }}
     </p>
 
-    <div class="footer">
-      <p v-if="version" data-test="app-version" class="version">nebegit {{ version.app }}</p>
+    <div class="flex justify-end items-center gap-1.5">
+      <p v-if="version" data-test="app-version" class="text-sm text-muted-color">
+        nebegit {{ version.app }}
+      </p>
       <Button type="submit" :label="t('settings.save')" />
     </div>
   </form>
-</template>
 
-<style scoped>
-.footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.6rem;
-}
-.version {
-  margin: 0;
-  font-size: 0.85em;
-  color: var(--p-text-muted-color);
-}
-.log-path {
-  font-family: var(--nb-font-mono);
-  font-size: 0.85em;
-  color: var(--p-text-muted-color);
-}
-</style>
+  <div v-if="loaded" class="flex flex-col gap-1 text-sm text-muted-color">
+    <p class="text-color font-semibold">{{ t('settings.themeCredits') }}</p>
+    <ul class="flex flex-col gap-1">
+      <li v-for="darkTheme in darkThemes" :key="darkTheme.id" data-test="theme-credit">
+        <a :href="darkTheme.credit.url" target="_blank" rel="noreferrer" class="underline">{{
+          darkTheme.credit.name
+        }}</a>
+        — {{ darkTheme.credit.copyright }} ({{ darkTheme.credit.licence }})
+      </li>
+    </ul>
+  </div>
+</template>

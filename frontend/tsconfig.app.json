@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
+    "paths": { "@/*": ["./src/*"] },
     "resolveJsonModule": true,
     "strict": true,
     "exactOptionalPropertyTypes": true,
@@ -20,5 +21,5 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/**/*.vue", "bindings/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/__tests__/*"]
 }

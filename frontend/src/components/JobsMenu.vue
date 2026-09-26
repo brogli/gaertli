@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, useTemplateRef } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import ProgressBar from 'openvue/progressbar'
-import { useJobsStore } from '../stores/jobs'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useWindowEvent } from '../lib/windowEvents'
-import { iconClass, spinClass } from '../lib/icons'
-import { ICON_BUTTON, useToolbarButton } from '../lib/layout'
+import { useJobsStore } from '@/stores/jobs'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useWindowEvent } from '@/lib/windowEvents'
+import { iconClass, spinClass } from '@/lib/icons'
+import { ICON_BUTTON, useToolbarButton } from '@/lib/layout'
 import { JobKind, type JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
@@ -65,12 +65,19 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
     @click="popover?.toggle($event)"
   />
   <Popover ref="popover">
-    <div class="jobs-list">
+    <div class="jobs-list flex flex-col gap-1.5 w-88 max-w-[90vw]">
       <ErrorBanner v-if="error" :error="error" />
-      <p v-if="!count" class="jobs-empty">{{ t('jobsMenu.noJobs') }}</p>
-      <div v-for="job in jobs.active" :key="job.id" class="job-row" data-test="job-row">
-        <span class="job-label">{{ jobLabel(job) }}</span>
-        <span v-if="job.message" class="job-message">{{ job.message }}</span>
+      <p v-if="!count" class="text-muted-color">{{ t('jobsMenu.noJobs') }}</p>
+      <div
+        v-for="job in jobs.active"
+        :key="job.id"
+        class="flex items-center gap-2"
+        data-test="job-row"
+      >
+        <span class="flex-none">{{ jobLabel(job) }}</span>
+        <span v-if="job.message" class="flex-1 min-w-0 truncate text-muted-color">{{
+          job.message
+        }}</span>
         <ProgressBar
           :value="job.progress"
           :mode="job.progress < 0 ? 'indeterminate' : 'determinate'"
@@ -87,33 +94,3 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
     </div>
   </Popover>
 </template>
-
-<style scoped>
-.jobs-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  width: 22rem;
-  max-width: 90vw;
-}
-.jobs-empty {
-  margin: 0;
-  color: var(--p-text-muted-color);
-}
-.job-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-}
-.job-label {
-  flex: none;
-}
-.job-message {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--p-text-muted-color);
-}
-</style>

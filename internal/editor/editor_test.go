@@ -130,7 +130,6 @@ func TestFR_UX_02_OpenFileReturnsTheResolvedArgv(t *testing.T) {
 	profile := core.EditorProfile{FileCmd: argvWriterBin + " {path}"}
 
 	argv, err := OpenFile(profile, "/tmp/x", 0)
-
 	if err != nil {
 		t.Fatal(err)
 	}

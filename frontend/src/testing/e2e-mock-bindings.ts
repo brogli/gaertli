@@ -23,14 +23,14 @@ import type {
   Preferences,
 } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import type { LogPathInfo } from '../../bindings/github.com/brogli/nebegit/internal/app/models'
-import { branchFixture } from './fixtures/branch'
-import { changedFilesFixture } from './fixtures/changes'
-import { diffFileFixture, hunk } from './fixtures/diff'
-import { jobFixture } from './fixtures/job'
-import { LOG_ROWS_FIXTURE } from './fixtures/log-rows'
-import { defaultSettingsFixture } from './fixtures/settings'
-import { summaryFixture } from './fixtures/summary'
-import { worktreeFixture } from './fixtures/worktree'
+import { branchFixture } from '@/testing/fixtures/branch'
+import { changedFilesFixture } from '@/testing/fixtures/changes'
+import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
+import { jobFixture } from '@/testing/fixtures/job'
+import { LOG_ROWS_FIXTURE } from '@/testing/fixtures/log-rows'
+import { defaultSettingsFixture } from '@/testing/fixtures/settings'
+import { summaryFixture } from '@/testing/fixtures/summary'
+import { worktreeFixture } from '@/testing/fixtures/worktree'
 
 // A real Facade call is an IPC round-trip; this delay keeps the mock
 // realistic enough that only the visible window loads up front.
@@ -308,8 +308,18 @@ export const AppService = {
     return Promise.resolve({ path: '/mock/nebegit.log', error: '' })
   },
 }
+// storedSettings is the mock's whole persisted state: Set replaces it, Get
+// reads it back, so a save shows up without a reload, as the real core's
+// settings:changed event does.
+let storedSettings: Preferences = defaultSettingsFixture({ debugMode: query.has('debug') })
+
 export const SettingsService = {
   Get(): Promise<Preferences> {
-    return Promise.resolve(defaultSettingsFixture())
+    return Promise.resolve(storedSettings)
+  },
+  Set(next: Preferences): Promise<void> {
+    storedSettings = next
+    dispatchEvent('settings:changed', undefined)
+    return Promise.resolve(undefined)
   },
 }

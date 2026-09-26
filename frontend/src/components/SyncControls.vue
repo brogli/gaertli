@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import { onKeyStroke } from '@vueuse/core'
 import Button from 'openvue/button'
 import SplitButton from 'openvue/splitbutton'
 import Select from 'openvue/select'
 import type { MenuItem } from 'openvue/menuitem'
-import { useRefsStore } from '../stores/refs'
-import { useSettingsStore } from '../stores/settings'
-import { useConfirmAction } from '../composables/useConfirmAction'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useJobNotices } from '../composables/useJobNotices'
+import { useRefsStore } from '@/stores/refs'
+import { useSettingsStore } from '@/stores/settings'
+import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useJobNotices } from '@/composables/useJobNotices'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   JobKind,
   PullMode,
   type JobInfo,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { iconClass } from '../lib/icons'
-import { useLayout, useToolbarButton } from '../lib/layout'
+import { iconClass } from '@/lib/icons'
+import { useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 
 // SyncControls is the Fetch/Pull/Push controls: it only starts jobs and
@@ -141,7 +141,7 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
 </script>
 
 <template>
-  <div class="sync-controls" :class="{ narrow }">
+  <div class="sync-controls flex items-center" :class="narrow ? 'gap-1' : 'gap-2'">
     <ErrorBanner v-if="error" :error="error" />
     <Button
       v-bind="toolbarButton"
@@ -208,14 +208,3 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
     </template>
   </div>
 </template>
-
-<style scoped>
-.sync-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-}
-.sync-controls.narrow {
-  gap: 0.25rem;
-}
-</style>

@@ -245,7 +245,6 @@ func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
 	c, id := openWorktree(t, repo.Dir)
 
 	got, err := c.Summary(t.Context(), id)
-
 	if err != nil {
 		t.Fatalf("Summary on an empty repo: %v, want no error", err)
 	}

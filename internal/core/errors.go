@@ -9,30 +9,45 @@ import (
 type Code string
 
 const (
-	NotARepo       Code = "NOT_A_REPO"
-	GitTooOld      Code = "GIT_TOO_OLD"
-	AuthFailed     Code = "AUTH_FAILED"
-	PushRejected   Code = "PUSH_REJECTED"
+	// NotARepo: the path is not inside a git worktree.
+	NotARepo Code = "NOT_A_REPO"
+	// GitTooOld: the system git is older than the oldest supported version.
+	GitTooOld Code = "GIT_TOO_OLD"
+	// AuthFailed: sign-in to a remote failed.
+	AuthFailed Code = "AUTH_FAILED"
+	// PushRejected: the remote declined a push for a reason other than
+	// being behind.
+	PushRejected Code = "PUSH_REJECTED"
+	// NotFastForward: a push or branch update is not a fast-forward.
 	NotFastForward Code = "NOT_FAST_FORWARD"
-	DirtyWorktree  Code = "DIRTY_WORKTREE"
-	Conflicts      Code = "CONFLICTS"
+	// DirtyWorktree: local changes are in the way.
+	DirtyWorktree Code = "DIRTY_WORKTREE"
+	// Conflicts: an operation stopped on conflicts, or cannot continue
+	// until they are resolved.
+	Conflicts Code = "CONFLICTS"
 	// Stopped: an operation stopped mid-way for another reason than
 	// conflicts (a hook, signing, a file in the way); it is left in
 	// progress for continue or abort.
-	Stopped     Code = "STOPPED"
-	Locked      Code = "LOCKED"
+	Stopped Code = "STOPPED"
+	// Locked: another process holds a git lock.
+	Locked Code = "LOCKED"
+	// InvalidName: a branch or worktree name fails git check-ref-format.
 	InvalidName Code = "INVALID_NAME"
-	NoUpstream  Code = "NO_UPSTREAM"
+	// NoUpstream: the branch has no upstream to update from.
+	NoUpstream Code = "NO_UPSTREAM"
 	// Unmerged: DeleteBranch without force refused a branch with commits
 	// not merged into its upstream, or into HEAD if it has none. Force
 	// fixes it, unlike a GitFailed "used by worktree" refusal.
-	Unmerged       Code = "UNMERGED_BRANCH"
+	Unmerged Code = "UNMERGED_BRANCH"
+	// EditorNotFound: the editor command could not start.
 	EditorNotFound Code = "EDITOR_NOT_FOUND"
 	// FileNotFound: OpenFile's path no longer exists in the worktree (a
 	// deleted or since-renamed file shown from a historical diff).
 	FileNotFound Code = "FILE_NOT_FOUND"
-	Cancelled    Code = "CANCELLED"
-	GitFailed    Code = "GIT_FAILED"
+	// Cancelled: the user cancelled the job.
+	Cancelled Code = "CANCELLED"
+	// GitFailed: any other git failure; git's own message is shown.
+	GitFailed Code = "GIT_FAILED"
 	// Internal marks a failure that is not git's: a panic, a bad request, a
 	// broken transport.
 	Internal Code = "INTERNAL"

@@ -3,14 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import Dialog from 'openvue/dialog'
 import RadioButton from 'openvue/radiobutton'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useConfirmAction } from '../composables/useConfirmAction'
+import { useI18n } from '@/i18n'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ResetMode } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { shortSha } from '../lib/format'
-import { useNotices } from '../lib/notice'
-import { DIALOG } from '../lib/layout'
+import { shortSha } from '@/lib/format'
+import { useNotices } from '@/lib/notice'
+import { DIALOG } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 
 // ResetDialog is the reset mode picker (soft/mixed/hard/keep). Every mode
@@ -100,11 +100,11 @@ function onResetClick(): void {
     <ErrorBanner v-if="error" :error="error" />
     <p>
       {{ t('dialogs.reset.resetTo', { branch: branchLabel }) }}
-      <span class="hash">{{ shortSha(sha) }}</span
-      >{{ ' ' }}<span class="ellipsis" :title="subject">{{ subject }}</span>
+      <span class="font-mono">{{ shortSha(sha) }}</span
+      >{{ ' ' }}<span :title="subject">{{ subject }}</span>
     </p>
-    <div class="reset-modes">
-      <label v-for="m in modes" :key="m.value" class="reset-mode">
+    <div class="flex flex-col gap-3">
+      <label v-for="m in modes" :key="m.value" class="reset-mode flex items-baseline gap-2">
         <RadioButton
           v-model="mode"
           :value="m.value"
@@ -132,19 +132,3 @@ function onResetClick(): void {
     </template>
   </Dialog>
 </template>
-
-<style scoped>
-.hash {
-  font-family: var(--nb-font-mono);
-}
-.reset-modes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.reset-mode {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5em;
-}
-</style>

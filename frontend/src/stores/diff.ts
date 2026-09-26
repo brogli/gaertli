@@ -6,7 +6,7 @@ import type {
   DiffHunk,
   DiffOptions,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { DiffKind, type DiffTarget } from '../lib/diffTarget'
+import { DiffKind, type DiffTarget } from '@/lib/diffTarget'
 
 // diff holds the currently viewed file's diff, cached per path for the
 // commit being viewed; the cache empties when the commit or the worktree

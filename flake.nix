@@ -2,37 +2,40 @@
   description = "nebegit dev shell: everything except Go";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-    # Only for golangci-lint: it must be built with a Go at least as new as the
-    # native one, and stable lags a Go release behind.
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable }:
+  outputs =
+    { self, nixpkgs }:
     let
-      forSystem = system:
+      forSystem =
+        system:
         let
           pkgs = import nixpkgs { inherit system; };
-          unstable = import nixpkgs-unstable { inherit system; };
-          isLinux = pkgs.stdenv.isLinux;
+          isLinux = pkgs.stdenv.hostPlatform.isLinux;
           # Both tools are pinned as `tool` directives in go.mod; these shims
           # let the Taskfile's bare `wails3` and the documented `task` resolve.
           goTool = name: pkgs.writeShellScriptBin name ''exec go tool ${name} "$@"'';
         in
         pkgs.mkShell {
-          packages = with pkgs; [
-            nodejs_24
-            pnpm_10
-            unstable.golangci-lint
-            (goTool "task")
-            (goTool "wails3")
-          ] ++ lib.optionals isLinux [
-            pkg-config
-            gtk4
-            webkitgtk_6_0
-            adwaita-icon-theme # mouse cursor for the X11 backend under WSLg
-            playwright-driver.browsers
-          ];
+          packages =
+            with pkgs;
+            [
+              nodejs_24
+              pnpm_11
+              golangci-lint
+              treefmt
+              nixfmt
+              (goTool "task")
+              (goTool "wails3")
+            ]
+            ++ lib.optionals isLinux [
+              pkg-config
+              gtk4
+              webkitgtk_6_0
+              adwaita-icon-theme # mouse cursor for the X11 backend under WSLg
+              playwright-driver.browsers
+            ];
 
           shellHook = ''
             if ! command -v go >/dev/null; then

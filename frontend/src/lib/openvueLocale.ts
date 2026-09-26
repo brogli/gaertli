@@ -1,5 +1,5 @@
 import type { PrimeVueLocaleOptions } from 'openvue/config'
-import type { Translate } from '../i18n'
+import type { Translate } from '@/i18n'
 
 // OpenVue fills its own "{0}" into a count message.
 const COUNT = { count: '{0}' }

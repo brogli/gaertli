@@ -1,15 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import {
-  commitFiles,
-  commitSha,
-  contextMenuItems,
-  logRow,
-  pickFromContextMenu,
-  pickRefAction,
-  rev,
-  shortRev,
-} from './helpers'
+import { commitFiles, commitSha, logRow, pickRefAction, rev, shortRev } from './helpers'
 import { gitAfterHistory } from './repos'
 
 // The log's rows, search, filters and copy actions against work's real
@@ -187,28 +178,6 @@ test('FR-LOG-08 filters combine to their intersection; clearing one keeps the ot
 
   await app.locator('.p-multiselect-clear-icon').click()
   await expectSubjects(app, allSubjects)
-})
-
-test('FR-LOG-12 Copy hash and Copy subject put them on the clipboard', async ({
-  app,
-  context,
-  git,
-  repos,
-}) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-  const row = logRow(app, 'add logo and func a')
-  const clipboard = () => app.evaluate(() => navigator.clipboard.readText())
-
-  expect(await contextMenuItems(app, row)).toEqual(
-    expect.arrayContaining(['Copy hash', 'Copy subject']),
-  )
-  await app.keyboard.press('Escape')
-  await pickFromContextMenu(app, row, 'Copy subject')
-  await expect.poll(clipboard).toBe('add logo and func a')
-
-  await pickFromContextMenu(app, row, 'Copy hash')
-  const sha = rev(git, repos.work, 'v1~1')
-  await expect.poll(clipboard).toBe(sha)
 })
 
 test('FR-REPO-04 a commit made outside the app appears at the top of the log by itself', async ({

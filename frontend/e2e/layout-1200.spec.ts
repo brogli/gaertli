@@ -25,7 +25,7 @@ async function middle(locator: Locator): Promise<number> {
 // openDiffWindow shows mockDiffUrl once its toolbar has rendered.
 async function openDiffWindow(page: Page): Promise<void> {
   await page.goto(mockDiffUrl)
-  await page.waitForSelector('.diff-toolbar .p-button')
+  await page.locator('.diff-toolbar .p-button').first().waitFor()
 }
 
 // expectInWindow: box lies wholly inside the 1200 x 800 window.
@@ -58,7 +58,7 @@ test('FR-UX-07 FR-UX-14 each picker opens inside the window, its rows on one lin
   await openMockRepo(page)
 
   for (const picker of ['repo-picker', 'worktree-picker', 'branch-picker']) {
-    await page.click(`[data-test=${picker}]`)
+    await page.locator(`[data-test=${picker}]`).click()
     const list = page.locator('.p-popover .picker-list')
     await expect(list.locator('li').first()).toBeVisible()
     expectInWindow(await stableBox(page.locator('.p-popover')))
@@ -75,7 +75,7 @@ test('FR-UX-07 FR-UX-14 each picker opens inside the window, its rows on one lin
 // switch and waits for the change list.
 async function switchToChanges(page: Page): Promise<void> {
   await page.getByRole('button', { name: /^Changes/ }).click()
-  await page.waitForSelector('.changes-column .files li')
+  await page.locator('.changes-column .files li').first().waitFor()
 }
 
 test('FR-UX-08 the log is the left column; a switch above it picks Details or Changes to its right', async ({
@@ -129,13 +129,31 @@ test('FR-UX-09 the diff toolbar shares one row', async ({ page }) => {
 test('FR-UX-09 commit-box checkboxes align with their label text', async ({ page }) => {
   await openMockRepo(page)
   await switchToChanges(page)
-  await page.waitForSelector('.commit-box label')
+  await page.locator('.commit-box label').first().waitFor()
 
   for (const label of await page.locator('.commit-box label').all()) {
     const checkboxCenter = await middle(label.locator('input[type=checkbox]'))
     const labelBox = await stableBox(label)
     expect(checkboxCenter).toBeGreaterThanOrEqual(labelBox.y)
     expect(checkboxCenter).toBeLessThanOrEqual(labelBox.y + labelBox.height)
+  }
+})
+
+test('FR-CHG-11 the commit box spaces its message field, checkbox rows and Commit button apart', async ({
+  page,
+}) => {
+  await openMockRepo(page)
+  await switchToChanges(page)
+  await page.locator('.commit-box label').first().waitFor()
+
+  const parts = [
+    page.locator('.commit-box textarea'),
+    ...(await page.locator('.commit-box label').all()),
+    page.locator('[data-test="commit-submit"]'),
+  ]
+  const boxes = await Promise.all(parts.map((part) => stableBox(part)))
+  for (let i = 1; i < boxes.length; i++) {
+    expect(boxes[i]!.y).toBeGreaterThanOrEqual(boxes[i - 1]!.y + boxes[i - 1]!.height + 4)
   }
 })
 
@@ -153,7 +171,7 @@ test("FR-LOG-01 the HEAD row's four ref labels still leave the subject at least 
   page,
 }) => {
   await openMockRepo(page)
-  await page.waitForSelector('.row .ref-label')
+  await page.locator('.row .ref-label').first().waitFor()
 
   const subjectBox = await stableBox(page.locator('.row').first().locator('.subject'))
   expect(subjectBox.width).toBeGreaterThanOrEqual(80)
@@ -163,7 +181,7 @@ test('FR-DIFF-07 in the diff window the diff fills the width beside the file lis
   page,
 }) => {
   await openDiffWindow(page)
-  await page.waitForSelector('.cm-editor')
+  await page.locator('.cm-editor').first().waitFor()
 
   const diff = await stableBox(page.locator('.diff-view'))
   expect(diff.width).toBeGreaterThanOrEqual(1200 * 0.6)
@@ -173,7 +191,7 @@ test('FR-UX-04 opening Settings shows a dialog without moving the log view', asy
   await openMockRepo(page)
   const beforeY = (await stableBox(page.locator('.log-column'))).y
 
-  await page.click('[data-test="open-settings"]')
+  await page.locator('[data-test="open-settings"]').click()
   await expect(page.getByRole('dialog')).toBeVisible()
 
   const afterY = (await stableBox(page.locator('.log-column'))).y
@@ -185,9 +203,9 @@ test('FR-UX-09 the log filter bar keeps its four fields on one row, none overlap
 }) => {
   await openMockRepo(page)
 
-  const fields = await page.locator('.filter-bar > *').all()
-  expect(fields.length).toBe(4)
-  const boxes = await Promise.all(fields.map(stableBox))
+  const fields = page.locator('.filter-bar > *')
+  await expect(fields).toHaveCount(4)
+  const boxes = await Promise.all((await fields.all()).map(stableBox))
   const tops = boxes.map((b) => b.y)
   expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(4)
   expectNoOverlap(boxes)

@@ -99,23 +99,27 @@ onMounted(() => root.value?.querySelector('input')?.focus())
 </script>
 
 <template>
-  <div ref="root" class="picker-list">
+  <div ref="root" class="picker-list flex min-h-0 flex-1 flex-col gap-1.5">
     <InputText
       v-model="query"
       :placeholder="placeholder"
       :aria-label="placeholder"
       @keydown="onKeydown"
     />
-    <div ref="scroller" class="picker-scroll">
+    <div ref="scroller" class="picker-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
       <ul
-        class="picker-rows"
+        class="picker-rows relative"
         role="listbox"
         :style="{ height: `${virtualizer.getTotalSize()}px`, '--row-height': `${ROW_HEIGHT}px` }"
       >
         <li
           v-for="{ index, start } in virtualizer.getVirtualItems()"
           :key="rows[index]!.key"
-          :class="{ header: rows[index]!.header, active: rows[index]!.key === activeKey }"
+          class="absolute inset-x-0 top-0 flex h-(--row-height) min-w-0 items-center gap-1.5 rounded px-1.5"
+          :class="[
+            rows[index]!.header ? '' : 'cursor-pointer hover:bg-emphasis',
+            rows[index]!.key === activeKey && 'active bg-emphasis',
+          ]"
           :style="{ transform: `translateY(${start}px)` }"
           :role="rows[index]!.header ? 'presentation' : 'option'"
           :aria-selected="rows[index]!.header ? undefined : rows[index]!.key === activeKey"
@@ -128,70 +132,3 @@ onMounted(() => root.value?.querySelector('input')?.focus())
     </div>
   </div>
 </template>
-
-<style scoped>
-.picker-list {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 0.4rem;
-  min-height: 0;
-}
-.picker-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-.picker-rows {
-  position: relative;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.picker-rows li {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  height: var(--row-height);
-  min-width: 0;
-  padding: 0 0.4rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.picker-rows li:hover,
-.picker-rows li.active {
-  background: var(--p-content-hover-background);
-}
-.picker-rows li.header {
-  cursor: default;
-  background: none;
-}
-/* The parts of a picker's row, shared by every picker. */
-:slotted(.row) {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 0.35em;
-  min-width: 0;
-}
-/* A fixed-width slot so a row without the marker still aligns with one that
-   has it. */
-:slotted(.current-marker) {
-  flex: none;
-  width: 1em;
-}
-:slotted(.muted) {
-  font-size: 0.85em;
-  color: var(--p-text-muted-color);
-}
-/* Takes only the space the rest of the row leaves, so it gives way first. */
-:slotted(.leftover) {
-  flex: 1 1 0;
-}
-</style>

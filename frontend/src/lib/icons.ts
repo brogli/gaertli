@@ -2,9 +2,19 @@
 // components use this map instead of spelling out a class string of their
 // own.
 
-import type { Translate } from '../i18n'
+import type { Translate } from '@/i18n'
 
 type Tone = 'green' | 'blue' | 'red' | 'violet' | 'orange' | 'muted'
+
+// Whole class names, so Tailwind finds them in the source.
+export const TONE_CLASS: Record<Tone, string> = {
+  green: 'text-tone-green',
+  blue: 'text-tone-blue',
+  red: 'text-tone-red',
+  violet: 'text-tone-violet',
+  orange: 'text-tone-orange',
+  muted: 'text-tone-muted',
+}
 
 interface StatusIcon {
   icon: string
@@ -12,7 +22,19 @@ interface StatusIcon {
   tone: Tone
 }
 
-const STATUS: Record<string, { icon: string; labelKey: string; tone: Tone }> = {
+interface StatusEntry {
+  icon: string
+  labelKey: string
+  tone: Tone
+}
+
+const CONFLICTED: StatusEntry = {
+  icon: 'exclamation-triangle',
+  labelKey: 'conflicted',
+  tone: 'orange',
+}
+
+const STATUS: Record<string, StatusEntry> = {
   A: { icon: 'file-plus', labelKey: 'added', tone: 'green' },
   M: { icon: 'file-edit', labelKey: 'modified', tone: 'blue' },
   D: { icon: 'trash', labelKey: 'deleted', tone: 'red' },
@@ -20,7 +42,7 @@ const STATUS: Record<string, { icon: string; labelKey: string; tone: Tone }> = {
   C: { icon: 'copy', labelKey: 'copied', tone: 'violet' },
   T: { icon: 'sync', labelKey: 'typeChanged', tone: 'muted' },
   '?': { icon: 'question-circle', labelKey: 'untracked', tone: 'muted' },
-  U: { icon: 'exclamation-triangle', labelKey: 'conflicted', tone: 'orange' },
+  U: CONFLICTED,
 }
 
 // statusIcon maps a changed file's status to its icon, tooltip label and
@@ -29,7 +51,7 @@ const STATUS: Record<string, { icon: string; labelKey: string; tone: Tone }> = {
 // this map does not recognise falls back to a plain file icon labelled with
 // the code itself.
 export function statusIcon(status: string, t: Translate): StatusIcon {
-  const entry = STATUS[status] ?? (status.length === 2 ? STATUS.U! : undefined)
+  const entry = STATUS[status] ?? (status.length === 2 ? CONFLICTED : undefined)
   return entry
     ? { icon: entry.icon, label: t(`common.fileStatus.${entry.labelKey}`), tone: entry.tone }
     : { icon: 'file', label: status, tone: 'muted' }
@@ -97,14 +119,16 @@ export function spinClass(name: IconName): string {
 
 // NOTICE_ICON is each notice severity's icon: the ones OpenVue's Toast
 // draws itself.
+const INFO_ICON = 'info-circle'
+
 const NOTICE_ICON: Record<string, string> = {
   error: 'times-circle',
   warn: 'exclamation-triangle',
-  info: 'info-circle',
+  info: INFO_ICON,
   success: 'check',
 }
 
 // noticeIconClass is a notice severity's icon class, info's when unset.
 export function noticeIconClass(severity: string | undefined): string {
-  return oiClass(NOTICE_ICON[severity ?? ''] ?? NOTICE_ICON.info!)
+  return oiClass(NOTICE_ICON[severity ?? ''] ?? INFO_ICON)
 }

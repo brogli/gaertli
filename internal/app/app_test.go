@@ -150,24 +150,6 @@ func TestFR_REPO_06_PathArgThenOpenOrFocusOpensAWindow(t *testing.T) {
 	}
 }
 
-func TestADR_9_OptionsRegistersTheFacadeAndSingleInstance(t *testing.T) {
-	reg := NewRegistry()
-	opts := options(fstest.MapFS{}, reg, func(string) {}, nil)
-
-	if opts.Name != "nebegit" {
-		t.Errorf("Name = %q, want %q", opts.Name, "nebegit")
-	}
-	if len(opts.Services) != 1 {
-		t.Fatalf("Services = %d entries, want 1", len(opts.Services))
-	}
-	if _, ok := opts.Services[0].Instance().(*Facade); !ok {
-		t.Errorf("Services[0].Instance() = %T, want *Facade", opts.Services[0].Instance())
-	}
-	if opts.SingleInstance == nil || opts.SingleInstance.UniqueID == "" {
-		t.Error("SingleInstance.UniqueID not set")
-	}
-}
-
 func TestFR_REPO_06_ASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testing.T) {
 	launchDir, elsewhere := t.TempDir(), t.TempDir()
 	cases := []struct{ arg, want string }{

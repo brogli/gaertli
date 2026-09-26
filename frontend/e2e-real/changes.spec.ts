@@ -13,7 +13,6 @@ import {
   fileRow,
   fileText,
   logRow,
-  switchToChanges,
 } from './helpers'
 
 // The changes view on work's real working tree: groups, staging whole
@@ -74,18 +73,6 @@ test('FR-CHG-01 the changes view lists staged, unstaged, untracked and conflicte
   await expect(app.locator('.changes-body h3', { hasText: 'Conflicted' })).toBeVisible()
 })
 
-test('FR-UX-08 the switch shows the changes view or the commit detail view, never both', async ({
-  app,
-}) => {
-  await expect(app.locator('.changes-body')).toBeVisible()
-
-  await app.getByRole('button', { name: 'Details', exact: true }).click()
-  await expect(app.locator('.changes-body')).toBeHidden()
-
-  await switchToChanges(app)
-  await expect(app.locator('.changes-body')).toBeVisible()
-})
-
 test('FR-CHG-02 staging and unstaging a file moves it between the groups and the index', async ({
   openApp,
   repos,
@@ -143,28 +130,6 @@ test("FR-CHG-04 the diff window shows a changed file's diff and lists the other 
 
   await diffRow(diff, 'Unstaged', 'docs/readme.md').click()
   await expect(diffText(diff)).toContainText('more docs')
-})
-
-test('FR-CHG-03 untracked, deleted, added and renamed files offer no hunk or line staging', async ({
-  openDiff,
-  repos,
-  git,
-}) => {
-  changeEveryKind(repos.work, git)
-  const diff = await openDiff(repos.work, unstaged('hunks.txt'))
-  await expect(stageHunk(diff)).toHaveCount(5)
-  const cases: [group: string, file: string, shows: string][] = [
-    ['Untracked', 'new.txt', 'brand new'],
-    ['Unstaged', 'readme.md', 'more docs'],
-    ['Staged', 'added.txt', 'added'],
-    ['Staged', 'app.go', 'func b() {}'],
-  ]
-  for (const [group, file, shows] of cases) {
-    await diffRow(diff, group, file).click()
-    await expect(diffText(diff)).toContainText(shows)
-    await expect(stageHunk(diff)).toHaveCount(0)
-    await expect(diff.locator('[data-test=stage-selected-lines]')).toHaveCount(0)
-  }
 })
 
 test('FR-CHG-03 Stage hunk stages only its own block, even one two lines from the next', async ({

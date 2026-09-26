@@ -9,8 +9,8 @@ import {
   type LogCommit,
   type LogFilter,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { onRepoChanged, onWindowEvent } from '../lib/windowEvents'
-import type { CoreError } from '../composables/useCoreCall'
+import { onRepoChanged, onWindowEvent } from '@/lib/windowEvents'
+import type { CoreError } from '@/composables/useCoreCall'
 
 type RowView = {
   cache: Map<number, LogCommit>

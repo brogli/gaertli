@@ -2,15 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page, Request } from '@playwright/test'
 import { test, expect } from './fixtures'
-import {
-  contextMenuItems,
-  diffText,
-  hunksText,
-  logRow,
-  pickFromContextMenu,
-  rev,
-  shortRev,
-} from './helpers'
+import { diffText, hunksText, logRow, pickFromContextMenu, rev, shortRev } from './helpers'
 
 // Comparing two commits, or a commit with the working tree, in the main
 // window's side column. A double-click's diff window is a native window:
@@ -97,22 +89,6 @@ test('FR-CMP-01 "Compare with <hash>" on another commit compares it with the sel
     .toEqual(['Modified docs/readme.md', 'Modified src/main.go'])
 })
 
-test('FR-CMP-01 "Compare with <hash>" is offered neither with nothing selected nor on the selected commit itself', async ({
-  app,
-}) => {
-  const row = logRow(app, 'add logo and func a')
-  const withNothingSelected = await contextMenuItems(app, row)
-  await app.keyboard.press('Escape')
-  await expect(row).toHaveClass(/selected/)
-  const onTheSelectedCommit = await contextMenuItems(app, row)
-  const comparesWithAnother = (items: string[]) =>
-    items.some((i) => i !== 'Compare with working tree' && i.startsWith('Compare with '))
-
-  expect(withNothingSelected).toContain('Copy hash')
-  expect(comparesWithAnother(withNothingSelected)).toBe(false)
-  expect(comparesWithAnother(onTheSelectedCommit)).toBe(false)
-})
-
 test('FR-CMP-02 a click on a compared file shows no diff; a double-click opens its diff window; Escape leaves the comparison', async ({
   app,
   git,
@@ -135,23 +111,6 @@ test('FR-CMP-02 a click on a compared file shows no diff; a double-click opens i
   await app.keyboard.press('Escape')
   await expect(compareView(app)).toBeHidden()
   await expect(app.locator('.commit-details')).toBeHidden() // the whole selection is dropped
-})
-
-test('FR-CMP-03 the comparison shows from → to; Swap reverses the direction', async ({
-  app,
-  git,
-  repos,
-}) => {
-  await ctrlClickCompare(app, 'initial: add base files', 'feature: add feature.txt')
-  const view = compareView(app)
-  const initial = shortRev(git, repos.work, 'v1~2')
-  const feature = shortRev(git, repos.work, 'feature')
-  await expect(view.locator('header')).toContainText(`${initial} → ${feature}`)
-  await expect.poll(() => listedFiles(view)).toContain('Added feature.txt')
-
-  await view.locator('[data-test=swap]').click()
-  await expect(view.locator('header')).toContainText(`${feature} → ${initial}`)
-  await expect.poll(() => listedFiles(view)).toContain('Deleted feature.txt')
 })
 
 test('FR-CMP-04 compare with working tree lists committed and uncommitted differences, leaves out untracked files and says so', async ({

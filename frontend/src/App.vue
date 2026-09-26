@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import ConfirmDialog from 'openvue/confirmdialog'
-import NoticeArea from './components/NoticeArea.vue'
-import MainView from './views/MainView.vue'
-import DiffWindowView from './views/DiffWindowView.vue'
-import { diffWindowQuery } from './lib/diffTarget'
-import { useSettingsStore } from './stores/settings'
-import { DIALOG } from './lib/layout'
+import NoticeArea from '@/components/NoticeArea.vue'
+import MainView from '@/views/MainView.vue'
+import DiffWindowView from '@/views/DiffWindowView.vue'
+import { diffWindowQuery } from '@/lib/diffTarget'
+import { useSettingsStore } from '@/stores/settings'
+import { DIALOG } from '@/lib/layout'
 
 // A window's query string, fixed for its lifetime, picks its root view:
 // ?view=diff, else the main view.

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
-import { SECONDARY_BUTTON } from '../lib/layout'
-import { useChangesStore } from '../stores/changes'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useOpenInEditor } from '../composables/useOpenInEditor'
-import { useConfirmAction } from '../composables/useConfirmAction'
+import { useI18n } from '@/i18n'
+import { SECONDARY_BUTTON } from '@/lib/layout'
+import { useChangesStore } from '@/stores/changes'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DiffKind, fileTarget } from '../lib/diffTarget'
+import { DiffKind, fileTarget } from '@/lib/diffTarget'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ChangedFileList from './ChangedFileList.vue'
 import CommitBox from './CommitBox.vue'
@@ -117,11 +117,14 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
 </script>
 
 <template>
-  <aside class="changes-column">
-    <section class="changes-body">
-      <header>
+  <!-- Sizing is the parent layout's job (WorktreeContent.vue). The change list
+       scrolls on its own; the commit box below it does not. -->
+  <aside class="changes-column flex h-full min-h-0 flex-col">
+    <section class="changes-body flex flex-1 flex-col gap-3 overflow-auto py-2 px-2.5">
+      <!-- The buttons move below the heading, together, when both do not fit. -->
+      <header class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
         <h2>{{ t('changesView.heading') }}</h2>
-        <div class="header-actions">
+        <div class="flex gap-1.5 whitespace-nowrap">
           <Button v-bind="SECONDARY_BUTTON" :label="t('changesView.stageAll')" @click="stageAll" />
           <Button
             v-bind="SECONDARY_BUTTON"
@@ -132,7 +135,7 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
       </header>
       <ErrorBanner v-if="error" :error="error" />
 
-      <template v-for="g in groups" :key="g.title">
+      <section v-for="g in groups" :key="g.title" class="flex flex-col gap-1">
         <h3>{{ g.title }}</h3>
         <p v-if="!g.files.length">{{ g.empty }}</p>
         <ChangedFileList
@@ -146,55 +149,20 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
           @action="g.onAction"
           @second-action="g.onSecondAction"
         />
-      </template>
+      </section>
 
-      <h3>{{ t('changesView.conflictedTitle') }}</h3>
-      <p v-if="!conflicted.length">{{ t('changesView.conflictedEmpty') }}</p>
-      <ChangedFileList
-        :files="conflicted"
-        action="markResolved"
-        @open="openEditor"
-        @open-editor="openEditor"
-        @action="stageFile"
-      />
+      <section class="flex flex-col gap-1">
+        <h3>{{ t('changesView.conflictedTitle') }}</h3>
+        <p v-if="!conflicted.length">{{ t('changesView.conflictedEmpty') }}</p>
+        <ChangedFileList
+          :files="conflicted"
+          action="markResolved"
+          @open="openEditor"
+          @open-editor="openEditor"
+          @action="stageFile"
+        />
+      </section>
     </section>
-    <CommitBox :key="wt" :wt="wt" />
+    <CommitBox :key="wt" :wt="wt" class="flex-none border-t border-surface py-2 px-2.5" />
   </aside>
 </template>
-
-<style scoped>
-/* Sizing is the parent layout's job (WorktreeContent.vue). The change list
-   scrolls on its own; the commit box below it does not. */
-.changes-column {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.changes-body {
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.5rem 0.6rem;
-}
-/* The buttons move below the heading, together, when both do not fit. */
-.changes-body header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem 0.5rem;
-}
-.header-actions {
-  display: flex;
-  gap: 0.35rem;
-  white-space: nowrap;
-}
-.changes-column > :deep(.commit-box) {
-  flex: none;
-  padding: 0.5rem 0.6rem;
-  border-top: 1px solid var(--p-content-border-color);
-}
-</style>

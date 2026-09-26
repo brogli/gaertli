@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestQA_OSS_01_CheckReportsOnlyDisallowedLicences(t *testing.T) {
+func TestOSS_01_CheckReportsOnlyDisallowedLicences(t *testing.T) {
 	tests := []struct {
 		name string
 		deps []Dependency
@@ -56,7 +56,7 @@ func TestFR_UX_18_CheckAllowsOFLForTheBundledFontsOnly(t *testing.T) {
 	}
 }
 
-func TestQA_OSS_01_NoticesRendersOneParagraphPerDependency(t *testing.T) {
+func TestOSS_01_NoticesRendersOneParagraphPerDependency(t *testing.T) {
 	deps := []Dependency{
 		{Name: "foo", Version: "1.2.0", Licence: "MIT", Text: "Copyright foo authors"},
 		{Name: "bar", Version: "0.9.1", Licence: "BSD-3-Clause", Text: "Copyright bar authors"},
@@ -75,12 +75,29 @@ func TestQA_OSS_01_NoticesRendersOneParagraphPerDependency(t *testing.T) {
 	}
 }
 
-func TestQA_OSS_05_NoticesCreditCodeAdaptedFromLazygit(t *testing.T) {
+func TestOSS_05_NoticesCreditCodeAdaptedFromLazygit(t *testing.T) {
 	if violations := Check(adaptedCode); len(violations) > 0 {
 		t.Errorf("adapted code with a licence outside the allow-list: %v", violations)
 	}
 	notices := Notices(adaptedCode)
 	for _, want := range []string{"github.com/jesseduffield/lazygit", "Copyright (c) 2018 Jesse Duffield", "Permission is hereby granted"} {
+		if !strings.Contains(notices, want) {
+			t.Errorf("notices lack %q:\n%s", want, notices)
+		}
+	}
+}
+
+func TestOSS_05_NoticesCreditTheFourDarkThemes(t *testing.T) {
+	if violations := Check(themeCredits); len(violations) > 0 {
+		t.Errorf("theme credits with a licence outside the allow-list: %v", violations)
+	}
+	notices := Notices(themeCredits)
+	for _, want := range []string{
+		"Copyright (c) morhetz",
+		"Copyright (c) 2021 Catppuccin",
+		"Copyright (c) 2016-present Sven Greb",
+		"Copyright (c) 2023 Dracula Theme",
+	} {
 		if !strings.Contains(notices, want) {
 			t.Errorf("notices lack %q:\n%s", want, notices)
 		}

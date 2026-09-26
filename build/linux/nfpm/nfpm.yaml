@@ -1,23 +1,23 @@
-name: "nebegit"
+name: 'nebegit'
 arch: ${GOARCH}
-platform: "linux"
-version: "0.1.0"
-section: "default"
-priority: "extra"
-maintainer: "nebegit <28339986+brogli@users.noreply.github.com>"
-description: "Desktop git GUI that sits beside your editor"
-vendor: "nebegit"
-homepage: "https://github.com/brogli/nebegit"
-license: "BSD-3-Clause"
-release: "1"
+platform: 'linux'
+version: '0.1.0'
+section: 'default'
+priority: 'extra'
+maintainer: 'nebegit <28339986+brogli@users.noreply.github.com>'
+description: 'Desktop git GUI that sits beside your editor'
+vendor: 'nebegit'
+homepage: 'https://github.com/brogli/nebegit'
+license: 'BSD-3-Clause'
+release: '1'
 
 contents:
-  - src: "./bin/nebegit"
-    dst: "/usr/bin/nebegit"
-  - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/1024x1024/apps/nebegit.png"
-  - src: "./build/linux/nebegit.desktop"
-    dst: "/usr/share/applications/nebegit.desktop"
+  - src: './bin/nebegit'
+    dst: '/usr/bin/nebegit'
+  - src: './build/appicon.png'
+    dst: '/usr/share/icons/hicolor/1024x1024/apps/nebegit.png'
+  - src: './build/linux/nebegit.desktop'
+    dst: '/usr/share/applications/nebegit.desktop'
 
 # GTK4, WebKitGTK 6.0, and git itself, unversioned: the app checks the
 # running git's version at start and shows a clear message if it's too old,
@@ -43,4 +43,4 @@ overrides:
       - webkitgtk-6.0
 
 scripts:
-  postinstall: "./build/linux/nfpm/scripts/postinstall.sh"
+  postinstall: './build/linux/nfpm/scripts/postinstall.sh'

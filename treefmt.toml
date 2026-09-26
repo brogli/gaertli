@@ -1,0 +1,54 @@
+# `treefmt` lints with fixes, then formats; `treefmt --ci` is the pipeline's
+# check. Lower priority runs first. JS tools are frontend/'s own, so their
+# versions come from its lockfile; the rest come from the Nix shell.
+
+on-unmatched = "debug"
+# Test fixtures stay as written, some of them deliberately wrong; the Go
+# tools skip testdata/ for the same reason.
+excludes = ["**/testdata/**", "*pnpm-lock.yaml", "flake.lock"]
+
+[formatter.oxlint]
+command = "tools/treefmt/frontend"
+options = ["oxlint", "--fix", "--"]
+includes = ["frontend/**/*.vue", "frontend/**/*.ts", "frontend/**/*.mts"]
+priority = 1
+
+[formatter.golangci-lint]
+command = "tools/treefmt/lint-go-packages"
+includes = ["*.go"]
+priority = 1
+
+[formatter.eslint]
+command = "tools/treefmt/frontend"
+options = ["eslint", "--fix", "--cache", "--no-warn-ignored", "--max-warnings=0", "--"]
+includes = ["frontend/**/*.vue", "frontend/**/*.ts", "frontend/**/*.mts"]
+priority = 2
+
+[formatter.stylelint]
+command = "tools/treefmt/frontend"
+options = ["stylelint", "--fix", "--cache", "--"]
+includes = ["frontend/**/*.css", "frontend/**/*.vue"]
+priority = 2
+
+# Every file type oxfmt formats, anywhere in the repo, in the frontend's one
+# style. From the repo root: oxfmt refuses paths with "..".
+[formatter.oxfmt]
+command = "frontend/node_modules/.bin/oxfmt"
+options = ["--config", "frontend/.oxfmtrc.json"]
+includes = [
+  "*.cjs", "*.css", "*.html", "*.js", "*.json", "*.jsonc", "*.md", "*.mjs",
+  "*.mts", "*.scss", "*.ts", "*.tsx", "*.vue", "*.yaml", "*.yml",
+]
+priority = 3
+
+# gofumpt and goimports, as .golangci.yml's formatters configure them.
+[formatter.gofumpt]
+command = "golangci-lint"
+options = ["fmt"]
+includes = ["*.go"]
+priority = 3
+
+[formatter.nixfmt]
+command = "nixfmt"
+includes = ["*.nix"]
+priority = 3

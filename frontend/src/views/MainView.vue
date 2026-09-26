@@ -3,15 +3,15 @@ import { ref } from 'vue'
 import { onKeyStroke } from '@vueuse/core'
 import Dialog from 'openvue/dialog'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import SettingsPanel from '../components/SettingsPanel.vue'
-import RepoPicker from '../components/RepoPicker.vue'
-import DebugArea from '../components/DebugArea.vue'
+import SettingsPanel from '@/components/SettingsPanel.vue'
+import RepoPicker from '@/components/RepoPicker.vue'
+import DebugArea from '@/components/DebugArea.vue'
 import WorktreeContent from './WorktreeContent.vue'
-import { useSettingsStore } from '../stores/settings'
-import { iconClass } from '../lib/icons'
-import { ICON_BUTTON } from '../lib/layout'
+import { useSettingsStore } from '@/stores/settings'
+import { iconClass } from '@/lib/icons'
+import { ICON_BUTTON } from '@/lib/layout'
 
 // MainView is every main window's root content: WorktreeContent once a
 // worktree is selected, else the repo list as the page. distro is set only
@@ -35,15 +35,18 @@ onKeyStroke(
 </script>
 
 <template>
-  <div class="window-body">
+  <!-- The window's content on top, the debug strip (if shown) fixed below
+       it: the same shape WorktreeContent.vue uses for its own toolbar and
+       body. -->
+  <div class="flex h-full min-h-0 flex-col">
     <WorktreeContent
       v-if="path"
       :path="path"
       :distro="distro"
       @open-settings="showSettings = true"
     />
-    <main v-else class="start-page">
-      <header class="start-header">
+    <main v-else class="start-page flex min-h-0 flex-1 flex-col overflow-auto">
+      <header class="flex items-center justify-between border-b border-surface py-1.5 px-2.5">
         <h1>nebegit</h1>
         <Button
           v-bind="ICON_BUTTON"
@@ -67,28 +70,3 @@ onKeyStroke(
     <SettingsPanel @close="showSettings = false" />
   </Dialog>
 </template>
-
-<style scoped>
-/* The window's content on top, the debug strip (if shown) fixed below it:
-   the same shape WorktreeContent.vue uses for its own toolbar and body. */
-.window-body {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-.start-page {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-.start-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--p-content-border-color);
-}
-</style>

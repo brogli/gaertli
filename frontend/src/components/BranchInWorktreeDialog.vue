@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import Dialog from 'openvue/dialog'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useI18n } from '@/i18n'
+import { useCoreCall } from '@/composables/useCoreCall'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DIALOG } from '../lib/layout'
-import { basename, repoPath } from '../lib/path'
+import { DIALOG } from '@/lib/layout'
+import { basename, repoPath } from '@/lib/path'
 import ErrorBanner from './ErrorBanner.vue'
 
 // BranchInWorktreeDialog offers to switch this window to the worktree that
@@ -35,7 +35,7 @@ async function confirm(): Promise<void> {
   >
     <ErrorBanner v-if="error" :error="error" />
     <p>{{ t('dialogs.branchInWorktree.message', { branch, folder: basename(path) }) }}</p>
-    <p class="path">{{ path }}</p>
+    <p class="text-muted-color">{{ path }}</p>
     <template #footer>
       <Button
         :label="t('common.cancel')"
@@ -51,9 +51,3 @@ async function confirm(): Promise<void> {
     </template>
   </Dialog>
 </template>
-
-<style scoped>
-.path {
-  color: var(--p-text-muted-color);
-}
-</style>

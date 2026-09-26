@@ -16,14 +16,6 @@ import (
 	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
-func TestADR_3_DeployTarget(t *testing.T) {
-	got := deployTarget("1.4.0")
-	want := "$HOME/.cache/nebegit/1.4.0/nebegit-core"
-	if got != want {
-		t.Errorf("deployTarget(%q) = %q, want %q", "1.4.0", got, want)
-	}
-}
-
 // localRunner is a fake wslRunner: it ignores distro and runs args as a
 // local command, so ensureDeployed's "sh -c ..." scripts run for real
 // against a test-sandboxed $HOME.

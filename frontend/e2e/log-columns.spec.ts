@@ -31,7 +31,7 @@ test('FR-LOG-01 at 1200 px the subject, author, date and hash start at the same 
 }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
   await openMockRepo(page)
-  await page.waitForSelector('.row .hash')
+  await page.locator('.row .hash').first().waitFor()
 
   await page.locator('.row').nth(3).click()
   await expect(page.locator('.row.selected')).toHaveCount(1)
@@ -44,7 +44,7 @@ test('FR-UX-09 at 420 px the author column hides instead of shrinking to a slive
 }) => {
   await page.setViewportSize({ width: 420, height: 800 })
   await openMockRepo(page)
-  await page.waitForSelector('.row .hash')
+  await page.locator('.row .hash').first().waitFor()
 
   await expect(page.locator('.row .author').first()).toBeHidden()
   await expectColumnsLineUp(page, ['.message', '.subject', '.date', '.hash'])
@@ -53,7 +53,7 @@ test('FR-UX-09 at 420 px the author column hides instead of shrinking to a slive
 test('FR-LOG-01 FR-CMP-05 compared rows keep their content where it is', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
   await openMockRepo(page)
-  await page.waitForSelector('.row .hash')
+  await page.locator('.row .hash').first().waitFor()
   const rows = page.locator('.row')
   const subjectX = async () => (await rows.nth(1).locator('.subject').boundingBox())!.x
 
@@ -77,4 +77,21 @@ test('FR-LOG-01 in a narrow window the HEAD row\'s "+N" stays inside its message
   const message = (await head.locator('.message').boundingBox())!
   const more = (await head.locator('.ref-more').boundingBox())!
   expect(more.x + more.width).toBeLessThanOrEqual(message.x + message.width)
+})
+
+test('FR-LOG-02 the graph draws its branch lines in more than one colour, none in the text colour', async ({
+  page,
+}) => {
+  await openMockRepo(page)
+  await page.locator('.graph-cell circle').first().waitFor()
+
+  const colours = await page.evaluate(() => ({
+    text: getComputedStyle(document.body).color,
+    lanes: [...document.querySelectorAll('.graph-cell circle, .graph-cell path')].map(
+      (el) => getComputedStyle(el).color,
+    ),
+  }))
+
+  expect(new Set(colours.lanes).size).toBeGreaterThan(1)
+  expect(colours.lanes).not.toContain(colours.text)
 })

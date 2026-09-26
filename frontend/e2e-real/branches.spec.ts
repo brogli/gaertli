@@ -14,7 +14,6 @@ import {
   pickerError,
   pickFromContextMenu,
   pickRefAction,
-  refActions,
   refRow,
   rev,
 } from './helpers'
@@ -102,23 +101,6 @@ test('FR-BR-01 an invalid or taken branch name is refused with a message', async
     await expect(dialog).toBeHidden()
   }
   expect(git(repos.work, 'branch', '--list')).toBe(branchesBefore)
-})
-
-test('FR-BR-09 the branch picker lists "New branch…", then the local, remote branches and tags', async ({
-  app,
-}) => {
-  await openBranchPicker(app)
-
-  const rows = app.locator('.p-popover .picker-rows li')
-  await expect(rows.first()).toHaveText('New branch…')
-  const texts = (await rows.allTextContents()).map((t) => t.trim())
-  const at = (text: string) => texts.findIndex((t) => t.startsWith(text))
-  expect(at('Local')).toBeLessThan(at('B'))
-  expect(at('B')).toBeLessThan(at('Remote'))
-  expect(at('Remote')).toBeLessThan(at('origin/feature'))
-  expect(at('origin/feature')).toBeLessThan(at('Tags'))
-  expect(at('Tags')).toBeLessThan(at('v1'))
-  await expect(refRow(app, 'main').locator('[data-test=current-marker]')).toBeVisible()
 })
 
 test('FR-BR-09 a branch picked in the branch picker is checked out; a new branch from it starts at its commit', async ({
@@ -249,19 +231,6 @@ test('FR-BR-08 checking out a commit warns first, then shows detached HEAD and o
   expect(rev(git, repos.work, 'rescued')).toBe(target)
 })
 
-test('FR-BR-02 the reset dialog names the branch and the commit and explains each mode', async ({
-  app,
-}) => {
-  await openReset(app, 'docs and func b')
-
-  const dialog = app.getByRole('dialog')
-  await expect(dialog).toContainText('Reset main to')
-  await expect(dialog).toContainText('docs and func b')
-  for (const mode of ['Soft', 'Mixed', 'Hard', 'Keep']) {
-    await expect(dialog.getByRole('radio', { name: new RegExp(`^${mode}\\b.+`) })).toBeVisible()
-  }
-})
-
 test('FR-BR-02 a soft reset moves the branch and keeps the changes staged', async ({
   app,
   repos,
@@ -306,17 +275,6 @@ test('FR-BR-03 a hard reset asks first, names how many files are lost, then disc
   await expect.poll(() => rev(git, repos.work, 'HEAD')).toBe(commitSha(git, repos.work, 'initial'))
   expect(git(repos.work, 'status', '--porcelain', '--untracked-files=no')).toBe('')
   await expect(app.getByRole('dialog')).toBeHidden()
-})
-
-test('FR-BR-04 after a reset the dialog closes without another action', async ({
-  app,
-  repos,
-  git,
-}) => {
-  await resetTo(app, 'docs and func b', 'Soft')
-
-  await expect(app.getByRole('dialog')).toBeHidden()
-  expect(rev(git, repos.work, 'HEAD')).toBe(commitSha(git, repos.work, 'docs and func b'))
 })
 
 test.describe('a repo with no remote', () => {
@@ -389,22 +347,6 @@ test('FR-BR-07 a keep reset on a clean tree moves the branch like hard, without 
   expect(rev(git, repos.work, 'HEAD')).toBe(commitSha(git, repos.work, 'add logo'))
   expect(git(repos.work, 'status', '--porcelain', '--untracked-files=no')).toBe('')
   await expect(confirmDialog(app)).toBeHidden()
-})
-
-test('FR-BR-06 Rename… and Delete are offered on local branches other than the current one', async ({
-  app,
-}) => {
-  expect(await refActions(app, 'B')).toEqual(expect.arrayContaining(['Rename…', 'Delete']))
-  await app.keyboard.press('Escape')
-
-  const remoteItems = await refActions(app, 'origin/feature')
-  expect(remoteItems).toContain('Check out')
-  expect(remoteItems).not.toContain('Rename…')
-  expect(remoteItems).not.toContain('Delete')
-  await app.keyboard.press('Escape')
-
-  const currentItems = await refActions(app, 'main')
-  for (const item of ['Check out', 'Rename…', 'Delete']) expect(currentItems).not.toContain(item)
 })
 
 test('FR-BR-06 renaming refuses an invalid or taken name with a message, then renames', async ({

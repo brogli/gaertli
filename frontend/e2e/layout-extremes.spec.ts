@@ -10,7 +10,7 @@ test('FR-CHG-11 wide (1600), 60 changed files: scrolling the change list never m
 }) => {
   await page.setViewportSize({ width: 1600, height: 900 })
   await openMockRepo(page, '&changedFiles=60')
-  await page.waitForSelector('.changes-column .files li')
+  await page.locator('.changes-column .files li').first().waitFor()
 
   const commitButton = page.locator('[data-test="commit-submit"]')
   const before = await commitButton.boundingBox()

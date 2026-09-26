@@ -225,8 +225,12 @@ function freePort(): Promise<number> {
     const probe = net.createServer()
     probe.once('error', reject)
     probe.listen(0, 'localhost', () => {
-      const { port } = probe.address() as net.AddressInfo
-      probe.close(() => resolve(port))
+      const address = probe.address()
+      if (address === null || typeof address === 'string') {
+        probe.close(() => reject(new Error('probe socket has no port address')))
+        return
+      }
+      probe.close(() => resolve(address.port))
     })
   })
 }

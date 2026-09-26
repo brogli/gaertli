@@ -4,13 +4,13 @@ import Dialog from 'openvue/dialog'
 import InputText from 'openvue/inputtext'
 import Checkbox from 'openvue/checkbox'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useI18n } from '@/i18n'
+import { useCoreCall } from '@/composables/useCoreCall'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { Worktree } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { DIALOG } from '../lib/layout'
-import { repoPath as toRepoPath } from '../lib/path'
-import { useRefsStore } from '../stores/refs'
+import { DIALOG } from '@/lib/layout'
+import { repoPath as toRepoPath } from '@/lib/path'
+import { useRefsStore } from '@/stores/refs'
 import BranchSelect from './BranchSelect.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import FormField from './FormField.vue'
@@ -71,8 +71,12 @@ async function submit(): Promise<void> {
   if (wt) created.value = wt
 }
 
-// createdPath is the created worktree's path as core calls take it.
-const createdPath = () => toRepoPath(created.value!.path, props.distro)
+// createdPath is the created worktree's path as core calls take it, called
+// only from the footer buttons shown once created is set.
+function createdPath(): string {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by the v-if="created" the calling buttons render under
+  return toRepoPath(created.value!.path, props.distro)
+}
 
 function openWindow(): Promise<void> {
   return runAndClose(() => AppService.OpenPath(createdPath()), finish)
@@ -106,7 +110,7 @@ function finish(): void {
       {{ t('dialogs.createWorktree.created', { path: created.path }) }}
     </p>
     <template v-else>
-      <label class="action-row">
+      <label class="flex flex-wrap items-center gap-2">
         <Checkbox v-model="newBranch" binary />
         {{ t('dialogs.createWorktree.newBranch') }}
       </label>

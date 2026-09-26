@@ -57,10 +57,20 @@ const (
 type Theme string
 
 const (
-	SystemTheme Theme = "" // follows the OS preference
-	LightTheme  Theme = "light"
-	DarkTheme   Theme = "dark"
+	SystemTheme          Theme = "" // follows the OS preference
+	LightTheme           Theme = "light"
+	DarkTheme            Theme = "dark"
+	GruvboxDarkTheme     Theme = "gruvbox-dark"
+	CatppuccinMochaTheme Theme = "catppuccin-mocha"
+	NordTheme            Theme = "nord"
+	DraculaTheme         Theme = "dracula"
 )
+
+// themeValues are Theme's allowed values.
+var themeValues = map[Theme]bool{
+	SystemTheme: true, LightTheme: true, DarkTheme: true,
+	GruvboxDarkTheme: true, CatppuccinMochaTheme: true, NordTheme: true, DraculaTheme: true,
+}
 
 // RecentRepo is one entry of Settings.RecentRepos.
 type RecentRepo struct {
@@ -107,6 +117,9 @@ func Load(path string) (Settings, error) {
 	var s Settings
 	if err := json.Unmarshal(data, &s); err != nil {
 		return Settings{}, err
+	}
+	if !themeValues[s.Theme] {
+		s.Theme = SystemTheme
 	}
 	return s, nil
 }

@@ -1,6 +1,6 @@
 import { useIntervalFn } from '@vueuse/core'
 import { watch } from 'vue'
-import { useSettingsStore } from '../stores/settings'
+import { useSettingsStore } from '@/stores/settings'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 
 // useAutoFetch fetches every settings.autoFetchIntervalMinutes while

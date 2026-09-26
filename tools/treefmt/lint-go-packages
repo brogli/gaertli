@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Usage: lint-go-packages <file.go...>
+#
+# golangci-lint lints packages, not single files: runs `golangci-lint run
+# --fix` once, from the repo root, on the package directories of the files
+# treefmt passes.
+set -euo pipefail
+
+cd "$(dirname "$0")/../.."
+mapfile -t packages < <(
+  for f in "$@"; do
+    dir=$(dirname "$f")
+    case $dir in
+      /*) echo "$dir" ;;
+      *) echo "./${dir#./}" ;;
+    esac
+  done | sort -u
+)
+exec golangci-lint run --fix "${packages[@]}"

@@ -4,6 +4,7 @@ import { usePreferredDark } from '@vueuse/core'
 import { Events } from '@wailsio/runtime'
 import { AppService, SettingsService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Theme, type Preferences } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+import { applyTheme } from '@/theme/themes'
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<Preferences | null>(null)
@@ -12,15 +13,11 @@ export const useSettingsStore = defineStore('settings', () => {
   // WSL has none.
   let distros: string[] | undefined
 
-  // Settings.theme applies live, whichever window saved it: dark or light
-  // force it, the default (System) follows the OS.
+  // Settings.theme applies live, whichever window saved it.
   const prefersDark = usePreferredDark()
   watch(
     [() => settings.value?.theme, prefersDark],
-    ([theme, osPrefersDark]) => {
-      const dark = theme === Theme.DarkTheme || (theme !== Theme.LightTheme && osPrefersDark)
-      document.documentElement.classList.toggle('nebegit-dark', dark)
-    },
+    ([theme, osPrefersDark]) => applyTheme(theme ?? Theme.SystemTheme, osPrefersDark),
     { immediate: true },
   )
 

@@ -2,21 +2,21 @@
 import { computed, ref, watch } from 'vue'
 import { Window } from '@wailsio/runtime'
 import { useEventListener } from '@vueuse/core'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   ChangeScope,
   type ChangedFile,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '../lib/diffTarget'
-import { useRepoChanged, useWindowEvent } from '../lib/windowEvents'
-import { useChangesStore } from '../stores/changes'
-import { useDiffStore } from '../stores/diff'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useOpenInEditor } from '../composables/useOpenInEditor'
-import ErrorBanner from '../components/ErrorBanner.vue'
-import ChangedFileList from '../components/ChangedFileList.vue'
-import DiffView from '../components/DiffView.vue'
+import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
+import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
+import { useChangesStore } from '@/stores/changes'
+import { useDiffStore } from '@/stores/diff'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import ErrorBanner from '@/components/ErrorBanner.vue'
+import ChangedFileList from '@/components/ChangedFileList.vue'
+import DiffView from '@/components/DiffView.vue'
 
 // DiffWindowView is the diff window's root view: the files of its target
 // on the left, one file's diff on the right. The window is its own JS
@@ -135,12 +135,12 @@ useEventListener(
 </script>
 
 <template>
-  <div class="diff-window">
-    <aside class="file-list">
+  <div class="flex h-full min-h-0 gap-4">
+    <aside class="file-list max-w-[35%] flex-none overflow-auto pl-2.5">
       <ErrorBanner v-if="error" :error="error" />
       <template v-for="g in groups" :key="g.title">
         <template v-if="g.files.length">
-          <h3 v-if="g.title">{{ g.title }}</h3>
+          <h3 v-if="g.title" class="mt-2 mb-1 text-sm">{{ g.title }}</h3>
           <ChangedFileList
             :files="g.files"
             :selected="current?.staged === g.staged ? current.file : null"
@@ -150,11 +150,13 @@ useEventListener(
         </template>
       </template>
       <template v-if="conflicted.length">
-        <h3>{{ t('changesView.conflictedTitle') }}</h3>
+        <h3 class="mt-2 mb-1 text-sm">{{ t('changesView.conflictedTitle') }}</h3>
         <ChangedFileList :files="conflicted" @open="openEditor" @open-editor="openEditor" />
       </template>
     </aside>
+    <!-- The diff takes the rest of the window, not just its content's width. -->
     <DiffView
+      class="min-w-0 flex-auto overflow-auto"
       :wt="wt"
       :target="target"
       :status="current?.file.status ?? ''"
@@ -162,28 +164,3 @@ useEventListener(
     />
   </div>
 </template>
-
-<style scoped>
-.diff-window {
-  display: flex;
-  gap: 1em;
-  height: 100%;
-  min-height: 0;
-}
-.file-list {
-  overflow: auto;
-  flex: 0 0 auto;
-  max-width: 35%;
-  padding-left: 0.6rem;
-}
-.file-list h3 {
-  margin: 0.5rem 0 0.2rem;
-  font-size: 0.9em;
-}
-/* The diff takes the rest of the window, not just its content's width. */
-.diff-view {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: auto;
-}
-</style>

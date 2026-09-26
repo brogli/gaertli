@@ -19,7 +19,6 @@ type LogCommit struct {
 	Refs         []RefLabel `json:"refs,omitempty"`
 	CheckedOutIn []string   `json:"checkedOutIn,omitempty"` // paths of worktrees whose HEAD is this commit
 	Graph        GraphRow   `json:"graph"`
-	Merge        bool       `json:"merge"` // two or more parents
 }
 
 // RefLabel is one decoration on a commit. Name is the short

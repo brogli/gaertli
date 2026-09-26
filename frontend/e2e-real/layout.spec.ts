@@ -97,9 +97,11 @@ test('FR-UX-09 a worktree row keeps its name, flags and buttons on one line; a l
       (await row.locator(':scope > *').all()).map(async (child) => (await child.boundingBox())!),
     )
     const middle = boxes[0]!.y + boxes[0]!.height / 2
-    for (const [i, box] of boxes.entries()) {
+    for (const box of boxes) {
       expect(Math.abs(box.y + box.height / 2 - middle)).toBeLessThanOrEqual(4)
-      if (i > 0) expect(box.x).toBeGreaterThanOrEqual(boxes[i - 1]!.x + boxes[i - 1]!.width + 2)
+    }
+    for (let i = 1; i < boxes.length; i++) {
+      expect(boxes[i]!.x).toBeGreaterThanOrEqual(boxes[i - 1]!.x + boxes[i - 1]!.width + 2)
     }
   }
 

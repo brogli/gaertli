@@ -1,4 +1,4 @@
-// Command trace checks requirement traceability: every required
+// Command trace checks requirement traceability: every MUST functional
 // requirement ID must be named by a Go test, a Vitest or Playwright test,
 // or a manual checklist entry.
 package main
@@ -18,19 +18,20 @@ import (
 
 // Config points trace at the files and directories it reads.
 type Config struct {
-	FunctionalDir, QualityPath, TestingPath string
-	GoRoot, FrontendRoot                    string
-	PendingPath                             string
+	RequirementsDir, TestingPath string
+	GoRoot, FrontendRoot         string
+	PendingPath                  string
 }
 
-// idExpr matches one requirement ID, e.g. FR-LOG-01.
-const idExpr = `[A-Z]{2,6}-[A-Z]{2,6}-[0-9]{2,3}`
+// idExpr matches one requirement ID: an area and a number (e.g. DIST-01), or
+// a category, an area and a number (e.g. FR-LOG-01).
+const idExpr = `[A-Z]{2,6}(?:-[A-Z]{2,6})?-[0-9]{2,3}`
 
 var (
 	idPattern     = regexp.MustCompile(`^` + idExpr + `$`)
 	separatorCell = regexp.MustCompile(`^:?-+:?$`)
 	goTestFunc    = regexp.MustCompile(`(?m)^func (Test[A-Za-z0-9_]*)\(`)
-	goTestID      = regexp.MustCompile(`^Test([A-Z]+)_([A-Z]+)_([0-9]+)(?:_|$)`)
+	goTestID      = regexp.MustCompile(`^Test([A-Z]+)(?:_([A-Z]+))?_([0-9]+)(?:_|$)`)
 	vitestCall    = regexp.MustCompile(`\b(?:it|test)\(\s*['"]([^'"]*)['"]`)
 	vitestID      = regexp.MustCompile(`^(` + idExpr + `)(?:\s|$)`)
 )
@@ -38,7 +39,7 @@ var (
 // run computes the required IDs and their coverage, and reports the
 // problems (missing or stale) to out.
 func run(cfg Config, out io.Writer) (int, error) {
-	required, err := requiredIDs(cfg.FunctionalDir, cfg.QualityPath)
+	required, err := requiredIDs(cfg.RequirementsDir)
 	if err != nil {
 		return 0, err
 	}
@@ -53,11 +54,12 @@ func run(cfg Config, out io.Writer) (int, error) {
 	return report(out, required, covered, pending, cfg.PendingPath), nil
 }
 
-// requiredIDs returns every MUST FR id from the .md files in functionalDir
-// and every QA id from qualityPath.
-func requiredIDs(functionalDir, qualityPath string) (map[string]bool, error) {
+// requiredIDs returns every MUST FR id from the .md files in
+// requirementsDir/functional.
+func requiredIDs(requirementsDir string) (map[string]bool, error) {
 	required := map[string]bool{}
 
+	functionalDir := filepath.Join(requirementsDir, "functional")
 	functionalPaths, err := filepath.Glob(filepath.Join(functionalDir, "*.md"))
 	if err != nil || len(functionalPaths) == 0 {
 		return nil, fmt.Errorf("no functional requirement files (*.md) in %s", functionalDir)
@@ -71,16 +73,6 @@ func requiredIDs(functionalDir, qualityPath string) (map[string]bool, error) {
 			if len(cells) >= 2 && cells[1] == "MUST" && idPattern.MatchString(cells[0]) {
 				required[cells[0]] = true
 			}
-		}
-	}
-
-	qaRows, err := tableRows(qualityPath)
-	if err != nil {
-		return nil, err
-	}
-	for _, cells := range qaRows {
-		if idPattern.MatchString(cells[0]) {
-			required[cells[0]] = true
 		}
 	}
 
@@ -158,14 +150,17 @@ func idFromGoTestName(name string) (string, bool) {
 	if m == nil {
 		return "", false
 	}
+	if m[2] == "" {
+		return m[1] + "-" + m[3], true
+	}
 	return m[1] + "-" + m[2] + "-" + m[3], true
 }
 
 // frontendCoverage returns the requirement IDs named by the first string
-// argument of an it(...) or test(...) call in Vitest (*.test.ts) and
-// Playwright (*.spec.ts) files below root.
+// argument of an it(...) or test(...) call in Vitest and Playwright files
+// (both *.spec.ts) below root.
 func frontendCoverage(root string) (map[string]bool, error) {
-	return coverageInFiles(root, []string{".test.ts", ".spec.ts"}, func(src string, covered map[string]bool) {
+	return coverageInFiles(root, []string{".spec.ts"}, func(src string, covered map[string]bool) {
 		for _, m := range vitestCall.FindAllStringSubmatch(src, -1) {
 			if id := vitestID.FindStringSubmatch(m[1]); id != nil {
 				covered[id[1]] = true

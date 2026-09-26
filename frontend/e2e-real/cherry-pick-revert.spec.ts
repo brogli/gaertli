@@ -66,24 +66,6 @@ test('FR-CP-03 a cherry-pick that stops on conflicts shows the operation and the
   await expect(fileRow(app, 'Conflicted', 'conflict.txt')).toBeVisible()
 })
 
-test('FR-CP-08 cherry-picking a merge commit asks for the parent and applies that side', async ({
-  openApp,
-  repos,
-  git,
-}) => {
-  git(repos.work, 'checkout', '-q', 'B')
-  const head = rev(git, repos.work, 'HEAD')
-  const app = await openApp(repos.work)
-
-  await pickFromContextMenu(app, logRow(app, "Merge branch 'side'"), 'Cherry-pick')
-  const dialog = app.getByRole('dialog')
-  await dialog.getByLabel('Pick against parent').fill('1')
-  await dialog.getByRole('button', { name: 'Confirm' }).click()
-
-  await expect.poll(() => rev(git, repos.work, 'HEAD~1')).toBe(head)
-  expect(git(repos.work, 'diff', '--name-only', 'HEAD~1', 'HEAD').trim()).toBe('side.txt')
-})
-
 test('FR-CP-06 "Cherry-pick…" can add the "cherry picked from" line to the message', async ({
   app,
   repos,

@@ -2,14 +2,14 @@
 import { computed } from 'vue'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
-import { useI18n } from '../i18n'
-import { useLogStore } from '../stores/log'
-import { useCompareStore } from '../stores/compare'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useOpenInEditor } from '../composables/useOpenInEditor'
+import { useI18n } from '@/i18n'
+import { useLogStore } from '@/stores/log'
+import { useCompareStore } from '@/stores/compare'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DiffKind, fileTarget } from '../lib/diffTarget'
-import { shortSha, timeAgo } from '../lib/format'
+import { DiffKind, fileTarget } from '@/lib/diffTarget'
+import { shortSha, timeAgo } from '@/lib/format'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ChangedFiles from './ChangedFiles.vue'
 import ErrorBanner from './ErrorBanner.vue'
@@ -62,40 +62,46 @@ const committerDiffers = computed(() => {
 </script>
 
 <template>
-  <CompareView v-if="compare.active" class="pane" :wt="wt" />
-  <CompareWorkingView v-else-if="compare.workingCommit" class="pane" :wt="wt" />
-  <p v-else-if="pickedCount >= 3" class="picked-count pane">
+  <!-- Each branch fills the view (a flex column's rest, or a splitter
+       panel). -->
+  <CompareView v-if="compare.active" class="flex-1 min-h-0 h-full" :wt="wt" />
+  <CompareWorkingView v-else-if="compare.workingCommit" class="flex-1 min-h-0 h-full" :wt="wt" />
+  <p v-else-if="pickedCount >= 3" class="flex-1 min-h-0 h-full px-2.5 py-1.5">
     {{ t('commitDetailView.selectedCount', { n: pickedCount }, pickedCount) }}
   </p>
   <Splitter
     v-else-if="log.details"
     layout="vertical"
-    class="commit-details"
+    class="commit-details flex-1 min-h-0 h-full"
     state-key="nebegit.layout.commitDetail"
     state-storage="local"
   >
-    <SplitterPanel :size="50" :min-size="10" class="split-part commit-message">
+    <SplitterPanel
+      :size="50"
+      :min-size="10"
+      class="commit-message flex flex-col gap-1.5 overflow-y-auto px-2.5 py-1.5"
+    >
       <ErrorBanner v-if="error" :error="error" />
-      <p class="subject">{{ subject }}</p>
-      <pre v-if="restBody" class="body">{{ restBody }}</pre>
-      <dl class="fields">
-        <dt>{{ t('commitDetailView.commit') }}</dt>
-        <dd :title="log.details.sha">{{ shortSha(log.details.sha) }}</dd>
-        <dt>{{ t('commitDetailView.author') }}</dt>
-        <dd :title="absoluteDate(log.details.authorAt)">
+      <p class="subject font-semibold break-words">{{ subject }}</p>
+      <pre v-if="restBody" class="whitespace-pre-wrap font-sans">{{ restBody }}</pre>
+      <dl class="fields grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5">
+        <dt class="text-muted-color">{{ t('commitDetailView.commit') }}</dt>
+        <dd class="truncate" :title="log.details.sha">{{ shortSha(log.details.sha) }}</dd>
+        <dt class="text-muted-color">{{ t('commitDetailView.author') }}</dt>
+        <dd class="truncate" :title="absoluteDate(log.details.authorAt)">
           {{ log.details.author }} &lt;{{ log.details.authorEmail }}&gt; ·
           {{ timeAgo(log.details.authorAt) }}
         </dd>
         <template v-if="committerDiffers">
-          <dt>{{ t('commitDetailView.committer') }}</dt>
-          <dd :title="absoluteDate(log.details.committerAt)">
+          <dt class="text-muted-color">{{ t('commitDetailView.committer') }}</dt>
+          <dd class="truncate" :title="absoluteDate(log.details.committerAt)">
             {{ log.details.committer }} &lt;{{ log.details.committerEmail }}&gt; ·
             {{ timeAgo(log.details.committerAt) }}
           </dd>
         </template>
         <template v-if="log.details.parents?.length">
-          <dt>{{ t('commitDetailView.parents') }}</dt>
-          <dd class="parents">
+          <dt class="text-muted-color">{{ t('commitDetailView.parents') }}</dt>
+          <dd class="parents flex flex-wrap gap-2 whitespace-normal">
             <span v-for="parent in log.details.parents" :key="parent" :title="parent">{{
               shortSha(parent)
             }}</span>
@@ -103,7 +109,7 @@ const committerDiffers = computed(() => {
         </template>
       </dl>
     </SplitterPanel>
-    <SplitterPanel :size="50" :min-size="10" class="split-part">
+    <SplitterPanel :size="50" :min-size="10" class="flex flex-col gap-1.5 px-2.5 py-1.5">
       <ChangedFiles
         :files="log.details.files ?? []"
         :selected="log.selectedFile"
@@ -114,62 +120,3 @@ const committerDiffers = computed(() => {
     </SplitterPanel>
   </Splitter>
 </template>
-
-<style scoped>
-.picked-count {
-  margin: 0;
-}
-/* Each content fills the view: the rest of a flex column (medium, narrow)
-   or all of a splitter panel (wide). A commit's two parts, like the other
-   contents, are inset from their edges; the message part scrolls, the
-   files part leaves that to its file region. */
-.pane,
-.commit-details {
-  flex: 1 1 auto;
-  height: 100%;
-  min-height: 0;
-}
-.pane,
-.split-part {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.4rem 0.6rem;
-  box-sizing: border-box;
-}
-.pane,
-.commit-message {
-  overflow-y: auto;
-}
-.subject {
-  margin: 0;
-  font-weight: 600;
-  overflow-wrap: break-word;
-}
-.body {
-  margin: 0;
-  font-family: inherit;
-  white-space: pre-wrap;
-}
-.fields {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.15rem 0.6rem;
-  margin: 0;
-}
-.fields dt {
-  color: var(--p-text-muted-color);
-}
-.fields dd {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.parents {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  white-space: normal;
-}
-</style>

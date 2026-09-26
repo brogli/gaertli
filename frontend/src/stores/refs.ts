@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ChangeScope, type Refs } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { onRepoChanged } from '../lib/windowEvents'
+import { onRepoChanged } from '@/lib/windowEvents'
 
 // refs holds the repo's branches, remotes, and tags, reloaded only when a
 // ref moved (the "refs" scope).

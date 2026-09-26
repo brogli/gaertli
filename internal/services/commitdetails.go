@@ -20,8 +20,10 @@ func (c *Core) CommitDetails(ctx context.Context, id core.WorktreeID, sha string
 	}
 	result, err := wt.Runner.Run(ctx, git.Call{
 		Dir: wt.Path, ReadOnly: true,
-		Args: []string{"show", "--format=" + detailsFormat, "--name-status", "-z", "-M",
-			"--first-parent", "--end-of-options", sha},
+		Args: []string{
+			"show", "--format=" + detailsFormat, "--name-status", "-z", "-M",
+			"--first-parent", "--end-of-options", sha,
+		},
 	})
 	if err != nil {
 		return core.CommitDetails{}, err

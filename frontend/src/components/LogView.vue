@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useLogStore } from '../stores/log'
+import { useLogStore } from '@/stores/log'
 import ErrorBanner from './ErrorBanner.vue'
 import FilterBar from './FilterBar.vue'
 import LogList from './LogList.vue'
@@ -19,7 +19,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="log-column">
+  <!-- Fills whichever layout container places it; LogList's virtual scroll
+       needs this bounded so it, not the page, scrolls. -->
+  <div class="log-column flex h-full min-w-0 min-h-0 flex-col">
     <FilterBar />
     <ErrorBanner v-if="log.error" :error="log.error" />
     <LogList
@@ -32,15 +34,3 @@ const emit = defineEmits<{
     />
   </div>
 </template>
-
-<style scoped>
-/* Fills whichever layout container places it; LogList's virtual scroll
-   needs this bounded so it, not the page, scrolls. */
-.log-column {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-}
-</style>

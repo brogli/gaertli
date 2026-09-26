@@ -25,7 +25,7 @@ tasks:
       - node_modules
     preconditions:
       - sh: pnpm --version
-        msg: "pnpm not found"
+        msg: 'pnpm not found'
     cmds:
       - pnpm install --frozen-lockfile
 
@@ -40,7 +40,7 @@ tasks:
     run: once
     dir: frontend
     sources:
-      - "**/*"
+      - '**/*'
       - exclude: node_modules/**/*
     generates:
       - dist/**/*
@@ -64,16 +64,16 @@ tasks:
     cmds:
       - task: frontend:run:{{.PACKAGE_MANAGER}}
         vars:
-          SCRIPT: "{{.SCRIPT}}"
+          SCRIPT: '{{.SCRIPT}}'
     vars:
-      SCRIPT: "{{.SCRIPT}}"
+      SCRIPT: '{{.SCRIPT}}'
 
   frontend:run:pnpm:
     dir: frontend
     cmds:
       - pnpm run {{.SCRIPT}}
     vars:
-      SCRIPT: "{{.SCRIPT}}"
+      SCRIPT: '{{.SCRIPT}}'
 
   frontend:vendor:puppertino:
     summary: Fetches Puppertino CSS into frontend/public for consistent mobile styling
@@ -110,36 +110,39 @@ tasks:
           sed -E -i'' 's/class=\"btn\"/class=\"p-btn p-prim-col\"/g' "$INDEX_HTML" || true
         fi
 
-
-
   generate:bindings:
     summary: Generates bindings for the frontend
     run: once
     sources:
-      - "**/*.[jt]s"
+      - '**/*.[jt]s'
       - exclude: frontend/**/*
-      - frontend/bindings/**/*  # Rerun when switching between dev/production mode causes changes in output
-      - "**/*.go"
+      - frontend/bindings/**/* # Rerun when switching between dev/production mode causes changes in output
+      - '**/*.go'
       - go.mod
       - go.sum
     generates:
       - frontend/bindings/**/*
     cmds:
       # The services live in internal/app, not at the repo root (the default pattern ".").
-      - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -ts -i ./internal/app
+      - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}}
+        -obfuscated{{end}} -ts -i ./internal/app
 
   generate:icons:
-    summary: Generates Windows `.ico` and Mac `.icns` from an image; on macOS, `-iconcomposerinput appicon.icon -macassetdir darwin` also produces `Assets.car` from a `.icon` file (skipped on other platforms).
+    summary:
+      Generates Windows `.ico` and Mac `.icns` from an image; on macOS, `-iconcomposerinput
+      appicon.icon -macassetdir darwin` also produces `Assets.car` from a `.icon` file (skipped on
+      other platforms).
     run: once
     dir: build
     sources:
-      - "appicon.png"
-      - "appicon.icon"
+      - 'appicon.png'
+      - 'appicon.icon'
     generates:
-      - "darwin/icons.icns"
-      - "windows/icon.ico"
+      - 'darwin/icons.icns'
+      - 'windows/icon.ico'
     cmds:
-      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
+      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename
+        windows/icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
 
   dev:frontend:
     summary: Runs the frontend in development mode
@@ -157,7 +160,8 @@ tasks:
     summary: Updates the build assets
     dir: build
     cmds:
-      - wails3 update build-assets -name "{{.APP_NAME}}" -binaryname "{{.APP_NAME}}" -config config.yml -dir .
+      - wails3 update build-assets -name "{{.APP_NAME}}" -binaryname "{{.APP_NAME}}" -config
+        config.yml -dir .
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
@@ -168,7 +172,7 @@ tasks:
       - docker build -t wails-cross -f build/docker/Dockerfile.cross build/docker/
     preconditions:
       - sh: docker info > /dev/null 2>&1
-        msg: "Docker is required. Please install Docker first."
+        msg: 'Docker is required. Please install Docker first.'
 
   ios:device:list:
     summary: Lists connected iOS devices (UDIDs)
@@ -176,26 +180,27 @@ tasks:
       - xcrun xcdevice list
 
   ios:run:device:
-    summary: Build, install, and launch on a physical iPhone using Apple tools (xcodebuild/devicectl)
+    summary:
+      Build, install, and launch on a physical iPhone using Apple tools (xcodebuild/devicectl)
     vars:
-      PROJECT: '{{.PROJECT}}'   # e.g., build/ios/xcode/<YourProject>.xcodeproj
-      SCHEME: '{{.SCHEME}}'     # e.g., ios.dev
+      PROJECT: '{{.PROJECT}}' # e.g., build/ios/xcode/<YourProject>.xcodeproj
+      SCHEME: '{{.SCHEME}}' # e.g., ios.dev
       CONFIG: '{{.CONFIG | default "Debug"}}'
       DERIVED: '{{.DERIVED | default "build/ios/DerivedData"}}'
-      UDID: '{{.UDID}}'         # from `task ios:device:list`
+      UDID: '{{.UDID}}' # from `task ios:device:list`
       BUNDLE_ID: '{{.BUNDLE_ID}}' # e.g., com.yourco.wails.ios.dev
-      TEAM_ID: '{{.TEAM_ID}}'   # optional, if your project is not already set up for signing
+      TEAM_ID: '{{.TEAM_ID}}' # optional, if your project is not already set up for signing
     preconditions:
       - sh: xcrun -f xcodebuild
-        msg: "xcodebuild not found. Please install Xcode."
+        msg: 'xcodebuild not found. Please install Xcode.'
       - sh: xcrun -f devicectl
-        msg: "devicectl not found. Please update to Xcode 15+ (which includes devicectl)."
+        msg: 'devicectl not found. Please update to Xcode 15+ (which includes devicectl).'
       - sh: test -n '{{.PROJECT}}'
-        msg: "Set PROJECT to your .xcodeproj path (e.g., PROJECT=build/ios/xcode/App.xcodeproj)."
+        msg: 'Set PROJECT to your .xcodeproj path (e.g., PROJECT=build/ios/xcode/App.xcodeproj).'
       - sh: test -n '{{.SCHEME}}'
-        msg: "Set SCHEME to your app scheme (e.g., SCHEME=ios.dev)."
+        msg: 'Set SCHEME to your app scheme (e.g., SCHEME=ios.dev).'
       - sh: test -n '{{.UDID}}'
-        msg: "Set UDID to your device UDID (see: task ios:device:list)."
+        msg: 'Set UDID to your device UDID (see: task ios:device:list).'
       - sh: test -n '{{.BUNDLE_ID}}'
         msg: "Set BUNDLE_ID to your app's bundle identifier (e.g., com.yourco.wails.ios.dev)."
     cmds:

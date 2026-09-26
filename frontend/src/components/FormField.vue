@@ -10,16 +10,8 @@ const labelId = `${id}-label`
 </script>
 
 <template>
-  <div class="form-field">
+  <div class="form-field flex flex-col gap-2">
     <label :id="labelId" :for="id">{{ label }}</label>
     <slot v-bind="{ id, labelId }" />
   </div>
 </template>
-
-<style scoped>
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-</style>

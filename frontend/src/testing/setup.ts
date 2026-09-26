@@ -3,8 +3,8 @@ import { config, enableAutoUnmount } from '@vue/test-utils'
 import PrimeVueConfig from 'openvue/config'
 import ConfirmationService from 'openvue/confirmationservice'
 import ToastService from 'openvue/toastservice'
-import { i18n } from '../i18n'
-import { openvueLocale } from '../lib/openvueLocale'
+import { i18n } from '@/i18n'
+import { openvueLocale } from '@/lib/openvueLocale'
 
 // Components with a window-level listener (onKeyStroke's shortcuts) would
 // otherwise keep firing into later tests in the same file: every mount

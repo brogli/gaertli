@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import Checkbox from 'openvue/checkbox'
@@ -8,15 +8,15 @@ import ContextMenu from 'openvue/contextmenu'
 import type { MenuItem } from 'openvue/menuitem'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Code, type Branch } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { useRefsStore } from '../stores/refs'
-import { useRepoStore } from '../stores/repo'
-import { useLogStore } from '../stores/log'
-import { useCoreCall, type CoreError } from '../composables/useCoreCall'
-import { useConfirmAction } from '../composables/useConfirmAction'
-import { shortSha } from '../lib/format'
-import { iconClass } from '../lib/icons'
-import { useLayout, useToolbarButton } from '../lib/layout'
-import { errorNotice, useNotices } from '../lib/notice'
+import { useRefsStore } from '@/stores/refs'
+import { useRepoStore } from '@/stores/repo'
+import { useLogStore } from '@/stores/log'
+import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
+import { useConfirmAction } from '@/composables/useConfirmAction'
+import { shortSha } from '@/lib/format'
+import { iconClass } from '@/lib/icons'
+import { useLayout, useToolbarButton } from '@/lib/layout'
+import { errorNotice, useNotices } from '@/lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
 import PickerList from './PickerList.vue'
 import RenameBranchDialog from './RenameBranchDialog.vue'
@@ -69,7 +69,9 @@ const tracked = computed(() => {
 // RefRow is one checkout-able entry; name is what the list shows and the
 // filter matches, e.g. "origin/x" for a remote branch, ref its full ref name.
 type RefRow = PickerRow & { name: string; ref: string; sha: string } & (
-    { kind: 'local'; branch: Branch } | { kind: 'remote'; shortName: string } | { kind: 'tag' }
+    | { kind: 'local'; branch: Branch }
+    | { kind: 'remote'; shortName: string }
+    | { kind: 'tag' }
   )
 type ActionRow = PickerRow & { kind: 'action'; label: string; run: () => void }
 type SectionRow = PickerRow & { kind: 'section'; label: string }
@@ -309,7 +311,7 @@ async function updateChecked(): Promise<void> {
 <template>
   <Button
     v-bind="toolbarButton"
-    class="picker-button"
+    class="min-w-0 max-w-80"
     data-test="branch-picker"
     :title="headLabel"
     :aria-label="headLabel"
@@ -317,7 +319,7 @@ async function updateChecked(): Promise<void> {
   >
     <i :class="iconClass('branch')" aria-hidden="true"></i>
     <template v-if="layout !== 'narrow'">
-      <span class="ellipsis">{{ headLabel }}</span>
+      <span class="min-w-10 flex-auto truncate">{{ headLabel }}</span>
       <span v-if="tracked" data-test="ahead-behind">
         <i :class="iconClass('ahead')" aria-hidden="true"></i>{{ tracked.ahead }}
         <i :class="iconClass('behind')" aria-hidden="true"></i>{{ tracked.behind }}
@@ -326,7 +328,7 @@ async function updateChecked(): Promise<void> {
     </template>
   </Button>
   <Popover ref="popover" @show="query = ''">
-    <div class="branch-list">
+    <div class="branch-list flex flex-col gap-1.5 w-112 max-w-[90vw] max-h-[70vh]">
       <ErrorBanner v-if="error" :error="error" />
       <PickerList
         v-model:query="query"
@@ -339,13 +341,13 @@ async function updateChecked(): Promise<void> {
           <h3 v-if="row.kind === 'section'">{{ row.label }}</h3>
           <span
             v-else-if="row.kind === 'action'"
-            class="row"
+            class="row flex min-w-0 flex-1 items-center gap-1.5"
             data-test="picker-action"
             @click="onActivate"
             >{{ row.label }}</span
           >
           <template v-else>
-            <span class="update-slot">
+            <span class="flex w-(--p-checkbox-width) flex-none">
               <Checkbox
                 v-if="updatable(row)"
                 binary
@@ -356,8 +358,12 @@ async function updateChecked(): Promise<void> {
                 @update:model-value="setChecked(row.name, $event)"
               />
             </span>
-            <span class="row" data-test="ref-row" @click="onActivate">
-              <span class="current-marker">
+            <span
+              class="row flex min-w-0 flex-1 items-center gap-1.5"
+              data-test="ref-row"
+              @click="onActivate"
+            >
+              <span class="current-marker w-[1em] flex-none text-xs text-primary">
                 <i
                   v-if="row.kind === 'local' && row.branch.current"
                   :class="iconClass('current')"
@@ -366,8 +372,11 @@ async function updateChecked(): Promise<void> {
                   :aria-label="t('branchPicker.currentBranch')"
                 ></i>
               </span>
-              <span class="ref-name ellipsis" :title="row.name">{{ row.name }}</span>
-              <span v-if="row.kind === 'local' && row.branch.upstream" class="muted leftover">
+              <span class="ref-name min-w-0 truncate" :title="row.name">{{ row.name }}</span>
+              <span
+                v-if="row.kind === 'local' && row.branch.upstream"
+                class="flex-1 whitespace-nowrap text-sm text-muted-color"
+              >
                 <span v-if="row.branch.ahead"
                   ><i :class="iconClass('ahead')" aria-hidden="true"></i
                   >{{ row.branch.ahead }}</span
@@ -377,7 +386,7 @@ async function updateChecked(): Promise<void> {
                   >{{ row.branch.behind }}</span
                 >
               </span>
-              <span v-else class="leftover"></span>
+              <span v-else class="flex-1"></span>
             </span>
           </template>
         </template>
@@ -392,33 +401,3 @@ async function updateChecked(): Promise<void> {
     @close="renameTarget = null"
   />
 </template>
-
-<style scoped>
-/* Wider than the other pickers, for the ahead/behind counts. */
-.picker-button {
-  max-width: 20rem;
-  white-space: nowrap;
-}
-.branch-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  width: 28rem;
-  max-width: 90vw;
-  max-height: 70vh;
-}
-/* A checkbox's width on every ref row, filled only where the branch can be
-   updated, so every name starts at the same x. */
-.update-slot {
-  flex: none;
-  display: flex;
-  width: var(--p-checkbox-width);
-}
-.current-marker {
-  font-size: 0.75em;
-  color: var(--p-primary-color);
-}
-.muted {
-  white-space: nowrap;
-}
-</style>

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mockDiffUrl } from './helpers'
+import { mockDiffUrl, openMockRepo } from './helpers'
 
 // happy-dom computes no cascade from style.css: this needs a real browser.
 // WebView2 on Windows shows its host window (black) through any part of the
@@ -50,8 +50,8 @@ async function openDiffBackgrounds(
   page: Page,
 ): Promise<{ codeArea: RGB | null; fileList: RGB | null }> {
   await page.goto(mockDiffUrl)
-  await page.waitForSelector('.cm-scroller')
-  await page.waitForSelector('.file-list li')
+  await page.locator('.cm-scroller').first().waitFor()
+  await page.locator('.file-list li').first().waitFor()
 
   // The diff's content is taller than the window, so any point inside the
   // scroller is the code area; a glyph or blank space makes no difference.
@@ -88,4 +88,18 @@ test('FR-UX-06 dark theme: the page paints the code area dark itself, not black'
   const { codeArea } = await openDiffBackgrounds(page)
 
   expect(isDarkNotBlack(codeArea)).toBe(true)
+})
+
+test('FR-UX-06 choosing Dracula in Settings and saving paints the main window in its colours at once', async ({
+  page,
+}) => {
+  await openMockRepo(page)
+
+  await page.locator('[data-test=open-settings]').click()
+  await page.locator('[data-test=theme-select]').click()
+  await page.getByRole('option', { name: 'Dracula' }).click()
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(40, 42, 54)')
+  await expect(page.locator('body')).toHaveCSS('color', 'rgb(248, 248, 242)')
 })

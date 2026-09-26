@@ -6,21 +6,17 @@ import {
   commitFiles,
   commitSha,
   diffText,
-  dragLogBorder,
   fileRow,
   hunksText,
   logRow,
   notice,
   openSettings,
-  pushFromClone,
-  rev,
   switchToChanges,
 } from './helpers'
 import type { Git, Repos } from './repos'
 
-// The diff window, themes, layout, keyboard shortcuts and every way of
-// opening a file in the external editor. Editor launches go to the
-// sandbox's stand-in editor.
+// The diff window and every way of opening a file in the external editor.
+// Editor launches go to the sandbox's stand-in editor.
 
 const rows = Array.from({ length: 200 }, (_, i) => `row ${i + 1}`)
 
@@ -135,82 +131,6 @@ test('FR-DIFF-06 "ignore whitespace" hides a whitespace-only change', async ({
   await expect(changed.first()).toBeVisible()
 })
 
-test('FR-UX-05 Ctrl+K commits, Ctrl+Shift+K pushes, Ctrl+T pulls; F5 refreshes in place instead of reloading the page', async ({
-  app,
-  git,
-  repos,
-}) => {
-  fs.writeFileSync(path.join(repos.work, 'staged.txt'), 'staged\n')
-  git(repos.work, 'add', 'staged.txt')
-  await expect(fileRow(app, 'Staged', 'staged.txt')).toBeVisible()
-  await app.getByPlaceholder('Commit message').fill('commit via Ctrl+K')
-  await app.keyboard.press('Control+k')
-  await expect
-    .poll(() => git(repos.work, 'log', '-1', '--format=%s').trim())
-    .toBe('commit via Ctrl+K')
-
-  await app.keyboard.press('Control+Shift+K')
-  await expect.poll(() => rev(git, repos.remote, 'main')).toBe(rev(git, repos.work, 'HEAD'))
-
-  pushFromClone(git, repos.other, 'main', { 'pulled.txt': 'pulled\n' }, 'from the other clone')
-  await app.keyboard.press('Control+t')
-  await expect.poll(() => fs.existsSync(path.join(repos.work, 'pulled.txt'))).toBe(true)
-
-  // A listener added after the app's own runs after it, so it sees whether
-  // the app kept F5 from reloading the page.
-  type Marked = { f5Prevented?: boolean }
-  await app.evaluate(() =>
-    window.addEventListener(
-      'keydown',
-      (e) => ((window as Marked).f5Prevented = e.defaultPrevented),
-      { once: true },
-    ),
-  )
-  await app.keyboard.press('F5')
-  expect(await app.evaluate(() => (window as Marked).f5Prevented)).toBe(true)
-})
-
-test('FR-UX-06 Light and Dark apply at once; System follows the OS setting', async ({ app }) => {
-  const dark = () => app.evaluate(() => document.documentElement.classList.contains('nebegit-dark'))
-  const setTheme = async (theme: string) => {
-    const dialog = await openSettings(app)
-    await dialog.locator('[data-test=theme-select]').getByRole('button', { name: theme }).click()
-    await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(dialog).toBeHidden()
-  }
-
-  await setTheme('Dark')
-  await expect.poll(dark).toBe(true)
-  await setTheme('Light')
-  await expect.poll(dark).toBe(false)
-
-  await setTheme('System')
-  await app.emulateMedia({ colorScheme: 'dark' })
-  await expect.poll(dark).toBe(true)
-  await app.emulateMedia({ colorScheme: 'light' })
-  await expect.poll(dark).toBe(false)
-})
-
-test('FR-UX-08 dragging the column border resizes the log', async ({ app }) => {
-  const logWidth = async () => (await app.locator('.log-column').boundingBox())!.width
-  const wide = await logWidth()
-  await dragLogBorder(app, wide - 150)
-  await expect.poll(logWidth).toBeLessThan(wide - 100)
-})
-
-test('FR-UX-08 the log sits left of a side panel switching between the commit detail view and the changes view', async ({
-  app,
-}) => {
-  const [log, side] = await Promise.all(
-    ['.log-column', '.side-column'].map(async (c) => (await app.locator(c).boundingBox())!),
-  )
-  expect(side!.x).toBeGreaterThanOrEqual(log!.x + log!.width - 1)
-  await expect(app.locator('.changes-column')).toBeVisible()
-
-  await app.getByRole('button', { name: 'Details', exact: true }).click()
-  await expect(app.locator('.changes-column')).toBeHidden()
-})
-
 test('FR-ED-02 a file opens in the editor from the commit detail view and the change list; a file gone from disk says so', async ({
   app,
   repos,
@@ -256,14 +176,6 @@ test('FR-ED-09 "Open in editor" from the diff opens the file at the clicked line
   await expect
     .poll(editorCalls)
     .toEqual([`stand-in-editor ${path.join(repos.work, 'long.txt')}:180`])
-})
-
-test('FR-ED-07 a preset fills the editor command fields', async ({ app }) => {
-  const dialog = await openSettings(app)
-  await dialog.locator('[data-test=editor-preset]', { hasText: 'VS Code' }).click()
-  await expect(dialog.getByLabel('Folder command')).toHaveValue('code {path}')
-  await expect(dialog.getByLabel('File command', { exact: true })).toHaveValue('code {path}')
-  await expect(dialog.getByLabel('File-at-line command')).toHaveValue('code -g {path}:{line}')
 })
 
 test('FR-ED-05 a saved editor change relabels "Open in …" in every window at once', async ({

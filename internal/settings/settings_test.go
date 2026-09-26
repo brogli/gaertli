@@ -160,6 +160,15 @@ func TestFR_UX_06_LoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
 	}
 }
 
+func TestFR_UX_06_LoadAcceptsTheFourDarkThemesAndFallsBackToSystemOnAnUnknownValue(t *testing.T) {
+	if got := loadJSON(t, `{"theme": "dracula"}`).Theme; got != settings.DraculaTheme {
+		t.Errorf("Theme = %q, want %q", got, settings.DraculaTheme)
+	}
+	if got := loadJSON(t, `{"theme": "bogus"}`).Theme; got != settings.SystemTheme {
+		t.Errorf("Theme = %q, want %q (unknown falls back to System)", got, settings.SystemTheme)
+	}
+}
+
 func TestFR_REPO_02_AddRecentMovesToFrontAndDedupes(t *testing.T) {
 	s := settings.Settings{}
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

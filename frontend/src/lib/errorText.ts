@@ -1,5 +1,5 @@
-import { i18n } from '../i18n'
-import type { CoreError } from '../composables/useCoreCall'
+import { i18n } from '@/i18n'
+import type { CoreError } from '@/composables/useCoreCall'
 import { Code } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // errorHeadline is the text an error shows first: the catalogue text for

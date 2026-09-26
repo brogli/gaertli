@@ -146,9 +146,6 @@ func pickArgs(verb string, opts core.PickOptions) []string {
 	if opts.RecordOrigin && verb == "cherry-pick" {
 		args = append(args, "-x")
 	}
-	if opts.Mainline > 0 {
-		args = append(args, "-m", strconv.Itoa(opts.Mainline))
-	}
 	if verb == "revert" {
 		args = append(args, "--no-edit")
 	}
@@ -156,9 +153,9 @@ func pickArgs(verb string, opts core.PickOptions) []string {
 }
 
 // runSequence is CherryPick's and Revert's shared body: resolve
-// shas, refuse the whole call up front if any is a merge commit and no
-// mainline is set, then run verb under wt's write lock. A failure that
-// leaves headFile behind stopped mid-way: Code Conflicts.
+// shas, refuse the whole call up front if any is a merge commit, then run
+// verb under wt's write lock. A failure that leaves headFile behind stopped
+// mid-way: Code Conflicts.
 func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb, headFile string, oldestFirst bool, opts core.PickOptions) error {
 	if len(shas) == 0 {
 		return core.Errorf(core.Internal, "no commits given")
@@ -171,11 +168,9 @@ func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb,
 	if err != nil {
 		return err
 	}
-	if opts.Mainline == 0 {
-		if merge, ok := firstMerge(candidates); ok {
-			args := map[string]string{"sha": merge.ShortSHA, "verb": verb}
-			return core.ErrorfArgs(core.GitFailed, "mergeCommitNotPickable", args, "%s is a merge commit; %s does not support a merge commit", merge.ShortSHA, verb)
-		}
+	if merge, ok := firstMerge(candidates); ok {
+		args := map[string]string{"sha": merge.ShortSHA, "verb": verb}
+		return core.ErrorfArgs(core.GitFailed, "mergeCommitNotPickable", args, "%s is a merge commit; %s does not support a merge commit", merge.ShortSHA, verb)
 	}
 
 	shas, err = orderedSHAs(ctx, wt.Runner, wt.Path, candidates, oldestFirst)
@@ -192,9 +187,6 @@ func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []string
 	if err != nil {
 		return err
 	}
-	if opts.Mainline > 0 && len(shas) != 1 {
-		return core.Errorf(core.Internal, "mainline needs exactly one commit, got %d", len(shas))
-	}
 	return runSequence(ctx, wt, shas, "cherry-pick", "CHERRY_PICK_HEAD", true, opts)
 }
 
@@ -204,6 +196,5 @@ func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []string, op
 	if err != nil {
 		return err
 	}
-	opts.Mainline = 0 // revert keeps its merge refusal and never gets -m
 	return runSequence(ctx, wt, shas, "revert", "REVERT_HEAD", false, opts)
 }

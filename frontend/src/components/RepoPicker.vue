@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useTemplateRef } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import Tag from 'openvue/tag'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { RecentRepo } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import type { Worktree } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { useCoreCall } from '../composables/useCoreCall'
-import { basename, repoPath } from '../lib/path'
-import { iconClass } from '../lib/icons'
-import { useLayout, useToolbarButton } from '../lib/layout'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { basename, repoPath } from '@/lib/path'
+import { iconClass } from '@/lib/icons'
+import { useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 import PickerList from './PickerList.vue'
 import type { PickerRow } from './pickerRow'
@@ -65,8 +65,8 @@ type Row = PickerRow & { text: string } & (
     | { kind: 'repo'; repo: RecentRepo; current: boolean }
   )
 
-function actionRow(key: string, label: string, action: () => void): Row {
-  return { key, kind: 'action', label, run: action, text: label }
+function actionRow(key: string, label: string, action: () => void, shortcut?: string): Row {
+  return { key, kind: 'action', label, run: action, text: label, ...(shortcut && { shortcut }) }
 }
 function repoRow(repo: RecentRepo, current: boolean): Row {
   return {
@@ -82,7 +82,12 @@ const query = ref('')
 const rows = computed<Row[]>(() => {
   const all: Row[] = [
     actionRow('open-folder', t('repoPicker.openFolder'), openFolder),
-    actionRow('new-window', t('repoPicker.newWindow'), newWindow),
+    actionRow(
+      'new-window',
+      t('repoPicker.newWindow'),
+      newWindow,
+      t('repoPicker.newWindowShortcut'),
+    ),
     ...(ownRepo.value ? [repoRow(ownRepo.value, true)] : []),
     ...recents.value.filter((r) => !isOwn(r)).map((r) => repoRow(r, false)),
   ]
@@ -124,7 +129,7 @@ function newWindow(): void {
   <Button
     v-if="!asPage"
     v-bind="toolbarButton"
-    class="picker-button"
+    class="min-w-0 max-w-64"
     data-test="repo-picker"
     :title="buttonTitle"
     :aria-label="buttonTitle"
@@ -132,7 +137,7 @@ function newWindow(): void {
   >
     <i :class="iconClass('repo')" aria-hidden="true"></i>
     <template v-if="layout !== 'narrow'">
-      <span class="ellipsis">{{ repoName }}</span>
+      <span class="min-w-10 flex-auto truncate">{{ repoName }}</span>
       <Tag
         v-if="distro"
         severity="secondary"
@@ -143,7 +148,10 @@ function newWindow(): void {
     </template>
   </Button>
   <component :is="asPage ? 'section' : Popover" ref="popover" @show="onShow">
-    <div class="repo-list" :class="{ page: asPage }">
+    <div
+      class="repo-list flex flex-col gap-1.5"
+      :class="asPage ? 'max-w-176 min-h-0 p-2.5' : 'w-112 max-w-[90vw] max-h-[70vh]'"
+    >
       <ErrorBanner v-if="error" :error="error" />
       <PickerList
         v-model:query="query"
@@ -154,17 +162,29 @@ function newWindow(): void {
         <template #row="{ row, activate: onActivate }">
           <span
             v-if="row.kind === 'action'"
-            class="row"
+            class="row flex min-w-0 flex-1 items-center gap-1.5"
             data-test="picker-action"
             @click="onActivate"
-            >{{ row.label }}</span
           >
-          <span v-else class="row" data-test="repo-row" :title="row.repo.path" @click="onActivate">
-            <span class="current-marker" aria-hidden="true">
+            <span data-test="picker-action-label" class="truncate">{{ row.label }}</span>
+            <span v-if="row.shortcut" class="ms-auto text-sm text-muted-color">{{
+              row.shortcut
+            }}</span>
+          </span>
+          <span
+            v-else
+            class="row flex min-w-0 flex-1 items-center gap-1.5"
+            data-test="repo-row"
+            :title="row.repo.path"
+            @click="onActivate"
+          >
+            <span class="current-marker w-[1em] flex-none" aria-hidden="true">
               <i v-if="row.current" :class="iconClass('current')"></i>
             </span>
-            <span class="repo-name ellipsis">{{ basename(row.repo.path) }}</span>
-            <span class="muted ellipsis leftover">{{ row.repo.path }}</span>
+            <span class="min-w-0 truncate font-semibold">{{ basename(row.repo.path) }}</span>
+            <span class="min-w-0 flex-1 truncate text-sm text-muted-color">{{
+              row.repo.path
+            }}</span>
             <Tag
               v-if="row.repo.distro"
               severity="secondary"
@@ -176,24 +196,3 @@ function newWindow(): void {
     </div>
   </component>
 </template>
-
-<style scoped>
-.repo-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  width: 28rem;
-  max-width: 90vw;
-  max-height: 70vh;
-}
-.repo-list.page {
-  width: auto;
-  max-width: 44rem;
-  max-height: none;
-  min-height: 0;
-  padding: 0.6rem;
-}
-.repo-name {
-  font-weight: 600;
-}
-</style>

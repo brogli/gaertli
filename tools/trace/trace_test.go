@@ -19,22 +19,22 @@ func writeFile(t *testing.T, path, content string) {
 }
 
 // newConfig lays out a fixture repo under t.TempDir() with the given
-// functional/area.md, quality.md and testing.md content, and returns a
-// Config pointing at it. GoRoot and FrontendRoot start out empty; PendingPath
-// starts out missing.
-func newConfig(t *testing.T, functional, quality, testing string) Config {
+// functional/area.md, quality.md, distribution.md and testing.md content, and
+// returns a Config pointing at it. GoRoot and FrontendRoot start out empty;
+// PendingPath starts out missing.
+func newConfig(t *testing.T, functional, quality, distribution, testing string) Config {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := Config{
-		FunctionalDir: filepath.Join(dir, "functional"),
-		QualityPath:   filepath.Join(dir, "quality.md"),
-		TestingPath:   filepath.Join(dir, "testing.md"),
-		GoRoot:        filepath.Join(dir, "go"),
-		FrontendRoot:  filepath.Join(dir, "frontend"),
-		PendingPath:   filepath.Join(dir, "pending.txt"),
+		RequirementsDir: dir,
+		TestingPath:     filepath.Join(dir, "testing.md"),
+		GoRoot:          filepath.Join(dir, "go"),
+		FrontendRoot:    filepath.Join(dir, "frontend"),
+		PendingPath:     filepath.Join(dir, "pending.txt"),
 	}
-	writeFile(t, filepath.Join(cfg.FunctionalDir, "area.md"), functional)
-	writeFile(t, cfg.QualityPath, quality)
+	writeFile(t, filepath.Join(cfg.RequirementsDir, "functional", "area.md"), functional)
+	writeFile(t, filepath.Join(cfg.RequirementsDir, "quality.md"), quality)
+	writeFile(t, filepath.Join(cfg.RequirementsDir, "distribution.md"), distribution)
 	writeFile(t, cfg.TestingPath, testing)
 	if err := os.MkdirAll(cfg.GoRoot, 0o755); err != nil {
 		t.Fatal(err)
@@ -90,21 +90,21 @@ const qualityFixture = `# Quality attributes (QA)
 | QA-EF-01 | a quality requirement |
 `
 
-func TestQA_MNT_02_RequiredIDsAreMustFRFromEveryFileAndAllQA(t *testing.T) {
+func TestQA_MNT_02_RequiredIDsAreTheMustFRFromEveryFunctionalFile(t *testing.T) {
 	dir := t.TempDir()
 	functionalDir := filepath.Join(dir, "functional")
-	qualityPath := filepath.Join(dir, "quality.md")
 	writeFile(t, filepath.Join(functionalDir, "ab.md"), functionalFixture)
 	writeFile(t, filepath.Join(functionalDir, "gh.md"), otherFunctionalFixture)
 	writeFile(t, filepath.Join(functionalDir, "notes.txt"), "| FR-XY-01 | MUST | not a requirements file |\n")
-	writeFile(t, qualityPath, qualityFixture)
+	writeFile(t, filepath.Join(dir, "quality.md"), qualityFixture)
+	writeFile(t, filepath.Join(dir, "distribution.md"), oneDistID)
 
-	required, err := requiredIDs(functionalDir, qualityPath)
+	required, err := requiredIDs(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := map[string]bool{"FR-AB-01": true, "FR-GH-01": true, "QA-EF-01": true}
+	want := map[string]bool{"FR-AB-01": true, "FR-GH-01": true}
 	if len(required) != len(want) {
 		t.Fatalf("required = %v, want %v", required, want)
 	}
@@ -120,11 +120,10 @@ func TestQA_MNT_02_RequiredIDsAreMustFRFromEveryFileAndAllQA(t *testing.T) {
 
 func TestQA_MNT_02_FunctionalDirWithoutRequirementFilesIsAnError(t *testing.T) {
 	dir := t.TempDir()
-	qualityPath := filepath.Join(dir, "quality.md")
-	writeFile(t, qualityPath, qualityFixture)
+	writeFile(t, filepath.Join(dir, "quality.md"), qualityFixture)
 
-	if _, err := requiredIDs(filepath.Join(dir, "functional"), qualityPath); err == nil {
-		t.Error("requiredIDs on a folder without .md files: err = nil, want an error")
+	if _, err := requiredIDs(dir); err == nil {
+		t.Error("requiredIDs on a requirements dir without functional/*.md: err = nil, want an error")
 	}
 }
 
@@ -138,7 +137,7 @@ const noRows = `| ID | Requirement |
 `
 
 func TestQA_MNT_02_GoTestCoversRequiredID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, filepath.Join(cfg.GoRoot, "foo_test.go"),
 		"package foo_test\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n")
 
@@ -146,7 +145,7 @@ func TestQA_MNT_02_GoTestCoversRequiredID(t *testing.T) {
 }
 
 func TestQA_MNT_02_GoTestNameDigitBoundaryDoesNotFalseMatch(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, filepath.Join(cfg.GoRoot, "foo_test.go"),
 		"package foo_test\n\nfunc TestFR_AB_010_Other(t *testing.T) {}\n")
 
@@ -160,15 +159,15 @@ func TestQA_MNT_02_GoTestNameDigitBoundaryDoesNotFalseMatch(t *testing.T) {
 }
 
 func TestQA_MNT_02_VitestCoversRequiredID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
-	writeFile(t, filepath.Join(cfg.FrontendRoot, "foo.test.ts"),
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
+	writeFile(t, filepath.Join(cfg.FrontendRoot, "src/components/__tests__/foo.spec.ts"),
 		"import { it } from 'vitest'\n\nit('FR-AB-01 does a thing', () => {})\n")
 
 	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_PlaywrightSpecCoversRequiredID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, filepath.Join(cfg.FrontendRoot, "e2e-real", "foo.spec.ts"),
 		"import { test } from './fixtures'\n\ntest('FR-AB-01 does a thing', async () => {})\n")
 
@@ -177,28 +176,41 @@ func TestQA_MNT_02_PlaywrightSpecCoversRequiredID(t *testing.T) {
 
 func TestQA_MNT_02_ManualChecklistCoversRequiredID(t *testing.T) {
 	checklist := "| FR-AB-01 | some manual check | all |\n"
-	cfg := newConfig(t, oneMustFR, noRows, checklist)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, checklist)
 
 	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_ManualChecklistRowCoversMultipleIDs(t *testing.T) {
-	checklist := "| FR-AB-01, QA-EF-01 | some manual check | all |\n"
-	cfg := newConfig(t, oneMustFR, qualityFixture, checklist)
+	checklist := "| FR-AB-01, FR-CD-01 | some manual check | all |\n"
+	cfg := newConfig(t, twoMustFR, noRows, noRows, checklist)
 
 	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_UncoveredMustFRIsReportedMissing(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 
 	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n")
 }
 
-func TestQA_MNT_02_UncoveredQAIsReportedMissing(t *testing.T) {
-	cfg := newConfig(t, noRows, qualityFixture, noRows)
+func TestQA_MNT_02_UncoveredQualityAndDistributionIDsAreNotRequired(t *testing.T) {
+	cfg := newConfig(t, oneMustFR, qualityFixture, oneDistID, noRows)
 
-	assertReport(t, cfg, "QA-EF-01: no test name and no manual checklist entry\n")
+	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n")
+}
+
+const oneDistID = `| ID | Requirement |
+|---|---|
+| DIST-01 | a two-segment id |
+`
+
+func TestQA_MNT_02_TestNamedForNonexistentIDLeavesRealIDReportedMissing(t *testing.T) {
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
+	writeFile(t, filepath.Join(cfg.GoRoot, "foo_test.go"),
+		"package foo_test\n\nfunc TestFR_AB_99_Thing(t *testing.T) {}\n")
+
+	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n")
 }
 
 const oneShouldFR = `| ID | Prio | Requirement |
@@ -207,7 +219,7 @@ const oneShouldFR = `| ID | Prio | Requirement |
 `
 
 func TestQA_MNT_02_UncoveredShouldFRIsNotReported(t *testing.T) {
-	cfg := newConfig(t, oneShouldFR, noRows, noRows)
+	cfg := newConfig(t, oneShouldFR, noRows, noRows, noRows)
 
 	assertReport(t, cfg, "")
 }
@@ -219,28 +231,28 @@ const twoMustFR = `| ID | Prio | Requirement |
 `
 
 func TestQA_MNT_02_EachUncoveredIDGetsExactlyOneSortedLine(t *testing.T) {
-	cfg := newConfig(t, twoMustFR, noRows, noRows)
+	cfg := newConfig(t, twoMustFR, noRows, noRows, noRows)
 
 	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n"+
 		"FR-CD-01: no test name and no manual checklist entry\n")
 }
 
 func TestTR_30_PendingEntrySuppressesMissingID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, cfg.PendingPath, "FR-AB-01\n")
 
 	assertReport(t, cfg, "")
 }
 
 func TestTR_30_PendingIgnoresBlankAndCommentLines(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, cfg.PendingPath, "# header\n\nFR-AB-01\n\n# trailer\n")
 
 	assertReport(t, cfg, "")
 }
 
 func TestTR_30_MissingPendingFileIsAnEmptyList(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 
 	out, code := runFixture(t, cfg)
 	if code != 1 || !strings.Contains(out, "FR-AB-01: no test name") {
@@ -249,7 +261,7 @@ func TestTR_30_MissingPendingFileIsAnEmptyList(t *testing.T) {
 }
 
 func TestTR_30_StalePendingEntryIsReported(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows)
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, filepath.Join(cfg.GoRoot, "a_test.go"), "package a\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n")
 	writeFile(t, cfg.PendingPath, "FR-AB-01\n")
 

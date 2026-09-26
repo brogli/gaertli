@@ -9,6 +9,8 @@ internal/remote/nebegit-core-linux
 frontend/node_modules/
 frontend/playwright-report/
 frontend/test-results/
+frontend/.eslintcache
+frontend/.stylelintcache
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 build/linux/nebegit.desktop
 .claude/worktrees/

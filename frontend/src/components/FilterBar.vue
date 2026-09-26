@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import { useDebounceFn } from '@vueuse/core'
 import AutoComplete from 'openvue/autocomplete'
 import MultiSelect from 'openvue/multiselect'
 import ClearableInput from './ClearableInput.vue'
-import { useLogStore } from '../stores/log'
-import { useRefsStore } from '../stores/refs'
-import { refGroups } from '../lib/refOptions'
+import { useLogStore } from '@/stores/log'
+import { useRefsStore } from '@/stores/refs'
+import { refGroups } from '@/lib/refOptions'
 import type { LogFilter } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 // FilterBar is the log filter: free-text author/path (debounced 300ms) and
@@ -67,10 +67,12 @@ function clearAuthor(): void {
 </script>
 
 <template>
-  <div class="filter-bar">
-    <div class="search-field">
+  <!-- The fields share one row and shrink with the log view. -->
+  <div class="filter-bar flex gap-2">
+    <div class="flex flex-1 min-w-0 items-center gap-1.5">
       <ClearableInput
         v-model="log.query"
+        class="flex-1 min-w-0"
         :placeholder="t('filterBar.searchMessage')"
         test-id="clear-query"
         @clear="log.clearQuery"
@@ -78,10 +80,17 @@ function clearAuthor(): void {
         @keydown.shift.enter.prevent="log.prevMatch"
         @keydown.esc="log.clearQuery"
       />
-      <span v-if="matchLabel" class="match-label" data-test="match-label">{{ matchLabel }}</span>
+      <span
+        v-if="matchLabel"
+        class="flex-none whitespace-nowrap text-muted-color text-sm"
+        data-test="match-label"
+        >{{ matchLabel }}</span
+      >
     </div>
     <AutoComplete
       v-model="author"
+      class="flex-1 min-w-0"
+      input-class="w-full min-w-0"
       :suggestions="authorSuggestions"
       :placeholder="t('filterBar.author')"
       show-clear
@@ -90,6 +99,7 @@ function clearAuthor(): void {
       @clear="clearAuthor"
     />
     <MultiSelect
+      class="flex-1 min-w-0"
       :model-value="log.filter.branches ?? []"
       :options="branchOptions"
       option-label="label"
@@ -105,6 +115,7 @@ function clearAuthor(): void {
     />
     <ClearableInput
       v-model="path"
+      class="flex-1 min-w-0"
       :placeholder="t('filterBar.path')"
       test-id="clear-path"
       @update:model-value="applyDebounced"
@@ -112,43 +123,3 @@ function clearAuthor(): void {
     />
   </div>
 </template>
-
-<style scoped>
-/* The fields share one row and shrink with the log view. */
-.filter-bar {
-  display: flex;
-  gap: 0.5em;
-}
-.filter-bar > * {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.filter-bar :deep(.p-autocomplete-input) {
-  width: 100%;
-  min-width: 0;
-}
-/* IconField (ClearableInput's root) and its InputText: WebKitGTK, unlike
-   Chromium, keeps an input's intrinsic width in a flex row unless both the
-   field and the input itself are told they may shrink to 0. */
-.filter-bar :deep(.p-iconfield) {
-  min-width: 0;
-}
-.filter-bar :deep(.p-inputtext) {
-  width: 100%;
-  min-width: 0;
-}
-.search-field {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-}
-.search-field > :deep(.p-iconfield) {
-  flex: 1 1 0;
-}
-.match-label {
-  flex: none;
-  color: var(--p-text-muted-color);
-  font-size: 0.9em;
-  white-space: nowrap;
-}
-</style>

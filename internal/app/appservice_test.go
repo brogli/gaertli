@@ -377,7 +377,6 @@ func TestFR_WT_13_SelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
 	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t)}}
 
 	err := s.SelectRecentRepo(callFrom(opener.windows[0].ID()), settings.RecentRepo{Path: "/b"})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +408,6 @@ func TestFR_WT_13_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t
 	err := s.SelectRecentRepo(callFrom(opener.windows[0].ID()), settings.RecentRepo{
 		Path: "/home/u/r-old", Distro: "Ubuntu", RepoKey: "/home/u/r/.git",
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,42 +1,42 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import { onKeyStroke } from '@vueuse/core'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import SelectButton from 'openvue/selectbutton'
 import Button from 'openvue/button'
-import { useRepoStore } from '../stores/repo'
-import { useRefsStore } from '../stores/refs'
-import { useLogStore } from '../stores/log'
-import { useCompareStore } from '../stores/compare'
-import { useChangesStore } from '../stores/changes'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useOpenInEditor } from '../composables/useOpenInEditor'
-import { useAutoFetch } from '../composables/useAutoFetch'
+import { useRepoStore } from '@/stores/repo'
+import { useRefsStore } from '@/stores/refs'
+import { useLogStore } from '@/stores/log'
+import { useCompareStore } from '@/stores/compare'
+import { useChangesStore } from '@/stores/changes'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import { useAutoFetch } from '@/composables/useAutoFetch'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import ErrorBanner from '../components/ErrorBanner.vue'
-import JobsMenu from '../components/JobsMenu.vue'
-import LogView from '../components/LogView.vue'
-import CommitDetailView from '../components/CommitDetailView.vue'
-import ChangesView from '../components/ChangesView.vue'
-import ConflictBanner from '../components/ConflictBanner.vue'
-import StashBanner from '../components/StashBanner.vue'
-import BranchPicker from '../components/BranchPicker.vue'
-import RepoPicker from '../components/RepoPicker.vue'
-import WorktreePicker from '../components/WorktreePicker.vue'
-import CreateBranchDialog from '../components/CreateBranchDialog.vue'
-import DetachWarningDialog from '../components/DetachWarningDialog.vue'
-import BranchInWorktreeDialog from '../components/BranchInWorktreeDialog.vue'
-import ResetDialog from '../components/ResetDialog.vue'
-import CreateWorktreeDialog from '../components/CreateWorktreeDialog.vue'
-import SyncControls from '../components/SyncControls.vue'
-import { commitStart, type StartPoint, type WorktreeStart } from '../components/startPoint'
-import { repoPath } from '../lib/path'
-import { useRepoChanged, useWindowEvent } from '../lib/windowEvents'
-import { iconClass } from '../lib/icons'
-import { useLayout, useToolbarButton } from '../lib/layout'
+import ErrorBanner from '@/components/ErrorBanner.vue'
+import JobsMenu from '@/components/JobsMenu.vue'
+import LogView from '@/components/LogView.vue'
+import CommitDetailView from '@/components/CommitDetailView.vue'
+import ChangesView from '@/components/ChangesView.vue'
+import ConflictBanner from '@/components/ConflictBanner.vue'
+import StashBanner from '@/components/StashBanner.vue'
+import BranchPicker from '@/components/BranchPicker.vue'
+import RepoPicker from '@/components/RepoPicker.vue'
+import WorktreePicker from '@/components/WorktreePicker.vue'
+import CreateBranchDialog from '@/components/CreateBranchDialog.vue'
+import DetachWarningDialog from '@/components/DetachWarningDialog.vue'
+import BranchInWorktreeDialog from '@/components/BranchInWorktreeDialog.vue'
+import ResetDialog from '@/components/ResetDialog.vue'
+import CreateWorktreeDialog from '@/components/CreateWorktreeDialog.vue'
+import SyncControls from '@/components/SyncControls.vue'
+import { commitStart, type StartPoint, type WorktreeStart } from '@/components/startPoint'
+import { repoPath } from '@/lib/path'
+import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
+import { iconClass } from '@/lib/icons'
+import { useLayout, useToolbarButton } from '@/lib/layout'
 
 const props = defineProps<{ path: string; distro?: string | undefined }>()
 const emit = defineEmits<{ 'open-settings': [] }>()
@@ -100,6 +100,7 @@ const editorLabel = computed(() =>
 // "Create branch here" while detached: its button renders only with a
 // loaded summary.
 function openCreateBranchHere(): void {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by the v-if="repo.summary?.detached" the calling button renders under
   createBranchStart.value = commitStart(repo.summary!.sha ?? '')
 }
 
@@ -172,8 +173,19 @@ const narrow = computed(() => layout.value === 'narrow')
 </script>
 
 <template>
-  <main>
-    <header class="toolbar" :class="{ narrow }">
+  <!-- The toolbar on top; below it the three views, laid out by width.
+       Their virtual scroll and internal scrolling need a bounded viewport:
+       fill the app (main.css's height chain), give the body the leftover
+       space. -->
+  <main class="flex h-full min-h-0 flex-col">
+    <!-- One compact row: the pickers and sync controls (or an error beside
+         them), then the actions, pushed right by the spacer. Below the
+         medium width, every control shrinks to icon-only: a tighter gap
+         buys back the room the three pickers need. -->
+    <header
+      class="toolbar flex flex-none items-center whitespace-nowrap border-b border-surface py-1.5 px-2.5"
+      :class="narrow ? 'gap-1' : 'gap-2'"
+    >
       <RepoPicker :path="path" :distro="distro" />
       <WorktreePicker :wt="wt" :path="path" :distro="distro" />
       <BranchPicker
@@ -195,8 +207,8 @@ const narrow = computed(() => layout.value === 'narrow')
         @click="openCreateBranchHere"
       />
       <SyncControls :wt="wt" :compact="compact" />
-      <ErrorBanner v-if="error" :error="error" />
-      <div class="toolbar-spacer"></div>
+      <ErrorBanner v-if="error" :error="error" class="min-w-0 flex-1" />
+      <div class="flex-1"></div>
       <JobsMenu :wt="wt" />
       <Button
         v-bind="toolbarButton"
@@ -228,7 +240,7 @@ const narrow = computed(() => layout.value === 'narrow')
     <Splitter
       v-if="layout === 'wide'"
       layout="horizontal"
-      class="worktree-body"
+      class="worktree-body flex min-h-0 flex-1"
       state-key="nebegit.layout.wide"
       state-storage="local"
     >
@@ -245,14 +257,16 @@ const narrow = computed(() => layout.value === 'narrow')
     <Splitter
       v-else-if="layout === 'medium'"
       layout="horizontal"
-      class="worktree-body"
+      class="worktree-body flex min-h-0 flex-1"
       state-key="nebegit.layout.medium"
       state-storage="local"
     >
       <SplitterPanel :size="60" :min-size="25">
         <LogView :wt="wt" v-on="logViewListeners" />
       </SplitterPanel>
-      <SplitterPanel :size="40" :min-size="20" class="side-column">
+      <!-- The medium layout's side panel: the switch fixed on top, the
+           chosen view below filling the rest. -->
+      <SplitterPanel :size="40" :min-size="20" class="side-column flex min-h-0 min-w-0 flex-col">
         <SelectButton
           v-model="view"
           :options="sideOptions"
@@ -260,15 +274,17 @@ const narrow = computed(() => layout.value === 'narrow')
           option-value="value"
           :allow-empty="false"
         />
-        <div v-show="sideView === 'details'" class="side-view">
+        <div v-show="sideView === 'details'" class="flex min-h-0 flex-1 flex-col">
           <CommitDetailView :wt="wt" />
         </div>
-        <div v-show="sideView === 'changes'" class="side-view">
+        <div v-show="sideView === 'changes'" class="flex min-h-0 flex-1 flex-col">
           <ChangesView :wt="wt" />
         </div>
       </SplitterPanel>
     </Splitter>
-    <div v-else class="worktree-body narrow-body">
+    <!-- The narrow layout's single view is the side panel's same shape,
+         full width instead of a side panel. -->
+    <div v-else class="worktree-body flex min-h-0 min-w-0 flex-1 flex-col">
       <SelectButton
         v-model="view"
         :options="narrowOptions"
@@ -276,13 +292,13 @@ const narrow = computed(() => layout.value === 'narrow')
         option-value="value"
         :allow-empty="false"
       />
-      <div v-show="view === 'log'" class="narrow-view">
+      <div v-show="view === 'log'" class="flex min-h-0 flex-1 flex-col">
         <LogView :wt="wt" v-on="logViewListeners" />
       </div>
-      <div v-show="view === 'details'" class="narrow-view">
+      <div v-show="view === 'details'" class="flex min-h-0 flex-1 flex-col">
         <CommitDetailView :wt="wt" />
       </div>
-      <div v-show="view === 'changes'" class="narrow-view">
+      <div v-show="view === 'changes'" class="flex min-h-0 flex-1 flex-col">
         <ChangesView :wt="wt" />
       </div>
     </div>
@@ -322,60 +338,3 @@ const narrow = computed(() => layout.value === 'narrow')
     />
   </main>
 </template>
-
-<style scoped>
-/* The toolbar on top; below it the three views, laid out by width. Their
-   virtual scroll and internal scrolling need a bounded viewport: fill the
-   app (style.css's height chain), give the body the leftover space. */
-main {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-/* One compact row: the pickers and sync controls (or an error beside
-   them), then the actions, pushed right by the spacer. */
-.toolbar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--p-content-border-color);
-  white-space: nowrap;
-}
-.toolbar-spacer {
-  flex: 1;
-}
-.toolbar :deep(.error-banner) {
-  flex: 1;
-  min-width: 0;
-}
-/* Below the medium width, every control shrinks to icon-only: a tighter
-   gap buys back the room the three pickers need. */
-.toolbar.narrow {
-  gap: 0.25rem;
-}
-.worktree-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-/* The medium layout's side panel: the switch fixed on top, the chosen
-   view below filling the rest. The narrow layout's single view is the
-   same shape, full width instead of a side panel. */
-.side-column,
-.narrow-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-.side-view,
-.narrow-view {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-</style>

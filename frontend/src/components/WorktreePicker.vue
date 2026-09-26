@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useTemplateRef } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
@@ -9,14 +9,14 @@ import {
   Code,
   type Worktree,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useOpenInEditor } from '../composables/useOpenInEditor'
-import { useConfirmAction } from '../composables/useConfirmAction'
-import { basename, repoPath } from '../lib/path'
-import { shortSha } from '../lib/format'
-import { useRepoChanged } from '../lib/windowEvents'
-import { iconClass } from '../lib/icons'
-import { ICON_BUTTON, useLayout, useToolbarButton } from '../lib/layout'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import { useConfirmAction } from '@/composables/useConfirmAction'
+import { basename, repoPath } from '@/lib/path'
+import { shortSha } from '@/lib/format'
+import { useRepoChanged } from '@/lib/windowEvents'
+import { iconClass } from '@/lib/icons'
+import { ICON_BUTTON, useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
 import PickerList from './PickerList.vue'
@@ -62,7 +62,8 @@ function isCurrent(w: Worktree): boolean {
 }
 
 type Row = PickerRow & { text: string } & (
-    { kind: 'action'; label: string; run: () => void } | { kind: 'worktree'; worktree: Worktree }
+    | { kind: 'action'; label: string; run: () => void }
+    | { kind: 'worktree'; worktree: Worktree }
   )
 function actionRow(key: string, label: string, action: () => void): Row {
   return { key, kind: 'action', label, run: action, text: label }
@@ -170,7 +171,7 @@ async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
 <template>
   <Button
     v-bind="toolbarButton"
-    class="picker-button"
+    class="min-w-0 max-w-64"
     data-test="worktree-picker"
     :title="path"
     :aria-label="path"
@@ -178,12 +179,12 @@ async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
   >
     <i :class="iconClass('worktree')" aria-hidden="true"></i>
     <template v-if="layout !== 'narrow'">
-      <span class="ellipsis">{{ basename(path) }}</span>
+      <span class="min-w-10 flex-auto truncate">{{ basename(path) }}</span>
       <i :class="iconClass('dropdown')" aria-hidden="true"></i>
     </template>
   </Button>
   <Popover ref="popover" @show="onShow">
-    <div class="worktree-list">
+    <div class="worktree-list flex flex-col gap-1.5 w-120 max-w-[90vw] max-h-[70vh]">
       <ErrorBanner v-if="error" :error="error" />
       <PickerList
         v-model:query="query"
@@ -194,43 +195,44 @@ async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
         <template #row="{ row, activate: onActivate }">
           <span
             v-if="row.kind === 'action'"
-            class="row"
+            class="row flex min-w-0 flex-1 items-center gap-1.5"
             data-test="picker-action"
             @click="onActivate"
             >{{ row.label }}</span
           >
           <template v-else>
             <span
-              class="row"
+              class="row flex min-w-0 flex-1 items-center gap-1.5"
               data-test="worktree-row"
               :title="row.worktree.path"
               @click="onActivate"
             >
-              <span class="current-marker" aria-hidden="true">
+              <span class="current-marker w-[1em] flex-none" aria-hidden="true">
                 <i v-if="isCurrent(row.worktree)" :class="iconClass('current')"></i>
               </span>
-              <span class="ellipsis" data-test="worktree-folder">
+              <span class="min-w-0 truncate" data-test="worktree-folder">
                 {{ basename(row.worktree.path) }}
               </span>
               <span
-                class="muted ellipsis leftover"
+                class="muted min-w-0 flex-1 truncate text-sm text-muted-color"
                 data-test="worktree-branch"
                 :title="worktreeLabel(row.worktree)"
               >
                 {{ worktreeLabel(row.worktree) }}
               </span>
-              <span v-if="row.worktree.main && !row.worktree.bare" class="muted">{{
-                t('worktreePicker.main')
-              }}</span>
+              <span
+                v-if="row.worktree.main && !row.worktree.bare"
+                class="text-sm text-muted-color"
+                >{{ t('worktreePicker.main') }}</span
+              >
               <span
                 v-if="row.worktree.dirty"
-                class="dirty-marker"
                 role="img"
                 data-test="dirty-marker"
                 :title="t('worktreePicker.uncommittedChanges')"
                 :aria-label="t('worktreePicker.uncommittedChanges')"
               >
-                <i :class="iconClass('dirty')"></i>
+                <i :class="iconClass('dirty')" class="text-tone-orange"></i>
               </span>
               <span
                 v-if="row.worktree.locked"
@@ -241,7 +243,7 @@ async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
               >
                 <i :class="iconClass('locked')"></i>
               </span>
-              <span v-if="row.worktree.missing" class="muted">{{
+              <span v-if="row.worktree.missing" class="text-sm text-muted-color">{{
                 t('worktreePicker.missing')
               }}</span>
             </span>
@@ -286,17 +288,3 @@ async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
     @created="load"
   />
 </template>
-
-<style scoped>
-.worktree-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  width: 30rem;
-  max-width: 90vw;
-  max-height: 70vh;
-}
-.dirty-marker i {
-  color: var(--nb-tone-orange);
-}
-</style>

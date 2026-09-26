@@ -181,18 +181,24 @@ func TestFR_UX_01_GitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
 func TestFR_UX_01_AGitFailuresMessageIsGitsOwn(t *testing.T) {
 	cases := []struct{ name, stderr, want string }{
 		{"prefix stripped", "fatal: a branch named 'main' already exists\n", "a branch named 'main' already exists"},
-		{"hints dropped, following lines kept",
+		{
+			"hints dropped, following lines kept",
 			"error: Your local changes to the following files would be overwritten by checkout:\n\tconflict.txt\nhint: stash them\nAborting\n",
-			"Your local changes to the following files would be overwritten by checkout:\nconflict.txt\nAborting"},
+			"Your local changes to the following files would be overwritten by checkout:\nconflict.txt\nAborting",
+		},
 		{"at most four lines", "a\nb\nc\nd\ne\n", "a\nb\nc\nd"},
 		{"leads with the fatal line, not progress before it", "Preparing worktree (new branch 'x')\nfatal: '/t' already exists\n", "'/t' already exists"},
 		{"no output: the exit code", "", "git exited 3"},
-		{"progress redrawn in place with \\r and ESC[K: only its last state",
+		{
+			"progress redrawn in place with \\r and ESC[K: only its last state",
 			"Rebasing (2/5)\rRebasing (3/5)\r\x1b[Kerror: untracked files would be overwritten:\n\tz.txt\nhint: move them\n",
-			"untracked files would be overwritten:\nz.txt"},
-		{"a line after progress on the same line keeps its own text",
+			"untracked files would be overwritten:\nz.txt",
+		},
+		{
+			"a line after progress on the same line keeps its own text",
 			"Rebasing (4/6)\x1b[K\rExecuting: git commit --amend\nrefusing\nwarning: execution failed\n",
-			"Executing: git commit --amend\nrefusing\nwarning: execution failed"},
+			"Executing: git commit --amend\nrefusing\nwarning: execution failed",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

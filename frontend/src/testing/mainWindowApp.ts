@@ -1,8 +1,8 @@
 import { vi, type Mock } from 'vitest'
-import { changedFilesFixture } from './fixtures/changes'
-import { commitDetailsFixture } from './fixtures/commitDetails'
-import { defaultSettingsFixture } from './fixtures/settings'
-import { summaryFixture } from './fixtures/summary'
+import { changedFilesFixture } from '@/testing/fixtures/changes'
+import { commitDetailsFixture } from '@/testing/fixtures/commitDetails'
+import { defaultSettingsFixture } from '@/testing/fixtures/settings'
+import { summaryFixture } from '@/testing/fixtures/summary'
 
 // Stand-ins for the app bindings the main window's views (MainView,
 // WorktreeContent and their children) call. A test file routes the module
@@ -65,5 +65,7 @@ export function resetMainWindowApp(): void {
 }
 
 function mocks<Name extends string>(...names: Name[]): Record<Name, Mock> {
-  return Object.fromEntries(names.map((name) => [name, vi.fn()])) as Record<Name, Mock>
+  const record: Record<Name, Mock> = Object.create(null)
+  for (const name of names) record[name] = vi.fn()
+  return record
 }

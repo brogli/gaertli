@@ -2,10 +2,10 @@
 import { computed } from 'vue'
 import Button from 'openvue/button'
 import { useLocalStorage } from '@vueuse/core'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { iconClass } from '../lib/icons'
-import { ICON_BUTTON } from '../lib/layout'
+import { iconClass } from '@/lib/icons'
+import { ICON_BUTTON } from '@/lib/layout'
 import ChangedFileList from './ChangedFileList.vue'
 import ChangedFileTree from './ChangedFileTree.vue'
 
@@ -33,8 +33,8 @@ const listeners = {
 </script>
 
 <template>
-  <div class="changed-files">
-    <div class="files-header">
+  <div class="changed-files flex flex-1 flex-col min-h-0 gap-1">
+    <div class="flex flex-none items-center justify-between gap-1.5">
       <h3>{{ t('commitDetailView.changedFiles', { n: files.length }, files.length) }}</h3>
       <Button
         v-bind="ICON_BUTTON"
@@ -47,33 +47,10 @@ const listeners = {
         @click="asTree = !asTree"
       />
     </div>
-    <div class="file-scroll">
+    <!-- The header stays; the files below it scroll. -->
+    <div class="file-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       <ChangedFileTree v-if="asTree" :files="files" :selected="selected" v-on="listeners" />
       <ChangedFileList v-else :files="files" :selected="selected" v-on="listeners" />
     </div>
   </div>
 </template>
-
-<style scoped>
-/* The header stays; the files below it scroll. */
-.changed-files {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-.files-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-}
-.file-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-</style>

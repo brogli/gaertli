@@ -4,10 +4,10 @@ import Dialog from 'openvue/dialog'
 import InputText from 'openvue/inputtext'
 import Checkbox from 'openvue/checkbox'
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
-import { useCoreCall } from '../composables/useCoreCall'
+import { useI18n } from '@/i18n'
+import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DIALOG } from '../lib/layout'
+import { DIALOG } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 import FormField from './FormField.vue'
 import StartPointField from './StartPointField.vue'
@@ -43,7 +43,7 @@ async function submit(): Promise<void> {
       <InputText :id="id" v-model="name" autofocus fluid />
     </FormField>
     <StartPointField v-model="start" />
-    <label class="action-row">
+    <label class="flex flex-wrap items-center gap-2">
       <Checkbox v-model="checkout" binary />
       {{ t('dialogs.createBranch.checkoutAfter') }}
     </label>

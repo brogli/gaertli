@@ -1105,8 +1105,7 @@ func TestFR_UX_11_UpdateBranchWithNoUpstreamNamesTheBranchInArgs(t *testing.T) {
 
 // updateBranchElsewhereFixture is updateBranchFixture with "B" checked out
 // in a second linked worktree (otherDir) rather than nowhere. The update
-// opens a session on otherDir; a test opens it first with openOn, so it is
-// closed when the test ends.
+// refuses before opening a session on otherDir.
 func updateBranchElsewhereFixture(t *testing.T) (repo *gittest.Repo, origin, otherDir string) {
 	t.Helper()
 	repo, origin = updateBranchFixture(t)
@@ -1115,111 +1114,65 @@ func updateBranchElsewhereFixture(t *testing.T) (repo *gittest.Repo, origin, oth
 	return repo, origin, otherDir
 }
 
-func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereFastForwardsItsFilesToo(t *testing.T) {
-	repo, origin, otherDir := updateBranchElsewhereFixture(t)
-	remoteAppendCommitOnBranch(t, origin, "B", "upstream.txt", "u", "upstream commit")
-
-	c, wt := openWorktree(t, repo.Dir)
-	openOn(t, c, otherDir)
-	job := waitForJobState(t, c, wt, jobID(t)(c.UpdateBranch(t.Context(), wt, "B")), "done")
-
-	result := updateBranchResult(t, job)
-	if result.Outcome != "updated" || result.Commits <= 0 {
-		t.Errorf("Result = %+v, want Outcome updated, Commits > 0", result)
-	}
-	if content := readFile(t, otherDir, "upstream.txt"); content != "u" {
-		t.Errorf("other worktree's upstream.txt = %q, want \"u\" (files followed the update)", content)
-	}
-}
-
-func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesWhenThatWorktreeIsDirty(t *testing.T) {
+func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
 	repo, origin, otherDir := updateBranchElsewhereFixture(t)
 	remoteAppendCommitOnBranch(t, origin, "B", "upstream.txt", "u", "upstream commit")
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
-	writeFile(t, otherDir, "seed.txt", "dirty")
+	beforeRemote, _ := refSHA(t, repo.Dir, "refs/remotes/origin/B")
 
 	c, wt := openWorktree(t, repo.Dir)
-	openOn(t, c, otherDir)
-	job := waitForJobState(t, c, wt, jobID(t)(c.UpdateBranch(t.Context(), wt, "B")), "failed")
+	rec := recordCommands(t, c, wt)
 
-	if job.Error == nil || job.Error.Code != core.DirtyWorktree {
-		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.DirtyWorktree)
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchCheckedOutElsewhere" {
+		t.Errorf("Key = %q, want branchCheckedOutElsewhere", ce.Key)
 	}
-	if job.Error.Args["branch"] != "B" || job.Error.Args["path"] != otherDir {
-		t.Errorf("Args = %+v, want branch=B path=%s", job.Error.Args, otherDir)
+	if ce.Args["branch"] != "B" || ce.Args["path"] != otherDir {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, otherDir)
 	}
-	if job.Error.Key != "branchCheckedOutDirty" {
-		t.Errorf("Key = %q, want branchCheckedOutDirty", job.Error.Key)
+	jobs, jobsErr := c.Jobs(t.Context(), wt)
+	if jobsErr != nil {
+		t.Fatal(jobsErr)
+	}
+	if len(jobs) != 0 {
+		t.Errorf("Jobs = %+v, want none started", jobs)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.Contains(e.Command, "fetch") || strings.Contains(e.Command, "merge") {
+			t.Errorf("recorded %q, want no fetch or merge before the refusal", e.Command)
+		}
 	}
 	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
 		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
 	}
-	if content := readFile(t, otherDir, "seed.txt"); content != "dirty" {
-		t.Errorf("other worktree's seed.txt = %q, want unchanged \"dirty\"", content)
+	if got, _ := refSHA(t, repo.Dir, "refs/remotes/origin/B"); got != beforeRemote {
+		t.Errorf("refs/remotes/origin/B = %q, want unchanged %q", got, beforeRemote)
+	}
+	if _, err := os.Stat(filepath.Join(otherDir, "upstream.txt")); !os.IsNotExist(err) {
+		t.Errorf("otherDir has upstream.txt, want it untouched")
 	}
 }
 
-// switchOnFetchHook switches otherDir to branch once a fetch has moved
-// refs/remotes/origin/B: between the update's read of where B is checked out
-// and its merge.
-const switchOnFetchHook = `refs=$(cat)
-[ "$1" = committed ] || exit 0
-case "$refs" in *" refs/remotes/origin/B"*) ;; *) exit 0 ;; esac
-[ -e "$MARK" ] && exit 0
-touch "$MARK"
-unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR
-git -C "$OTHER" switch -q C
-`
-
-func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesOnceThatWorktreeSwitchedBranch(t *testing.T) {
-	repo, origin, otherDir := updateBranchElsewhereFixture(t)
-	gittest.Run(t, repo.Dir, "branch", "--track", "C", "origin/B") // C would fast-forward to B's upstream
+func TestFR_UPD_01_UpdateBranchCheckedOutInThisWindowRefusesNamingItsOwnPath(t *testing.T) {
+	repo, origin := updateBranchFixture(t)
+	gittest.Run(t, repo.Dir, "checkout", "B")
 	remoteAppendCommitOnBranch(t, origin, "B", "upstream.txt", "u", "upstream commit")
-	bBefore, _ := refSHA(t, repo.Dir, "refs/heads/B")
-	cBefore, _ := refSHA(t, repo.Dir, "refs/heads/C")
-	t.Setenv("OTHER", filepath.ToSlash(otherDir))
-	t.Setenv("MARK", filepath.ToSlash(filepath.Join(t.TempDir(), "switched")))
-	writeHook(t, repo.Dir, "reference-transaction", switchOnFetchHook)
+	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
 
 	c, wt := openWorktree(t, repo.Dir)
-	openOn(t, c, otherDir)
-	id := jobID(t)(c.UpdateBranch(t.Context(), wt, "B"))
-	job := waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == id && (j.State == "done" || j.State == "failed") })
 
-	if job.Error == nil || job.Error.Code != core.GitFailed || job.Error.Key != "branchNoLongerCheckedOut" {
-		t.Fatalf("job.Error = %+v, want Code %s, key branchNoLongerCheckedOut", job.Error, core.GitFailed)
-	}
-	if job.Error.Args["branch"] != "B" || job.Error.Args["path"] != otherDir {
-		t.Errorf("Args = %+v, want branch=B path=%s", job.Error.Args, otherDir)
-	}
-	if got := currentBranch(t, otherDir); got != "C" {
-		t.Fatalf("other's branch = %q, want C (the hook switched it)", got)
-	}
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/C"); got != cBefore {
-		t.Errorf("refs/heads/C = %q, want unchanged %q", got, cBefore)
-	}
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != bBefore {
-		t.Errorf("refs/heads/B = %q, want unchanged %q", got, bBefore)
-	}
-}
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
 
-func TestFR_UPD_03_04_UpdateBranchCheckedOutElsewhereDivergedFailsNotFastForward(t *testing.T) {
-	repo, origin, otherDir := updateBranchElsewhereFixture(t)
-	remoteAppendCommitOnBranch(t, origin, "B", "upstream-only.txt", "u", "upstream commit")
-	gittest.Commit(t, otherDir, "local-only.txt", "l", "local commit")
-	localTip := gittest.HeadSHA(t, otherDir)
-
-	c, wt := openWorktree(t, repo.Dir)
-	openOn(t, c, otherDir)
-	job := waitForJobState(t, c, wt, jobID(t)(c.UpdateBranch(t.Context(), wt, "B")), "failed")
-
-	if job.Error == nil || job.Error.Code != core.NotFastForward || job.Error.Key != "branchDiverged" || job.Error.Args["branch"] != "B" {
-		t.Fatalf("job.Error = %+v, want Code %s, key branchDiverged, branch B", job.Error, core.NotFastForward)
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchCheckedOutElsewhere" {
+		t.Errorf("Key = %q, want branchCheckedOutElsewhere", ce.Key)
 	}
-	if job.Error.GitStderr == "" {
-		t.Error("GitStderr is empty, want git's own refusal kept for the details")
+	if ce.Args["branch"] != "B" || ce.Args["path"] != repo.Dir {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, repo.Dir)
 	}
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != localTip {
-		t.Errorf("refs/heads/B = %q, want unchanged %q", got, localTip)
+	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
+		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
 	}
 }

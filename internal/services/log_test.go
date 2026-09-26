@@ -83,27 +83,6 @@ func TestFR_LOG_01_ParseLogRecordParsesFieldsAndRefs(t *testing.T) {
 	}
 }
 
-func TestFR_CP_08_ParseLogRecordMarksAMultiParentCommitAsMerge(t *testing.T) {
-	oneParent := "2222222222222222222222222222222222222222\x1f2222222\x1f1111111111111111111111111111111111111111\x1fBob\x1f1700000100\x1f\x1fFeature work"
-	twoParents := "3333333333333333333333333333333333333333\x1f3333333\x1f1111111111111111111111111111111111111111 2222222222222222222222222222222222222222\x1fBob\x1f1700000200\x1f\x1fMerge branch"
-
-	commit, _, err := parseLogRecord([]byte(oneParent))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if commit.Merge {
-		t.Error("Merge = true for a one-parent commit, want false")
-	}
-
-	commit, _, err = parseLogRecord([]byte(twoParents))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !commit.Merge {
-		t.Error("Merge = false for a two-parent commit, want true")
-	}
-}
-
 func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 	repo := gittest.New(t)
 	commitOrphan(t, repo.Dir, "main", "a.txt", "a")

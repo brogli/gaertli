@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import InputText from 'openvue/inputtext'
 import IconField from 'openvue/iconfield'
 import InputIcon from 'openvue/inputicon'
-import { iconClass } from '../lib/icons'
+import { iconClass } from '@/lib/icons'
 
 // ClearableInput is a text field with a clear icon that shows once it has
 // text: a plain InputText for FilterBar's message and path fields, since
@@ -22,10 +22,12 @@ function clear(): void {
 
 <template>
   <IconField>
-    <InputText v-model="model" :placeholder="placeholder" />
+    <!-- min-w-0: WebKitGTK, unlike Chromium, keeps an input's intrinsic
+         width in a flex row otherwise. -->
+    <InputText v-model="model" class="w-full min-w-0" :placeholder="placeholder" />
     <InputIcon
       v-if="model"
-      :class="['clear', iconClass('clear')]"
+      :class="['cursor-pointer', iconClass('clear')]"
       role="button"
       tabindex="0"
       :data-test="testId"
@@ -36,9 +38,3 @@ function clear(): void {
     />
   </IconField>
 </template>
-
-<style scoped>
-.clear {
-  cursor: pointer;
-}
-</style>

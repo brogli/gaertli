@@ -1,4 +1,4 @@
-import { shortSha } from '../lib/format'
+import { shortSha } from '@/lib/format'
 
 // The types here have their own module: a type exported from a <script
 // setup> block resolves to `any` under eslint's type-aware linting.
@@ -13,7 +13,8 @@ export type StartPoint = { ref: string } | { rev: string; label: string }
 // WorktreeStart is a "New worktree from here…" prefill for
 // CreateWorktreeDialog: an existing branch, or a new branch at a start point.
 export type WorktreeStart =
-  { newBranch: false; branch: string } | { newBranch: true; start: StartPoint }
+  | { newBranch: false; branch: string }
+  | { newBranch: true; start: StartPoint }
 
 // commitStart is the fixed start point at the commit sha.
 export function commitStart(sha: string): StartPoint {

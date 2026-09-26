@@ -16,7 +16,7 @@ func TestMain(m *testing.M) {
 	testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "github.com/brogli/nebegit/internal/git/testdata/fakegit"})
 }
 
-func TestQA_INST_01_ChecksGitPresence(t *testing.T) {
+func TestDIST_01_ChecksGitPresence(t *testing.T) {
 	ok, msg := checkGit(t.Context(), git.Runner{Git: "/does/not/exist"})
 	if ok {
 		t.Fatal("checkGit() ok = true for a missing git")
@@ -26,7 +26,7 @@ func TestQA_INST_01_ChecksGitPresence(t *testing.T) {
 	}
 }
 
-func TestQA_INST_01_ChecksGitVersion(t *testing.T) {
+func TestDIST_01_ChecksGitVersion(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "git version 2.30.0\n")
 
 	ok, msg := checkGit(t.Context(), git.Runner{Git: fakegit})
@@ -41,14 +41,14 @@ func TestQA_INST_01_ChecksGitVersion(t *testing.T) {
 	}
 }
 
-func TestQA_INST_01_AcceptsInstalledGit(t *testing.T) {
+func TestDIST_01_AcceptsInstalledGit(t *testing.T) {
 	ok, msg := checkGit(t.Context(), git.Runner{})
 	if !ok {
 		t.Fatalf("checkGit() ok = false with the real, installed git; msg = %q", msg)
 	}
 }
 
-func TestQA_INST_01_Messages(t *testing.T) {
+func TestDIST_01_Messages(t *testing.T) {
 	msg := text(startupFailed, map[string]string{"error": "x"})
 	for _, want := range []string{"WebView2", "webkitgtk", "x"} {
 		if !strings.Contains(msg, want) {

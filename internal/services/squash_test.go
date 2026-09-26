@@ -398,9 +398,12 @@ func TestFR_LOG_14_SquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *
 	l := lineFixture(t, repo.Dir)
 	gittest.Run(t, repo.Dir, "branch", "stacked", l.C)
 	for _, kv := range [][2]string{
-		{"sequence.editor", "false"}, {"core.editor", "false"},
-		{"rebase.autoStash", "true"}, {"rebase.updateRefs", "true"},
-		{"rebase.missingCommitsCheck", "error"}, {"commit.cleanup", "strip"},
+		{"sequence.editor", "false"},
+		{"core.editor", "false"},
+		{"rebase.autoStash", "true"},
+		{"rebase.updateRefs", "true"},
+		{"rebase.missingCommitsCheck", "error"},
+		{"commit.cleanup", "strip"},
 	} {
 		gittest.Run(t, repo.Dir, "config", kv[0], kv[1])
 	}

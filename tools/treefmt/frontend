@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Usage: frontend <tool> [option...] -- <file...>
+#
+# Runs `pnpm exec <tool> [option...]` inside frontend/, where the tool, its
+# config and node_modules live, on the given files that lie in frontend/,
+# named relative to the repo root as treefmt passes them (treefmt has no
+# per-formatter working directory). Other files are skipped: editors format
+# through `treefmt --stdin`, which passes a temporary copy outside the repo.
+set -euo pipefail
+
+frontend="$(dirname "$0")/../../frontend"
+if [[ ! -d $frontend/node_modules ]]; then
+  echo "frontend/node_modules is missing: run 'pnpm install' in frontend/ (or 'task setup') first." >&2
+  exit 1
+fi
+
+cmd=()
+while [[ $# -gt 0 && $1 != -- ]]; do
+  cmd+=("$1")
+  shift
+done
+shift # the --
+
+files=()
+for f in "$@"; do
+  if [[ $f == frontend/* ]]; then
+    files+=("${f#frontend/}")
+  fi
+done
+# Without file arguments the tool would check all of frontend/.
+if ((${#files[@]} == 0)); then
+  exit 0
+fi
+
+cd "$frontend"
+exec pnpm exec "${cmd[@]}" "${files[@]}"

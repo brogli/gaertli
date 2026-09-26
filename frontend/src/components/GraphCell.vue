@@ -5,8 +5,8 @@ import {
   type GraphEdge,
   type GraphRow,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { laneColourClass } from '../lib/laneColours'
-import { highestLane } from '../lib/graphLanes'
+import { laneColourClass } from '@/lib/laneColours'
+import { highestLane } from '@/lib/graphLanes'
 
 // GraphCell draws one row's GraphRow as an SVG strip `lanes` wide and
 // `height` tall: a line per edge, the dot at the row's own lane on top of
@@ -45,60 +45,28 @@ function path(edge: GraphEdge): string {
 </script>
 
 <template>
-  <svg class="graph-cell" :width="lanes * LANE_WIDTH" :height="height">
+  <svg class="graph-cell flex-none" :width="lanes * LANE_WIDTH" :height="height">
     <path
       v-for="edge in edges"
       :key="`${edge.lane}-${edge.kind}`"
       :d="path(edge)"
-      class="edge"
+      class="fill-none stroke-current stroke-2"
       :class="[edge.kind, laneColourClass(edge.colour)]"
     />
-    <circle :cx="dot[0]" :cy="dot[1]" r="4" class="dot" :class="laneColourClass(graph.colour)" />
+    <circle
+      :cx="dot[0]"
+      :cy="dot[1]"
+      r="4"
+      class="fill-current"
+      :class="laneColourClass(graph.colour)"
+    />
     <text
       v-if="graph.overflow"
       :x="(highestLane(graph) + 1) * LANE_WIDTH"
       :y="height / 2 + 4"
-      class="overflow"
+      class="text-xs"
     >
       +{{ graph.overflow }}
     </text>
   </svg>
 </template>
-
-<style scoped>
-.graph-cell {
-  flex: none;
-}
-.edge {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-}
-.dot {
-  fill: currentColor;
-}
-.overflow {
-  font-size: 0.75em;
-}
-
-/* The lane palette (`lib/laneColours.ts`): distinct from the diff's
-   green/red and the comparison's from/to blue/orange. */
-.colour-0 {
-  color: var(--nb-tone-violet);
-}
-.colour-1 {
-  color: var(--nb-tone-teal);
-}
-.colour-2 {
-  color: var(--nb-tone-pink);
-}
-.colour-3 {
-  color: var(--nb-tone-cyan);
-}
-.colour-4 {
-  color: var(--nb-tone-purple);
-}
-.colour-5 {
-  color: var(--nb-tone-indigo);
-}
-</style>

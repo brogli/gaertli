@@ -266,22 +266,16 @@ func (c *Core) UpdateBranch(ctx context.Context, id core.WorktreeID, branch stri
 	if b.upstreamRef == "" {
 		return "", core.ErrorfArgs(core.NoUpstream, "noUpstream", map[string]string{"branch": branch}, "%q has no upstream configured.", branch)
 	}
+	if b.checkedOutIn != "" {
+		args := map[string]string{"branch": branch, "path": b.checkedOutIn}
+		return "", core.ErrorfArgs(core.GitFailed, "branchCheckedOutElsewhere", args, "%q is checked out in %s. Pull it in that worktree.", branch, b.checkedOutIn)
+	}
 
 	jobID := wt.Repo.Jobs().StartForBranch(ctx, core.UpdateBranchJob, branch, func(ctx context.Context, progress jobs.Progress) (any, error) {
-		if b.checkedOutIn == "" {
-			if err := fetchIntoLocalBranch(ctx, wt, b, progress); err != nil {
-				return nil, err
-			}
-			return branchMoved(ctx, wt, b)
-		}
-		other, err := c.sessions.Open(ctx, core.RepoPath(b.checkedOutIn))
-		if err != nil {
+		if err := fetchIntoLocalBranch(ctx, wt, b, progress); err != nil {
 			return nil, err
 		}
-		if err := c.fetchAndMergeElsewhere(ctx, other, b, progress); err != nil {
-			return nil, err
-		}
-		return branchMoved(ctx, other, b)
+		return branchMoved(ctx, wt, b)
 	})
 	return string(jobID), nil
 }
@@ -314,56 +308,6 @@ func fetchIntoLocalBranch(ctx context.Context, wt *session.Worktree, b branchUps
 	args := []string{"fetch", "--progress", b.remote, b.upstreamRef + ":refs/heads/" + b.name}
 	result, err := runRemote(ctx, wt, args, progress)
 	return classifyDivergedFetch(err, result, b.name)
-}
-
-// fetchAndMergeElsewhere is UpdateBranch's case where b is checked out in
-// other, a different worktree: refused early if other is dirty — no
-// network spent on a call already known to be refused. Otherwise fetches
-// only the shared remote-tracking ref (no destination refspec, so the
-// checked-out-branch fetch refusal never applies here) and merges --ff-only
-// under other's own write queue, updating its files too. A diverged branch
-// is NotFastForward, as in fetchIntoLocalBranch.
-func (c *Core) fetchAndMergeElsewhere(ctx context.Context, other *session.Worktree, b branchUpstream, progress jobs.Progress) error {
-	if c.isDirty(ctx, other.Path) {
-		args := map[string]string{"branch": b.name, "path": other.Path}
-		return core.ErrorfArgs(core.DirtyWorktree, "branchCheckedOutDirty", args, "%q is checked out in %s, which has uncommitted changes.", b.name, other.Path)
-	}
-	if _, err := runRemote(ctx, other, []string{"fetch", "--progress", b.remote, b.upstreamRef}, progress); err != nil {
-		return err
-	}
-
-	other.Lock()
-	defer other.Unlock()
-	if err := stillCheckedOut(ctx, other, b.name); err != nil {
-		return err
-	}
-	_, err := other.Runner.Run(ctx, git.Call{Dir: other.Path, Args: []string{"merge", "--ff-only", "@{upstream}"}})
-	if ce := gitFailure(err); ce != nil && diverged(ctx, other) {
-		retagDiverged(ce, b.name)
-	}
-	return err
-}
-
-// stillCheckedOut refuses once other no longer has branch checked out: it
-// may have switched since the update read where branch is, and a merge
-// lands on whatever other has checked out.
-func stillCheckedOut(ctx context.Context, other *session.Worktree, branch string) error {
-	current, _, err := headBranch(ctx, other.Runner, other.Path)
-	if err != nil || current == branch {
-		return err
-	}
-	args := map[string]string{"branch": branch, "path": other.Path}
-	return core.ErrorfArgs(core.GitFailed, "branchNoLongerCheckedOut", args, "%q is no longer checked out in %s. Try the update again.", branch, other.Path)
-}
-
-// diverged reports whether wt's HEAD is not an ancestor of its upstream:
-// merge-base --is-ancestor exits 1 for that, and 0 when a fast-forward is
-// possible.
-func diverged(ctx context.Context, wt *session.Worktree) bool {
-	result, err := wt.Runner.Run(ctx, git.Call{
-		Dir: wt.Path, ReadOnly: true, Args: []string{"merge-base", "--is-ancestor", "HEAD", "@{upstream}"},
-	})
-	return gitExited(err, result, 1)
 }
 
 // branchUpstreamFormat reads one branch's SHA, its upstream's remote ("."

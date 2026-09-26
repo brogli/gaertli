@@ -5,13 +5,13 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "nebegit" # The name of the company
-  productName: "nebegit" # The name of the application
-  productIdentifier: "ch.nebegit.app" # The unique product identifier
-  description: "The git tool that sits beside your editor" # The application description
-  copyright: "(c) 2026, nebegit contributors" # Copyright text
-  comments: "" # Comments
-  version: "0.0.1" # The application version
+  companyName: 'nebegit' # The name of the company
+  productName: 'nebegit' # The name of the application
+  productIdentifier: 'ch.nebegit.app' # The unique product identifier
+  description: 'The git tool that sits beside your editor' # The application description
+  copyright: '(c) 2026, nebegit contributors' # Copyright text
+  comments: '' # Comments
+  version: '0.0.1' # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"
@@ -45,11 +45,11 @@ dev_mode:
       - .DS_Store
       - .gitignore
       - .gitkeep
-      - "*_test.go"
+      - '*_test.go'
     watched_extension:
-      - "*.go"
-      - "*.js" # Watch for changes to JS/TS files included using the //wails:include directive.
-      - "*.ts" # The frontend directory will be excluded entirely by the setting above.
+      - '*.go'
+      - '*.js' # Watch for changes to JS/TS files included using the //wails:include directive.
+      - '*.ts' # The frontend directory will be excluded entirely by the setting above.
     git_ignore: true
   executes:
     - cmd: wails3 build DEV=true

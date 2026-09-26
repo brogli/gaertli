@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import Button from 'openvue/button'
-import { useI18n } from '../i18n'
-import { SECONDARY_BUTTON } from '../lib/layout'
-import { noticeIconClass } from '../lib/icons'
-import { useNotices } from '../lib/notice'
+import { useI18n } from '@/i18n'
+import { SECONDARY_BUTTON } from '@/lib/layout'
+import { noticeIconClass } from '@/lib/icons'
+import { useNotices } from '@/lib/notice'
 
 // DebugArea is the debug mode strip along the main window's bottom: one
 // button per notice severity, each showing a sample notice through the
@@ -19,7 +19,10 @@ function sample(kind: string, severity: 'error' | 'warn' | 'success', summary: s
 </script>
 
 <template>
-  <div class="debug-area">
+  <!-- A low strip along the window's bottom, the same shape as the toolbar
+       above the body (WorktreeContent.vue): fixed height, never grown or
+       shrunk by its siblings. -->
+  <div class="flex flex-none items-center gap-2 py-1.5 px-2.5 border-t border-surface">
     <Button
       v-bind="SECONDARY_BUTTON"
       :icon="noticeIconClass('error')"
@@ -40,17 +43,3 @@ function sample(kind: string, severity: 'error' | 'warn' | 'success', summary: s
     />
   </div>
 </template>
-
-<style scoped>
-/* A low strip along the window's bottom, the same shape as the toolbar
-   above the body (WorktreeContent.vue): fixed height, never grown or
-   shrunk by its siblings. */
-.debug-area {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border-top: 1px solid var(--p-content-border-color);
-}
-</style>

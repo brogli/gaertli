@@ -16,18 +16,18 @@ import { languages } from '@codemirror/language-data'
 import { classHighlighter } from '@lezer/highlight'
 import Button from 'openvue/button'
 import ToggleButton from 'openvue/togglebutton'
-import { useI18n } from '../i18n'
-import { useDiffStore } from '../stores/diff'
-import { useSettingsStore } from '../stores/settings'
-import { useChangesStore } from '../stores/changes'
-import { useCoreCall } from '../composables/useCoreCall'
-import { useConfirmAction } from '../composables/useConfirmAction'
-import { hunkChanges, hunksIn } from '../lib/gitHunks'
-import { basename } from '../lib/path'
-import { iconClass, type IconName } from '../lib/icons'
-import { ICON_BUTTON, SECONDARY_BUTTON } from '../lib/layout'
-import { useRepoChanged } from '../lib/windowEvents'
-import { DiffKind, readsWorkingTree, type DiffTarget } from '../lib/diffTarget'
+import { useI18n } from '@/i18n'
+import { useDiffStore } from '@/stores/diff'
+import { useSettingsStore } from '@/stores/settings'
+import { useChangesStore } from '@/stores/changes'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useConfirmAction } from '@/composables/useConfirmAction'
+import { hunkChanges, hunksIn } from '@/lib/gitHunks'
+import { basename } from '@/lib/path'
+import { iconClass, type IconName } from '@/lib/icons'
+import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
+import { useRepoChanged } from '@/lib/windowEvents'
+import { DiffKind, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { DiffMode } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import ErrorBanner from './ErrorBanner.vue'
@@ -127,6 +127,13 @@ function updateSelectedLinesEnabled(): void {
   selectedLinesEnabled.value = selectedLines() !== null
 }
 
+// classHighlighter emits plain "tok-*" classes; they take the app's own
+// tokens rather than CodeMirror's default colours.
+const CODE_COLOURS = EditorView.theme({
+  '.tok-keyword, .tok-operator': { color: 'var(--p-primary-color)' },
+  '.tok-comment': { color: 'var(--p-text-muted-color)', fontStyle: 'italic' },
+})
+
 // languageExtensionFor is the syntax highlighting for path's filename, or
 // null (plain text) when @codemirror/language-data knows none.
 async function languageExtensionFor(path: string): Promise<Extension | null> {
@@ -151,8 +158,7 @@ async function mountView(): Promise<void> {
   const language = await languageExtensionFor(props.target.path)
   if (seq !== loadSeq) return
 
-  // classHighlighter emits plain "tok-*" classes, themed below.
-  const lang = language ? [language, syntaxHighlighting(classHighlighter)] : []
+  const lang = language ? [language, syntaxHighlighting(classHighlighter), CODE_COLOURS] : []
   // Lines split at "\n" only, as git splits them: a lone "\r" stays in its
   // line, so git's hunks sit on git's lines.
   const docExtensions = [
@@ -382,11 +388,15 @@ const toolbar = computed<ToolbarButton[]>(() => {
 </script>
 
 <template>
-  <section class="diff-view">
+  <section class="diff-view flex flex-col gap-2">
     <ErrorBanner v-if="shownError" :error="shownError" />
     <p v-else-if="diff.loading">{{ t('diffWindow.loading') }}</p>
     <template v-else-if="diff.file">
-      <div class="diff-toolbar">
+      <!-- Sticky: the diff view scrolls as a whole (DiffWindowView.vue), and
+           next/previous change must stay clickable wherever a jump lands. -->
+      <div
+        class="diff-toolbar sticky top-0 z-10 flex items-center gap-1 bg-(--p-content-background)"
+      >
         <ToggleButton
           v-if="showsContent"
           :model-value="ignoreWhitespace"
@@ -425,7 +435,7 @@ const toolbar = computed<ToolbarButton[]>(() => {
               : t('diffWindow.showWhitespaceToStageHint')
           }}
         </p>
-        <div v-else class="action-row">
+        <div v-else class="flex flex-wrap items-center gap-2">
           <Button
             v-for="(chunk, i) in chunks"
             :key="i"
@@ -466,31 +476,3 @@ const toolbar = computed<ToolbarButton[]>(() => {
     </template>
   </section>
 </template>
-
-<style scoped>
-/* Sticky: the diff view scrolls as a whole (DiffWindowView.vue), and
-   next/previous change must stay clickable wherever a jump lands. */
-.diff-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.3em;
-  background: var(--p-content-background);
-}
-</style>
-
-<style>
-/* CodeMirror's own DOM is built outside Vue, so this is unscoped:
-   classHighlighter's "tok-*" classes, themed with this app's own tokens
-   rather than CodeMirror's default inline colors. */
-.tok-keyword,
-.tok-operator {
-  color: var(--p-primary-color);
-}
-.tok-comment {
-  color: var(--p-text-muted-color);
-  font-style: italic;
-}
-</style>

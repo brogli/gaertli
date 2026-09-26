@@ -1,7 +1,7 @@
 import { toValue, type MaybeRefOrGetter } from 'vue'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Code, type ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { errorNotice, useNotices } from '../lib/notice'
+import { errorNotice, useNotices } from '@/lib/notice'
 import type { CoreError, useCoreCall } from './useCoreCall'
 
 // useOpenInEditor opens a folder or a file in the configured editor through
@@ -10,7 +10,11 @@ import type { CoreError, useCoreCall } from './useCoreCall'
 export function useOpenInEditor(
   wt: MaybeRefOrGetter<string>,
   run: ReturnType<typeof useCoreCall>['run'],
-) {
+): {
+  openEditor: (f: ChangedFile) => void
+  openFolder: () => void
+  openFolderAt: (path: string) => void
+} {
   const notices = useNotices()
 
   function showEditorNotice(error: CoreError): boolean {

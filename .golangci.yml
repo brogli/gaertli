@@ -1,4 +1,4 @@
-version: "2"
+version: '2'
 
 run:
   build-tags: [bench]
@@ -25,5 +25,5 @@ linters:
 
 formatters:
   enable:
-    - gofmt
+    - gofumpt
     - goimports

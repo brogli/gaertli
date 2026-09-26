@@ -1,8 +1,8 @@
 version: '3'
 
 vars:
-  APP_NAME: "nebegit"
-  BIN_DIR: "bin"
+  APP_NAME: 'nebegit'
+  BIN_DIR: 'bin'
   PACKAGE_MANAGER: pnpm
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   # Target OS for build/package/run. Defaults to the host OS, and is overridden
@@ -24,17 +24,17 @@ tasks:
   build:
     summary: Builds the application
     cmds:
-      - task: "{{.GOOS}}:build"
+      - task: '{{.GOOS}}:build'
 
   package:
     summary: Packages a production build of the application
     cmds:
-      - task: "{{.GOOS}}:package"
+      - task: '{{.GOOS}}:package'
 
   run:
     summary: Runs the application
     cmds:
-      - task: "{{.GOOS}}:run"
+      - task: '{{.GOOS}}:run'
 
   dev:
     summary: Runs the application in development mode
@@ -57,7 +57,9 @@ tasks:
       - go test ./...
 
   test:go:race:
-    summary: Runs the git-facing Go tests with the race detector, no frontend build needed (used by the git-2-42 CI job)
+    summary:
+      Runs the git-facing Go tests with the race detector, no frontend build needed (used by the
+      git-2-42 CI job)
     env:
       GOPROXY: off
       GOFLAGS: -mod=readonly
@@ -74,19 +76,33 @@ tasks:
       - task: common:frontend:run
         vars: { SCRIPT: test:unit }
 
-  lint:
-    summary: golangci-lint, oxlint, eslint, prettier, vue-tsc
+  fmt:
+    summary: Lint with fixes, then format the whole repo (treefmt.toml)
     deps:
       - task: common:build:frontend
     cmds:
-      - golangci-lint run
-      - task: common:frontend:run
-        vars: { SCRIPT: lint }
+      - treefmt
+
+  lint:
+    summary:
+      treefmt --ci (every linter, then every formatter; fails on a finding or a change), vue-tsc
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - cmd: treefmt --ci
+        platforms: [linux, darwin]
+      # Windows runners have no Nix shell; the Windows-only Go files are
+      # linted there. golangci-lint type-checks internal/remote, whose
+      # go:embed needs the cross-built core.
+      - task: build:core:embed
+        platforms: [windows]
+      - cmd: golangci-lint run
+        platforms: [windows]
       - task: common:frontend:run
         vars: { SCRIPT: type-check }
 
   trace:
-    summary: Every MUST/QA ID has a test name or a manual checklist entry
+    summary: Every MUST FR ID has a test name or a manual checklist entry
     cmds:
       - go run ./tools/trace
 
@@ -98,14 +114,16 @@ tasks:
       - go run ./tools/licensecheck -out {{.OUT}}
 
   release:dry-run:
-    summary: Builds this platform's release artifact and licence notices into dist/, mirroring release.yml without publishing
+    summary:
+      Builds this platform's release artifact and licence notices into dist/, mirroring release.yml
+      without publishing
     vars:
       VERSION: '{{.VERSION | default "v0.0.0-dryrun"}}'
     cmds:
       - rm -rf dist && mkdir -p dist
       - task: build
         vars: { VERSION: '{{.VERSION}}' }
-      - task: "{{OS}}:package:dryrun"
+      - task: '{{OS}}:package:dryrun'
       - task: licence-check
         vars: { OUT: dist/THIRD-PARTY-NOTICES.txt }
       - cp LICENSE dist/
@@ -128,7 +146,9 @@ tasks:
         vars: { SCRIPT: test:e2e }
 
   build:server:
-    summary: Builds the app in Wails server mode (UI served over HTTP) for the real-backend e2e suite; Linux only
+    summary:
+      Builds the app in Wails server mode (UI served over HTTP) for the real-backend e2e suite;
+      Linux only
     cmds:
       - task: linux:build
         vars: { EXTRA_TAGS: server, OUTPUT: '{{.BIN_DIR}}/nebegit-server' }
@@ -145,15 +165,17 @@ tasks:
   build:core:
     summary: Builds the headless core as pure Go
     env:
-      CGO_ENABLED: "0"
+      CGO_ENABLED: '0'
     cmds:
       - go build -o {{.BIN_DIR}}/nebegit-core{{exeExt}} ./cmd/nebegit-core
 
   build:core:embed:
-    summary: Cross-compiles the headless core for linux/amd64 into internal/remote, for the Windows build to embed
+    summary:
+      Cross-compiles the headless core for linux/amd64 into internal/remote, for the Windows build
+      to embed
     sources: [cmd/nebegit-core/**/*.go, internal/**/*.go]
     generates: [internal/remote/nebegit-core-linux]
-    env: { GOOS: linux, GOARCH: amd64, CGO_ENABLED: "0" }
+    env: { GOOS: linux, GOARCH: amd64, CGO_ENABLED: '0' }
     cmds:
       - go build -trimpath -o internal/remote/nebegit-core-linux ./cmd/nebegit-core
 

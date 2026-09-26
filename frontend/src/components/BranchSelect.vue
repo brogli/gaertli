@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Select from 'openvue/select'
-import { useI18n } from '../i18n'
-import { useRefsStore } from '../stores/refs'
+import { useI18n } from '@/i18n'
+import { useRefsStore } from '@/stores/refs'
 
 // BranchSelect picks a local branch by name from a searchable list.
 defineProps<{ inputId: string }>()

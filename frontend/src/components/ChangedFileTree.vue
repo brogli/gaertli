@@ -3,11 +3,11 @@ import { computed, ref, watch } from 'vue'
 import Button from 'openvue/button'
 import Tree, { type TreeExpandedKeys, type TreePassThroughMethodOptions } from 'openvue/tree'
 import type { TreeNode } from 'openvue/treenode'
-import { useI18n } from '../i18n'
+import { useI18n } from '@/i18n'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { fileTree, folderKeys } from '../lib/fileTree'
-import { iconClass } from '../lib/icons'
-import { ICON_BUTTON } from '../lib/layout'
+import { fileTree, folderKeys } from '@/lib/fileTree'
+import { iconClass } from '@/lib/icons'
+import { ICON_BUTTON } from '@/lib/layout'
 import FileStatusIcon from './FileStatusIcon.vue'
 
 // ChangedFileTree shows changed files by folder in OpenVue's Tree, every
@@ -55,13 +55,15 @@ const pt = {
       if (event.key === 'Enter' && event.target === event.currentTarget) openFile(context.node)
     },
   }),
+  // A row's name takes the room its button leaves and ends in an ellipsis;
+  // nothing scrolls sideways.
+  nodeLabel: 'flex-1 min-w-0 flex items-center gap-1.5',
 }
 </script>
 
 <template>
   <Tree
     v-model:expanded-keys="expandedKeys"
-    class="file-tree"
     :value="nodes"
     selection-mode="single"
     :selection-keys="selectionKeys"
@@ -73,7 +75,7 @@ const pt = {
       <i v-else :class="iconClass('folder')"></i>
     </template>
     <template #default="{ node }">
-      <span class="name" :title="node.data?.path ?? node.label">
+      <span class="name flex-1 min-w-0 truncate" :title="node.data?.path ?? node.label">
         <template v-if="node.data?.oldPath">{{ node.data.oldPath }} &rarr; </template
         >{{ node.label }}
       </span>
@@ -89,22 +91,3 @@ const pt = {
     </template>
   </Tree>
 </template>
-
-<style scoped>
-/* A row's name takes the room its button leaves and ends in an ellipsis;
-   nothing scrolls sideways. */
-.file-tree :deep(.p-tree-node-label) {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-}
-.name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>

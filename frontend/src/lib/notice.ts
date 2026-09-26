@@ -1,7 +1,7 @@
 import type { ToastMessageOptions } from 'openvue/toast'
 import { useToast } from 'openvue/usetoast'
-import { i18n } from '../i18n'
-import type { CoreError } from '../composables/useCoreCall'
+import { i18n } from '@/i18n'
+import type { CoreError } from '@/composables/useCoreCall'
 import { errorHeadline } from './errorText'
 
 // NOTICE_GROUP is the group of the app's one notice area (NoticeArea.vue);
@@ -44,9 +44,14 @@ export function errorNotice(error: CoreError, actions: NoticeAction[] = []): App
 // outlives the component that showed the notice, a dialog closing at once.
 const shown = new Map<string, string | number>()
 
+interface Notices {
+  show: (kind: string, message: AppNotice) => void
+  clear: (kind: string) => void
+}
+
 // useNotices shows at most one notice per kind: a newer one replaces only
 // its own kind's, never another action's.
-export function useNotices() {
+export function useNotices(): Notices {
   const toast = useToast()
 
   function clear(kind: string): void {

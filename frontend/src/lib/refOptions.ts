@@ -1,5 +1,5 @@
 import type { Refs } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import type { Translate } from '../i18n'
+import type { Translate } from '@/i18n'
 
 // RefOption is one ref in a Select or MultiSelect: its short name shown,
 // its full ref name the value, so a branch and a tag of the same name stay

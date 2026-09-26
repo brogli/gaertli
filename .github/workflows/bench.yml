@@ -5,33 +5,60 @@ on:
     - cron: '17 3 * * *' # off-peak UTC; avoids the top-of-hour congestion GitHub's own docs warn about
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   bench:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20 # repo build a few seconds, each check well under 1s; Playwright browser download ~30-60s — generous headroom for a shared/loaded runner
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: 'nix develop --command bash -eo pipefail {0}'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-go@v6
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: frontend/package.json
+      - name: pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v7
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-
 
       - name: Setup (online)
-        run: |
-          go tool task setup
-          go install tool
-          pnpm --dir frontend exec playwright install --with-deps chromium
+        run: task setup
 
-      - run: task bench
+      - name: bench (offline)
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+          npm_config_offline: 'true'
+        run: task bench
 
-      - run: task e2e
+      - name: e2e (offline)
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+          npm_config_offline: 'true'
+        run: task e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
