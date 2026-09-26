@@ -104,6 +104,12 @@ function activate(row: Row): void {
     void run(() => AppService.SelectWorktree(id(row.worktree.path)))
 }
 
+function rowAttrs(row: Row): Record<string, string> {
+  return row.kind === 'action'
+    ? { 'data-test': 'picker-action' }
+    : { 'data-test': 'worktree-row', title: row.worktree.path }
+}
+
 const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
 
 // closeAnd closes the popover, then runs action: for an action that leaves
@@ -190,91 +196,79 @@ async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
         v-model:query="query"
         :rows="rows"
         :placeholder="t('worktreePicker.searchPlaceholder')"
+        :row-attrs="rowAttrs"
         @activate="activate"
       >
-        <template #row="{ row, activate: onActivate }">
-          <span
-            v-if="row.kind === 'action'"
-            class="row flex min-w-0 flex-1 items-center gap-1.5"
-            data-test="picker-action"
-            @click="onActivate"
-            >{{ row.label }}</span
-          >
+        <template #row="{ row }">
+          <template v-if="row.kind === 'action'">{{ row.label }}</template>
           <template v-else>
-            <span
-              class="row flex min-w-0 flex-1 items-center gap-1.5"
-              data-test="worktree-row"
-              :title="row.worktree.path"
-              @click="onActivate"
-            >
-              <span class="current-marker w-[1em] flex-none" aria-hidden="true">
-                <i v-if="isCurrent(row.worktree)" :class="iconClass('current')"></i>
-              </span>
-              <span class="min-w-0 truncate" data-test="worktree-folder">
-                {{ basename(row.worktree.path) }}
-              </span>
-              <span
-                class="muted min-w-0 flex-1 truncate text-sm text-muted-color"
-                data-test="worktree-branch"
-                :title="worktreeLabel(row.worktree)"
-              >
-                {{ worktreeLabel(row.worktree) }}
-              </span>
-              <span
-                v-if="row.worktree.main && !row.worktree.bare"
-                class="text-sm text-muted-color"
-                >{{ t('worktreePicker.main') }}</span
-              >
-              <span
-                v-if="row.worktree.dirty"
-                role="img"
-                data-test="dirty-marker"
-                :title="t('worktreePicker.uncommittedChanges')"
-                :aria-label="t('worktreePicker.uncommittedChanges')"
-              >
-                <i :class="iconClass('dirty')" class="text-tone-orange"></i>
-              </span>
-              <span
-                v-if="row.worktree.locked"
-                role="img"
-                data-test="locked-marker"
-                :title="t('worktreePicker.locked')"
-                :aria-label="t('worktreePicker.locked')"
-              >
-                <i :class="iconClass('locked')"></i>
-              </span>
-              <span v-if="row.worktree.missing" class="text-sm text-muted-color">{{
-                t('worktreePicker.missing')
-              }}</span>
+            <span class="current-marker w-[1em] flex-none" aria-hidden="true">
+              <i v-if="isCurrent(row.worktree)" :class="iconClass('current')"></i>
             </span>
-            <template v-if="!row.worktree.bare">
-              <Button
-                v-bind="ICON_BUTTON"
-                :icon="iconClass('externalLink')"
-                data-test="open-in-new-window"
-                :title="t('worktreePicker.openInNewWindow')"
-                :aria-label="t('worktreePicker.openInNewWindow')"
-                @click="openInNewWindow(row.worktree)"
-              />
-              <Button
-                v-if="!row.worktree.missing"
-                v-bind="ICON_BUTTON"
-                :icon="iconClass('openEditor')"
-                data-test="open-in-editor"
-                :title="t('worktreePicker.openInEditor')"
-                :aria-label="t('worktreePicker.openInEditor')"
-                @click="openInEditor(row.worktree)"
-              />
-              <Button
-                v-if="!row.worktree.main && !isCurrent(row.worktree)"
-                v-bind="ICON_BUTTON"
-                :icon="iconClass('removeWorktree')"
-                data-test="remove-worktree"
-                :title="t('worktreePicker.removeWorktree')"
-                :aria-label="t('worktreePicker.removeWorktree')"
-                @click="removeWorktree(row.worktree)"
-              />
-            </template>
+            <span class="min-w-0 truncate" data-test="worktree-folder">
+              {{ basename(row.worktree.path) }}
+            </span>
+            <span
+              class="muted min-w-0 flex-1 truncate text-sm text-muted-color"
+              data-test="worktree-branch"
+              :title="worktreeLabel(row.worktree)"
+            >
+              {{ worktreeLabel(row.worktree) }}
+            </span>
+            <span v-if="row.worktree.main && !row.worktree.bare" class="text-sm text-muted-color">{{
+              t('worktreePicker.main')
+            }}</span>
+            <span
+              v-if="row.worktree.dirty"
+              role="img"
+              data-test="dirty-marker"
+              :title="t('worktreePicker.uncommittedChanges')"
+              :aria-label="t('worktreePicker.uncommittedChanges')"
+            >
+              <i :class="iconClass('dirty')" class="text-tone-orange"></i>
+            </span>
+            <span
+              v-if="row.worktree.locked"
+              role="img"
+              data-test="locked-marker"
+              :title="t('worktreePicker.locked')"
+              :aria-label="t('worktreePicker.locked')"
+            >
+              <i :class="iconClass('locked')"></i>
+            </span>
+            <span v-if="row.worktree.missing" class="text-sm text-muted-color">{{
+              t('worktreePicker.missing')
+            }}</span>
+          </template>
+        </template>
+        <template #trail="{ row }">
+          <template v-if="row.kind === 'worktree' && !row.worktree.bare">
+            <Button
+              v-bind="ICON_BUTTON"
+              :icon="iconClass('externalLink')"
+              data-test="open-in-new-window"
+              :title="t('worktreePicker.openInNewWindow')"
+              :aria-label="t('worktreePicker.openInNewWindow')"
+              @click="openInNewWindow(row.worktree)"
+            />
+            <Button
+              v-if="!row.worktree.missing"
+              v-bind="ICON_BUTTON"
+              :icon="iconClass('openEditor')"
+              data-test="open-in-editor"
+              :title="t('worktreePicker.openInEditor')"
+              :aria-label="t('worktreePicker.openInEditor')"
+              @click="openInEditor(row.worktree)"
+            />
+            <Button
+              v-if="!row.worktree.main && !isCurrent(row.worktree)"
+              v-bind="ICON_BUTTON"
+              :icon="iconClass('removeWorktree')"
+              data-test="remove-worktree"
+              :title="t('worktreePicker.removeWorktree')"
+              :aria-label="t('worktreePicker.removeWorktree')"
+              @click="removeWorktree(row.worktree)"
+            />
           </template>
         </template>
       </PickerList>

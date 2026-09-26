@@ -61,7 +61,7 @@ async function loadRecents(): Promise<void> {
 onMounted(loadRecents)
 
 type Row = PickerRow & { text: string } & (
-    | { kind: 'action'; label: string; run: () => void }
+    | { kind: 'action'; label: string; run: () => void; shortcut?: string }
     | { kind: 'repo'; repo: RecentRepo; current: boolean }
   )
 
@@ -111,6 +111,12 @@ function activate(row: Row): void {
   } else if (!row.current) void run(() => AppService.SelectRecentRepo(row.repo))
 }
 
+function rowAttrs(row: Row): Record<string, string> {
+  return row.kind === 'action'
+    ? { 'data-test': 'picker-action' }
+    : { 'data-test': 'repo-row', title: row.repo.path }
+}
+
 const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
 
 // openFolder opens the folder dialog; the folder picked tells a local repo
@@ -157,27 +163,17 @@ function newWindow(): void {
         v-model:query="query"
         :rows="rows"
         :placeholder="t('repoPicker.searchPlaceholder')"
+        :row-attrs="rowAttrs"
         @activate="activate"
       >
-        <template #row="{ row, activate: onActivate }">
-          <span
-            v-if="row.kind === 'action'"
-            class="row flex min-w-0 flex-1 items-center gap-1.5"
-            data-test="picker-action"
-            @click="onActivate"
-          >
+        <template #row="{ row }">
+          <template v-if="row.kind === 'action'">
             <span data-test="picker-action-label" class="truncate">{{ row.label }}</span>
             <span v-if="row.shortcut" class="ms-auto text-sm text-muted-color">{{
               row.shortcut
             }}</span>
-          </span>
-          <span
-            v-else
-            class="row flex min-w-0 flex-1 items-center gap-1.5"
-            data-test="repo-row"
-            :title="row.repo.path"
-            @click="onActivate"
-          >
+          </template>
+          <template v-else>
             <span class="current-marker w-[1em] flex-none" aria-hidden="true">
               <i v-if="row.current" :class="iconClass('current')"></i>
             </span>
@@ -190,7 +186,7 @@ function newWindow(): void {
               severity="secondary"
               :value="t('repoPicker.wslTitle', { distro: row.repo.distro })"
             />
-          </span>
+          </template>
         </template>
       </PickerList>
     </div>

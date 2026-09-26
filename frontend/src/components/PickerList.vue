@@ -9,17 +9,25 @@ import type { PickerRow } from './pickerRow'
 // activates a row. A right-click on a row, or Shift+F10 or the context-menu
 // key in the filter for the active row, asks for the row's menu. A header
 // row only labels a group. The parent filters rows by query. Only the rows
-// in view are rendered. The row slot gets activate to wire to its own
-// clickable part; a row's action buttons are siblings of that part, not
-// nested in it, so a button click never reaches it and needs no
-// propagation guard. A right-button press stops at its row: OpenVue's
+// in view are rendered. Each row is a clickable part holding the row slot,
+// with rowAttrs(row) as its attributes, between the lead and trail slots; a
+// button in those slots is a sibling of the clickable part, so its click
+// never activates the row. A right-button press stops at its row: OpenVue's
 // Popover counts any mousedown in it as a click inside, and a right-click
 // sends no click to reset that, so the next click outside would not close
 // the list.
-const props = defineProps<{ rows: Row[]; placeholder: string }>()
+const props = defineProps<{
+  rows: Row[]
+  placeholder: string
+  rowAttrs?: (row: Row) => Record<string, string>
+}>()
 const query = defineModel<string>('query', { default: '' })
 const emit = defineEmits<{ activate: [row: Row]; menu: [row: Row, event: MouseEvent] }>()
-defineSlots<{ row(props: { row: Row; activate: () => void }): unknown }>()
+defineSlots<{
+  lead?(props: { row: Row }): unknown
+  row(props: { row: Row }): unknown
+  trail?(props: { row: Row }): unknown
+}>()
 
 // Every row is one line of this height, so the virtualizer never measures.
 const ROW_HEIGHT = 28
@@ -126,7 +134,15 @@ onMounted(() => root.value?.querySelector('input')?.focus())
           @mousedown.right.stop
           @contextmenu.prevent="openMenu(rows[index]!, $event)"
         >
-          <slot name="row" :row="rows[index]!" :activate="() => activate(rows[index]!)" />
+          <slot name="lead" :row="rows[index]!" />
+          <div
+            class="flex min-w-0 flex-1 items-center gap-1.5"
+            v-bind="rowAttrs?.(rows[index]!)"
+            @click="activate(rows[index]!)"
+          >
+            <slot name="row" :row="rows[index]!" />
+          </div>
+          <slot name="trail" :row="rows[index]!" />
         </li>
       </ul>
     </div>

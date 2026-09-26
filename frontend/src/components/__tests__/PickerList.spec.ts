@@ -12,17 +12,15 @@ const rows: Row[] = [
   { key: 'b', label: 'beta' },
 ]
 
-// mountList renders each row as a clickable span (wired to the slot's
-// activate) plus, per row, a sibling button that calls action with the
-// row's key; waits for the rows in view to render.
+// mountList renders each row's label, plus a trailing button that calls
+// action with the row's key; waits for the rows in view to render.
 async function mountList(action = vi.fn(), listRows: Row[] = rows) {
   const { wrapper } = await mountInBody(PickerList<Row>, {
     props: { rows: listRows, placeholder: 'Filter' },
     slots: {
-      row: ({ row, activate }: { row: Row; activate: () => void }) => [
-        h('span', { class: 'main', onClick: activate }, row.label),
+      row: ({ row }: { row: Row }) => h('span', { class: 'main' }, row.label),
+      trail: ({ row }: { row: Row }) =>
         h('button', { class: 'act', onClick: () => action(row.key) }),
-      ],
     },
   })
   return wrapper

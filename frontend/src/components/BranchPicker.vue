@@ -77,6 +77,15 @@ type ActionRow = PickerRow & { kind: 'action'; label: string; run: () => void }
 type SectionRow = PickerRow & { kind: 'section'; label: string }
 type Row = RefRow | ActionRow | SectionRow
 
+function isRef(row: Row): row is RefRow {
+  return row.kind !== 'action' && row.kind !== 'section'
+}
+
+function rowAttrs(row: Row): Record<string, string> {
+  if (row.kind === 'section') return {}
+  return { 'data-test': row.kind === 'action' ? 'picker-action' : 'ref-row' }
+}
+
 function actionRow(key: string, label: string, run: () => void): ActionRow {
   return { key, kind: 'action', label, run }
 }
@@ -121,7 +130,7 @@ const sections = computed<{ label: string; rows: RefRow[] }[]>(() => [
 
 // Local branches with an upstream, other than the current one, can be
 // checked to update several at once.
-function updatable(row: RefRow): boolean {
+function updatable(row: Row): boolean {
   return row.kind === 'local' && !row.branch.current && !!row.branch.upstream
 }
 const checked = ref(new Set<string>())
@@ -274,7 +283,7 @@ const menuModel = ref<MenuItem[]>([])
 // openMenu opens a ref row's actions at event: the pointer, or the row
 // itself when opened from the keyboard.
 function openMenu(row: Row, event: MouseEvent): void {
-  if (row.kind === 'action' || row.kind === 'section') return
+  if (!isRef(row)) return
   menuModel.value = menuItems(row)
   menu.value?.show(event)
 }
@@ -334,60 +343,50 @@ async function updateChecked(): Promise<void> {
         v-model:query="query"
         :rows="rows"
         :placeholder="t('branchPicker.searchPlaceholder')"
+        :row-attrs="rowAttrs"
         @activate="activate"
         @menu="openMenu"
       >
-        <template #row="{ row, activate: onActivate }">
+        <template #lead="{ row }">
+          <span v-if="isRef(row)" class="flex w-(--p-checkbox-width) flex-none">
+            <Checkbox
+              v-if="updatable(row)"
+              binary
+              data-test="update-select"
+              :model-value="checked.has(row.name)"
+              :title="t('branchPicker.selectToUpdate', { name: row.name })"
+              :aria-label="t('branchPicker.selectToUpdate', { name: row.name })"
+              @update:model-value="setChecked(row.name, $event)"
+            />
+          </span>
+        </template>
+        <template #row="{ row }">
           <h3 v-if="row.kind === 'section'">{{ row.label }}</h3>
-          <span
-            v-else-if="row.kind === 'action'"
-            class="row flex min-w-0 flex-1 items-center gap-1.5"
-            data-test="picker-action"
-            @click="onActivate"
-            >{{ row.label }}</span
-          >
+          <template v-else-if="row.kind === 'action'">{{ row.label }}</template>
           <template v-else>
-            <span class="flex w-(--p-checkbox-width) flex-none">
-              <Checkbox
-                v-if="updatable(row)"
-                binary
-                data-test="update-select"
-                :model-value="checked.has(row.name)"
-                :title="t('branchPicker.selectToUpdate', { name: row.name })"
-                :aria-label="t('branchPicker.selectToUpdate', { name: row.name })"
-                @update:model-value="setChecked(row.name, $event)"
-              />
+            <span class="current-marker w-[1em] flex-none text-xs text-primary">
+              <i
+                v-if="row.kind === 'local' && row.branch.current"
+                :class="iconClass('current')"
+                data-test="current-marker"
+                :title="t('branchPicker.currentBranch')"
+                :aria-label="t('branchPicker.currentBranch')"
+              ></i>
             </span>
+            <span class="ref-name min-w-0 truncate" :title="row.name">{{ row.name }}</span>
             <span
-              class="row flex min-w-0 flex-1 items-center gap-1.5"
-              data-test="ref-row"
-              @click="onActivate"
+              v-if="row.kind === 'local' && row.branch.upstream"
+              class="flex-1 whitespace-nowrap text-sm text-muted-color"
             >
-              <span class="current-marker w-[1em] flex-none text-xs text-primary">
-                <i
-                  v-if="row.kind === 'local' && row.branch.current"
-                  :class="iconClass('current')"
-                  data-test="current-marker"
-                  :title="t('branchPicker.currentBranch')"
-                  :aria-label="t('branchPicker.currentBranch')"
-                ></i>
-              </span>
-              <span class="ref-name min-w-0 truncate" :title="row.name">{{ row.name }}</span>
-              <span
-                v-if="row.kind === 'local' && row.branch.upstream"
-                class="flex-1 whitespace-nowrap text-sm text-muted-color"
+              <span v-if="row.branch.ahead"
+                ><i :class="iconClass('ahead')" aria-hidden="true"></i>{{ row.branch.ahead }}</span
               >
-                <span v-if="row.branch.ahead"
-                  ><i :class="iconClass('ahead')" aria-hidden="true"></i
-                  >{{ row.branch.ahead }}</span
-                >
-                <span v-if="row.branch.behind"
-                  ><i :class="iconClass('behind')" aria-hidden="true"></i
-                  >{{ row.branch.behind }}</span
-                >
-              </span>
-              <span v-else class="flex-1"></span>
+              <span v-if="row.branch.behind"
+                ><i :class="iconClass('behind')" aria-hidden="true"></i
+                >{{ row.branch.behind }}</span
+              >
             </span>
+            <span v-else class="flex-1"></span>
           </template>
         </template>
       </PickerList>
