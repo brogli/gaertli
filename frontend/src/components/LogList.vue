@@ -255,16 +255,21 @@ function plainSelectionOtherThan(row: LogCommit): LogCommit | null {
 // selection.
 function pickAndRevertActions() {
   return {
-    cherryPick,
-    cherryPickOptions: () =>
-      (pickDialog.value = { verb: 'cherry-pick', shas: shasOf(log.selection) }),
-    revert: () =>
-      void runAndClose(
-        () => Facade.Revert(props.wt, shasOf(log.selection), gitDefaults),
-        log.dropSelection,
-      ),
-    revertOptions: () => (pickDialog.value = { verb: 'revert', shas: shasOf(log.selection) }),
+    cherryPick: () => pickWithDefaults(Facade.CherryPick),
+    cherryPickOptions: () => openPickDialog('cherry-pick'),
+    revert: () => pickWithDefaults(Facade.Revert),
+    revertOptions: () => openPickDialog('revert'),
   }
+}
+
+// pickWithDefaults runs pick on the selection with git's defaults; a
+// refusal shows in the error banner.
+function pickWithDefaults(pick: typeof Facade.CherryPick): void {
+  void runAndClose(() => pick(props.wt, shasOf(log.selection), gitDefaults), log.dropSelection)
+}
+
+function openPickDialog(verb: 'cherry-pick' | 'revert'): void {
+  pickDialog.value = { verb, shas: shasOf(log.selection) }
 }
 
 function selectionActions(): Parameters<typeof buildSelectionMenuItems>[1] {
@@ -282,15 +287,6 @@ function shasOf(rows: LogCommit[]): string[] {
 
 // gitDefaults are the plain "Cherry-pick" and "Revert" items' options.
 const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
-
-// cherryPick picks with git's defaults; a selection with a merge commit is
-// refused, shown through the error banner.
-function cherryPick(): void {
-  void runAndClose(
-    () => Facade.CherryPick(props.wt, shasOf(log.selection), gitDefaults),
-    log.dropSelection,
-  )
-}
 </script>
 
 <template>
