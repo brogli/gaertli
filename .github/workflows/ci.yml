@@ -64,6 +64,9 @@ jobs:
           retention-days: 7
 
   windows:
+    # Only Windows can run the Go tests' Windows paths (processes, paths,
+    # the WSL core). The Windows binary itself is cross-compiled on Linux,
+    # in the linux job's `task ci`.
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -75,32 +78,15 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          version: 11
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          install-only: true
-
       - name: Setup (online)
-        run: |
-          go tool task setup
-          go install tool
+        run: go mod download
 
-      - name: ci (offline)
+      - name: Go tests (offline)
         env:
           GOPROXY: off
           GOTOOLCHAIN: local
           GOFLAGS: -mod=readonly
-          npm_config_offline: 'true'
-        run: task ci
+        run: go tool task test:go:core
 
   macos:
     runs-on: macos-latest
@@ -181,11 +167,11 @@ jobs:
           sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
           go mod download
 
-      - name: test:go:race on git 2.42 (offline)
+      - name: Go tests with the race detector on git 2.42 (offline)
         env:
           GOPROXY: off
           GOTOOLCHAIN: local
           GOFLAGS: -mod=readonly
         run: |
           git --version
-          go tool task test:go:race
+          go tool task test:go:core FLAGS=-race

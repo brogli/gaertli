@@ -122,15 +122,14 @@ tasks:
       INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
 
   package:dryrun:
-    summary: Zips the built .exe and LICENSE into dist/, mirroring release.yml's windows job
+    summary:
+      Zips the cross-compiled .exe and LICENSE into dist/, mirroring release.yml's windows job
     deps:
       - task: build
     cmds:
       - mkdir -p dist
-      - cmd:
-          powershell -Command "Compress-Archive -Path '{{.BIN_DIR}}/{{.APP_NAME}}.exe','LICENSE'
-          -DestinationPath 'dist/{{.APP_NAME}}-windows-amd64.zip' -Force"
-        platforms: [windows]
+      - rm -f dist/{{.APP_NAME}}-windows-amd64.zip
+      - zip -j dist/{{.APP_NAME}}-windows-amd64.zip {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE
 
   generate:syso:
     summary: Generates Windows `.syso` file

@@ -56,16 +56,18 @@ tasks:
     cmds:
       - go test ./...
 
-  test:go:race:
+  test:go:core:
     summary:
-      Runs the git-facing Go tests with the race detector, no frontend build needed (used by the
-      git-2-42 CI job)
+      Runs the Go tests that need no frontend build (the git-2-42 and windows CI jobs); FLAGS=-race
+      adds the race detector
+    deps:
+      - task: build:core:embed
     env:
       GOPROXY: off
       GOFLAGS: -mod=readonly
       GOTOOLCHAIN: local
     cmds:
-      - go test -race ./internal/... ./cmd/nebegit-core/...
+      - go test {{.FLAGS}} ./internal/... ./cmd/nebegit-core/...
 
   test:
     summary: Runs Go and frontend tests offline
@@ -188,3 +190,4 @@ tasks:
       - task: test
       - task: build
       - task: build:core
+      - task: windows:build
