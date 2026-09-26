@@ -424,6 +424,7 @@ func TestFR_BR_05_CheckoutNamesTheOtherWorktreeWhenABranchIsAlreadyCheckedOutThe
 	gittest.Run(t, repo.Dir, "branch", "feature")
 	linked := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
+	linkedPath := gitPath(t, linked)
 	before := currentBranch(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
@@ -431,8 +432,8 @@ func TestFR_BR_05_CheckoutNamesTheOtherWorktreeWhenABranchIsAlreadyCheckedOutThe
 	err := c.Checkout(t.Context(), wt, "feature")
 
 	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, linked) {
-		t.Errorf("GitStderr = %q, want it to name the other worktree's path %q", ce.GitStderr, linked)
+	if !strings.Contains(ce.GitStderr, linkedPath) {
+		t.Errorf("GitStderr = %q, want it to name the other worktree's path %q", ce.GitStderr, linkedPath)
 	}
 	if got := currentBranch(t, repo.Dir); got != before {
 		t.Errorf("current branch = %s, want unchanged %s", got, before)

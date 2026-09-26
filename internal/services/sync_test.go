@@ -1116,6 +1116,7 @@ func updateBranchElsewhereFixture(t *testing.T) (repo *gittest.Repo, origin, oth
 
 func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
 	repo, origin, otherDir := updateBranchElsewhereFixture(t)
+	otherPath := gitPath(t, otherDir)
 	remoteAppendCommitOnBranch(t, origin, "B", "upstream.txt", "u", "upstream commit")
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
 	beforeRemote, _ := refSHA(t, repo.Dir, "refs/remotes/origin/B")
@@ -1129,8 +1130,8 @@ func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesBeforeAnyGitCall(t *tes
 	if ce.Key != "branchCheckedOutElsewhere" {
 		t.Errorf("Key = %q, want branchCheckedOutElsewhere", ce.Key)
 	}
-	if ce.Args["branch"] != "B" || ce.Args["path"] != otherDir {
-		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, otherDir)
+	if ce.Args["branch"] != "B" || ce.Args["path"] != otherPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, otherPath)
 	}
 	jobs, jobsErr := c.Jobs(t.Context(), wt)
 	if jobsErr != nil {
@@ -1158,6 +1159,7 @@ func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesBeforeAnyGitCall(t *tes
 func TestFR_UPD_01_UpdateBranchCheckedOutInThisWindowRefusesNamingItsOwnPath(t *testing.T) {
 	repo, origin := updateBranchFixture(t)
 	gittest.Run(t, repo.Dir, "checkout", "B")
+	repoPath := gitPath(t, repo.Dir)
 	remoteAppendCommitOnBranch(t, origin, "B", "upstream.txt", "u", "upstream commit")
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
 
@@ -1169,8 +1171,8 @@ func TestFR_UPD_01_UpdateBranchCheckedOutInThisWindowRefusesNamingItsOwnPath(t *
 	if ce.Key != "branchCheckedOutElsewhere" {
 		t.Errorf("Key = %q, want branchCheckedOutElsewhere", ce.Key)
 	}
-	if ce.Args["branch"] != "B" || ce.Args["path"] != repo.Dir {
-		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, repo.Dir)
+	if ce.Args["branch"] != "B" || ce.Args["path"] != repoPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, repoPath)
 	}
 	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
 		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)

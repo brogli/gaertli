@@ -207,11 +207,13 @@ func TestFR_LOG_10_LoadLogMarksCheckedOutWorktrees(t *testing.T) {
 	for _, r := range rows {
 		byMsg[r.Subject] = r
 	}
-	if got := byMsg["second"].CheckedOutIn; len(got) != 1 || got[0] != linked {
-		t.Errorf("second commit CheckedOutIn = %v, want [%s]", got, linked)
+	linkedPath := gitPath(t, linked)
+	mainPath := gitPath(t, repo.Dir)
+	if got := byMsg["second"].CheckedOutIn; len(got) != 1 || got[0] != linkedPath {
+		t.Errorf("second commit CheckedOutIn = %v, want [%s]", got, linkedPath)
 	}
-	if got := byMsg["base"].CheckedOutIn; len(got) != 1 || got[0] != repo.Dir {
-		t.Errorf("base commit CheckedOutIn = %v, want [%s]", got, repo.Dir)
+	if got := byMsg["base"].CheckedOutIn; len(got) != 1 || got[0] != mainPath {
+		t.Errorf("base commit CheckedOutIn = %v, want [%s]", got, mainPath)
 	}
 }
 

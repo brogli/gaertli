@@ -75,6 +75,7 @@ func TestFR_WT_04_OpenFolderAtStartsTheEditorOnTheWorktreesToplevelWithNoPriorSe
 	gittest.Run(t, repo.Dir, "branch", "feature")
 	linkedDir := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linkedDir, "feature")
+	linkedPath := gitPath(t, linkedDir)
 
 	c := New(func(core.Event) {})
 	outFile := pushArgvWriter(t, c)
@@ -83,8 +84,8 @@ func TestFR_WT_04_OpenFolderAtStartsTheEditorOnTheWorktreesToplevelWithNoPriorSe
 		t.Fatal(err)
 	}
 
-	if got := waitForFile(t, outFile); got != linkedDir {
-		t.Errorf("helper argv = %q, want %q", got, linkedDir)
+	if got := waitForFile(t, outFile); got != linkedPath {
+		t.Errorf("helper argv = %q, want %q", got, linkedPath)
 	}
 }
 
@@ -116,7 +117,7 @@ func TestFR_ED_02_OpenFileJoinsThePathAgainstTheWorktreeToplevel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := filepath.Join(repo.Dir, "sub", "foo.txt")
+	want := filepath.Join(gitPath(t, repo.Dir), "sub", "foo.txt")
 	if got := waitForFile(t, outFile); got != want {
 		t.Errorf("helper argv = %q, want %q", got, want)
 	}
@@ -150,7 +151,7 @@ func TestFR_UX_02_OpenFileLogsTheEditorStart(t *testing.T) {
 	}
 
 	record := onlyEditorRecord(t, events)
-	if want := []string{argvWriterBin, filepath.Join(repo.Dir, "seed.txt")}; !slices.Equal(record.Argv, want) {
+	if want := []string{argvWriterBin, filepath.Join(gitPath(t, repo.Dir), "seed.txt")}; !slices.Equal(record.Argv, want) {
 		t.Errorf("argv = %v, want %v", record.Argv, want)
 	}
 	if record.Error != "" {
@@ -169,13 +170,14 @@ func TestFR_UX_02_OpenFileWithACommandNotOnPathLogsTheArgvAndTheError(t *testing
 		t.Fatal(err)
 	}
 	wt := openOn(t, c, repo.Dir)
-	t.Setenv("PATH", t.TempDir()) // empty: nothing resolves, set after opening (which itself needs git)
+	repoPath := gitPath(t, repo.Dir) // before PATH is wiped: gitPath itself needs to run git
+	t.Setenv("PATH", t.TempDir())    // empty: nothing resolves, set after opening (which itself needs git)
 
 	err := c.OpenFile(t.Context(), wt.ID, "seed.txt", 0)
 	coretest.AssertCode(t, err, core.EditorNotFound)
 
 	record := onlyEditorRecord(t, events)
-	if want := []string{"definitely-not-a-real-editor", filepath.Join(repo.Dir, "seed.txt")}; !slices.Equal(record.Argv, want) {
+	if want := []string{"definitely-not-a-real-editor", filepath.Join(repoPath, "seed.txt")}; !slices.Equal(record.Argv, want) {
 		t.Errorf("argv = %v, want %v", record.Argv, want)
 	}
 	if record.Error == "" {

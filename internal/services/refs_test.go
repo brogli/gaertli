@@ -149,7 +149,7 @@ func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := map[string]string{"master": repo.Dir, "feature": linked}
+	want := map[string]string{"master": gitPath(t, repo.Dir), "feature": gitPath(t, linked)}
 	for _, b := range refs.Branches {
 		if b.CheckedOutIn != want[b.Name] {
 			t.Errorf("branch %q CheckedOutIn = %q, want %q", b.Name, b.CheckedOutIn, want[b.Name])

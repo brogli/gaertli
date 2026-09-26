@@ -73,8 +73,9 @@ func TestFR_WT_01_ListWorktreesListsMainAndLinkedWorktrees(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("len(worktrees) = %d, want 3: %+v", len(got), got)
 	}
-	if !got[0].Main || got[0].Path != repo.Dir {
-		t.Errorf("worktrees[0] = %+v, want the main worktree at %s", got[0], repo.Dir)
+	mainPath := gitPath(t, repo.Dir)
+	if !got[0].Main || got[0].Path != mainPath {
+		t.Errorf("worktrees[0] = %+v, want the main worktree at %s", got[0], mainPath)
 	}
 	for i := 1; i < len(got); i++ {
 		if got[i].Main {
@@ -82,11 +83,11 @@ func TestFR_WT_01_ListWorktreesListsMainAndLinkedWorktrees(t *testing.T) {
 		}
 	}
 
-	linked := findWorktree(t, got, linkedDir)
+	linked := findWorktree(t, got, gitPath(t, linkedDir))
 	if linked.Branch != "feature" {
 		t.Errorf("linked worktree = %+v, want Branch \"feature\"", linked)
 	}
-	detached := findWorktree(t, got, detachedDir)
+	detached := findWorktree(t, got, gitPath(t, detachedDir))
 	if detached.Branch != "" {
 		t.Errorf("detached worktree = %+v, want Branch empty", detached)
 	}
@@ -109,10 +110,10 @@ func TestFR_WT_01_ListWorktreesReportsDirtyPerWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if wt := findWorktree(t, got, dirtyDir); !wt.Dirty {
+	if wt := findWorktree(t, got, gitPath(t, dirtyDir)); !wt.Dirty {
 		t.Errorf("dirty worktree Dirty = false, want true")
 	}
-	if wt := findWorktree(t, got, cleanDir); wt.Dirty {
+	if wt := findWorktree(t, got, gitPath(t, cleanDir)); wt.Dirty {
 		t.Errorf("clean worktree Dirty = true, want false")
 	}
 }
@@ -122,6 +123,7 @@ func TestFR_WT_01_ListWorktreesReportsAMissingDirectoryWithoutError(t *testing.T
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	linkedDir := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", linkedDir, gittest.HeadSHA(t, repo.Dir))
+	wantPath := gitPath(t, linkedDir)
 	if err := os.RemoveAll(linkedDir); err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +134,7 @@ func TestFR_WT_01_ListWorktreesReportsAMissingDirectoryWithoutError(t *testing.T
 		t.Fatal(err)
 	}
 
-	wt := findWorktree(t, got, linkedDir)
+	wt := findWorktree(t, got, wantPath)
 	if !wt.Missing {
 		t.Errorf("Missing = false, want true")
 	}
@@ -157,8 +159,9 @@ func TestFR_WT_13_MainWorktreeFindsTheMainWorktreeFromTheCommonGitDir(t *testing
 		t.Fatal(err)
 	}
 
-	if !got.Main || got.Path != repo.Dir {
-		t.Errorf("MainWorktree = %+v, want the main worktree at %s", got, repo.Dir)
+	mainPath := gitPath(t, repo.Dir)
+	if !got.Main || got.Path != mainPath {
+		t.Errorf("MainWorktree = %+v, want the main worktree at %s", got, mainPath)
 	}
 }
 
@@ -203,11 +206,12 @@ func TestFR_WT_01_ListWorktreesMarksABareRepoAndRunsNoStatusInIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(got) != 2 || !got[0].Bare || got[0].Path != bareDir || got[0].Dirty || got[1].Bare {
+	barePath := gitPath(t, bareDir)
+	if len(got) != 2 || !got[0].Bare || got[0].Path != barePath || got[0].Dirty || got[1].Bare {
 		t.Fatalf("worktrees = %+v, want the bare repo first, marked bare, then the linked worktree", got)
 	}
 	for _, e := range rec.snapshot() {
-		if e.Dir == bareDir && strings.Contains(e.Command, "status") {
+		if e.Dir == barePath && strings.Contains(e.Command, "status") {
 			t.Errorf("ran %q in the bare repo, want no status there", e.Command)
 		}
 	}
@@ -240,8 +244,8 @@ func TestFR_WT_02_AddWorktreeChecksOutAnExistingBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got.Path != target || got.Branch != "feature" {
-		t.Errorf("AddWorktree = %+v, want Path %s, Branch \"feature\"", got, target)
+	if want := gitPath(t, target); got.Path != want || got.Branch != "feature" {
+		t.Errorf("AddWorktree = %+v, want Path %s, Branch \"feature\"", got, want)
 	}
 	if branch := currentBranch(t, target); branch != "feature" {
 		t.Errorf("checked-out branch in %s = %q, want feature", target, branch)
@@ -260,11 +264,7 @@ func TestFR_WT_14_AddWorktreeFindsTheNewWorktreeGivenAnotherFormOfItsPath(t *tes
 		t.Fatal(err)
 	}
 
-	want, err := filepath.EvalSymlinks(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Path != want {
+	if want := gitPath(t, target); got.Path != want {
 		t.Errorf("AddWorktree Path = %q, want git's form %q", got.Path, want)
 	}
 }
@@ -439,8 +439,8 @@ func TestFR_WT_03_AddWorktreeCreatesTheTargetsMissingParentDirectory(t *testing.
 		t.Fatal(err)
 	}
 
-	if got.Path != target {
-		t.Errorf("AddWorktree Path = %s, want %s", got.Path, target)
+	if want := gitPath(t, target); got.Path != want {
+		t.Errorf("AddWorktree Path = %s, want %s", got.Path, want)
 	}
 	if _, statErr := os.Stat(target); statErr != nil {
 		t.Errorf("target %s missing: %v (git should have created its own parent directory)", target, statErr)
@@ -566,6 +566,7 @@ func TestFR_WT_07_PruneWorktreesRemovesOnlyMissingEntries(t *testing.T) {
 	}
 	clean := filepath.Join(t.TempDir(), "clean")
 	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", clean, sha)
+	cleanPath := gitPath(t, clean)
 
 	c, _ := openWorktree(t, repo.Dir)
 	if err := c.PruneWorktrees(t.Context(), core.RepoPath(repo.Dir)); err != nil {
@@ -579,7 +580,7 @@ func TestFR_WT_07_PruneWorktreesRemovesOnlyMissingEntries(t *testing.T) {
 	if slices.ContainsFunc(got, func(wt core.Worktree) bool { return wt.Path == missing }) {
 		t.Errorf("worktrees = %+v, want %s pruned away", got, missing)
 	}
-	findWorktree(t, got, clean) // still present, fails the test if not
+	findWorktree(t, got, cleanPath) // still present, fails the test if not
 }
 
 // findWorktree returns the row of worktrees whose Path is path, failing t
@@ -593,4 +594,14 @@ func findWorktree(t *testing.T, worktrees []core.Worktree, path string) core.Wor
 	}
 	t.Fatalf("no worktree with path %s in %+v", path, worktrees)
 	return core.Worktree{}
+}
+
+// gitPath returns dir's path the way git reports it: a worktree's toplevel,
+// or a bare repo's own directory. Called before dir is removed.
+func gitPath(t *testing.T, dir string) string {
+	t.Helper()
+	if gittest.Out(t, dir, "rev-parse", "--is-bare-repository") == "true" {
+		return gittest.Out(t, dir, "rev-parse", "--absolute-git-dir")
+	}
+	return gittest.Out(t, dir, "rev-parse", "--show-toplevel")
 }
