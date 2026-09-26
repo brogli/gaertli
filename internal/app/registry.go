@@ -566,20 +566,20 @@ func (r *Registry) sinkFor(distro string) core.EventSink {
 
 // dispatch emits ev to the windows it concerns among those distro backs
 // ("" = local), its payload decoded into the event's registered type. An
-// event that does not decode is dropped and logged. A "command" event never
-// reaches a window: it is written to the app log instead.
+// event that does not decode is dropped and logged. A "command" or "editor"
+// event never reaches a window: it is written to the app log instead.
 func (r *Registry) dispatch(distro string, ev core.Event) {
 	data, err := decodeEvent(ev)
 	if err != nil {
 		r.log.Warn("event dropped", "name", ev.Name, "err", err)
 		return
 	}
-	if entry, ok := data.(core.CommandRecord); ok {
-		logCommand(r.log, ev.Worktree, entry)
+	switch record := data.(type) {
+	case core.CommandRecord:
+		logCommand(r.log, ev.Worktree, record)
 		return
-	}
-	if entry, ok := data.(core.EditorRecord); ok {
-		logEditor(r.log, ev.Worktree, entry)
+	case core.EditorRecord:
+		logEditor(r.log, ev.Worktree, record)
 		return
 	}
 	for _, w := range r.targets(distro, ev) {
