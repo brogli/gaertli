@@ -106,16 +106,32 @@ func emittedEventNames(t *testing.T, dirs ...string) []string {
 	return slices.Compact(names)
 }
 
-func TestTR_28_EveryEmittedEventHasADecoderAndARegistration(t *testing.T) {
+func TestTR_28_EveryEmittedEventDecodesAndOnlyWindowEventsAreRegistered(t *testing.T) {
 	emitted := emittedEventNames(t, ".", "../session", "../services")
 
 	if decoded := slices.Sorted(maps.Keys(eventPayloads)); !slices.Equal(decoded, emitted) {
 		t.Errorf("eventPayloads has %v, want the emitted events %v", decoded, emitted)
 	}
+
 	for _, name := range emitted {
-		if !registered(name) {
-			t.Errorf("%q is not registered", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			r, opener := newTestRegistry()
+			r.OpenOrFocus("wt", "/wt", "")
+
+			r.Dispatch(core.Event{Name: name, Worktree: "wt", Payload: json.RawMessage("null")})
+
+			received := opener.windows[0].emitted
+			switch len(received) {
+			case 1:
+				assertRegisteredType(t, name, received[0].payload)
+			case 0:
+				if registered(name) {
+					t.Errorf("%q is registered but reaches no window", name)
+				}
+			default:
+				t.Fatalf("emitted %d events, want 0 or 1", len(received))
+			}
+		})
 	}
 }
 

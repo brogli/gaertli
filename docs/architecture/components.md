@@ -213,12 +213,12 @@ Hidden views stay mounted, so switching keeps the scroll position and the typed 
 | `settings:changed` | settings were saved; every window reloads its settings and summary, so the theme and the "Open in …" label follow                                     |
 | `diff:show`        | the shell retargets an open diff window to another file                                                                                               |
 
-Each event is registered in the shell with its Go payload type, and the binding generator types the
-frontend's handlers from that registration, so no event type is written by hand in TypeScript. A
-value from a fixed set (a change's scope, a job's kind and state, a pull mode) is a Go string type
-with constants, generated into a TypeScript enum, so a mistyped value fails the type check. A core's
-events travel as JSON, so they survive the RPC hop from a WSL core; the shell decodes each into its
-registered type before emitting it.
+Each event a window receives is registered in the shell with its Go payload type, and the binding
+generator types the frontend's handlers from that registration, so no event type is written by hand
+in TypeScript. A value from a fixed set (a change's scope, a job's kind and state, a pull mode) is a
+Go string type with constants, generated into a TypeScript enum, so a mistyped value fails the type
+check. A core's events travel as JSON, so they survive the RPC hop from a WSL core; the shell
+decodes each into its registered type before emitting it.
 
 Wails delivers every event to every window, naming as its sender the window it was emitted through.
 The shell emits each event through each window it concerns (ADR-9), and every frontend listener

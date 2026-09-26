@@ -15,22 +15,22 @@ type DiffShow struct {
 	Target DiffTarget      `json:"target"`
 }
 
-// init registers every event name with its payload type; the binding
-// generator turns them into the frontend's event types. Each name is also a
-// key of eventPayloads.
+// init registers every event a window receives with its payload type; the
+// binding generator turns them into the frontend's event types. Each name is
+// also a key of eventPayloads. "command" and "editor" are not registered:
+// dispatch never emits them to a window, only logs them.
 func init() {
 	application.RegisterEvent[core.RepoChanged]("repo:changed")
 	application.RegisterEvent[core.LogProgress]("log:progress")
 	application.RegisterEvent[core.JobInfo]("job:update")
-	application.RegisterEvent[core.CommandRecord]("command")
-	application.RegisterEvent[core.EditorRecord]("editor")
 	application.RegisterEvent[application.Void]("core:reconnected")
 	application.RegisterEvent[DiffShow]("diff:show")
 	application.RegisterEvent[application.Void]("settings:changed")
 }
 
-// eventPayloads decodes a core.Event's JSON payload into the data type its
-// name is registered with: Wails emits only data of exactly that type.
+// eventPayloads decodes a core.Event's JSON payload into the type it is
+// registered with, or, for a logged event ("command", "editor"), its record
+// type.
 var eventPayloads = map[string]func(json.RawMessage) (any, error){
 	"repo:changed":     decodePayload[core.RepoChanged],
 	"log:progress":     decodePayload[core.LogProgress],
