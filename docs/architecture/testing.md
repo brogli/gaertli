@@ -54,7 +54,7 @@ an automated test.
 
 ## CI
 
-CI follows TR-14, TR-26 and TR-42. The real-backend e2e suite runs as its own Linux job; the mock
-e2e suite runs nightly with the performance checks. One Linux job runs the Go tests with the race
-detector against the oldest supported git, built from source (QA-COMP-03). A Windows job runs the Go
-tests on Windows; the Windows app is cross-compiled in the Linux job (TR-26).
+CI follows TR-14, TR-26 and TR-42. The mock and the real-backend e2e suites each run as their own
+Linux job on every push; the performance checks run nightly. One Linux job runs the Go tests with
+the race detector against the oldest supported git, built from source (QA-COMP-03). A Windows job
+runs the Go tests on Windows; the Windows app is cross-compiled in the Linux job (TR-26).
