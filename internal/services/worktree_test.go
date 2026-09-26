@@ -14,6 +14,7 @@ import (
 )
 
 func TestFR_WT_01_ParseWorktreeRecordsParsesFieldsAndFlags(t *testing.T) {
+	t.Parallel()
 	fixture := "worktree /repo\x00HEAD 1111111111111111111111111111111111111111\x00branch refs/heads/main\x00\x00" +
 		"worktree /repo-detached\x00HEAD 2222222222222222222222222222222222222222\x00detached\x00\x00" +
 		"worktree /repo-locked\x00HEAD 3333333333333333333333333333333333333333\x00branch refs/heads/locked-branch\x00locked reason\x00\x00" +
@@ -55,6 +56,7 @@ func TestFR_WT_01_ParseWorktreeRecordsParsesFieldsAndFlags(t *testing.T) {
 }
 
 func TestFR_WT_01_ListWorktreesListsMainAndLinkedWorktrees(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -94,6 +96,7 @@ func TestFR_WT_01_ListWorktreesListsMainAndLinkedWorktrees(t *testing.T) {
 }
 
 func TestFR_WT_01_ListWorktreesReportsDirtyPerWorktree(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	sha := gittest.HeadSHA(t, repo.Dir)
@@ -119,6 +122,7 @@ func TestFR_WT_01_ListWorktreesReportsDirtyPerWorktree(t *testing.T) {
 }
 
 func TestFR_WT_01_ListWorktreesReportsAMissingDirectoryWithoutError(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	linkedDir := filepath.Join(t.TempDir(), "linked")
@@ -144,6 +148,7 @@ func TestFR_WT_01_ListWorktreesReportsAMissingDirectoryWithoutError(t *testing.T
 }
 
 func TestFR_WT_13_MainWorktreeFindsTheMainWorktreeFromTheCommonGitDir(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	linkedDir := filepath.Join(t.TempDir(), "linked")
@@ -166,6 +171,7 @@ func TestFR_WT_13_MainWorktreeFindsTheMainWorktreeFromTheCommonGitDir(t *testing
 }
 
 func TestFR_WT_13_MainWorktreeErrorsForABareRepoWhoseOnlyWorktreeIsGone(t *testing.T) {
+	t.Parallel()
 	src := gittest.New(t)
 	gittest.Commit(t, src.Dir, "seed.txt", "a", "first")
 	branch := currentBranch(t, src.Dir)
@@ -190,6 +196,7 @@ func TestFR_WT_13_MainWorktreeErrorsForABareRepoWhoseOnlyWorktreeIsGone(t *testi
 }
 
 func TestFR_WT_01_ListWorktreesMarksABareRepoAndRunsNoStatusInIt(t *testing.T) {
+	t.Parallel()
 	src := gittest.New(t)
 	gittest.Commit(t, src.Dir, "seed.txt", "a", "first")
 	branch := currentBranch(t, src.Dir)
@@ -218,6 +225,7 @@ func TestFR_WT_01_ListWorktreesMarksABareRepoAndRunsNoStatusInIt(t *testing.T) {
 }
 
 func TestFR_UX_11_MainWorktreeNamesThePathInArgsWhenGitCannotListIt(t *testing.T) {
+	t.Parallel()
 	c := New(func(core.Event) {})
 	bogus := core.RepoPath(t.TempDir())
 
@@ -233,6 +241,7 @@ func TestFR_UX_11_MainWorktreeNamesThePathInArgsWhenGitCannotListIt(t *testing.T
 }
 
 func TestFR_WT_02_AddWorktreeChecksOutAnExistingBranch(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -253,6 +262,7 @@ func TestFR_WT_02_AddWorktreeChecksOutAnExistingBranch(t *testing.T) {
 }
 
 func TestFR_WT_14_AddWorktreeFindsTheNewWorktreeGivenAnotherFormOfItsPath(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -285,6 +295,7 @@ func anotherFormOfATempDir(t *testing.T) string {
 }
 
 func TestFR_WT_02_AddWorktreeCreatesANewBranchFromAGivenStart(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	firstSHA := gittest.HeadSHA(t, repo.Dir)
@@ -309,6 +320,7 @@ func TestFR_WT_02_AddWorktreeCreatesANewBranchFromAGivenStart(t *testing.T) {
 }
 
 func TestFR_WT_02_AddWorktreeStartsANewBranchAtTheFullRefNamedWhenATagAndABranchShareItsName(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	branchSHA, tagSHA := branchAndTagNamedV1(t, repo.Dir)
 
@@ -328,6 +340,7 @@ func TestFR_WT_02_AddWorktreeStartsANewBranchAtTheFullRefNamedWhenATagAndABranch
 }
 
 func TestFR_WT_02_AddWorktreeWithANewBranchAndNoStartBranchesFromHEAD(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	head := gittest.HeadSHA(t, repo.Dir)
@@ -344,6 +357,7 @@ func TestFR_WT_02_AddWorktreeWithANewBranchAndNoStartBranchesFromHEAD(t *testing
 }
 
 func TestFR_WT_02_AddWorktreeIntoAFolderWithFilesCreatesNoBranch(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	target := t.TempDir()
@@ -368,6 +382,7 @@ func TestFR_WT_02_AddWorktreeIntoAFolderWithFilesCreatesNoBranch(t *testing.T) {
 }
 
 func TestFR_WT_02_AddWorktreeRejectsAnInvalidNewBranchNameBeforeTouchingGit(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	target := filepath.Join(t.TempDir(), "wt")
@@ -385,6 +400,7 @@ func TestFR_WT_02_AddWorktreeRejectsAnInvalidNewBranchNameBeforeTouchingGit(t *t
 }
 
 func TestFR_WT_02_AddWorktreeRejectsADuplicateBranchNameAsGitFailed(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "dup")
@@ -405,6 +421,7 @@ func TestFR_WT_02_AddWorktreeRejectsADuplicateBranchNameAsGitFailed(t *testing.T
 }
 
 func TestFR_WT_03_AddWorktreeRefusesAnExistingNonEmptyTargetAsGitFailed(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -428,6 +445,7 @@ func TestFR_WT_03_AddWorktreeRefusesAnExistingNonEmptyTargetAsGitFailed(t *testi
 }
 
 func TestFR_WT_03_AddWorktreeCreatesTheTargetsMissingParentDirectory(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -448,6 +466,7 @@ func TestFR_WT_03_AddWorktreeCreatesTheTargetsMissingParentDirectory(t *testing.
 }
 
 func TestFR_WT_07_RemoveWorktreeRemovesACleanLinkedWorktree(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -469,6 +488,7 @@ func TestFR_WT_07_RemoveWorktreeRemovesACleanLinkedWorktree(t *testing.T) {
 }
 
 func TestFR_WT_07_RemoveWorktreeRefusesADirtyWorktreeAsCodeDirtyWorktree(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -495,6 +515,7 @@ func TestFR_WT_07_RemoveWorktreeRefusesADirtyWorktreeAsCodeDirtyWorktree(t *test
 }
 
 func TestFR_WT_07_RemoveWorktreeForcedRemovesADirtyWorktree(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -513,6 +534,7 @@ func TestFR_WT_07_RemoveWorktreeForcedRemovesADirtyWorktree(t *testing.T) {
 }
 
 func TestFR_WT_07_RemoveWorktreeRefusesALockedWorktreeEvenForced(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -533,6 +555,7 @@ func TestFR_WT_07_RemoveWorktreeRefusesALockedWorktreeEvenForced(t *testing.T) {
 }
 
 func TestFR_WT_07_RemoveWorktreeRemovesAMissingWorktreeWithNoForce(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	target := filepath.Join(t.TempDir(), "linked")
@@ -556,6 +579,7 @@ func TestFR_WT_07_RemoveWorktreeRemovesAMissingWorktreeWithNoForce(t *testing.T)
 }
 
 func TestFR_WT_07_PruneWorktreesRemovesOnlyMissingEntries(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	sha := gittest.HeadSHA(t, repo.Dir)

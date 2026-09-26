@@ -16,6 +16,7 @@ import (
 )
 
 func TestFR_CP_01_ParseCandidatesReadsDateAndMergeFromEachRecord(t *testing.T) {
+	t.Parallel()
 	records := "root1\x1froot\x1f10\x1f\n" +
 		"normal1\x1fnorm\x1f20\x1fparent1\n" +
 		"merge1\x1fmerg\x1f30\x1fparent1 parent2\n"
@@ -36,6 +37,7 @@ func TestFR_CP_01_ParseCandidatesReadsDateAndMergeFromEachRecord(t *testing.T) {
 }
 
 func TestFR_CP_02_OrderedSHAsSortsByCommitDateBothDirections(t *testing.T) {
+	t.Parallel()
 	byDate := []pickCandidate{
 		{SHA: "c30", CommitAt: 30}, {SHA: "c10", CommitAt: 10}, {SHA: "c20", CommitAt: 20},
 	}
@@ -57,6 +59,7 @@ func TestFR_CP_02_OrderedSHAsSortsByCommitDateBothDirections(t *testing.T) {
 }
 
 func TestFR_CP_02_TiedSHAsFindsCandidatesSharingACommitterDate(t *testing.T) {
+	t.Parallel()
 	candidates := []pickCandidate{
 		{SHA: "a", CommitAt: 10}, {SHA: "b", CommitAt: 20}, {SHA: "c", CommitAt: 20}, {SHA: "d", CommitAt: 30},
 	}
@@ -73,6 +76,7 @@ func TestFR_CP_02_TiedSHAsFindsCandidatesSharingACommitterDate(t *testing.T) {
 }
 
 func TestFR_CP_05_FirstMergeFindsTheMergeCandidateOrReportsNone(t *testing.T) {
+	t.Parallel()
 	normal1 := pickCandidate{SHA: "a"}
 	merge := pickCandidate{SHA: "b", Merge: true}
 	normal2 := pickCandidate{SHA: "c"}
@@ -89,6 +93,7 @@ func TestFR_CP_05_FirstMergeFindsTheMergeCandidateOrReportsNone(t *testing.T) {
 }
 
 func TestFR_CP_01_RunSequenceRejectsEmptyShasBeforeAnyGitCall(t *testing.T) {
+	t.Parallel()
 	// without the guard, "git log --no-walk" with no revision defaults to HEAD
 	wt := &session.Worktree{}
 
@@ -98,6 +103,7 @@ func TestFR_CP_01_RunSequenceRejectsEmptyShasBeforeAnyGitCall(t *testing.T) {
 }
 
 func TestFR_CP_01_CherryPickAppliesACommitOntoCurrentHEAD(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -124,6 +130,7 @@ func TestFR_CP_01_CherryPickAppliesACommitOntoCurrentHEAD(t *testing.T) {
 }
 
 func TestFR_CP_04_CherryPickRefusesWithADirtyFileInTheWay(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	pickSHA, beforeHEAD := cherryPickConflictFixture(t, repo.Dir)
 
@@ -144,6 +151,7 @@ func TestFR_CP_04_CherryPickRefusesWithADirtyFileInTheWay(t *testing.T) {
 }
 
 func TestFR_CP_04_CherryPickFailsWhenAnotherPickIsAlreadyStuck(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "conflict.txt", "base\n", "base")
 	gittest.Run(t, repo.Dir, "branch", "confl")
@@ -197,6 +205,7 @@ func TestFR_CP_04_CherryPickFailsWhenAnotherPickIsAlreadyStuck(t *testing.T) {
 }
 
 func TestFR_CP_01_CherryPickWorksOnADetachedHEAD(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	baseSHA := gittest.HeadSHA(t, repo.Dir)
@@ -289,6 +298,7 @@ func TestFR_CP_02_CherryPickAppliesParentBeforeChildWhenCommitterDatesTie(t *tes
 }
 
 func TestFR_CP_05_CherryPickRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	x1SHA, mSHA, x2SHA := mergeCommitFixture(t, repo.Dir)
 	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
@@ -315,6 +325,7 @@ func TestFR_CP_05_CherryPickRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t
 }
 
 func TestFR_RV_03_RevertRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	x1SHA, mSHA, x2SHA := mergeCommitFixture(t, repo.Dir)
 	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
@@ -386,6 +397,7 @@ func TestFR_RV_02_RevertAppliesChildBeforeParentWhenCommitterDatesTie(t *testing
 }
 
 func TestFR_RV_01_RevertUndoesACommitLeavingItInHistory(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "adds b.txt")
@@ -409,6 +421,7 @@ func TestFR_RV_01_RevertUndoesACommitLeavingItInHistory(t *testing.T) {
 }
 
 func TestFR_RV_03_RevertRefusesWithADirtyFileInTheWay(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	revertSHA, beforeHEAD := revertConflictFixture(t, repo.Dir)
 
@@ -429,6 +442,7 @@ func TestFR_RV_03_RevertRefusesWithADirtyFileInTheWay(t *testing.T) {
 }
 
 func TestFR_CP_01_CherryPickReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	featureSHA := realConflictFixture(t, repo.Dir, "cherry-pick")
 
@@ -443,6 +457,7 @@ func TestFR_CP_01_CherryPickReportsCodeConflictsOnARealStopLeftInPlace(t *testin
 }
 
 func TestFR_RV_01_RevertReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	c1SHA := realConflictFixture(t, repo.Dir, "revert")
 
@@ -457,6 +472,7 @@ func TestFR_RV_01_RevertReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T)
 }
 
 func TestFR_CP_06_CherryPickWithRecordOriginAppendsTheCherryPickedFromLine(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -479,6 +495,7 @@ func TestFR_CP_06_CherryPickWithRecordOriginAppendsTheCherryPickedFromLine(t *te
 }
 
 func TestFR_CP_06_CherryPickWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -504,6 +521,7 @@ func TestFR_CP_06_CherryPickWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T)
 }
 
 func TestFR_RV_04_RevertWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "adds b.txt")
@@ -532,6 +550,7 @@ func TestFR_RV_04_RevertWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T) {
 // progress, so ConflictBanner never shows. The conflicted file itself
 // still surfaces through Status, for the changes view's own resolve flow.
 func TestFR_CP_06_CherryPickWithNoCommitOnARealConflictLeavesNoOperationState(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	featureSHA := realConflictFixture(t, repo.Dir, "cherry-pick")
 
@@ -556,6 +575,7 @@ func TestFR_CP_06_CherryPickWithNoCommitOnARealConflictLeavesNoOperationState(t 
 // revert that stops on a real conflict, so this one does get remapped to
 // Conflicts and ConflictBanner does show, with a working Continue/Abort.
 func TestFR_RV_04_RevertWithNoCommitOnARealConflictStillReportsConflicts(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	revertSHA := realConflictFixture(t, repo.Dir, "revert")
 

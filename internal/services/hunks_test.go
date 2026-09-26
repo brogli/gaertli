@@ -39,6 +39,7 @@ func shown(t *testing.T, c *Core, id core.WorktreeID, path string, staged bool, 
 }
 
 func TestFR_CHG_03_StageLinesRefusesLinesThatChangedSinceTheyWereShown(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name, base, displayed, now string
 		old, new                   []int
@@ -80,6 +81,7 @@ func twinBlocks(extra, first, second string) string {
 const tenLines = "n1\nn2\nn3\nn4\nn5\nn6\nn7\nn8\nn9\nn10\n"
 
 func TestFR_CHG_03_StageLinesOfTheSecondHunkAloneChangesItsOwnBlockNotAnIdenticalOne(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", twinBlocks("", "TARGET", "TARGET"), "base")
 	writeFile(t, repo.Dir, "f.txt", twinBlocks(tenLines, "CHANGED", "TARGET"))
@@ -102,6 +104,7 @@ func partial(frag *gitdiff.TextFragment, selected map[int]bool, reverse bool) st
 }
 
 func TestFR_CHG_03_BuildPartialPatchStartsTheProducedSideWhereTheOtherSideStarts(t *testing.T) {
+	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 10, OldLines: 3,
 		NewPosition: 20, NewLines: 4,
@@ -127,6 +130,7 @@ func TestFR_CHG_03_BuildPartialPatchStartsTheProducedSideWhereTheOtherSideStarts
 }
 
 func TestFR_CHG_03_StageLinesOfLinesAddedAfterALastLineWithoutNewlineGivesThatLineANewline(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "first\nlast", "base")
 	writeFile(t, repo.Dir, "f.txt", "first\nlast\nadded1\nadded2\n")
@@ -154,6 +158,7 @@ func indexBytes(t *testing.T, dir, name string) string {
 // A replacement's selected new line comes with the old line the UI pairs
 // it with (see DiffView's selectedLines).
 func TestFR_CHG_03_StageLinesOfAReplacementStagesItAsOneChange(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name, base, now, want string
 	}{
@@ -181,6 +186,7 @@ func TestFR_CHG_03_StageLinesOfAReplacementStagesItAsOneChange(t *testing.T) {
 // Selecting X of a replacement removing lines sends the whole hunk (see
 // DiffView's selectedLines).
 func TestFR_CHG_03_StageLinesOfAReplacementRemovingLinesStagesTheWholeHunk(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "a\nx\ny\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "a\nX")
@@ -196,6 +202,7 @@ func TestFR_CHG_03_StageLinesOfAReplacementRemovingLinesStagesTheWholeHunk(t *te
 }
 
 func TestFR_CHG_03_StageLinesOfALineWithoutNewlineThatAKeptLineFollowsGivesItANewline(t *testing.T) {
+	t.Parallel()
 	for _, base := range []string{"a\nx\ny\n", "a\nx\ny"} {
 		t.Run(base, func(t *testing.T) {
 			repo := gittest.New(t)
@@ -215,6 +222,7 @@ func TestFR_CHG_03_StageLinesOfALineWithoutNewlineThatAKeptLineFollowsGivesItANe
 }
 
 func TestFR_CHG_03_StageLinesStagesAHunkOnABlankLineExactly(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name, base, now string
 		old, new        []int
@@ -254,6 +262,7 @@ func repairedFixture(t *testing.T, dir string) {
 // whitespace, but a selection from git diff -w's hunks still changes no
 // bytes outside itself.
 func TestFR_DIFF_06_LinesOfAnIgnoreWhitespaceHunkStageAndDiscardWhatTheFullDiffChanges(t *testing.T) {
+	t.Parallel()
 	t.Run("the ignore-whitespace hunk", func(t *testing.T) {
 		repo := gittest.New(t)
 		repairedFixture(t, repo.Dir)
@@ -311,6 +320,7 @@ func TestFR_DIFF_06_LinesOfAnIgnoreWhitespaceHunkStageAndDiscardWhatTheFullDiffC
 // An API contract: a selection from git diff -w's hunks, which the UI does
 // not offer, changes no bytes outside itself.
 func TestFR_DIFF_06_AnIgnoreWhitespaceHunkStagesAndDiscardsOnlyItsOwnLines(t *testing.T) {
+	t.Parallel()
 	// Each base → now has one full-diff change block; git diff -w shows
 	// only parts of it as hunks.
 	const twoBase, twoNow = "b\n  a\n  q\nc\n", "b\nX\na\nQ\nc\n" // -w hunks: +X; -  q +Q
@@ -386,6 +396,7 @@ func joinedWhitespaceFixture(t *testing.T, dir string) {
 // An API contract: a selection from git diff -w's hunks, which the UI does
 // not offer, changes no bytes outside itself.
 func TestFR_DIFF_06_StageAndDiscardLinesOfIgnoreWhitespaceHunksLeaveTheWhitespaceOnlyLineBetween(t *testing.T) {
+	t.Parallel()
 	t.Run("stage", func(t *testing.T) {
 		repo := gittest.New(t)
 		joinedWhitespaceFixture(t, repo.Dir)
@@ -416,6 +427,7 @@ func TestFR_DIFF_06_StageAndDiscardLinesOfIgnoreWhitespaceHunksLeaveTheWhitespac
 }
 
 func TestFR_CHG_03_StageLinesStagesPartOfWhatAnEmptyFileGained(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "", "base")
 	writeFile(t, repo.Dir, "f.txt", "a\nb\n")
@@ -431,6 +443,7 @@ func TestFR_CHG_03_StageLinesStagesPartOfWhatAnEmptyFileGained(t *testing.T) {
 }
 
 func TestFR_CHG_03_BuildPartialPatchKeepsSelectedFoldsUnselectedRemovalToContextDropsUnselectedAddition(t *testing.T) {
+	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 4,
 		NewPosition: 1, NewLines: 4,
@@ -459,6 +472,7 @@ func TestFR_CHG_03_BuildPartialPatchKeepsSelectedFoldsUnselectedRemovalToContext
 }
 
 func TestFR_CHG_03_BuildPartialPatchSelectingEveryChangedLineKeepsAllOfThem(t *testing.T) {
+	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 2,
 		NewPosition: 1, NewLines: 2,
@@ -480,6 +494,7 @@ func TestFR_CHG_03_BuildPartialPatchSelectingEveryChangedLineKeepsAllOfThem(t *t
 }
 
 func TestFR_CHG_03_BuildPartialPatchFoldedNoEOLLineKeepsItsOwnMarkerDroppedLineLosesIt(t *testing.T) {
+	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 1,
 		NewPosition: 1, NewLines: 1,
@@ -505,6 +520,7 @@ func TestFR_CHG_03_BuildPartialPatchFoldedNoEOLLineKeepsItsOwnMarkerDroppedLineL
 // applied with --reverse, "+" is the removal side — the opposite of the
 // stage-direction fold above.
 func TestFR_CHG_03_BuildPartialPatchReverseFoldsTheOppositeSide(t *testing.T) {
+	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 2,
 		NewPosition: 1, NewLines: 2,
@@ -532,6 +548,7 @@ func TestFR_CHG_03_BuildPartialPatchReverseFoldsTheOppositeSide(t *testing.T) {
 // covers adjacent changed lines, which git lists as every "-" line followed
 // by every "+" line.
 func TestFR_CHG_03_BuildPartialPatchPairsABlockOfDeletesThenAddsByPosition(t *testing.T) {
+	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 2,
 		NewPosition: 1, NewLines: 2,
@@ -556,6 +573,7 @@ func TestFR_CHG_03_BuildPartialPatchPairsABlockOfDeletesThenAddsByPosition(t *te
 }
 
 func TestFR_CHG_03_FileHeaderLinesStopsBeforeTheFirstHunk(t *testing.T) {
+	t.Parallel()
 	diff := []byte("diff --git a/f b/f\nindex abc..def 100644\n--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n-old\n+new\n")
 
 	got := fileHeaderLines(diff)
@@ -579,6 +597,7 @@ func twoHunksFixture(t *testing.T, dir string) string {
 }
 
 func TestFR_CHG_03_StageLinesStagesOnlyTheSelectedHunkLeavingTheOtherUntouched(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	changed := twoHunksFixture(t, repo.Dir)
 
@@ -603,6 +622,7 @@ func TestFR_CHG_03_StageLinesStagesOnlyTheSelectedHunkLeavingTheOtherUntouched(t
 }
 
 func TestFR_CHG_03_StageLinesReverseUnstagesOnlyTheSelectedHunk(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	twoHunksFixture(t, repo.Dir)
 
@@ -649,6 +669,7 @@ func twoChangeFixture(t *testing.T, dir string) {
 }
 
 func TestFR_CHG_03_StageLinesStagesOnlyTheSelectedChangeWithinAHunk(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	twoChangeFixture(t, repo.Dir)
 
@@ -669,6 +690,7 @@ func TestFR_CHG_03_StageLinesStagesOnlyTheSelectedChangeWithinAHunk(t *testing.T
 }
 
 func TestFR_CHG_03_StageLinesReverseUnstagesOnlyTheSelectedChange(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	twoChangeFixture(t, repo.Dir)
 
@@ -701,6 +723,7 @@ func TestFR_CHG_03_StageLinesReverseUnstagesOnlyTheSelectedChange(t *testing.T) 
 // stages, and separately unstages, one of the two edits git reports as a
 // single hunk.
 func TestFR_CHG_03_StageLinesSelectsTheRequestedChangeEvenWhenGitMergesTwoChangesIntoOneHunk(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	twoChangeFixture(t, repo.Dir)
 
@@ -737,6 +760,7 @@ func TestFR_CHG_03_StageLinesSelectsTheRequestedChangeEvenWhenGitMergesTwoChange
 // stage call for lines that call already staged — is a stale selection,
 // Code Internal, not a git failure.
 func TestFR_CHG_03_StageLinesSelectingNoLongerChangedLinesIsInternal(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	oneHunkFixture(t, repo.Dir)
 
@@ -760,6 +784,7 @@ func TestFR_CHG_03_StageLinesSelectingNoLongerChangedLinesIsInternal(t *testing.
 // selection naming line numbers the current diff never changed is also a
 // stale selection, Code Internal, applying nothing.
 func TestFR_CHG_03_StageLinesSelectingLinesNotInTheDiffIsInternal(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	oneHunkFixture(t, repo.Dir)
 
@@ -779,6 +804,7 @@ func TestFR_CHG_03_StageLinesSelectingLinesNotInTheDiffIsInternal(t *testing.T) 
 // TestFR_CHG_03_StageLinesOnAPathWithNoDiffIsAClearInternalError covers a
 // re-diff that lists no file at all, as for an untracked path.
 func TestFR_CHG_03_StageLinesOnAPathWithNoDiffIsAClearInternalError(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "tracked.txt", "a\n", "base")
 	writeFile(t, repo.Dir, "untracked.txt", "new\n") // never `git add`ed
@@ -800,6 +826,7 @@ func TestFR_CHG_03_StageLinesOnAPathWithNoDiffIsAClearInternalError(t *testing.T
 }
 
 func TestFR_CHG_03_StageLinesPreservesTheFinalLineExactlyWhenItsChangeIsNotSelected(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "line1\nline2\nlast", "base") // no trailing newline
 	writeFile(t, repo.Dir, "f.txt", "line1\nline2-changed\nLAST")      // still no trailing newline
@@ -832,6 +859,7 @@ func TestFR_CHG_03_StageLinesPreservesTheFinalLineExactlyWhenItsChangeIsNotSelec
 }
 
 func TestFR_CHG_03_StageLinesPreservesCRLFLineEndingsExactly(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "line1\r\nline2\r\nline3\r\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "line1\r\nline2-changed\r\nline3\r\n")
@@ -862,6 +890,7 @@ func TestFR_CHG_03_StageLinesPreservesCRLFLineEndingsExactly(t *testing.T) {
 }
 
 func TestFR_CHG_03_StageLinesStagesAHistogramHunkExactlyAsGitShowsIt(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	movedLineFixture(t, repo.Dir)
 	gittest.Run(t, repo.Dir, "config", "diff.algorithm", "histogram")
@@ -882,6 +911,7 @@ func TestFR_CHG_03_StageLinesStagesAHistogramHunkExactlyAsGitShowsIt(t *testing.
 }
 
 func TestFR_CHG_03_StageLinesUnderAutocrlfStagesTheCleanFormAndKeepsTheWorkingFileCRLF(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	autocrlfFixture(t, repo.Dir)
 
@@ -903,6 +933,7 @@ func TestFR_CHG_03_StageLinesUnderAutocrlfStagesTheCleanFormAndKeepsTheWorkingFi
 // whitespace, but a selection from git diff -w's hunks stages only its
 // own lines.
 func TestFR_DIFF_06_StageLinesOfAnIgnoreWhitespaceHunkLeavesTheWhitespaceChangeUnstaged(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	whitespaceFixture(t, repo.Dir)
 

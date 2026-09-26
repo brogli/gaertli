@@ -12,6 +12,7 @@ import (
 )
 
 func TestQA_COMP_01_HunksOfReadsGitsU0HunkHeaders(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		header, body string
 		want         core.DiffHunk
@@ -58,6 +59,7 @@ func framingFixture(t *testing.T, dir string) {
 }
 
 func TestQA_COMP_01_DiffWorkingAndStageLinesIgnoreConfigThatChangesThePatchFraming(t *testing.T) {
+	t.Parallel()
 	junk := writeScript(t, "echo EXTERNAL DIFF JUNK")
 	configs := [][2]string{
 		{"color.ui", "always"},
@@ -103,6 +105,7 @@ func modeFixture(t *testing.T, dir string) {
 }
 
 func TestQA_COMP_01_StageAndDiscardLinesLeaveTheFileModeAlone(t *testing.T) {
+	t.Parallel()
 	t.Run("stage", func(t *testing.T) {
 		repo := gittest.New(t)
 		modeFixture(t, repo.Dir)
@@ -158,6 +161,7 @@ func textconvFixture(t *testing.T, dir string) {
 }
 
 func TestQA_COMP_01_DiffWorkingAndStageLinesUseTheRealTextNotTheTextconvOutput(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	textconvFixture(t, repo.Dir)
 

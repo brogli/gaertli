@@ -13,6 +13,7 @@ import (
 )
 
 func TestFR_CHG_10_DiscardFileRestoresATrackedFilesWorkingTreeContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "changed\n")
@@ -33,6 +34,7 @@ func TestFR_CHG_10_DiscardFileRestoresATrackedFilesWorkingTreeContent(t *testing
 }
 
 func TestFR_CHG_10_DiscardFileRemovesAnUntrackedFile(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	writeFile(t, repo.Dir, "new.txt", "new")
@@ -58,6 +60,7 @@ func TestFR_CHG_10_DiscardFileRemovesAnUntrackedFile(t *testing.T) {
 // removes it without -d, unlike a directory-less `git clean -f` scanning
 // the whole tree.
 func TestFR_CHG_10_DiscardFileRemovesAnUntrackedDirectory(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	if err := os.MkdirAll(filepath.Join(repo.Dir, "newdir"), 0o755); err != nil {
@@ -76,6 +79,7 @@ func TestFR_CHG_10_DiscardFileRemovesAnUntrackedDirectory(t *testing.T) {
 }
 
 func TestFR_CHG_10_DiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstagedChangePending(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	changed := twoHunksFixture(t, repo.Dir)
 
@@ -103,6 +107,7 @@ func TestFR_CHG_10_DiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstage
 }
 
 func TestFR_CHG_10_DiscardLinesStaleSelectionIsInternalAndAppliesNothing(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	oneHunkFixture(t, repo.Dir)
 	before := readFile(t, repo.Dir, "f.txt")
@@ -119,6 +124,7 @@ func TestFR_CHG_10_DiscardLinesStaleSelectionIsInternalAndAppliesNothing(t *test
 }
 
 func TestFR_CHG_10_DiscardLinesOfTheSecondHunkAloneRevertsItsOwnBlockNotAnIdenticalOne(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", twinBlocks("", "CHANGED", "TARGET"), "base")
 	writeFile(t, repo.Dir, "f.txt", twinBlocks(tenLines, "CHANGED", "CHANGED"))
@@ -135,6 +141,7 @@ func TestFR_CHG_10_DiscardLinesOfTheSecondHunkAloneRevertsItsOwnBlockNotAnIdenti
 }
 
 func TestFR_CHG_10_DiscardLinesRestoringLinesAfterALastLineWithoutNewlineGivesThatLineANewline(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "first\nlast\nold1\nold2\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "first\nlast")
@@ -153,6 +160,7 @@ func TestFR_CHG_10_DiscardLinesRestoringLinesAfterALastLineWithoutNewlineGivesTh
 // hunk action does and as the UI sends a line selection in a replacement
 // (see DiffView's selectedLines).
 func TestFR_CHG_10_DiscardLinesOfAReplacementRestoresTheReplacedLine(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name, base, now string
 		old, new        []int
@@ -179,6 +187,7 @@ func TestFR_CHG_10_DiscardLinesOfAReplacementRestoresTheReplacedLine(t *testing.
 }
 
 func TestFR_CHG_10_DiscardLinesRestoringALineWithoutNewlineThatAKeptLineFollowsGivesItANewline(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "a\nX", "base")
 	writeFile(t, repo.Dir, "f.txt", "a\nx\ny\n")
@@ -194,6 +203,7 @@ func TestFR_CHG_10_DiscardLinesRestoringALineWithoutNewlineThatAKeptLineFollowsG
 }
 
 func TestFR_CHG_10_DiscardLinesRefusesLinesThatChangedSinceTheyWereShown(t *testing.T) {
+	t.Parallel()
 	for name, now := range map[string]string{
 		"another line added where the shown one was":  "1\n2\n3\n4\nY\nX\n5\n6\n",
 		"an identical line added above the shown one": "1\n2\n3\n4\nX\nY\nX\n5\n6\n",
@@ -220,6 +230,7 @@ func TestFR_CHG_10_DiscardLinesRefusesLinesThatChangedSinceTheyWereShown(t *test
 }
 
 func TestFR_CHG_10_DiscardLinesRevertsOnlyTheSelectedHunk(t *testing.T) {
+	t.Parallel()
 	t.Run("a CRLF working file under autocrlf keeps CRLF on every line", func(t *testing.T) {
 		repo := gittest.New(t)
 		autocrlfFixture(t, repo.Dir)

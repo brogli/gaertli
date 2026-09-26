@@ -15,6 +15,7 @@ import (
 )
 
 func TestFR_SYNC_07_ACancelledFetchLeavesNoLockAndTheNextFetchWorks(t *testing.T) {
+	t.Parallel()
 	repo, origin := cancelFixture(t)
 	tip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
 	hook := stallRefUpdate(t, repo.Dir, "refs/remotes/origin/master")
@@ -31,6 +32,7 @@ func TestFR_SYNC_07_ACancelledFetchLeavesNoLockAndTheNextFetchWorks(t *testing.T
 }
 
 func TestFR_SYNC_07_ACancelledPullLeavesNoLockAndTheNextPullWorks(t *testing.T) {
+	t.Parallel()
 	repo, origin := cancelFixture(t)
 	tip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
 	hook := stallRefUpdate(t, repo.Dir, "refs/heads/master")
@@ -47,6 +49,7 @@ func TestFR_SYNC_07_ACancelledPullLeavesNoLockAndTheNextPullWorks(t *testing.T) 
 }
 
 func TestFR_SYNC_07_ACancelledPushLeavesNoLockAndTheNextPushWorks(t *testing.T) {
+	t.Parallel()
 	repo, origin := cancelFixture(t)
 	gittest.Commit(t, repo.Dir, "local.txt", "l", "local commit")
 	local := gittest.HeadSHA(t, repo.Dir)

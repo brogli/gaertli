@@ -53,6 +53,7 @@ func recordCommands(t *testing.T, c *Core, wt core.WorktreeID) *commandRecorder 
 }
 
 func TestFR_REPO_01_OpenWorktreeReusesSessionForSameToplevel(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	sub := filepath.Join(repo.Dir, "sub", "dir")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
@@ -72,6 +73,7 @@ func TestFR_REPO_01_OpenWorktreeReusesSessionForSameToplevel(t *testing.T) {
 }
 
 func TestFR_REPO_01_OpenWorktreeGivesLinkedWorktreesDistinctIDsSameRepoKey(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	linked := filepath.Join(t.TempDir(), "linked")
@@ -90,6 +92,7 @@ func TestFR_REPO_01_OpenWorktreeGivesLinkedWorktreesDistinctIDsSameRepoKey(t *te
 }
 
 func TestFR_REPO_05_OpenWorktreeRejectsPlainDirectory(t *testing.T) {
+	t.Parallel()
 	c := New(func(core.Event) {})
 
 	_, err := c.OpenWorktree(t.Context(), core.RepoPath(t.TempDir()))
@@ -98,6 +101,7 @@ func TestFR_REPO_05_OpenWorktreeRejectsPlainDirectory(t *testing.T) {
 }
 
 func TestFR_REPO_05_OpenWorktreeRejectsMissingPath(t *testing.T) {
+	t.Parallel()
 	c := New(func(core.Event) {})
 
 	_, err := c.OpenWorktree(t.Context(), core.RepoPath(filepath.Join(t.TempDir(), "missing")))
@@ -106,6 +110,7 @@ func TestFR_REPO_05_OpenWorktreeRejectsMissingPath(t *testing.T) {
 }
 
 func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
@@ -122,6 +127,7 @@ func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
 }
 
 func TestFR_REPO_03_SummaryReportsTheBranchByItsNameWhenATagSharesIt(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Run(t, repo.Dir, "switch", "-c", "v1")
@@ -139,6 +145,7 @@ func TestFR_REPO_03_SummaryReportsTheBranchByItsNameWhenATagSharesIt(t *testing.
 }
 
 func TestFR_REPO_03_SummaryReportsDetachedHEAD(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	sha := gittest.HeadSHA(t, repo.Dir)
@@ -156,6 +163,7 @@ func TestFR_REPO_03_SummaryReportsDetachedHEAD(t *testing.T) {
 }
 
 func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	c, id := openWorktree(t, repo.Dir)
@@ -182,6 +190,7 @@ func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 }
 
 func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "file.txt", "base\n", "base")
 	gittest.Run(t, repo.Dir, "branch", "other")
@@ -207,6 +216,7 @@ func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
 }
 
 func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	if err := os.Mkdir(filepath.Join(repo.Dir, ".git", "rebase-merge"), 0o755); err != nil {
@@ -224,6 +234,7 @@ func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
 }
 
 func TestQA_REL_02_SummaryReportsHeadSHA(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Commit(t, repo.Dir, "seed.txt", "y", "second")
@@ -241,6 +252,7 @@ func TestQA_REL_02_SummaryReportsHeadSHA(t *testing.T) {
 }
 
 func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
 
@@ -254,6 +266,7 @@ func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
 }
 
 func TestQA_REL_02_SummaryReportsSHAWhenDetached(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	sha := gittest.HeadSHA(t, repo.Dir)
@@ -276,6 +289,7 @@ func TestQA_REL_02_SummaryReportsSHAWhenDetached(t *testing.T) {
 }
 
 func TestFR_REPO_04_SetFocusedTrueRunsAnImmediatePollerCheck(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	events := make(chan core.Event, 16)
@@ -313,6 +327,7 @@ func countCommandEvents(events chan core.Event) int {
 }
 
 func TestFR_REPO_04_RefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	events := make(chan core.Event, 16)

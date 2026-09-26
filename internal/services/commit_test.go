@@ -22,6 +22,7 @@ func writeHook(t *testing.T, dir, name, script string) {
 }
 
 func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByte(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	writeFile(t, repo.Dir, "a.txt", "content\n")
 	gittest.Run(t, repo.Dir, "add", "--", "a.txt")
@@ -41,6 +42,7 @@ func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByte(t 
 }
 
 func TestFR_CHG_05_CommitFailsWhenNothingIsStaged(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "content\n", "add a.txt")
 	head := gittest.HeadSHA(t, repo.Dir)
@@ -55,6 +57,7 @@ func TestFR_CHG_05_CommitFailsWhenNothingIsStaged(t *testing.T) {
 }
 
 func TestFR_CHG_05_CommitFailsOnAWhitespaceOnlyMessage(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "content\n", "add a.txt")
 	writeFile(t, repo.Dir, "b.txt", "new\n")
@@ -71,6 +74,7 @@ func TestFR_CHG_05_CommitFailsOnAWhitespaceOnlyMessage(t *testing.T) {
 }
 
 func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceWithTheFurtherStagedChange(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "first message")
 	writeFile(t, repo.Dir, "b.txt", "further\n")
@@ -93,6 +97,7 @@ func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceWithTheFurtherStagedChange(t *t
 }
 
 func TestFR_CHG_06_CommitAmendSucceedsWithNothingStagedRewordingOnly(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "first message")
 	treeBefore := gittest.Out(t, repo.Dir, "rev-parse", "HEAD^{tree}")
@@ -111,6 +116,7 @@ func TestFR_CHG_06_CommitAmendSucceedsWithNothingStagedRewordingOnly(t *testing.
 }
 
 func TestFR_CHG_06_CommitAmendOnAnUnbornHeadFailsCleanly(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 
 	c, id := openWorktree(t, repo.Dir)
@@ -123,6 +129,7 @@ func TestFR_CHG_06_CommitAmendOnAnUnbornHeadFailsCleanly(t *testing.T) {
 // proves the existing GitFailed/GitStderr path already covers this case: no
 // production code changes needed.
 func TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 	writeFile(t, repo.Dir, "b.txt", "staged\n")
@@ -143,6 +150,7 @@ func TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr
 }
 
 func TestFR_CHG_07_AFailingCommitMsgHooksStdoutReachesGitStderr(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 	writeFile(t, repo.Dir, "b.txt", "staged\n")
@@ -163,6 +171,7 @@ func TestFR_CHG_07_AFailingCommitMsgHooksStdoutReachesGitStderr(t *testing.T) {
 }
 
 func TestFR_CHG_07_ASucceedingPreCommitHookRunsAsUsual(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 	writeFile(t, repo.Dir, "b.txt", "staged\n")
@@ -181,6 +190,7 @@ func TestFR_CHG_07_ASucceedingPreCommitHookRunsAsUsual(t *testing.T) {
 }
 
 func TestFR_CHG_08_SetMessageDraftIsReadBackFromSummary(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
 
@@ -198,6 +208,7 @@ func TestFR_CHG_08_SetMessageDraftIsReadBackFromSummary(t *testing.T) {
 }
 
 func TestFR_CHG_08_ASuccessfulCommitClearsTheDraft(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 	writeFile(t, repo.Dir, "b.txt", "staged\n")
@@ -221,6 +232,7 @@ func TestFR_CHG_08_ASuccessfulCommitClearsTheDraft(t *testing.T) {
 }
 
 func TestFR_CHG_08_AFailedCommitLeavesTheDraftUntouched(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 

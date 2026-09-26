@@ -9,6 +9,7 @@ import (
 )
 
 func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "x", "base")
 	base := gittest.HeadSHA(t, repo.Dir)
@@ -44,6 +45,7 @@ func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 }
 
 func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "shared.txt", "base", "base")
 	gittest.Run(t, repo.Dir, "branch", "side")
@@ -69,6 +71,7 @@ func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T)
 }
 
 func TestFR_LOG_03_ParseCommitDetailsFieldsEmailsAndDates(t *testing.T) {
+	t.Parallel()
 	header := strings.Join([]string{
 		"aaaa", "bbbb cccc", "Alice", "alice@example.com", "1700000000",
 		"Bob", "bob@example.com", "1700000100", "Subject line\n",

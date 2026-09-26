@@ -11,6 +11,7 @@ import (
 )
 
 func TestFR_LOG_01_ParseTrackParsesBracketedForms(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		track                 string
 		wantAhead, wantBehind int
@@ -34,6 +35,7 @@ func TestFR_LOG_01_ParseTrackParsesBracketedForms(t *testing.T) {
 }
 
 func TestFR_LOG_01_ParseRefRecordsThenToRefsBucketsAndDereferencesTags(t *testing.T) {
+	t.Parallel()
 	const (
 		shaMain        = "1111111111111111111111111111111111111111"
 		shaFeature     = "2222222222222222222222222222222222222222"
@@ -100,6 +102,7 @@ func buildForEachRefFixture(records []ref) []byte {
 }
 
 func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	sha := gittest.HeadSHA(t, repo.Dir)
@@ -136,6 +139,7 @@ func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
 }
 
 func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -158,6 +162,7 @@ func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
 }
 
 func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	c, wt := openWorktree(t, repo.Dir)
 
@@ -172,6 +177,7 @@ func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
 }
 
 func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
@@ -197,6 +203,7 @@ func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
 }
 
 func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	bare := bareRemote(t, repo, "origin")
@@ -226,6 +233,7 @@ func findBranch(branches []core.Branch, name string) *core.Branch {
 }
 
 func TestFR_LOG_01_RefsGroupsARemoteWhoseNameHasASlashUnderItsWholeName(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	sha := gittest.HeadSHA(t, repo.Dir)

@@ -14,6 +14,7 @@ import (
 )
 
 func TestFR_LOG_05_LogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
+	t.Parallel()
 	args := LogArgs(core.LogFilter{Author: "a", Branches: []string{"main"}, Path: "p"})
 	if slices.ContainsFunc(args, func(a string) bool { return strings.HasPrefix(a, "--grep") }) {
 		t.Errorf("args = %v, want no --grep: LogArgs does not search", args)
@@ -28,6 +29,7 @@ func TestFR_LOG_05_LogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
 }
 
 func TestFR_LOG_05_SearchArgsBuildsAGrepPass(t *testing.T) {
+	t.Parallel()
 	args := searchArgs(core.LogFilter{}, "bug")
 
 	for _, want := range []string{"--grep=bug", "--regexp-ignore-case", "--fixed-strings", "--exclude=refs/stash", "--all", "--format=%H"} {
@@ -45,6 +47,7 @@ func TestFR_LOG_05_SearchArgsBuildsAGrepPass(t *testing.T) {
 }
 
 func TestFR_LOG_06_BuildFilterArgsBranches(t *testing.T) {
+	t.Parallel()
 	args := LogArgs(core.LogFilter{Branches: []string{"main", "feature"}})
 
 	if slices.Contains(args, "--exclude=refs/stash") || slices.Contains(args, "--all") {
@@ -57,6 +60,7 @@ func TestFR_LOG_06_BuildFilterArgsBranches(t *testing.T) {
 }
 
 func TestFR_LOG_07_BuildFilterArgsPath(t *testing.T) {
+	t.Parallel()
 	args := LogArgs(core.LogFilter{Path: "sub/dir"})
 
 	if len(args) < 2 || args[len(args)-2] != "--" || args[len(args)-1] != "sub/dir" {
@@ -65,6 +69,7 @@ func TestFR_LOG_07_BuildFilterArgsPath(t *testing.T) {
 }
 
 func TestFR_LOG_08_BuildFilterArgsCombined(t *testing.T) {
+	t.Parallel()
 	args := LogArgs(core.LogFilter{Author: "a", Branches: []string{"main"}, Path: "p"})
 
 	for _, want := range []string{"--author=a", "--regexp-ignore-case", "--fixed-strings"} {
@@ -88,6 +93,7 @@ func TestFR_LOG_08_BuildFilterArgsCombined(t *testing.T) {
 }
 
 func TestFR_LOG_05_HashPatternMatchesHexOnly(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		s    string
 		want bool
@@ -107,6 +113,7 @@ func TestFR_LOG_05_HashPatternMatchesHexOnly(t *testing.T) {
 }
 
 func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first commit")
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "urgent fix")
@@ -140,6 +147,7 @@ func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *te
 }
 
 func TestFR_LOG_05_SearchLogHexShapedNonexistentQueryFallsBackToMessageSearch(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "mentions deadbeef in passing")
 
@@ -156,6 +164,7 @@ func TestFR_LOG_05_SearchLogHexShapedNonexistentQueryFallsBackToMessageSearch(t 
 }
 
 func TestFR_LOG_05_SearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	commitAs(t, repo.Dir, "a.txt", "a", "ann's change", "Ann", "ann@example.com")
 	commitAs(t, repo.Dir, "b.txt", "b", "bob's change", "Bob", "bob@example.com")
@@ -183,6 +192,7 @@ func TestFR_LOG_05_SearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
 }
 
 func TestFR_LOG_05_SearchLogByHashOutsideFilteredViewReturnsNoIndices(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	_, _ = branchAndTagNamedV1(t, repo.Dir)
 	outsideSHA := gittest.HeadSHA(t, repo.Dir) // "third", past v1's history
@@ -206,6 +216,7 @@ func TestFR_LOG_05_SearchLogByHashOutsideFilteredViewReturnsNoIndices(t *testing
 }
 
 func TestFR_LOG_05_SearchLogByHashInsideFilteredViewReturnsItsIndex(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	_, tagSHA := branchAndTagNamedV1(t, repo.Dir)
 
@@ -228,6 +239,7 @@ func TestFR_LOG_05_SearchLogByHashInsideFilteredViewReturnsItsIndex(t *testing.T
 }
 
 func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "root.txt", "r", "root")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -260,6 +272,7 @@ func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 }
 
 func TestFR_LOG_06_SetLogFilterByTagShowsTheHistoryLeadingToIt(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	branchAndTagNamedV1(t, repo.Dir) // v1: a branch at "first", an annotated tag at "second"
 
@@ -280,6 +293,7 @@ func TestFR_LOG_06_SetLogFilterByTagShowsTheHistoryLeadingToIt(t *testing.T) {
 }
 
 func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "path.txt", "1", "A touches path")
 	gittest.Commit(t, repo.Dir, "other.txt", "1", "B touches other")
@@ -308,6 +322,7 @@ func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *test
 }
 
 func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "root.txt", "r", "root") // shared ancestor
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -332,6 +347,7 @@ func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) 
 }
 
 func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "second")

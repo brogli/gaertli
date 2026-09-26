@@ -107,6 +107,7 @@ func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.Operat
 }
 
 func TestFR_CONF_04_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
+	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
 			dir, c, wt, beforeHEAD := stoppedRepo(t, kind)
@@ -124,6 +125,7 @@ func TestFR_CONF_04_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *te
 }
 
 func TestFR_CONF_04_ContinueOperationRebaseNeverWaitsOnACommitMessageEditor(t *testing.T) {
+	t.Parallel()
 	_, c, wt, _ := stoppedRepo(t, "rebase")
 	if err := c.StageFile(t.Context(), wt, conflictPath("rebase")); err != nil {
 		t.Fatal(err)
@@ -144,6 +146,7 @@ var operationStateFile = map[string]string{
 }
 
 func TestFR_CONF_04_AbortOperationRestoresTheFreshStop(t *testing.T) {
+	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
 			dir, c, wt, beforeHEAD := stoppedRepo(t, kind)
@@ -241,6 +244,7 @@ func unsetEditorEnv(t *testing.T) {
 }
 
 func TestFR_CONF_04_ContinueAbortAndSkipOperationSayNoOperationIsInProgress(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	c, wt := openWorktree(t, repo.Dir)
@@ -268,6 +272,7 @@ var unresolvedMessage = map[string]string{
 }
 
 func TestFR_CONF_04_ContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
+	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
 			dir, c, wt, _ := stoppedRepo(t, kind, conflictPath(kind), "other.txt")
@@ -291,6 +296,7 @@ func TestFR_CONF_04_ContinueOperationRefusesWhileAConflictedFileRemains(t *testi
 }
 
 func TestFR_CONF_04_AContinueThatStopsForAnotherReasonThanAConflictIsAStop(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	writeHook(t, repo.Dir, "prepare-commit-msg", refuseAmendHook) // fails the squash's amend step
@@ -310,6 +316,7 @@ func TestFR_CONF_04_AContinueThatStopsForAnotherReasonThanAConflictIsAStop(t *te
 }
 
 func TestFR_CONF_01_SummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T) {
+	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
 			_, c, wt, _ := stoppedRepo(t, kind)
@@ -326,6 +333,7 @@ func TestFR_CONF_01_SummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T
 }
 
 func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "conflict.txt", "base\n", "base")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -369,6 +377,7 @@ func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *t
 }
 
 func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "shared.txt", "base\n", "base")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -413,6 +422,7 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 }
 
 func TestFR_CP_03_AStoppedCherryPickResolvesAndCompletesThroughContinueOperation(t *testing.T) {
+	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
 
 	if err := c.StageFile(t.Context(), wt, conflictPath("cherry-pick")); err != nil {
@@ -513,6 +523,7 @@ func TestFR_CP_07_SkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvi
 // nothing for git to apply next: the sequence just ends, same as any other
 // skip, with the operation state file gone and HEAD unmoved.
 func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
+	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
 
 	if err := c.SkipOperation(t.Context(), wt); err != nil {
@@ -530,6 +541,7 @@ func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothi
 
 // Same as above, for revert.
 func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
+	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
 
 	if err := c.SkipOperation(t.Context(), wt); err != nil {
@@ -546,6 +558,7 @@ func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWit
 }
 
 func TestFR_CP_07_SkipOperationMidMergeSaysAMergeCannotBeSkipped(t *testing.T) {
+	t.Parallel()
 	dir, c, wt, _ := stoppedRepo(t, "merge")
 	rec := recordCommands(t, c, wt)
 
@@ -564,6 +577,7 @@ func TestFR_CP_07_SkipOperationMidMergeSaysAMergeCannotBeSkipped(t *testing.T) {
 }
 
 func TestFR_RV_03_AStoppedRevertResolvesAndCompletesThroughContinueOperation(t *testing.T) {
+	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
 
 	if err := c.StageFile(t.Context(), wt, conflictPath("revert")); err != nil {

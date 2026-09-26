@@ -28,6 +28,7 @@ func openCompareRepo(t *testing.T) (*gittest.Repo, *Core, core.WorktreeID) {
 }
 
 func TestFR_CMP_01_CompareCommitsListsModifiedAddedAndDeletedFiles(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
 	gittest.Commit(t, repo.Dir, "f3", "three", "add f3")
@@ -55,6 +56,7 @@ func TestFR_CMP_01_CompareCommitsListsModifiedAddedAndDeletedFiles(t *testing.T)
 }
 
 func TestFR_CMP_01_CompareCommitsDetectsARename(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f1")
 	a := gittest.HeadSHA(t, repo.Dir)
@@ -72,6 +74,7 @@ func TestFR_CMP_01_CompareCommitsDetectsARename(t *testing.T) {
 }
 
 func TestFR_CMP_03_CompareCommitsSwappedMirrorsEveryStatus(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
 	gittest.Commit(t, repo.Dir, "f3", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f3")
@@ -125,6 +128,7 @@ func TestFR_CMP_03_CompareCommitsSwappedMirrorsEveryStatus(t *testing.T) {
 }
 
 func TestFR_CMP_01_CompareCommitsSameCommitIsEmpty(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
 	a := gittest.HeadSHA(t, repo.Dir)
@@ -139,6 +143,7 @@ func TestFR_CMP_01_CompareCommitsSameCommitIsEmpty(t *testing.T) {
 }
 
 func TestFR_CMP_02_DiffRangeReturnsContentAtTwoArbitraryCommits(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "x", "add f1")
 	a := gittest.HeadSHA(t, repo.Dir)
@@ -156,6 +161,7 @@ func TestFR_CMP_02_DiffRangeReturnsContentAtTwoArbitraryCommits(t *testing.T) {
 }
 
 func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "other", "unrelated", "add other")
 	a := gittest.HeadSHA(t, repo.Dir)
@@ -172,6 +178,7 @@ func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 }
 
 func TestFR_CMP_04_DiffAgainstWorkingComparesHeadContentToTheLiteralOnDiskFile(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "head content\n", "add f1")
 	head := gittest.HeadSHA(t, repo.Dir)
@@ -193,6 +200,7 @@ func TestFR_CMP_04_DiffAgainstWorkingComparesHeadContentToTheLiteralOnDiskFile(t
 // under git's own "either side binary" rule), not new.dat against itself
 // (an unpaired add, which reads as plain text).
 func TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTheNewOne(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	base := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 50)[:2000]
 	oldContent := base[:1000] + "\x00" + base[1001:]
@@ -211,6 +219,7 @@ func TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTh
 }
 
 func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesTogether(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
 	c1 := gittest.HeadSHA(t, repo.Dir)
@@ -234,6 +243,7 @@ func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesTogether(t *t
 }
 
 func TestFR_CMP_02_DiffRangeOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
+	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
 	a := gittest.HeadSHA(t, repo.Dir)

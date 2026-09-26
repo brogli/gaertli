@@ -60,6 +60,7 @@ func rawMessage(t *testing.T, dir, rev string) string {
 }
 
 func TestFR_LOG_14_SquashTodoPicksTheOldestFixesUpTheOthersAmendsThenReplaysTheRest(t *testing.T) {
+	t.Parallel()
 	chain := []string{"b", "c", "d", "e"}
 	selected := map[string]bool{"b": true, "d": true}
 
@@ -72,6 +73,7 @@ func TestFR_LOG_14_SquashTodoPicksTheOldestFixesUpTheOthersAmendsThenReplaysTheR
 }
 
 func TestFR_LOG_14_AnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
+	t.Parallel()
 	timedOut := core.Errorf(core.Cancelled, "context deadline exceeded")
 
 	coretest.AssertCode(t, asStop(timedOut, false), core.Stopped)
@@ -79,6 +81,7 @@ func TestFR_LOG_14_AnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
 }
 
 func TestFR_LOG_14_SquashFoldsAdjacentCommitsWithTheGivenMessageAndTheOldestsAuthor(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -104,6 +107,7 @@ func TestFR_LOG_14_SquashFoldsAdjacentCommitsWithTheGivenMessageAndTheOldestsAut
 }
 
 func TestFR_LOG_14_SquashMovesALaterCommitUpNextToTheOldest(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -119,6 +123,7 @@ func TestFR_LOG_14_SquashMovesALaterCommitUpNextToTheOldest(t *testing.T) {
 }
 
 func TestFR_LOG_14_FixupKeepsTheOldestMessageWhateverOrderTheShasCome(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -134,6 +139,7 @@ func TestFR_LOG_14_FixupKeepsTheOldestMessageWhateverOrderTheShasCome(t *testing
 }
 
 func TestFR_LOG_14_FixupIntoTheRootCommit(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -152,6 +158,7 @@ const uncleanMessage = "amend! Subject\n\n# hash line\n; semicolon line\n\n\n\nt
 	"# ------------------------ >8 ------------------------\nbelow the scissors"
 
 func TestFR_LOG_14_TheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T) {
+	t.Parallel()
 	for _, cleanup := range []string{"strip", "whitespace", "scissors", "verbatim"} {
 		for _, commentChar := range []string{"#", ";"} {
 			t.Run(cleanup+" "+commentChar, func(t *testing.T) {
@@ -177,6 +184,7 @@ func TestFR_LOG_14_TheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T)
 }
 
 func TestFR_LOG_14_FixupKeepsTheOldestMessageExactly(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "base.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "b.txt", "b\n")
@@ -211,6 +219,7 @@ func conflictLine(t *testing.T, dir string) (b, d string) {
 }
 
 func TestFR_LOG_14_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		fold func(c *Core, wt core.WorktreeID, shas []string) error
@@ -257,6 +266,7 @@ func TestFR_LOG_14_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T
 }
 
 func TestFR_LOG_14_UncommittedChangesToTrackedFilesBlock(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	writeFile(t, repo.Dir, "untracked.txt", "fine")
@@ -281,6 +291,7 @@ func TestFR_LOG_14_UncommittedChangesToTrackedFilesBlock(t *testing.T) {
 }
 
 func TestFR_LOG_14_AMergeCommitInTheWayBlocksAndIsNamed(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	x1, merge, x2 := mergeCommitFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -297,6 +308,7 @@ func TestFR_LOG_14_AMergeCommitInTheWayBlocksAndIsNamed(t *testing.T) {
 }
 
 func TestFR_LOG_14_ACommitOffTheCurrentBranchBlocks(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	gittest.Run(t, repo.Dir, "switch", "-c", "side", l.C)
@@ -321,6 +333,7 @@ func TestFR_LOG_14_ACommitOffTheCurrentBranchBlocks(t *testing.T) {
 }
 
 func TestFR_LOG_14_ADetachedHeadOrARunningOperationBlocks(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -345,6 +358,7 @@ func TestFR_LOG_14_ADetachedHeadOrARunningOperationBlocks(t *testing.T) {
 }
 
 func TestFR_LOG_14_CheckSaysWhetherTheOldestSelectedCommitIsPushed(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -376,6 +390,7 @@ func TestFR_LOG_14_CheckSaysWhetherTheOldestSelectedCommitIsPushed(t *testing.T)
 }
 
 func TestFR_LOG_14_CheckProposesTheSelectedMessagesOldestFirst(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -421,6 +436,7 @@ func TestFR_LOG_14_SquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *
 }
 
 func TestFR_LOG_14_FewerThanTwoCommitsOrABlankMessageIsABadRequest(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
@@ -439,6 +455,7 @@ func TestFR_LOG_14_FewerThanTwoCommitsOrABlankMessageIsABadRequest(t *testing.T)
 }
 
 func TestFR_LOG_14_AStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		fixture func(t *testing.T, dir string) (shas []string)
@@ -496,6 +513,7 @@ func TestFR_LOG_14_AStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testin
 const refuseAmendHook = "[ \"$2\" = commit ] && { echo refusing >&2; exit 1; }\nexit 0\n"
 
 func TestFR_LOG_14_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	writeHook(t, repo.Dir, "prepare-commit-msg", refuseAmendHook)
@@ -517,6 +535,7 @@ func TestFR_LOG_14_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 }
 
 func TestFR_LOG_14_AFailedAmendStopsAndAbortRestores(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	writeHook(t, repo.Dir, "prepare-commit-msg", refuseAmendHook)
@@ -534,6 +553,7 @@ func TestFR_LOG_14_AFailedAmendStopsAndAbortRestores(t *testing.T) {
 }
 
 func TestFR_LOG_14_ACommitMadeAfterTheCheckStopsTheRebaseInsteadOfBeingDropped(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)

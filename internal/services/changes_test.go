@@ -17,6 +17,7 @@ import (
 )
 
 func TestFR_CHG_01_ParseStatusGroupsByXAndYAndHandlesRenameHeaderUnmergedUntracked(t *testing.T) {
+	t.Parallel()
 	data := []byte(
 		"# branch.oid abc123\x00" +
 			"1 MM N... 100644 100644 100644 aaaa aaaa a.txt\x00" +
@@ -40,6 +41,7 @@ func TestFR_CHG_01_ParseStatusGroupsByXAndYAndHandlesRenameHeaderUnmergedUntrack
 }
 
 func TestFR_CHG_01_ParseStatusRenameWithUnstagedEditKeepsGroupsSeparate(t *testing.T) {
+	t.Parallel()
 	data := []byte(
 		"2 RM N... 100644 100644 100644 bbbb bbbb R100 newpath.txt\x00" +
 			"oldpath.txt\x00",
@@ -93,6 +95,7 @@ func writeFile(t *testing.T, dir, name, content string) {
 }
 
 func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflict(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "conflict.txt", "base\n", "base")
 	gittest.Commit(t, repo.Dir, "tracked.txt", "tracked\n", "add tracked.txt")
@@ -134,6 +137,7 @@ func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflict(t *testing.T) 
 }
 
 func TestFR_CHG_01_StatusListsAFileChangedBothWaysOnce(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 	writeFile(t, repo.Dir, "a.txt", "staged\n")
@@ -152,6 +156,7 @@ func TestFR_CHG_01_StatusListsAFileChangedBothWaysOnce(t *testing.T) {
 }
 
 func TestFR_CHG_01_StatusListsAStagedRenameWithOldPath(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "old.txt", "content\n", "add old.txt")
 	gittest.Run(t, repo.Dir, "mv", "old.txt", "new.txt")
@@ -170,6 +175,7 @@ func TestFR_CHG_01_StatusListsAStagedRenameWithOldPath(t *testing.T) {
 }
 
 func TestFR_CHG_02_StageFileStagesAnUntrackedFile(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a\n", "add a.txt")
 	writeFile(t, repo.Dir, "b.txt", "untracked content\n")
@@ -189,6 +195,7 @@ func TestFR_CHG_02_StageFileStagesAnUntrackedFile(t *testing.T) {
 }
 
 func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 	writeFile(t, repo.Dir, "a.txt", "modified\n")
@@ -215,6 +222,7 @@ func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T)
 // refuses a path with no index entry at all, so the race is a
 // never-tracked path.
 func TestFR_CHG_02_UnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "clean\n", "add a.txt")
 
@@ -231,6 +239,7 @@ func TestFR_CHG_02_UnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
 }
 
 func TestFR_CHG_02_StageAllStagesEveryChangeAtOnce(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "tracked.txt", "orig\n", "add tracked.txt")
 	writeFile(t, repo.Dir, "tracked.txt", "modified\n")
@@ -252,6 +261,7 @@ func TestFR_CHG_02_StageAllStagesEveryChangeAtOnce(t *testing.T) {
 }
 
 func TestFR_CHG_02_UnstageAllReturnsEveryFileToItsOwnGroup(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "tracked.txt", "orig\n", "add tracked.txt")
 	writeFile(t, repo.Dir, "tracked.txt", "modified\n")
@@ -278,6 +288,7 @@ func TestFR_CHG_02_UnstageAllReturnsEveryFileToItsOwnGroup(t *testing.T) {
 }
 
 func TestFR_CHG_04_DiffWorkingStagedReturnsHeadAndIndexContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "head content\n", "add a.txt")
 	writeFile(t, repo.Dir, "a.txt", "staged content\n")
@@ -294,6 +305,7 @@ func TestFR_CHG_04_DiffWorkingStagedReturnsHeadAndIndexContent(t *testing.T) {
 }
 
 func TestFR_CHG_04_DiffWorkingStagedOnNewFileHasNoOldContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "existing.txt", "x\n", "add existing.txt")
 	writeFile(t, repo.Dir, "new.txt", "brand new\n")
@@ -312,6 +324,7 @@ func TestFR_CHG_04_DiffWorkingStagedOnNewFileHasNoOldContent(t *testing.T) {
 // A rename git detects: -M pairs paths whose content is at least 50%
 // similar.
 func TestFR_CHG_04_DiffWorkingStagedRenameUsesOldPath(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	base := strings.Repeat("line unchanged\n", 20)
 	gittest.Commit(t, repo.Dir, "old.txt", base+"pre-rename\n", "add old.txt")
@@ -330,6 +343,7 @@ func TestFR_CHG_04_DiffWorkingStagedRenameUsesOldPath(t *testing.T) {
 }
 
 func TestFR_CHG_04_DiffWorkingUnstagedReturnsIndexAndWorkingTreeContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "index content\n", "add a.txt")
 	writeFile(t, repo.Dir, "a.txt", "on-disk content\n")
@@ -345,6 +359,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedReturnsIndexAndWorkingTreeContent(t *testi
 }
 
 func TestFR_CHG_04_DiffWorkingUnstagedDeletionHasNoNewContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "index content\n", "add a.txt")
 	if err := os.Remove(filepath.Join(repo.Dir, "a.txt")); err != nil {
@@ -362,6 +377,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedDeletionHasNoNewContent(t *testing.T) {
 }
 
 func TestFR_CHG_04_DiffWorkingUntrackedHasNoOldContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "existing.txt", "x\n", "add existing.txt")
 	writeFile(t, repo.Dir, "new.txt", "on-disk\n")
@@ -377,6 +393,7 @@ func TestFR_CHG_04_DiffWorkingUntrackedHasNoOldContent(t *testing.T) {
 }
 
 func TestFR_CHG_04_DiffWorkingHandlesAFileChangedBothWaysCorrectlyForBothCalls(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
 	writeFile(t, repo.Dir, "a.txt", "staged\n")
@@ -403,6 +420,7 @@ func TestFR_CHG_04_DiffWorkingHandlesAFileChangedBothWaysCorrectlyForBothCalls(t
 }
 
 func TestFR_CHG_04_DiffWorkingUntrackedBinaryFileHasNoContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "existing.txt", "x\n", "add existing.txt")
 	writeFile(t, repo.Dir, "bin.dat", "abc\x00def")
@@ -418,6 +436,7 @@ func TestFR_CHG_04_DiffWorkingUntrackedBinaryFileHasNoContent(t *testing.T) {
 }
 
 func TestFR_CHG_04_DiffWorkingUnstagedBinaryFileHasNoContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
 	writeFile(t, repo.Dir, "bin.dat", "xyz\x00123")
@@ -433,6 +452,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedBinaryFileHasNoContent(t *testing.T) {
 }
 
 func TestFR_CHG_04_DiffWorkingUnstagedCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "big.txt", strings.Repeat("a", maxDiffFileSize+1), "add big file")
 	big := strings.Repeat("b", maxDiffFileSize+1)
@@ -460,6 +480,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedCapsHugeFilesWithAForceReloadBypass(t *tes
 }
 
 func TestFR_CHG_04_DiffWorkingShowsAFileWhoseNameHoldsANewline(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows file names cannot hold a newline")
 	}

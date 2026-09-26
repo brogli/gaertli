@@ -46,6 +46,7 @@ func movedLineFixture(t *testing.T, dir string) {
 }
 
 func TestQA_COMP_01_DiffWorkingHunksFollowTheConfiguredDiffAlgorithm(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		algorithm string
 		want      []core.DiffHunk
@@ -76,6 +77,7 @@ func autocrlfFixture(t *testing.T, dir string) {
 }
 
 func TestQA_COMP_01_DiffWorkingShowsACRLFWorkingFileInTheCleanForm(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	autocrlfFixture(t, repo.Dir)
 
@@ -96,6 +98,7 @@ func filterFixture(t *testing.T, dir string) {
 }
 
 func TestQA_COMP_01_DiffWorkingShowsAFilteredWorkingFileInTheCleanForm(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	filterFixture(t, repo.Dir)
 
@@ -113,6 +116,7 @@ func whitespaceFixture(t *testing.T, dir string) {
 }
 
 func TestFR_DIFF_06_DiffWorkingIgnoringWhitespaceKeepsOnlyRealChangesInTheHunks(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	whitespaceFixture(t, repo.Dir)
 
@@ -124,6 +128,7 @@ func TestFR_DIFF_06_DiffWorkingIgnoringWhitespaceKeepsOnlyRealChangesInTheHunks(
 }
 
 func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *testing.T) {
+	t.Parallel()
 	none := core.DiffOptions{}
 	body := strings.Repeat("line unchanged\n", 20)
 
@@ -258,6 +263,7 @@ func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *t
 }
 
 func TestFR_DIFF_03_DiffCallsTreatFilesGitCallsBinaryAsBinary(t *testing.T) {
+	t.Parallel()
 	for _, attributes := range []string{"*.dat binary\n", "*.dat -diff\n"} {
 		t.Run(attributes, func(t *testing.T) {
 			repo := gittest.New(t)
@@ -285,6 +291,7 @@ func TestFR_DIFF_03_DiffCallsTreatFilesGitCallsBinaryAsBinary(t *testing.T) {
 }
 
 func TestADR_7_ParseCatFileBatchReadsAFoundOrAMissingObject(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		data string
 		want []byte
@@ -300,6 +307,7 @@ func TestADR_7_ParseCatFileBatchReadsAFoundOrAMissingObject(t *testing.T) {
 }
 
 func TestADR_7_BlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
+	t.Parallel()
 	size, err := blobSize("12345")
 	if err != nil || size != 12345 {
 		t.Errorf("blobSize(number) = %d, %v, want 12345, nil", size, err)
@@ -312,6 +320,7 @@ func TestADR_7_BlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
 }
 
 func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "first\n", "first")
 	gittest.Commit(t, repo.Dir, "a.txt", "second\n", "second")
@@ -329,6 +338,7 @@ func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
 }
 
 func TestFR_LOG_04_DiffFileOnAddedFileHasNoOldContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "added text\n", "add a.txt")
 	sha := gittest.HeadSHA(t, repo.Dir)
@@ -345,6 +355,7 @@ func TestFR_LOG_04_DiffFileOnAddedFileHasNoOldContent(t *testing.T) {
 }
 
 func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "still here\n", "add a.txt")
 	gittest.Run(t, repo.Dir, "rm", "a.txt")
@@ -363,6 +374,7 @@ func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 }
 
 func TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	base := strings.Repeat("line unchanged\n", 20)
 	gittest.Commit(t, repo.Dir, "a.txt", base+"old ending\n", "add a.txt")
@@ -384,6 +396,7 @@ func TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath(t *testing.T) {
 }
 
 func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
 	sha := gittest.HeadSHA(t, repo.Dir)
@@ -400,6 +413,7 @@ func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T)
 }
 
 func TestFR_DIFF_03_DiffFileTreatsGitattributesDiffOverrideAsBinary(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, ".gitattributes", "a.txt -diff\n", "add gitattributes")
 	gittest.Commit(t, repo.Dir, "a.txt", "plain text, no nul bytes\n", "add a.txt")
@@ -417,6 +431,7 @@ func TestFR_DIFF_03_DiffFileTreatsGitattributesDiffOverrideAsBinary(t *testing.T
 }
 
 func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	big := strings.Repeat("a", maxDiffFileSize+1)
 	gittest.Commit(t, repo.Dir, "big.txt", big, "add big file")
@@ -445,6 +460,7 @@ func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 }
 
 func TestQA_PERF_05_DiffFileUnder1MBCompletesWithinBudget(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	content := strings.Repeat("a line of committed text\n", 700*1024/25) // ~700KB, under maxDiffFileSize
 	gittest.Commit(t, repo.Dir, "file.txt", content, "add a ~700KB file")
@@ -467,6 +483,7 @@ func TestQA_PERF_05_DiffFileUnder1MBCompletesWithinBudget(t *testing.T) {
 }
 
 func TestADR_7_DiffFileOnRootCommitHasNoOldContent(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "root content\n", "root commit")
 	sha := gittest.HeadSHA(t, repo.Dir)

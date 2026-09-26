@@ -34,6 +34,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestFR_LOG_01_ParseLogRecordParsesFieldsAndRefs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		record string
@@ -84,6 +85,7 @@ func TestFR_LOG_01_ParseLogRecordParsesFieldsAndRefs(t *testing.T) {
 }
 
 func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	commitOrphan(t, repo.Dir, "main", "a.txt", "a")
 	commitOrphan(t, repo.Dir, "feature", "b.txt", "b")
@@ -158,6 +160,7 @@ func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T
 // row has a line out to each parent's lane, the base row a line in from
 // each branch's lane.
 func TestFR_LOG_02_LogRowsJoinAMergeAndItsForkPointToBothLanes(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "base")
 	gittest.Run(t, repo.Dir, "branch", "side")
@@ -191,6 +194,7 @@ func TestFR_LOG_02_LogRowsJoinAMergeAndItsForkPointToBothLanes(t *testing.T) {
 }
 
 func TestFR_LOG_10_LoadLogMarksCheckedOutWorktrees(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "base")
 	older := gittest.HeadSHA(t, repo.Dir)
@@ -218,6 +222,7 @@ func TestFR_LOG_10_LoadLogMarksCheckedOutWorktrees(t *testing.T) {
 }
 
 func TestFR_REPO_04_ReloadLogNoOpsWhenTipsUnchanged(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
@@ -240,6 +245,7 @@ func TestFR_REPO_04_ReloadLogNoOpsWhenTipsUnchanged(t *testing.T) {
 }
 
 func TestFR_REPO_04_ReloadLogRestartsWhenARefMoved(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
@@ -263,6 +269,7 @@ func TestFR_REPO_04_ReloadLogRestartsWhenARefMoved(t *testing.T) {
 }
 
 func TestFR_REPO_04_ReloadLogRestartsWhenOnlyHEADsTargetChanged(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -287,6 +294,7 @@ func TestFR_REPO_04_ReloadLogRestartsWhenOnlyHEADsTargetChanged(t *testing.T) {
 // the rows: its log:progress names the new generation, so a window knows
 // to drop the rows it cached.
 func TestFR_REPO_04_ReloadLogProgressNamesTheNewGeneration(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	progress := make(chan core.LogProgress, 100)
@@ -320,6 +328,7 @@ func TestFR_REPO_04_ReloadLogProgressNamesTheNewGeneration(t *testing.T) {
 // unreachable until ReloadLog also restarts its own filtered stream, not
 // only the repo-wide one.
 func TestFR_REPO_04_ReloadLogRestartsTheActiveFilterWhenARefMoved(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "keep this")
 	gittest.Commit(t, repo.Dir, "a.txt", "a2", "drop this")
@@ -366,6 +375,7 @@ func nextDone(t *testing.T, progress <-chan core.LogProgress) core.LogProgress {
 }
 
 func TestFR_LOG_01_LogIndexOfFindsRowBySHA(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "second")
@@ -492,6 +502,7 @@ func buildLogFixture(n int) []byte {
 // A window opened on a repo whose log another window already loaded
 // learns the row count from log:progress like the first one did.
 func TestFR_LOG_01_LoadLogOnALoadedRepoReemitsItsProgress(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	commitOrphan(t, repo.Dir, "main", "a.txt", "a")
 	commitOrphan(t, repo.Dir, "feature", "b.txt", "b")
@@ -567,6 +578,7 @@ func TestFR_LOG_09_AFailedLoadCarriesGitsErrorInItsDoneProgress(t *testing.T) {
 // The log is loaded once per repo; HEAD is per worktree, so each window's
 // rows carry the HEAD label on its own worktree's HEAD commit.
 func TestFR_LOG_01_LogRowsPlaceHEADOnTheAskingWorktreesHead(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "a")
 	gittest.Run(t, repo.Dir, "branch", "side")
@@ -651,6 +663,7 @@ func commitOrphan(t *testing.T, dir, branch, file, msg string) {
 }
 
 func TestFR_UX_02_AppDrivenReadsAreBackgroundCommands(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	c, wt := openWorktree(t, repo.Dir)
 	rec := recordCommands(t, c, wt)
