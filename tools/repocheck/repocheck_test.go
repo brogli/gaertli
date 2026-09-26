@@ -296,64 +296,67 @@ func plant(t *testing.T, root, rel, content string) {
 	t.Cleanup(func() { _ = os.Remove(path) })
 }
 
-// A native control in a template and a restyled OpenVue class in CSS are
-// lint findings, not a repo check.
-func TestTR_37_TreefmtCIFailsOnANativeControlAndARestyledControl(t *testing.T) {
-	root := repoRoot(t)
+// treefmtCI runs `treefmt --ci` on paths (relative to root), skipping t
+// outside the Nix shell or without frontend/node_modules.
+func treefmtCI(t *testing.T, root string, paths ...string) (string, error) {
+	t.Helper()
 	if _, err := exec.LookPath("treefmt"); err != nil {
 		t.Skip("treefmt not on PATH (outside the Nix shell)")
 	}
 	if _, err := os.Stat(filepath.Join(root, "frontend", "node_modules")); err != nil {
 		t.Skip("frontend/node_modules missing")
 	}
-
-	vueFault := "frontend/src/components/__fixture_tr37.vue"
-	cssFault := "frontend/src/assets/__fixture_tr37.css"
-	plant(t, root, vueFault, "<template>\n  <button>x</button>\n</template>\n")
-	plant(t, root, cssFault, ".fixture .p-button {\n  color: red;\n}\n")
-
-	cmd := exec.CommandContext(t.Context(), "treefmt", "--ci", vueFault, cssFault)
+	cmd := exec.CommandContext(t.Context(), "treefmt", append([]string{"--ci"}, paths...)...)
 	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// assertTreefmtCIFails asserts `treefmt --ci` fails on paths and names every
+// one of wants.
+func assertTreefmtCIFails(t *testing.T, root string, paths []string, wants ...string) {
+	t.Helper()
+	out, err := treefmtCI(t, root, paths...)
 	if err == nil {
-		t.Fatalf("treefmt --ci passed a native control and a restyled OpenVue class:\n%s", out)
+		t.Fatalf("treefmt --ci %v: want non-zero exit, got 0\n%s", paths, out)
 	}
-	for _, want := range []string{"vue/no-restricted-html-elements", "selector-disallowed-list", cssFault} {
-		if !strings.Contains(string(out), want) {
+	for _, want := range wants {
+		if !strings.Contains(out, want) {
 			t.Errorf("treefmt --ci output lacks %q:\n%s", want, out)
 		}
 	}
 }
 
+func assertTreefmtCIPasses(t *testing.T, root string, paths ...string) {
+	t.Helper()
+	if out, err := treefmtCI(t, root, paths...); err != nil {
+		t.Errorf("treefmt --ci %v: want exit 0, got error: %v\n%s", paths, err, out)
+	}
+}
+
+// A native control in a template and a restyled OpenVue class in CSS are
+// lint findings, not a repo check.
+func TestTR_37_TreefmtCIFailsOnANativeControlAndARestyledControl(t *testing.T) {
+	root := repoRoot(t)
+	vueFault := "frontend/src/components/__fixture_tr37.vue"
+	cssFault := "frontend/src/assets/__fixture_tr37.css"
+	plant(t, root, vueFault, "<template>\n  <button>x</button>\n</template>\n")
+	plant(t, root, cssFault, ".fixture .p-button {\n  color: red;\n}\n")
+
+	assertTreefmtCIFails(t, root, []string{vueFault, cssFault},
+		"vue/no-restricted-html-elements", "selector-disallowed-list", cssFault)
+}
+
 // treefmt --ci runs every linter, then every formatter, and fails on a
-// finding a fix cannot remove as well as on any file it would change. Like
-// every test that plants files in the tree, it lives in this package so
-// they run one after another.
+// finding a fix cannot remove as well as on any file it would change.
 func TestTR_38_TreefmtCIFailsOnALintErrorAndAnUnformattedFile(t *testing.T) {
 	root := repoRoot(t)
-	if _, err := exec.LookPath("treefmt"); err != nil {
-		t.Skip("treefmt not on PATH (outside the Nix shell)")
-	}
-	if _, err := os.Stat(filepath.Join(root, "frontend", "node_modules")); err != nil {
-		t.Skip("frontend/node_modules missing")
-	}
-
 	lintFault := "frontend/src/__fixture_treefmt_lint.ts"
 	formatFault := "docs/__fixture_treefmt_format.md"
 	plant(t, root, lintFault, "export function fixture(): void {\n  for (let i = 0; i < 3; i--) {\n    console.log(i)\n  }\n}\n")
 	plant(t, root, formatFault, "#  Title\n\n\n*   item\n")
 
-	cmd := exec.CommandContext(t.Context(), "treefmt", "--ci", lintFault, formatFault)
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("treefmt --ci passed a lint error and an unformatted file:\n%s", out)
-	}
-	for _, want := range []string{"for-direction", formatFault} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("treefmt --ci output lacks %q:\n%s", want, out)
-		}
-	}
+	assertTreefmtCIFails(t, root, []string{lintFault, formatFault}, "for-direction", formatFault)
 }
 
 // One treefmt run covers both faults: an e2e spec only the Playwright
@@ -361,13 +364,6 @@ func TestTR_38_TreefmtCIFailsOnALintErrorAndAnUnformattedFile(t *testing.T) {
 // (oxlint's own vitest plugin already reports the more common findings).
 func TestTR_39_TreefmtCIFailsOnPlaywrightAndVitestFindings(t *testing.T) {
 	root := repoRoot(t)
-	if _, err := exec.LookPath("treefmt"); err != nil {
-		t.Skip("treefmt not on PATH (outside the Nix shell)")
-	}
-	if _, err := os.Stat(filepath.Join(root, "frontend", "node_modules")); err != nil {
-		t.Skip("frontend/node_modules missing")
-	}
-
 	playwrightFault := "frontend/e2e/__fixture_missing_await.spec.ts"
 	vitestFault := "frontend/src/lib/__tests__/__fixture_identical_title.spec.ts"
 	// expect(locator).toBeVisible() is itself auto-fixable (the rule
@@ -383,28 +379,12 @@ func TestTR_39_TreefmtCIFailsOnPlaywrightAndVitestFindings(t *testing.T) {
 			"it('fixture case', () => {\n  expect(true).toBe(true)\n})\n\n"+
 			"it('fixture case', () => {\n  expect(true).toBe(true)\n})\n")
 
-	cmd := exec.CommandContext(t.Context(), "treefmt", "--ci", playwrightFault, vitestFault)
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("treefmt --ci passed a missing Playwright await and a duplicate Vitest title:\n%s", out)
-	}
-	for _, want := range []string{"playwright/missing-playwright-await", "vitest/no-identical-title"} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("treefmt --ci output lacks %q:\n%s", want, out)
-		}
-	}
+	assertTreefmtCIFails(t, root, []string{playwrightFault, vitestFault},
+		"playwright/missing-playwright-await", "vitest/no-identical-title")
 }
 
 func TestTR_40_TreefmtCIFailsOnUntypedTypeScriptAndRuntimeProps(t *testing.T) {
 	root := repoRoot(t)
-	if _, err := exec.LookPath("treefmt"); err != nil {
-		t.Skip("treefmt not on PATH (outside the Nix shell)")
-	}
-	if _, err := os.Stat(filepath.Join(root, "frontend", "node_modules")); err != nil {
-		t.Skip("frontend/node_modules missing")
-	}
-
 	libFault := "frontend/src/lib/__fixture_tr40_lib.ts"
 	plant(t, root, libFault, "export function fixture(value: string | null) {\n"+
 		"  const cast = value as string\n"+
@@ -421,34 +401,17 @@ func TestTR_40_TreefmtCIFailsOnUntypedTypeScriptAndRuntimeProps(t *testing.T) {
 		"  <span>{{ label }}</span>\n"+
 		"</template>\n")
 
-	cmd := exec.CommandContext(t.Context(), "treefmt", "--ci", libFault, vueFault)
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("treefmt --ci passed an unexplained '!', an 'as' cast, an untyped export, an undescribed disable and a runtime defineProps:\n%s", out)
-	}
-	for _, want := range []string{
+	assertTreefmtCIFails(t, root, []string{libFault, vueFault},
 		"no-non-null-assertion",
 		"consistent-type-assertions",
 		"explicit-module-boundary-types",
 		"require-description",
 		"define-props-declaration",
-	} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("treefmt --ci output lacks %q:\n%s", want, out)
-		}
-	}
+	)
 }
 
 func TestTR_40_TreefmtCIAllowsNonNullAssertionInTests(t *testing.T) {
 	root := repoRoot(t)
-	if _, err := exec.LookPath("treefmt"); err != nil {
-		t.Skip("treefmt not on PATH (outside the Nix shell)")
-	}
-	if _, err := os.Stat(filepath.Join(root, "frontend", "node_modules")); err != nil {
-		t.Skip("frontend/node_modules missing")
-	}
-
 	testFault := "frontend/src/lib/__tests__/__fixture_tr40.spec.ts"
 	plant(t, root, testFault, "import { describe, expect, it } from 'vitest'\n\n"+
 		"describe('fixture', () => {\n"+
@@ -458,51 +421,27 @@ func TestTR_40_TreefmtCIAllowsNonNullAssertionInTests(t *testing.T) {
 		"  })\n"+
 		"})\n")
 
-	cmd := exec.CommandContext(t.Context(), "treefmt", "--ci", testFault)
-	cmd.Dir = root
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Errorf("treefmt --ci on a test's non-null assertion: want exit 0, got error: %v\n%s", err, out)
-	}
+	assertTreefmtCIPasses(t, root, testFault)
 }
 
 // stylelint checks CSS files and <style> blocks alike and knows
 // Tailwind's own at-rules.
 func TestTR_39_TreefmtCIFailsOnUnknownCSSPropertiesAndPassesTailwindAtRules(t *testing.T) {
 	root := repoRoot(t)
-	if _, err := exec.LookPath("treefmt"); err != nil {
-		t.Skip("treefmt not on PATH (outside the Nix shell)")
-	}
-	if _, err := os.Stat(filepath.Join(root, "frontend", "node_modules")); err != nil {
-		t.Skip("frontend/node_modules missing")
-	}
-
 	cssFault := "frontend/src/assets/__fixture_stylelint.css"
 	vueFault := "frontend/src/components/__fixture_stylelint.vue"
 	plant(t, root, cssFault, ".cm-fixture {\n  colr: red;\n}\n")
 	plant(t, root, vueFault, "<template>\n  <span />\n</template>\n\n"+
 		"<style>\n.cm-fixture {\n  colr: red;\n}\n</style>\n")
 
-	cmd := exec.CommandContext(t.Context(), "treefmt", "--ci", cssFault, vueFault)
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("treefmt --ci passed an unknown CSS property:\n%s", out)
-	}
-	for _, want := range []string{"property-no-unknown", "__fixture_stylelint.css", "__fixture_stylelint.vue"} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("treefmt --ci output lacks %q:\n%s", want, out)
-		}
-	}
+	assertTreefmtCIFails(t, root, []string{cssFault, vueFault},
+		"property-no-unknown", "__fixture_stylelint.css", "__fixture_stylelint.vue")
 
 	tailwind := "frontend/src/assets/__fixture_tailwind.css"
 	plant(t, root, tailwind, "@import 'tailwindcss';\n\n"+
 		"@custom-variant fixture (&:where(.fixture, .fixture *));\n\n"+
 		"@theme {\n  --color-fixture: red;\n}\n")
-	cmd = exec.CommandContext(t.Context(), "treefmt", "--ci", tailwind)
-	cmd.Dir = root
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Errorf("treefmt --ci on Tailwind's at-rules: want exit 0, got error: %v\n%s", err, out)
-	}
+	assertTreefmtCIPasses(t, root, tailwind)
 }
 
 // A planted component's utility classes reach the built CSS: one from
@@ -542,37 +481,15 @@ func TestTR_43_BuildTurnsUtilityClassesIntoCSS(t *testing.T) {
 // check; a keyframes block and a rule for CodeMirror's own DOM stay.
 func TestTR_43_TreefmtCIFailsOnAStyleBlockRuleUtilitiesCanExpress(t *testing.T) {
 	root := repoRoot(t)
-	if _, err := exec.LookPath("treefmt"); err != nil {
-		t.Skip("treefmt not on PATH (outside the Nix shell)")
-	}
-	if _, err := os.Stat(filepath.Join(root, "frontend", "node_modules")); err != nil {
-		t.Skip("frontend/node_modules missing")
-	}
-
 	fault := "frontend/src/components/__fixture_tr43.vue"
 	plant(t, root, fault, "<template>\n  <div class=\"fixture-row\" />\n</template>\n\n"+
 		"<style scoped>\n.fixture-row {\n  display: flex;\n}\n</style>\n")
 
-	cmd := exec.CommandContext(t.Context(), "treefmt", "--ci", fault)
-	cmd.Dir = root
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("treefmt --ci passed a <style> rule utilities can express:\n%s", out)
-	}
-	for _, want := range []string{"selector-disallowed-list", fault} {
-		if !strings.Contains(string(out), want) {
-			t.Errorf("treefmt --ci output lacks %q:\n%s", want, out)
-		}
-	}
+	assertTreefmtCIFails(t, root, []string{fault}, "selector-disallowed-list", fault)
 
 	pass := "frontend/src/components/__fixture_tr43_pass.vue"
 	plant(t, root, pass, "<template>\n  <div class=\"fixture-editor\" />\n</template>\n\n"+
 		"<style scoped>\n@keyframes fixture-spin {\n  from {\n    transform: rotate(0deg);\n  }\n\n"+
 		"  to {\n    transform: rotate(360deg);\n  }\n}\n\n.cm-editor {\n  height: 100%;\n}\n</style>\n")
-
-	cmd = exec.CommandContext(t.Context(), "treefmt", "--ci", pass)
-	cmd.Dir = root
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Errorf("treefmt --ci on keyframes and a CodeMirror rule: want exit 0, got error: %v\n%s", err, out)
-	}
+	assertTreefmtCIPasses(t, root, pass)
 }
