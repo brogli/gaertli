@@ -284,7 +284,7 @@ function shasOf(rows: LogCommit[]): string[] {
 const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
 
 // cherryPick picks with git's defaults; a selection with a merge commit is
-// refused (FR-CP-05), shown through the error banner.
+// refused, shown through the error banner.
 function cherryPick(): void {
   void runAndClose(
     () => Facade.CherryPick(props.wt, shasOf(log.selection), gitDefaults),
