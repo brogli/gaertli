@@ -3,6 +3,7 @@ package services
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -245,6 +246,42 @@ func TestFR_WT_02_AddWorktreeChecksOutAnExistingBranch(t *testing.T) {
 	if branch := currentBranch(t, target); branch != "feature" {
 		t.Errorf("checked-out branch in %s = %q, want feature", target, branch)
 	}
+}
+
+func TestFR_WT_14_AddWorktreeFindsTheNewWorktreeGivenAnotherFormOfItsPath(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	target := filepath.Join(anotherFormOfATempDir(t), "wt")
+
+	c, _ := openWorktree(t, repo.Dir)
+	got, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "feature", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Path != want {
+		t.Errorf("AddWorktree Path = %q, want git's form %q", got.Path, want)
+	}
+}
+
+// anotherFormOfATempDir returns a temp folder that git resolves to a
+// different string than the one given to it: on Windows, t.TempDir()'s own
+// short, backslash form; elsewhere, a folder reached through a symlink.
+func anotherFormOfATempDir(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return t.TempDir()
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(t.TempDir(), link); err != nil {
+		t.Fatal(err)
+	}
+	return link
 }
 
 func TestFR_WT_02_AddWorktreeCreatesANewBranchFromAGivenStart(t *testing.T) {

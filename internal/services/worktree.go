@@ -97,14 +97,18 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 }
 
 // describeWorktree returns target's row from wt's repo's worktree list.
+// Rows are matched by file identity, not by string equality: git lists a
+// worktree's resolved path, which need not be the string given to add it.
 func describeWorktree(ctx context.Context, wt *session.Worktree, target string) (core.Worktree, error) {
 	worktrees, err := worktreeList(ctx, wt.Runner, wt.Path, false)
 	if err != nil {
 		return core.Worktree{}, err
 	}
-	for _, row := range worktrees {
-		if row.Path == target {
-			return row, nil // just created: clean by construction
+	if targetInfo, err := os.Stat(target); err == nil {
+		for _, row := range worktrees {
+			if rowInfo, err := os.Stat(row.Path); err == nil && os.SameFile(rowInfo, targetInfo) {
+				return row, nil // just created: clean by construction
+			}
 		}
 	}
 	return core.Worktree{}, core.Errorf(core.Internal, "worktree %q not found after creation", target)
