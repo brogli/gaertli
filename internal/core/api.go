@@ -2,7 +2,7 @@
 // DTOs, one error type, and events.
 //
 // Implemented in-process by internal/services and over JSON-RPC by
-// internal/remote.Client. The shell binds the generated app.Facade, which
+// internal/remote.Client. The shell binds the generated app.Forwarder, which
 // forwards each call to the core that owns the call's worktree or path.
 package core
 
@@ -10,20 +10,10 @@ import "context"
 
 //go:generate go run ../../tools/gencore
 
-// API is the whole backend. Rules, enforced by tools/gencore: first parameter
-// context.Context, last result error, at most one other result, and every
-// parameter and result JSON-serialisable (no chan, func, or interface).
-//
-// The second parameter decides where the facade sends the call: a WorktreeID
-// goes to the core owning that worktree, a RepoPath to the core for that path,
-// anything else to the local core.
-type API interface {
+// WindowAPI is what a window may call; the shell binds it to Wails.
+type WindowAPI interface {
 	// Version identifies the core; the shell compares Protocol on connect.
 	Version(ctx context.Context) (Version, error)
-
-	// OpenWorktree validates path and returns the session's identity.
-	// Idempotent: opening an already-open worktree returns the same ID.
-	OpenWorktree(ctx context.Context, path RepoPath) (WorktreeInfo, error)
 
 	// Summary is the worktree's branch and state, without ahead/behind and
 	// refs. Cheap: the UI calls it again on every change.
@@ -111,14 +101,6 @@ type API interface {
 	// Refresh checks wt's repo and worktree for outside changes now. Any
 	// resulting "repo:changed" event follows asynchronously.
 	Refresh(ctx context.Context, wt WorktreeID) error
-
-	// SetFocused starts (with an immediate check) or stops wt's status
-	// poller as its window gains or loses focus.
-	SetFocused(ctx context.Context, wt WorktreeID, focused bool) error
-
-	// CloseWorktree ends wt's session: its poller, and the repo's watcher if
-	// no other open worktree shares the repo. No-op for an unknown id.
-	CloseWorktree(ctx context.Context, wt WorktreeID) error
 
 	// ReloadLog restarts the log stream if a ref tip moved since the log
 	// last finished. No-op before the first load finishes or while one runs.
@@ -222,11 +204,6 @@ type API interface {
 	// Fixup is Squash keeping the oldest sha's message exactly.
 	Fixup(ctx context.Context, wt WorktreeID, shas []string) (SquashResult, error)
 
-	// SetEditorProfile sets the profile this core's OpenFolder/OpenFile use.
-	// The shell calls it directly on each core when connecting: the
-	// generated Facade would route it to the local core only.
-	SetEditorProfile(ctx context.Context, profile EditorProfile) error
-
 	// OpenFolder starts the configured editor on wt's folder.
 	OpenFolder(ctx context.Context, wt WorktreeID) error
 
@@ -242,12 +219,6 @@ type API interface {
 	// commit, clean/dirty, main/locked/missing. Stateless: starts no
 	// session or poller.
 	ListWorktrees(ctx context.Context, path RepoPath) ([]Worktree, error)
-
-	// MainWorktree finds a repo's main worktree straight from its common
-	// git dir (gitDir), with no worktree of the caller's own needed: the
-	// repo picker's fallback when a repo's remembered worktree is gone.
-	// Bare with no worktree left is Code NotARepo.
-	MainWorktree(ctx context.Context, gitDir RepoPath) (Worktree, error)
 
 	// AddWorktree creates a worktree at target on the existing branch (by
 	// name: a full ref would detach), or, if newBranch, on a new branch
@@ -350,6 +321,41 @@ type API interface {
 	// PruneWorktrees removes bookkeeping for path's repo's worktrees whose
 	// directory is gone.
 	PruneWorktrees(ctx context.Context, path RepoPath) error
+}
+
+// API is the whole backend: WindowAPI and the calls only the shell makes.
+// Rules, enforced by tools/gencore: first parameter context.Context, last
+// result error, at most one other result, and every parameter and result
+// JSON-serialisable (no chan, func, or interface).
+//
+// The second parameter decides where the facade sends the call: a WorktreeID
+// goes to the core owning that worktree, a RepoPath to the core for that path,
+// anything else to the local core.
+type API interface {
+	WindowAPI
+
+	// OpenWorktree validates path and returns the session's identity.
+	// Idempotent: opening an already-open worktree returns the same ID.
+	OpenWorktree(ctx context.Context, path RepoPath) (WorktreeInfo, error)
+
+	// SetFocused starts (with an immediate check) or stops wt's status
+	// poller as its window gains or loses focus.
+	SetFocused(ctx context.Context, wt WorktreeID, focused bool) error
+
+	// CloseWorktree ends wt's session: its poller, and the repo's watcher if
+	// no other open worktree shares the repo. No-op for an unknown id.
+	CloseWorktree(ctx context.Context, wt WorktreeID) error
+
+	// SetEditorProfile sets the profile this core's OpenFolder/OpenFile use.
+	// The shell calls it directly on each core when connecting: the
+	// generated Forwarder would route it to the local core only.
+	SetEditorProfile(ctx context.Context, profile EditorProfile) error
+
+	// MainWorktree finds a repo's main worktree straight from its common
+	// git dir (gitDir), with no worktree of the caller's own needed: the
+	// repo picker's fallback when a repo's remembered worktree is gone.
+	// Bare with no worktree left is Code NotARepo.
+	MainWorktree(ctx context.Context, gitDir RepoPath) (Worktree, error)
 }
 
 // Version of a core. App is "dev" until a release build stamps it.

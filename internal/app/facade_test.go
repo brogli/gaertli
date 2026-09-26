@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/brogli/nebegit/internal/app"
@@ -42,9 +43,9 @@ func (r *stubRouter) CoreOf(context.Context, core.WorktreeID) (core.API, core.Wo
 
 func (r *stubRouter) CoreFor(core.RepoPath) (core.API, error) { r.other++; return nil, nil }
 
-func TestADR_3_FacadeRoutesWorktreeLessCallsToTheLocalCore(t *testing.T) {
+func TestADR_3_ForwarderRoutesWorktreeLessCallsToTheLocalCore(t *testing.T) {
 	r := &stubRouter{local: stubCore{v: core.Version{App: "local"}}}
-	f := app.NewFacade(r)
+	f := app.NewForwarder(r)
 
 	v, err := f.Version(t.Context())
 	if err != nil || v.App != "local" {
@@ -55,9 +56,9 @@ func TestADR_3_FacadeRoutesWorktreeLessCallsToTheLocalCore(t *testing.T) {
 	}
 }
 
-func TestTR_28_FacadeCallsTheCoreWithTheIDTheRouterReturns(t *testing.T) {
+func TestTR_28_ForwarderCallsTheCoreWithTheIDTheRouterReturns(t *testing.T) {
 	var seen core.WorktreeID
-	f := app.NewFacade(&stubRouter{owner: stubCore{seen: &seen}, ownerID: "/home/u/r"})
+	f := app.NewForwarder(&stubRouter{owner: stubCore{seen: &seen}, ownerID: "/home/u/r"})
 
 	if _, err := f.Summary(t.Context(), `\\wsl.localhost\A\home\u\r`); err != nil {
 		t.Fatal(err)
@@ -65,5 +66,31 @@ func TestTR_28_FacadeCallsTheCoreWithTheIDTheRouterReturns(t *testing.T) {
 
 	if seen != "/home/u/r" {
 		t.Errorf("the core got %q, want the router's id /home/u/r", seen)
+	}
+}
+
+// TestTR_28_FacadeMethodSetIsExactlyWindowAPI proves the bound Facade's
+// method set from the two interfaces, not from a list of names: every
+// Facade method is a WindowAPI method, and every API method outside
+// WindowAPI is absent from Facade.
+func TestTR_28_FacadeMethodSetIsExactlyWindowAPI(t *testing.T) {
+	facade := reflect.TypeFor[*app.Facade]()
+	windowAPI := reflect.TypeFor[core.WindowAPI]()
+	api := reflect.TypeFor[core.API]()
+
+	for method := range facade.Methods() {
+		name := method.Name
+		if _, ok := windowAPI.MethodByName(name); !ok {
+			t.Errorf("Facade has %s, not a core.WindowAPI method", name)
+		}
+	}
+	for method := range api.Methods() {
+		name := method.Name
+		if _, ok := windowAPI.MethodByName(name); ok {
+			continue
+		}
+		if _, ok := facade.MethodByName(name); ok {
+			t.Errorf("Facade has %s, a core.API method outside core.WindowAPI", name)
+		}
 	}
 }

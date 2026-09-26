@@ -16,9 +16,13 @@ type Router interface {
 	CoreFor(core.RepoPath) (core.API, error)
 }
 
-// Facade is the Wails service for core.API; its methods are generated and
-// forward to the core the Router names.
-type Facade struct{ router Router }
+// Forwarder implements core.API by forwarding each call to the core the
+// Router names; the shell's api. Its methods are generated.
+type Forwarder struct{ router Router }
 
-// NewFacade binds a Facade to r.
-func NewFacade(r Router) *Facade { return &Facade{router: r} }
+// NewForwarder binds a Forwarder to r.
+func NewForwarder(r Router) *Forwarder { return &Forwarder{router: r} }
+
+// Facade is the Wails service windows call: the Forwarder's WindowAPI
+// methods only, since Wails binds every method of a bound type.
+type Facade struct{ core.WindowAPI }

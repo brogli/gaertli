@@ -9,7 +9,7 @@ import (
 	"github.com/brogli/nebegit/tools/gencore/testdata/fixture"
 )
 
-func (f *Facade) ByPath(ctx context.Context, path core.RepoPath) error {
+func (f *Forwarder) ByPath(ctx context.Context, path core.RepoPath) error {
 	c, err := f.router.CoreFor(path)
 	if err != nil {
 		return err
@@ -17,7 +17,7 @@ func (f *Facade) ByPath(ctx context.Context, path core.RepoPath) error {
 	return c.ByPath(ctx, path)
 }
 
-func (f *Facade) ByWorktree(ctx context.Context, wt core.WorktreeID, q fixture.Q) (fixture.Page, error) {
+func (f *Forwarder) ByWorktree(ctx context.Context, wt core.WorktreeID, q fixture.Q) (fixture.Page, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero fixture.Page
@@ -26,6 +26,6 @@ func (f *Facade) ByWorktree(ctx context.Context, wt core.WorktreeID, q fixture.Q
 	return c.ByWorktree(ctx, coreID, q)
 }
 
-func (f *Facade) Local(ctx context.Context) (fixture.Page, error) {
+func (f *Forwarder) Local(ctx context.Context) (fixture.Page, error) {
 	return f.router.Local().Local(ctx)
 }

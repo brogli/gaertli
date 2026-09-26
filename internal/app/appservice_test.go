@@ -117,7 +117,7 @@ func TestFR_REPO_07_OpenFolderOpensAFolderInsideADistroOnItsCore(t *testing.T) {
 			reg.OpenOrFocus("", "", "")
 			store := newTestStore(t)
 			s := &AppService{
-				shell:  shell{api: NewFacade(reg), reg: reg, store: store, notify: &fakeNotifier{}},
+				shell:  shell{api: NewForwarder(reg), reg: reg, store: store, notify: &fakeNotifier{}},
 				picker: &fakePicker{path: picked, ok: true},
 			}
 			fw := &fakeCallingWindow{id: opener.windows[0].ID()}
@@ -146,7 +146,7 @@ func TestFR_REPO_07_OpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
 	reg.OpenOrFocus("", "", "")
 	store := newTestStore(t)
 	s := &AppService{
-		shell:  shell{api: NewFacade(reg), reg: reg, store: store, notify: &fakeNotifier{}},
+		shell:  shell{api: NewForwarder(reg), reg: reg, store: store, notify: &fakeNotifier{}},
 		picker: &fakePicker{path: "/repos/r", ok: true},
 	}
 	fw := &fakeCallingWindow{id: opener.windows[0].ID()}

@@ -58,7 +58,7 @@ func Run(assets fs.FS, args []string) error {
 	onPath := func(path string) { sh.launch(context.Background(), path) }
 	a := application.New(options(assets, reg, onPath, logger))
 	reg.Bind(a)
-	sh = shell{api: NewFacade(reg), reg: reg, store: store, notify: wailsNotifier{app: a}, logPath: logPath, logErr: errString(logErr)}
+	sh = shell{api: NewForwarder(reg), reg: reg, store: store, notify: wailsNotifier{app: a}, logPath: logPath, logErr: errString(logErr)}
 	a.RegisterService(application.NewService(&AppService{shell: sh, picker: wailsPicker{app: a}}))
 	a.RegisterService(application.NewService(NewSettingsService(store, reg, a.Event, logLevel)))
 	// The frontend's uncaught errors reach the same app log, at Error, via
@@ -117,7 +117,7 @@ func options(assets fs.FS, reg *Registry, onSecondInstance func(path string), lo
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 		Services: []application.Service{
-			application.NewService(NewFacade(reg)),
+			application.NewService(&Facade{NewForwarder(reg)}),
 		},
 		OnShutdown: reg.Quitting,
 		SingleInstance: &application.SingleInstanceOptions{
@@ -175,7 +175,7 @@ func (n wailsNotifier) Show(title, msg string) {
 // shell is what every "open this worktree" trigger shares: CLI launch,
 // second-instance relay, folder picker, recent-repo click.
 type shell struct {
-	api    core.API // the Facade, which routes each call through the Router
+	api    core.API // the Forwarder, which routes each call through the Router
 	reg    *Registry
 	store  *settings.Store
 	notify errorNotifier

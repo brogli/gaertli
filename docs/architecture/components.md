@@ -197,7 +197,9 @@ Hidden views stay mounted, so switching keeps the scroll position and the typed 
 
 - **Calls** (UI → Go): generated bindings. Each returns a DTO or rejects with the core error
   (`errors-security.md`). Large data (log rows, file contents) always goes through calls, and so
-  does cancelling a job.
+  does cancelling a job. A window can call only the window part of the core API; the calls the shell
+  makes for itself (opening, focusing and closing a worktree session, setting a core's editor
+  profile, finding a repo's main worktree) are not bound.
 - **Events** (Go → UI), small payloads only:
 
 | Event              | Meaning                                                                                                                                               |

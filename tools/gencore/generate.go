@@ -1,5 +1,5 @@
-// Command gencore reads the core.API interface and writes the shell facade,
-// the JSON-RPC client and the JSON-RPC dispatcher. A method is
+// Command gencore reads the core.API interface and writes the shell's
+// forwarder, the JSON-RPC client and the JSON-RPC dispatcher. A method is
 // written once, in the interface.
 package main
 
@@ -19,7 +19,7 @@ var outputs = []struct {
 	path string
 	emit func(api *types.Package, methods []method) *file
 }{
-	{"internal/app/facade_gen.go", emitFacade},
+	{"internal/app/forwarder_gen.go", emitForwarder},
 	{"internal/remote/client_gen.go", emitClient},
 	{"internal/remote/dispatch_gen.go", emitDispatch},
 }
@@ -250,11 +250,11 @@ func (f *file) results(m method) string {
 	return "(" + f.typ(m.result) + ", error)"
 }
 
-func emitFacade(pkg *types.Package, methods []method) *file {
+func emitForwarder(pkg *types.Package, methods []method) *file {
 	f := newFile("app", pkg, "context")
 	for _, m := range methods {
 		params, args := f.signature(m)
-		f.printf("func (f *Facade) %s(%s) %s {\n", m.name, params, f.results(m))
+		f.printf("func (f *Forwarder) %s(%s) %s {\n", m.name, params, f.results(m))
 		if m.router.method == "" {
 			f.printf("\treturn f.router.Local().%s(%s)\n", m.name, strings.Join(args, ", "))
 		} else {

@@ -512,7 +512,7 @@ func newTwoDistroShell(t *testing.T) (sh shell, opener *fakeOpener, calls map[st
 		sinks[distro] = sink
 		return &fakeDistroCore{client: clients[distro]}
 	}
-	sh = shell{api: NewFacade(r), reg: r, store: newTestStore(t), notify: &fakeNotifier{}}
+	sh = shell{api: NewForwarder(r), reg: r, store: newTestStore(t), notify: &fakeNotifier{}}
 	ctx := t.Context()
 	sh.open(ctx, `\\wsl.localhost\A\home\u\r`)
 	sh.open(ctx, `\\wsl.localhost\B\home\u\r`)
@@ -766,7 +766,7 @@ func newLocalShell(t *testing.T, closed *[]core.WorktreeID, calls chan<- routedC
 	t.Helper()
 	r, opener := newTestRegistry()
 	r.SetLocal(fakeAPI{openWorktree: openAsIs, closed: closed, calls: calls})
-	return shell{api: NewFacade(r), reg: r, store: newTestStore(t), notify: &fakeNotifier{}}, opener
+	return shell{api: NewForwarder(r), reg: r, store: newTestStore(t), notify: &fakeNotifier{}}, opener
 }
 
 // openDiffFrom opens mainWindow's diff window on wt's working-tree changes.
