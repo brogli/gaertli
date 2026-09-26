@@ -43,3 +43,13 @@ export function refLi(page: Page, name: string): Locator {
     has: page.locator(`.ref-name:text-is("${name}")`),
   })
 }
+
+// dragLogBorder drags the border right of the log view to x.
+export async function dragLogBorder(page: Page, x: number): Promise<void> {
+  const gutter = (await page.locator('.worktree-body > .p-splitter-gutter').boundingBox())!
+  const y = gutter.y + 200
+  await page.mouse.move(gutter.x + gutter.width / 2, y)
+  await page.mouse.down()
+  await page.mouse.move(x, y, { steps: 8 })
+  await page.mouse.up()
+}

@@ -1,7 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, type Locator, type Page } from '@playwright/test'
+import { openBranchPicker, openWorktreePicker, refLi } from '../e2e/helpers'
 import type { Git } from './repos'
+
+export { openBranchPicker, openWorktreePicker, refLi }
 
 // Locators and actions the area specs share; an area-only helper stays in
 // its spec file.
@@ -9,12 +12,6 @@ import type { Git } from './repos'
 // logRow is the log row whose subject contains subject.
 export function logRow(page: Page, subject: string): Locator {
   return page.locator('.row', { has: page.locator('.subject', { hasText: subject }) }).first()
-}
-
-// openBranchPicker opens the toolbar's branch picker.
-export async function openBranchPicker(page: Page): Promise<void> {
-  await page.locator('[data-test=branch-picker]').click()
-  await page.locator('.p-popover .branch-list').waitFor()
 }
 
 // refRow is the open branch picker's row of the ref named exactly name, e.g.
@@ -25,24 +22,10 @@ export function refRow(page: Page, name: string): Locator {
   })
 }
 
-// refLi is that row's <li>: the row and its sibling checkbox both live
-// inside it.
-export function refLi(page: Page, name: string): Locator {
-  return page.locator('.p-popover .picker-rows li', {
-    has: page.locator(`.ref-name:text-is("${name}")`),
-  })
-}
-
 // pickRefAction picks item from name's context menu in the branch picker.
 export async function pickRefAction(page: Page, name: string, item: string): Promise<void> {
   await openBranchPicker(page)
   await pickFromContextMenu(page, refRow(page, name), item)
-}
-
-// openWorktreePicker opens the toolbar's worktree picker.
-export async function openWorktreePicker(page: Page): Promise<void> {
-  await page.locator('[data-test=worktree-picker]').click()
-  await page.locator('.p-popover .worktree-list').waitFor()
 }
 
 // pickerAction is the open picker's (or the start page's) action row
@@ -141,16 +124,6 @@ export async function openSettings(page: Page): Promise<Locator> {
   const dialog = page.getByRole('dialog', { name: 'Settings' })
   await expect(dialog).toBeVisible()
   return dialog
-}
-
-// dragLogBorder drags the border right of the log view to x.
-export async function dragLogBorder(page: Page, x: number): Promise<void> {
-  const gutter = (await page.locator('.worktree-body > .p-splitter-gutter').boundingBox())!
-  const y = gutter.y + 200
-  await page.mouse.move(gutter.x + gutter.width / 2, y)
-  await page.mouse.down()
-  await page.mouse.move(x, y, { steps: 8 })
-  await page.mouse.up()
 }
 
 // choosePull opens the sync controls' Pull split button's menu and picks

@@ -1,32 +1,42 @@
-import type { Locator } from '@playwright/test'
-import { test, expect } from './fixtures'
-import { dragLogBorder } from './helpers'
+import { test, expect, type Page } from '@playwright/test'
+import { dragLogBorder, openMockRepo, overflows } from './helpers'
 
-// Layout at the 1200 x 800 window the fixtures open. The picker layout
-// cases moved to frontend/e2e/layout-pickers.spec.ts, which needs no real
-// git; these need a real repo's changes view and log.
+// Layout at the 1200 x 800 window the fixtures open, with the mock's
+// default log rows: row 0 (HEAD) carries four ref labels, and the changes
+// view has a file in each group.
+test.beforeEach(async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 })
+})
 
-// overflows: locator's content is wider than its box.
-function overflows(locator: Locator): Promise<boolean> {
-  return locator.evaluate((el) => el.scrollWidth > el.clientWidth)
+// switchToChanges picks "Changes" in the medium layout's side-panel switch,
+// so the changes view shows beside the log instead of the commit detail
+// view it defaults to.
+async function switchToChanges(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /^Changes/ }).click()
+  await page.locator('.changes-body').waitFor()
 }
 
 test('FR-UX-09 the changes heading shows whole; Stage all and Unstage all share one row', async ({
-  app,
+  page,
 }) => {
-  const heading = app.locator('.changes-body header h2')
+  await openMockRepo(page)
+  await switchToChanges(page)
+
+  const heading = page.locator('.changes-body header h2')
   expect(await overflows(heading)).toBe(false)
-  const stageAll = await app.getByRole('button', { name: 'Stage all', exact: true }).boundingBox()
-  const unstageAll = await app
+  const stageAll = await page.getByRole('button', { name: 'Stage all', exact: true }).boundingBox()
+  const unstageAll = await page
     .getByRole('button', { name: 'Unstage all', exact: true })
     .boundingBox()
   expect(Math.abs(stageAll!.y - unstageAll!.y)).toBeLessThan(4)
 })
 
 test('FR-LOG-01 a crowded log row shows two whole ref labels and "+N" naming them all', async ({
-  app,
+  page,
 }) => {
-  const row = app.locator('.row', { has: app.locator('.ref-label.head') })
+  await openMockRepo(page)
+
+  const row = page.locator('.row', { has: page.locator('.ref-label.head') })
   const labels = row.locator('.ref-label')
   await expect(labels).toHaveCount(2)
   for (const label of await labels.all()) {
@@ -39,14 +49,16 @@ test('FR-LOG-01 a crowded log row shows two whole ref labels and "+N" naming the
 })
 
 test('FR-UX-09 in a narrow log view the ref labels shrink to an ellipsis; "+N" and the hash stay inside the row', async ({
-  app,
+  page,
 }) => {
-  await dragLogBorder(app, 300)
+  await openMockRepo(page)
+
+  await dragLogBorder(page, 300)
   await expect
-    .poll(async () => (await app.locator('.log-column').boundingBox())!.width)
+    .poll(async () => (await page.locator('.log-column').boundingBox())!.width)
     .toBeLessThan(380)
-  const list = app.locator('.log-list')
-  const row = app.locator('.row', { has: app.locator('.ref-label.head') })
+  const list = page.locator('.log-list')
+  const row = page.locator('.row', { has: page.locator('.ref-label.head') })
   const rowRight = async () => {
     const box = (await row.boundingBox())!
     return box.x + box.width
