@@ -383,7 +383,7 @@ export const AppService = {
   },
 }
 // storedSettings is the mock's whole persisted state: Set replaces it, Get
-// reads it back, so a save shows up without a reload, as the real core's
+// reads it back, so a save shows up without a reload, as the shell's
 // settings:changed event does.
 let storedSettings: Preferences = defaultSettingsFixture({ debugMode: query.has('debug') })
 
