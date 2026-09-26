@@ -88,7 +88,7 @@ func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
 // TestDIST_03_LdflagsStampAppVersion proves the release build's version
 // stamping mechanism: -ldflags -X into buildinfo.App, surfaced by --version.
 func TestDIST_03_LdflagsStampAppVersion(t *testing.T) {
-	stamped := filepath.Join(t.TempDir(), "nebegit-core-stamped")
+	stamped := filepath.Join(t.TempDir(), testbin.Exe("nebegit-core-stamped"))
 	build := exec.CommandContext(t.Context(), "go", "build",
 		"-ldflags", "-X github.com/brogli/nebegit/internal/buildinfo.App=v9.9.9",
 		"-o", stamped, ".")

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -17,8 +18,8 @@ type Bin struct {
 	Pkg  string // package path, relative to the calling test's directory
 }
 
-// Main builds bins into a temp directory, runs m, and exits with its code.
-// It is a whole TestMain:
+// Main builds bins into a temp directory, runs m and removes the directory.
+// It is a whole TestMain, or part of one:
 //
 //	func TestMain(m *testing.M) {
 //		testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "./testdata/fakegit"})
@@ -29,15 +30,23 @@ func Main(m *testing.M, bins ...Bin) {
 		panic(err)
 	}
 	for _, bin := range bins {
-		*bin.Path = filepath.Join(dir, binaryName(bin.Pkg))
+		*bin.Path = filepath.Join(dir, Exe(binaryName(bin.Pkg)))
 		if err := build(*bin.Path, bin.Pkg); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	}
-	code := m.Run()
+	m.Run()
 	_ = os.RemoveAll(dir)
-	os.Exit(code)
+}
+
+// Exe names a binary so exec finds it: on Windows it tries a name only with
+// a PATHEXT extension added.
+func Exe(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + ".exe"
+	}
+	return name
 }
 
 // binaryName is the last element of pkg's directory: the test's own
