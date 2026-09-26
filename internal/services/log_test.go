@@ -23,7 +23,8 @@ import (
 var fakegit string
 
 // argvWriterBin is internal/editor/testdata/argvwriter, the stand-in editor
-// editor_test.go uses: it writes its argv to a file next to itself.
+// editor_test.go uses: it writes its argv to the file its first argument
+// names.
 var argvWriterBin string
 
 func TestMain(m *testing.M) {

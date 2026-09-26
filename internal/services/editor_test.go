@@ -33,16 +33,14 @@ func onlyEditorRecord(t *testing.T, events []core.Event) core.EditorRecord {
 
 // pushArgvWriter installs an editor profile whose folder/file commands are
 // argvWriterBin (built in TestMain, log_test.go), and returns the file it
-// writes its received argv to, removed on cleanup.
+// writes its received argv to.
 func pushArgvWriter(t *testing.T, c *Core) string {
 	t.Helper()
-	profile := core.EditorProfile{FolderCmd: argvWriterBin + " {path}", FileCmd: argvWriterBin + " {path}"}
-	if err := c.SetEditorProfile(t.Context(), profile); err != nil {
+	outFile := filepath.Join(t.TempDir(), "argv")
+	cmd := argvWriterBin + " " + outFile + " {path}"
+	if err := c.SetEditorProfile(t.Context(), core.EditorProfile{FolderCmd: cmd, FileCmd: cmd}); err != nil {
 		t.Fatal(err)
 	}
-	outFile := argvWriterBin + ".out"
-	_ = os.Remove(outFile)
-	t.Cleanup(func() { _ = os.Remove(outFile) })
 	return outFile
 }
 
@@ -70,6 +68,7 @@ func assertNoEditorStarted(t *testing.T, outFile string) {
 }
 
 func TestFR_WT_04_OpenFolderAtStartsTheEditorOnTheWorktreesToplevelWithNoPriorSession(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
@@ -90,6 +89,7 @@ func TestFR_WT_04_OpenFolderAtStartsTheEditorOnTheWorktreesToplevelWithNoPriorSe
 }
 
 func TestFR_WT_04_OpenFolderAtRejectsANonRepoPathStartingNoEditor(t *testing.T) {
+	t.Parallel()
 	c := New(func(core.Event) {})
 	outFile := pushArgvWriter(t, c)
 
@@ -100,6 +100,7 @@ func TestFR_WT_04_OpenFolderAtRejectsANonRepoPathStartingNoEditor(t *testing.T) 
 }
 
 func TestFR_ED_02_OpenFileJoinsThePathAgainstTheWorktreeToplevel(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	if err := os.MkdirAll(filepath.Join(repo.Dir, "sub"), 0o755); err != nil {
@@ -124,6 +125,7 @@ func TestFR_ED_02_OpenFileJoinsThePathAgainstTheWorktreeToplevel(t *testing.T) {
 }
 
 func TestFR_ED_02_OpenFileReturnsFileNotFoundForAMissingPathStartingNoEditor(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 
@@ -138,12 +140,13 @@ func TestFR_ED_02_OpenFileReturnsFileNotFoundForAMissingPathStartingNoEditor(t *
 }
 
 func TestFR_UX_02_OpenFileLogsTheEditorStart(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 
 	var events []core.Event
 	c := New(func(ev core.Event) { events = append(events, ev) })
-	pushArgvWriter(t, c)
+	outFile := pushArgvWriter(t, c)
 	wt := openOn(t, c, repo.Dir)
 
 	if err := c.OpenFile(t.Context(), wt.ID, "seed.txt", 0); err != nil {
@@ -151,7 +154,7 @@ func TestFR_UX_02_OpenFileLogsTheEditorStart(t *testing.T) {
 	}
 
 	record := onlyEditorRecord(t, events)
-	if want := []string{argvWriterBin, filepath.Join(gitPath(t, repo.Dir), "seed.txt")}; !slices.Equal(record.Argv, want) {
+	if want := []string{argvWriterBin, outFile, filepath.Join(gitPath(t, repo.Dir), "seed.txt")}; !slices.Equal(record.Argv, want) {
 		t.Errorf("argv = %v, want %v", record.Argv, want)
 	}
 	if record.Error != "" {
@@ -186,6 +189,7 @@ func TestFR_UX_02_OpenFileWithACommandNotOnPathLogsTheArgvAndTheError(t *testing
 }
 
 func TestFR_UX_11_OpenFileNamesTheMissingPathInArgs(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 
@@ -205,6 +209,7 @@ func TestFR_UX_11_OpenFileNamesTheMissingPathInArgs(t *testing.T) {
 }
 
 func TestFR_ED_02_OpenFileRejectsAPathEscapingTheWorktreeStartingNoEditor(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 

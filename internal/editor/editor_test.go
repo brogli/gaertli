@@ -2,6 +2,7 @@ package editor
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -11,8 +12,8 @@ import (
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// argvWriterBin writes its own argv to a file next to itself, standing in
-// for a real editor.
+// argvWriterBin writes its argv to the file its first argument names,
+// standing in for a real editor.
 var argvWriterBin string
 
 func TestMain(m *testing.M) {
@@ -20,6 +21,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestFR_ED_05_Default(t *testing.T) {
+	t.Parallel()
 	want := core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"}
 	if got := Default(); got != want {
 		t.Errorf("Default() = %+v, want %+v", got, want)
@@ -27,6 +29,7 @@ func TestFR_ED_05_Default(t *testing.T) {
 }
 
 func TestFR_ED_04_FillPlaceholders(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		argv []string
@@ -49,6 +52,7 @@ func TestFR_ED_04_FillPlaceholders(t *testing.T) {
 }
 
 func TestFR_ED_04_BuildCommandViaOpenFileSelectsTheRightTemplate(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		profile core.EditorProfile
@@ -112,7 +116,9 @@ func TestFR_UX_11_OpenFolderNamesTheFailedCommandInArgs(t *testing.T) {
 }
 
 func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
-	profile := core.EditorProfile{FolderCmd: argvWriterBin + " {path}"}
+	t.Parallel()
+	cmd, outFile := argvWriterCmd(t)
+	profile := core.EditorProfile{FolderCmd: cmd}
 
 	start := time.Now()
 	if _, err := OpenFolder(profile, "/tmp/x"); err != nil {
@@ -121,38 +127,48 @@ func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 250*time.Millisecond {
 		t.Errorf("OpenFolder took %v, want promptly (detached, not waiting on the editor)", elapsed)
 	}
-	if got := awaitArgv(t); got != "/tmp/x" {
+	if got := awaitArgv(t, outFile); got != "/tmp/x" {
 		t.Errorf("helper argv = %q, want %q", got, "/tmp/x")
 	}
 }
 
 func TestFR_UX_02_OpenFileReturnsTheResolvedArgv(t *testing.T) {
-	profile := core.EditorProfile{FileCmd: argvWriterBin + " {path}"}
+	t.Parallel()
+	cmd, outFile := argvWriterCmd(t)
+	profile := core.EditorProfile{FileCmd: cmd}
 
 	argv, err := OpenFile(profile, "/tmp/x", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{argvWriterBin, "/tmp/x"}; !slices.Equal(argv, want) {
+	if want := []string{argvWriterBin, outFile, "/tmp/x"}; !slices.Equal(argv, want) {
 		t.Errorf("argv = %v, want %v", argv, want)
 	}
-	awaitArgv(t)
+	awaitArgv(t, outFile)
 }
 
 func TestFR_ED_01_ALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
-	profile := core.EditorProfile{FileCmd: argvWriterBin + " {path}"}
+	t.Parallel()
+	cmd, outFile := argvWriterCmd(t)
+	profile := core.EditorProfile{FileCmd: cmd}
 
 	if _, err := OpenFile(profile, "/tmp/x", 0); err != nil {
 		t.Fatalf("OpenFile = %v, want nil: argvwriter exits 1 like explorer.exe after a successful open", err)
 	}
-	awaitArgv(t)
+	awaitArgv(t, outFile)
 }
 
-// awaitArgv waits up to 2s for argvwriter's output file and returns it.
-func awaitArgv(t *testing.T) string {
+// argvWriterCmd returns a command template that runs argvWriterBin on
+// {path}, and the file it writes its argv to.
+func argvWriterCmd(t *testing.T) (template, outFile string) {
 	t.Helper()
-	outFile := argvWriterBin + ".out"
-	t.Cleanup(func() { _ = os.Remove(outFile) })
+	outFile = filepath.Join(t.TempDir(), "argv")
+	return argvWriterBin + " " + outFile + " {path}", outFile
+}
+
+// awaitArgv waits up to 2s for outFile and returns its content.
+func awaitArgv(t *testing.T, outFile string) string {
+	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if content, err := os.ReadFile(outFile); err == nil {
