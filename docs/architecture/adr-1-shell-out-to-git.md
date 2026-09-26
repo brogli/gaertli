@@ -22,4 +22,4 @@ two engines would mean two behaviours.
 - Output is parsed from machine-readable formats only (TR-08); the environment and arguments follow
   TR-09 and TR-10.
 - Each call costs a process start, which is noticeable on Windows. We keep calls few and large,
-  stream the log, and read blobs through `cat-file --batch`.
+  stream the log, and read the sizes of several blobs in one `cat-file --batch-check`.

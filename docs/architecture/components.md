@@ -24,8 +24,8 @@ Test helpers: `internal/core/coretest` (core errors, events), `internal/git/gitt
 pipe).
 
 Binaries: `cmd/nebegit` is the GUI with an in-process core. `cmd/nebegit-core` is the headless core
-for WSL: it serves JSON-RPC with `--stdio` and acts as the launcher when given a path. It builds
-without cgo.
+for WSL: it serves JSON-RPC on stdio, and acts as the launcher when given a path. It builds without
+cgo.
 
 Dependencies point one way: `app` → `services` and `remote` → `core`. `services` uses `session`,
 `git`, `graph`, `watch`, `jobs` and `editor`. `remote` uses `git` too, so one rule masks credentials
