@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -114,18 +115,7 @@ func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	file := filepath.Join(t.TempDir(), "records")
-	if err := os.WriteFile(file, buildLogFixture(5), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500")
-	wt.Runner.Git = fakegit
+	streamFakeLog(t, c, id, 5, 500)
 
 	if err := c.LoadLog(t.Context(), id); err != nil {
 		t.Fatal(err)
@@ -134,6 +124,7 @@ func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T
 	var res core.LogRowsResult
 	deadline := time.Now().Add(400 * time.Millisecond)
 	for time.Now().Before(deadline) {
+		var err error
 		res, err = c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
@@ -489,6 +480,23 @@ func hasRefLabel(rows []core.LogCommit, name string) bool {
 		}
 	}
 	return false
+}
+
+// streamFakeLog points id's runner at fakegit, whose log calls stream
+// rows records, delayMS apart.
+func streamFakeLog(t *testing.T, c *Core, id core.WorktreeID, rows, delayMS int) {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "records")
+	if err := os.WriteFile(file, buildLogFixture(rows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKEGIT_STREAM_FILE", file)
+	t.Setenv("FAKEGIT_STREAM_DELAY_MS", strconv.Itoa(delayMS))
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.Runner.Git = fakegit
 }
 
 func buildLogFixture(n int) []byte {

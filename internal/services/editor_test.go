@@ -106,9 +106,7 @@ func TestFR_ED_02_OpenFileJoinsThePathAgainstTheWorktreeToplevel(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo.Dir, "sub"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repo.Dir, "sub", "foo.txt"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, repo.Dir, "sub/foo.txt", "x")
 
 	c := New(func(core.Event) {})
 	outFile := pushArgvWriter(t, c)

@@ -2,8 +2,6 @@ package services
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -386,18 +384,7 @@ func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T
 func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	file1 := filepath.Join(t.TempDir(), "records1")
-	if err := os.WriteFile(file1, buildLogFixture(5), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file1)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "300")
-	wt.Runner.Git = fakegit
+	streamFakeLog(t, c, id, 5, 300)
 
 	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {
 		t.Fatal(err)
@@ -417,12 +404,7 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 
 	// Swap in a different, faster fixture before the first load can finish,
 	// and start a second filter.
-	file2 := filepath.Join(t.TempDir(), "records2")
-	if err := os.WriteFile(file2, buildLogFixture(2), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file2)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "0")
+	streamFakeLog(t, c, id, 2, 0)
 
 	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"other"}}); err != nil {
 		t.Fatal(err)
@@ -440,18 +422,7 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	file := filepath.Join(t.TempDir(), "records")
-	if err := os.WriteFile(file, buildLogFixture(5), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500") // 5 records * 500ms = 2.5s unstreamed
-	wt.Runner.Git = fakegit
+	streamFakeLog(t, c, id, 5, 500) // 5 records * 500ms = 2.5s unstreamed
 
 	start := time.Now()
 	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {

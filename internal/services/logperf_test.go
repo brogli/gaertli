@@ -1,8 +1,6 @@
 package services
 
 import (
-	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -16,18 +14,7 @@ import (
 func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	file := filepath.Join(t.TempDir(), "records")
-	if err := os.WriteFile(file, buildLogFixture(5), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500") // 5 records * 500ms = 2.5s unstreamed
-	wt.Runner.Git = fakegit
+	streamFakeLog(t, c, id, 5, 500) // 5 records * 500ms = 2.5s unstreamed
 
 	start := time.Now()
 	if err := c.LoadLog(t.Context(), id); err != nil {
@@ -65,17 +52,7 @@ func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	const rows = 20000
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	file := filepath.Join(t.TempDir(), "records")
-	if err := os.WriteFile(file, buildLogFixture(rows), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("FAKEGIT_STREAM_FILE", file) // no FAKEGIT_STREAM_DELAY_MS: fast, this case measures memory not timing
-	wt.Runner.Git = fakegit
+	streamFakeLog(t, c, id, rows, 0) // fast, this case measures memory not timing
 
 	var before, after runtime.MemStats
 	runtime.GC()
