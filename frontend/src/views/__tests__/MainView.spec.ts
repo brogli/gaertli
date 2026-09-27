@@ -9,6 +9,8 @@ vi.mock(
 )
 import { AppService, SettingsService, resetMainWindowApp } from '@/testing/mainWindowApp'
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import MainView from '../MainView.vue'
 import RepoPicker from '@/components/RepoPicker.vue'
 import DebugArea from '@/components/DebugArea.vue'

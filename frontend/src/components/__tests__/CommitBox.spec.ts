@@ -14,6 +14,8 @@ const { Facade } = vi.hoisted(() => ({
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import CommitBox from '../CommitBox.vue'
 import { useChangesStore } from '@/stores/changes'
 import { useRepoStore } from '@/stores/repo'

@@ -9,6 +9,8 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Fac
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import StashBanner from '../StashBanner.vue'
 import { useRepoStore } from '@/stores/repo'
 import { useChangesStore } from '@/stores/changes'

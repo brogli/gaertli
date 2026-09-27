@@ -12,6 +12,8 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   SettingsService,
 }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import SquashDialog from '../SquashDialog.vue'
 import NoticeArea from '../NoticeArea.vue'
 import { mountInBody } from '@/testing/mountInBody'

@@ -12,6 +12,7 @@ export const Window: { Close: Mock; Name: Mock } = {
   Close: vi.fn(),
   Name: vi.fn(() => Promise.resolve(OWN_WINDOW)),
 }
+export const System: { IsWindows: Mock } = { IsWindows: vi.fn(() => false) }
 
 // emit fires every handler registered for name, as the runtime does. The
 // event is for this window unless ev names another sender.

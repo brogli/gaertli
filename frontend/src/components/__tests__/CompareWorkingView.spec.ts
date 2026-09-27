@@ -9,6 +9,8 @@ const { Facade, AppService } = vi.hoisted(() => ({
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import CompareWorkingView from '../CompareWorkingView.vue'
 import { useCompareStore } from '@/stores/compare'
 import { commitRow } from '@/testing/fixtures/log-rows'

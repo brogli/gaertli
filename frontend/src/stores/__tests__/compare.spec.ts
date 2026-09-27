@@ -7,6 +7,8 @@ const { Facade } = vi.hoisted(() => ({
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import { useLogStore } from '../log'
 import { useCompareStore } from '../compare'
 import { commitRow } from '@/testing/fixtures/log-rows'

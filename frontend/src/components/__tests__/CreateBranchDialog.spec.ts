@@ -6,6 +6,8 @@ const { Facade } = vi.hoisted(() => ({ Facade: { CreateBranch: vi.fn() } }))
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import CreateBranchDialog from '../CreateBranchDialog.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { field, fieldLabels, footerButtons } from '@/testing/dialog'

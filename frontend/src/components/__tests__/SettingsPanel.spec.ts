@@ -14,6 +14,8 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade,
 }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import SettingsPanel from '../SettingsPanel.vue'
 import ErrorBanner from '../ErrorBanner.vue'
 import AutoComplete from 'openvue/autocomplete'

@@ -6,6 +6,8 @@ import { defineComponent, nextTick } from 'vue'
 const { Facade } = vi.hoisted(() => ({ Facade: { Jobs: vi.fn() } }))
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import { useJobNotices } from '../useJobNotices'
 import { useJobsStore } from '@/stores/jobs'
 import { useRefsStore } from '@/stores/refs'

@@ -24,6 +24,8 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Fac
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import ChangesView from '../ChangesView.vue'
 import CommitBox from '../CommitBox.vue'
 import { useChangesStore } from '@/stores/changes'

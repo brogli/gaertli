@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const { Facade } = vi.hoisted(() => ({ Facade: { Push: vi.fn() } }))
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
 import SetUpstreamDialog from '../SetUpstreamDialog.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { useRefsStore } from '@/stores/refs'
