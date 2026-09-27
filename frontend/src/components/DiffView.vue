@@ -22,6 +22,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useChangesStore } from '@/stores/changes'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useSyncedScrollX } from '@/composables/useSyncedScrollX'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
 import { basename } from '@/lib/path'
 import { iconClass, type IconName } from '@/lib/icons'
@@ -59,6 +60,7 @@ const { t } = useI18n()
 
 const container = ref<HTMLElement | null>(null)
 let view: EditorView | MergeView | null = null
+let untieScrollX: (() => void) | null = null
 
 // Reactive copies of CodeMirror state: the mounted view's chunks, and
 // whether the selection lies inside one.
@@ -117,6 +119,8 @@ const whitespaceLabel = computed(() =>
 )
 
 function destroyView(): void {
+  untieScrollX?.()
+  untieScrollX = null
   view?.destroy()
   view = null
   chunks.value = []
@@ -197,6 +201,7 @@ async function mountView(): Promise<void> {
           b: { doc: file.newContent ?? '', extensions: docExtensions },
           ...gitDiff,
         })
+  if (view instanceof MergeView) untieScrollX = useSyncedScrollX(view.a.scrollDOM, view.b.scrollDOM)
   chunks.value = view instanceof MergeView ? view.chunks : (getChunks(view.state)?.chunks ?? [])
   updateSelectedLinesEnabled()
 }

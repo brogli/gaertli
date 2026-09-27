@@ -1162,6 +1162,58 @@ describe('DiffView', () => {
     expect(wrapper.find('[data-test="discard-selected-lines"]').exists()).toBe(false)
   })
 
+  // mountSideBySide mounts a.txt's commit diff in side-by-side mode.
+  async function mountSideBySide(): Promise<VueWrapper> {
+    SettingsService.Get.mockResolvedValue(
+      defaultSettingsFixture({ diffMode: DiffMode.SideBySideDiff }),
+    )
+    await useSettingsStore().load()
+    Facade.DiffFile.mockResolvedValue(
+      diffFileFixture({ oldContent: 'old\n', newContent: 'new\n', hunks: [hunk(1, 1, 1, 1)] }),
+    )
+    return mountCommit()
+  }
+
+  it('FR-DIFF-08 side by side, scrolling side a sideways moves side b with it', async () => {
+    const wrapper = await mountSideBySide()
+    const [a, b] = wrapper.findAll<HTMLElement>('.cm-scroller').map((w) => w.element)
+
+    a!.scrollLeft = 120
+    a!.dispatchEvent(new Event('scroll'))
+
+    expect(b!.scrollLeft).toBe(120)
+  })
+
+  it('FR-DIFF-08 the echo scroll a synced write causes on the other side is ignored, so the two do not ping-pong', async () => {
+    const wrapper = await mountSideBySide()
+    const [a, b] = wrapper.findAll<HTMLElement>('.cm-scroller').map((w) => w.element)
+
+    b!.scrollLeft = 80
+    b!.dispatchEvent(new Event('scroll'))
+    expect(a!.scrollLeft).toBe(80)
+
+    a!.dispatchEvent(new Event('scroll')) // the browser's own echo of the write just made
+
+    expect(a!.scrollLeft).toBe(80)
+    expect(b!.scrollLeft).toBe(80)
+  })
+
+  it('FR-DIFF-08 switching to unified mode unties the old sides: their listeners are gone', async () => {
+    const wrapper = await mountSideBySide()
+    const [oldA, oldB] = wrapper.findAll<HTMLElement>('.cm-scroller').map((w) => w.element)
+
+    await wrapper.get('[data-test="mode-toggle"]').trigger('click')
+    await flushPromises()
+
+    const scrollers = wrapper.findAll<HTMLElement>('.cm-scroller')
+    expect(scrollers).toHaveLength(1)
+    expect(() => scrollers[0]!.element.dispatchEvent(new Event('scroll'))).not.toThrow()
+
+    oldA!.scrollLeft = 99
+    oldA!.dispatchEvent(new Event('scroll'))
+    expect(oldB!.scrollLeft).toBe(0)
+  })
+
   it('FR-UX-09 every toolbar button has a title and aria-label; the mode and ignore-whitespace toggles expose aria-pressed', async () => {
     Facade.DiffFile.mockResolvedValue(
       diffFileFixture({
