@@ -26,6 +26,7 @@ import { Events, emit } from '@/testing/runtime'
 import WorktreePicker from '../WorktreePicker.vue'
 import CreateWorktreeDialog from '../CreateWorktreeDialog.vue'
 import { worktreeFixture } from '@/testing/fixtures/worktree'
+import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 
 const main = worktreeFixture({ path: '/repos/alpha', branch: 'main', main: true })
 const feat = worktreeFixture({ path: '/repos/alpha-feat', branch: 'feat' })
@@ -50,6 +51,31 @@ function worktreeRow(body: DOMWrapper<Element>, path: string): DOMWrapper<Elemen
 
 function actionRow(body: DOMWrapper<Element>, label: string): DOMWrapper<Element> {
   return body.findAll('[data-test="picker-action"]').find((r) => r.text() === label)!
+}
+
+// worktreeMenu right-clicks path's row, opening its menu.
+async function worktreeMenu(body: DOMWrapper<Element>, path: string): Promise<void> {
+  await worktreeRow(body, path).get('[data-test="worktree-row"]').trigger('contextmenu')
+  await flushPromises()
+}
+
+// pickWorktreeMenuAction opens path's menu and clicks the item labelled action.
+async function pickWorktreeMenuAction(
+  body: DOMWrapper<Element>,
+  path: string,
+  action: string,
+): Promise<void> {
+  await worktreeMenu(body, path)
+  await clickMenuItem(body, action)
+  await flushPromises()
+}
+
+// listOpen tells whether the worktree list is showing.
+async function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
+  await flushPromises()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  await flushPromises()
+  return body.find('.worktree-list').exists()
 }
 
 describe('WorktreePicker', () => {
@@ -112,6 +138,111 @@ describe('WorktreePicker', () => {
       .get('[data-test="open-in-new-window"]')
       .trigger('click')
     expect(AppService.OpenPath).toHaveBeenCalledWith('/repos/alpha-feat')
+  })
+
+  it('FR-WT-13 a right-click opens a worktree\'s menu: the current one, another, one missing and a bare one differ; no "…" buttons show', async () => {
+    const other = worktreeFixture({ path: '/repos/alpha-other', branch: 'other' })
+    const gone = worktreeFixture({ path: '/repos/alpha-gone', branch: 'gone', missing: true })
+    const bare = worktreeFixture({ path: '/repos/alpha.git', branch: '', sha: '', bare: true })
+    Facade.ListWorktrees.mockResolvedValue([main, other, gone, bare])
+    const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
+
+    expect(body.find('[data-test="row-actions"]').exists()).toBe(false)
+
+    // A bare row is a header: checked first, with no earlier menu open to
+    // linger, since PickerList leaves an open menu as is for an empty one.
+    await worktreeMenu(body, '/repos/alpha.git')
+    expect(menuLabels(body)).toEqual([])
+
+    await worktreeMenu(body, '/repos/alpha')
+    expect(menuLabels(body)).toEqual(['Open in new window', 'Open in editor'])
+
+    await worktreeMenu(body, '/repos/alpha-other')
+    expect(menuLabels(body)).toEqual([
+      'Switch to worktree',
+      'Open in new window',
+      'Open in editor',
+      'Remove worktree',
+    ])
+
+    await worktreeMenu(body, '/repos/alpha-gone')
+    expect(menuLabels(body)).toEqual([
+      'Switch to worktree',
+      'Open in new window',
+      'Remove worktree',
+    ])
+  })
+
+  it("FR-WT-13 Shift+F10 in the filter opens the active worktree's menu", async () => {
+    const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
+    const filter = body.get('.picker-list input')
+
+    await filter.trigger('keydown', { key: 'ArrowDown' })
+    await filter.trigger('keydown', { key: 'ArrowDown' })
+    await filter.trigger('keydown', { key: 'F10', shiftKey: true })
+
+    expect(menuLabels(body)).toEqual([
+      'Switch to worktree',
+      'Open in new window',
+      'Open in editor',
+      'Remove worktree',
+    ])
+  })
+
+  it('FR-WT-08 the menu\'s "Switch to worktree", "Open in new window" and "Open in editor" call SelectWorktree, OpenPath and OpenFolderAt with the worktree\'s id', async () => {
+    const { wrapper, body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
+
+    await pickWorktreeMenuAction(body, '/repos/alpha-feat', 'Switch to worktree')
+    expect(AppService.SelectWorktree).toHaveBeenCalledWith('/repos/alpha-feat')
+
+    await wrapper.get('[data-test="worktree-picker"]').trigger('click')
+    await pickWorktreeMenuAction(body, '/repos/alpha-feat', 'Open in new window')
+    expect(AppService.OpenPath).toHaveBeenCalledWith('/repos/alpha-feat')
+
+    await wrapper.get('[data-test="worktree-picker"]').trigger('click')
+    await pickWorktreeMenuAction(body, '/repos/alpha-feat', 'Open in editor')
+    expect(Facade.OpenFolderAt).toHaveBeenCalledWith('/repos/alpha-feat')
+  })
+
+  it("FR-WT-07 the menu's Remove worktree confirms, naming the loss, before removing a clean worktree", async () => {
+    const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
+
+    await pickWorktreeMenuAction(body, '/repos/alpha-feat', 'Remove worktree')
+    expect(confirmOptions().message).not.toContain('uncommitted changes')
+    confirmOptions().accept()
+    await flushPromises()
+
+    expect(Facade.RemoveWorktree).toHaveBeenCalledWith('/repos/alpha', '/repos/alpha-feat', false)
+  })
+
+  it("FR-WT-13 the menu's Open in new window failing shows the reason as a notice, not the list's banner", async () => {
+    AppService.OpenPath.mockRejectedValueOnce(new Error('boom', { cause: { message: 'boom' } }))
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
+
+    await pickWorktreeMenuAction(body, '/repos/alpha-feat', 'Open in new window')
+
+    expect(notice.get('.p-toast').text()).toContain('boom')
+    expect(body.find('.error-banner').exists()).toBe(false)
+  })
+
+  it('FR-WT-13 the Remove button closes the list before confirming; a refusal other than DIRTY_WORKTREE shows as a notice, no second confirmation', async () => {
+    Facade.RemoveWorktree.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'GIT_FAILED', message: 'is locked' } }),
+    )
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
+
+    await worktreeRow(body, '/repos/alpha-feat')
+      .get('[data-test="remove-worktree"]')
+      .trigger('click')
+    expect(await listOpen(body)).toBe(false)
+
+    confirmOptions().accept()
+    await flushPromises()
+
+    expect(notice.get('.p-toast').text()).toContain('is locked')
+    expect(confirmRequire).toHaveBeenCalledTimes(1)
   })
 
   it("FR-WT-08 a WSL repo's worktree is switched to and opened by its UNC path", async () => {

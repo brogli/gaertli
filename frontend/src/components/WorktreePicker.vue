@@ -3,13 +3,14 @@ import { computed, onMounted, ref, useTemplateRef } from 'vue'
 import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
+import type { MenuItem } from 'openvue/menuitem'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   ChangeScope,
   Code,
   type Worktree,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { useCoreCall } from '@/composables/useCoreCall'
+import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { basename, repoPath } from '@/lib/path'
@@ -17,6 +18,7 @@ import { shortSha } from '@/lib/format'
 import { useRepoChanged } from '@/lib/windowEvents'
 import { iconClass } from '@/lib/icons'
 import { ICON_BUTTON, useLayout, useToolbarButton } from '@/lib/layout'
+import { errorNotice, useNotices } from '@/lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
 import CreateWorktreeDialog from './CreateWorktreeDialog.vue'
 import PickerList from './PickerList.vue'
@@ -28,7 +30,24 @@ import { filterRows, type PickerRow } from './pickerRow'
 // always POSIX.
 const props = defineProps<{ wt: string; path: string; distro?: string | undefined }>()
 const { error, run } = useCoreCall()
-const { openFolderAt } = useOpenInEditor(() => props.wt, run)
+const notices = useNotices()
+
+// outOfList runs an entry action's call, chosen from a button or the menu:
+// its refusal shows as a notice, since the action has already closed the
+// list, unless onError claims it first.
+function outOfList<T>(
+  call: () => Promise<T>,
+  onError?: (error: CoreError) => boolean,
+): Promise<T | undefined> {
+  return run(call, (e) => onError?.(e) || showRefusal(e))
+}
+
+function showRefusal(refusal: CoreError): boolean {
+  notices.show('worktree-picker', errorNotice(refusal))
+  return true
+}
+
+const { openFolderAt } = useOpenInEditor(() => props.wt, outOfList)
 const { confirmAction } = useConfirmAction()
 const { t } = useI18n()
 const layout = useLayout()
@@ -109,6 +128,27 @@ function rowAttrs(row: Row): Record<string, string> {
     : { 'data-test': 'worktree-row', title: row.worktree.path }
 }
 
+// menuItems is a worktree's menu: the button conditions, plus "Switch to
+// worktree" for any but the current one.
+function menuItems(w: Worktree): MenuItem[] {
+  return [
+    ...(isCurrent(w) ? [] : [{ label: t('worktreePicker.switchTo'), command: () => switchTo(w) }]),
+    { label: t('worktreePicker.openInNewWindow'), command: () => openInNewWindow(w) },
+    ...(w.missing
+      ? []
+      : [{ label: t('worktreePicker.openInEditor'), command: () => openInEditor(w) }]),
+    ...(w.main || isCurrent(w)
+      ? []
+      : [{ label: t('worktreePicker.removeWorktree'), command: () => removeWorktree(w) }]),
+  ]
+}
+
+// menuFor is a row's menu, held by PickerList: a bare worktree (a header)
+// and an action row get none.
+function menuFor(row: Row): MenuItem[] {
+  return row.kind === 'worktree' && !row.worktree.bare ? menuItems(row.worktree) : []
+}
+
 const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
 
 // closeAnd closes the popover, then runs action: for an action that leaves
@@ -118,8 +158,12 @@ function closeAnd(action: () => void): void {
   action()
 }
 
+function switchTo(w: Worktree): void {
+  closeAnd(() => void outOfList(() => AppService.SelectWorktree(id(w.path))))
+}
+
 function openInNewWindow(w: Worktree): void {
-  closeAnd(() => void run(() => AppService.OpenPath(id(w.path))))
+  closeAnd(() => void outOfList(() => AppService.OpenPath(id(w.path))))
 }
 
 function openInEditor(w: Worktree): void {
@@ -138,19 +182,21 @@ async function prune(): Promise<void> {
 // after all (DIRTY_WORKTREE), a second confirmation names the loss, then
 // retries forced.
 function removeWorktree(w: Worktree): void {
-  if (w.dirty) {
+  closeAnd(() => {
+    if (w.dirty) {
+      confirmAction(
+        t('worktreePicker.removeWorktree'),
+        t('worktreePicker.removeConfirmDirty', { path: w.path }),
+        () => void remove(w, true),
+      )
+      return
+    }
     confirmAction(
       t('worktreePicker.removeWorktree'),
-      t('worktreePicker.removeConfirmDirty', { path: w.path }),
-      () => void remove(w, true),
+      t('worktreePicker.removeConfirmClean', { path: w.path }),
+      () => void removeThenRetryIfDirty(w),
     )
-    return
-  }
-  confirmAction(
-    t('worktreePicker.removeWorktree'),
-    t('worktreePicker.removeConfirmClean', { path: w.path }),
-    () => void removeThenRetryIfDirty(w),
-  )
+  })
 }
 
 async function removeThenRetryIfDirty(w: Worktree): Promise<void> {
@@ -162,13 +208,18 @@ async function removeThenRetryIfDirty(w: Worktree): Promise<void> {
   )
 }
 
-// remove returns the refusal's code; a DIRTY_WORKTREE one is not shown, the
-// caller asks again instead.
+// remove returns the refusal's code; the runner claims a DIRTY_WORKTREE one,
+// leaving it unshown, so the caller asks again. Any other shows as a notice.
 async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
-  await run(() => Facade.RemoveWorktree(props.wt, id(w.path), force))
-  const code = error.value?.code
+  let code: Code | undefined
+  await outOfList(
+    () => Facade.RemoveWorktree(props.wt, id(w.path), force),
+    (refusal) => {
+      code = refusal.code
+      return code === Code.DirtyWorktree
+    },
+  )
   if (!code) void load()
-  if (code === Code.DirtyWorktree) error.value = null
   return code
 }
 </script>
@@ -196,6 +247,7 @@ async function remove(w: Worktree, force: boolean): Promise<Code | undefined> {
         :rows="rows"
         :placeholder="t('worktreePicker.searchPlaceholder')"
         :row-attrs="rowAttrs"
+        :menu="menuFor"
         @activate="activate"
       >
         <template #row="{ row }">
