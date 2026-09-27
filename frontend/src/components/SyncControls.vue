@@ -112,12 +112,12 @@ function onRetryJob(job: JobInfo): void {
   JOB_RETRIES[job.kind]?.(job)
 }
 
-// Ctrl+T pulls only with an upstream, as the Pull button shows only then;
-// Ctrl+Shift+K pushes only where the Push button is enabled.
+// Ctrl+T pulls only where the Pull button is enabled and shows (an
+// upstream); Ctrl+Shift+K pushes only where the Push button is enabled.
 useShortcut(
   (event) => event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 't',
   () => {
-    if (refs.current?.upstream) onPull()
+    if (!disabledReason.value && refs.current?.upstream) onPull()
   },
 )
 useShortcut(

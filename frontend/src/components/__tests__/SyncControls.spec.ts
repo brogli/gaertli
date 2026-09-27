@@ -418,4 +418,14 @@ describe('SyncControls', () => {
 
     expect(Facade.Pull).not.toHaveBeenCalled()
   })
+
+  it('FR-UX-05 Ctrl+T does nothing without a remote, even with an upstream (Pull is disabled)', async () => {
+    setRefs({ upstream: 'origin/main' }, [])
+    await mountControls()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true }))
+    await flushPromises()
+
+    expect(Facade.Pull).not.toHaveBeenCalled()
+  })
 })
