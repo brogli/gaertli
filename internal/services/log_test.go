@@ -528,6 +528,12 @@ func TestFR_LOG_01_LoadLogOnALoadedRepoReemitsItsProgress(t *testing.T) {
 	})
 	wt := openOn(t, c, repo.Dir)
 	loadLog(t, c, wt.ID)
+	// The load's done progress is emitted after LogRows reports it done.
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.ContainsFunc(progress, func(p core.LogProgress) bool { return p.Done })
+	})
 	mu.Lock()
 	progress = nil
 	mu.Unlock()
@@ -640,6 +646,18 @@ func waitForLog(t *testing.T, c *Core, id core.WorktreeID) []core.LogCommit {
 		t.Fatal(res.Error)
 	}
 	return res.Rows
+}
+
+// waitFor polls cond for up to 5 s.
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatal("condition not met within 5 s")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 // waitForLogRows polls LogRows until the window's load, filtered or not,
