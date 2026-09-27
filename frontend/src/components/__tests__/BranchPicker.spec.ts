@@ -341,6 +341,18 @@ describe('BranchPicker', () => {
     expect(menuLabels(body)).toEqual([...expected, 'Show history'])
   })
 
+  it('FR-BR-09 clicking a row\'s "…" opens the same menu as its right-click', async () => {
+    const { body } = await openPicker()
+
+    await openActions(body, 'feat')
+    const fromRightClick = menuLabels(body)
+
+    await refRow(body, 'feat').get('[data-test="row-actions"]').trigger('click')
+    await flushPromises()
+
+    expect(menuLabels(body)).toEqual(fromRightClick)
+  })
+
   it('FR-BR-09 the right-clicked entry becomes the active one', async () => {
     const { body } = await openPicker()
 

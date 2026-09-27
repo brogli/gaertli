@@ -4,7 +4,6 @@ import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import Checkbox from 'openvue/checkbox'
-import ContextMenu from 'openvue/contextmenu'
 import type { MenuItem } from 'openvue/menuitem'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Code, type Branch } from '../../bindings/github.com/brogli/nebegit/internal/core'
@@ -275,15 +274,10 @@ function menuItems(row: RefRow): MenuItem[] {
   ]
 }
 
-const menu = useTemplateRef<InstanceType<typeof ContextMenu>>('menu')
-const menuModel = ref<MenuItem[]>([])
-
-// openMenu opens a ref row's actions at event: the pointer, or the row
-// itself when opened from the keyboard.
-function openMenu(row: Row, event: MouseEvent): void {
-  if (!isRef(row)) return
-  menuModel.value = menuItems(row)
-  menu.value?.show(event)
+// menuFor is a row's menu, held by PickerList: a ref row's actions, empty
+// for an action or section row.
+function menuFor(row: Row): MenuItem[] {
+  return isRef(row) ? menuItems(row) : []
 }
 
 const renameTarget = ref<string | null>(null)
@@ -342,8 +336,9 @@ async function updateChecked(): Promise<void> {
         :rows="rows"
         :placeholder="t('branchPicker.searchPlaceholder')"
         :row-attrs="rowAttrs"
+        :menu="menuFor"
+        menu-button
         @activate="activate"
-        @menu="openMenu"
       >
         <template #lead="{ row }">
           <span v-if="isRef(row)" class="flex w-(--p-checkbox-width) flex-none">
@@ -388,7 +383,6 @@ async function updateChecked(): Promise<void> {
           </template>
         </template>
       </PickerList>
-      <ContextMenu ref="menu" :model="menuModel" />
     </div>
   </Popover>
   <RenameBranchDialog

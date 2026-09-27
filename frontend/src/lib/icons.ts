@@ -96,6 +96,7 @@ const ICON = {
   jobsIdle: 'clock',
   jobsRunning: 'spinner',
   abort: 'stop-circle',
+  rowActions: 'ellipsis-h',
 } as const
 
 export type IconName = keyof typeof ICON

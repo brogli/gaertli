@@ -1,7 +1,9 @@
 import { h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import type { MenuItem } from 'openvue/menuitem'
 import PickerList from '../PickerList.vue'
 import { mountInBody } from '@/testing/mountInBody'
+import { menuLabels } from '@/testing/contextMenu'
 import type { PickerRow } from '../pickerRow'
 
 type Row = PickerRow & { label: string }
@@ -12,24 +14,33 @@ const rows: Row[] = [
   { key: 'b', label: 'beta' },
 ]
 
+// menuFor gives each row a menu holding one item labelled after its key.
+function menuFor(row: Row): MenuItem[] {
+  return [{ label: `${row.key}-item` }]
+}
+
 // mountList renders each row's label, plus a trailing button that calls
 // action with the row's key; waits for the rows in view to render.
-async function mountList(action = vi.fn(), listRows: Row[] = rows) {
-  const { wrapper } = await mountInBody(PickerList<Row>, {
-    props: { rows: listRows, placeholder: 'Filter' },
+async function mountList(
+  action = vi.fn(),
+  listRows: Row[] = rows,
+  props: { menu?: (row: Row) => MenuItem[]; menuButton?: boolean } = {},
+) {
+  const { wrapper, body } = await mountInBody(PickerList<Row>, {
+    props: { rows: listRows, placeholder: 'Filter', ...props },
     slots: {
       row: ({ row }: { row: Row }) => h('span', { class: 'main' }, row.label),
       trail: ({ row }: { row: Row }) =>
         h('button', { class: 'act', onClick: () => action(row.key) }),
     },
   })
-  return wrapper
+  return { wrapper, body }
 }
 
 describe('PickerList', () => {
   it('FR-WT-13 a button in a row runs its own action and does not activate the row', async () => {
     const action = vi.fn()
-    const wrapper = await mountList(action)
+    const { wrapper } = await mountList(action)
 
     await wrapper.findAll('.act')[2]!.trigger('click')
 
@@ -38,7 +49,7 @@ describe('PickerList', () => {
   })
 
   it('FR-WT-13 a click on a row activates it; a header row does nothing', async () => {
-    const wrapper = await mountList()
+    const { wrapper } = await mountList()
 
     await wrapper.findAll('li')[0]!.get('.main').trigger('click')
     await wrapper.findAll('li')[2]!.get('.main').trigger('click')
@@ -47,7 +58,7 @@ describe('PickerList', () => {
   })
 
   it('FR-WT-13 the filter has focus; arrows move the active row past headers and Enter activates it', async () => {
-    const wrapper = await mountList()
+    const { wrapper } = await mountList()
     const filter = wrapper.get('input')
     expect(document.activeElement).toBe(filter.element)
 
@@ -61,39 +72,49 @@ describe('PickerList', () => {
     expect(wrapper.get('li.active').text()).toBe('alpha')
   })
 
-  it("FR-BR-09 a right-click on a row makes it the active row and asks for its menu at the pointer; a header's asks nothing", async () => {
-    const wrapper = await mountList()
+  it('FR-BR-09 each non-header row gets an "Actions" button opening a menu; the header gets none', async () => {
+    const { wrapper } = await mountList(vi.fn(), rows, { menu: menuFor, menuButton: true })
 
-    await wrapper.findAll('li')[0]!.trigger('contextmenu')
-    await wrapper
-      .findAll('li')[2]!
-      .get('.main')
-      .trigger('contextmenu', { clientX: 40, clientY: 50 })
-
-    const menus = wrapper.emitted<[Row, MouseEvent]>('menu')!
-    expect(menus.map(([row]) => row)).toEqual([rows[2]])
-    expect([menus[0]![1].clientX, menus[0]![1].clientY]).toEqual([40, 50])
-    expect(wrapper.get('li.active').text()).toBe('beta')
+    const items = wrapper.findAll('li')
+    expect(items[0]!.find('[data-test="row-actions"]').exists()).toBe(false)
+    for (const item of items.slice(1)) {
+      const button = item.get('[data-test="row-actions"]')
+      expect(button.attributes('title')).toBe('Actions')
+      expect(button.attributes('aria-label')).toBe('Actions')
+      expect(button.attributes('aria-haspopup')).toBe('menu')
+    }
   })
 
-  it("FR-BR-09 Shift+F10 or the context-menu key in the filter asks for the active row's menu at that row", async () => {
-    const wrapper = await mountList()
+  it('FR-BR-09 clicking a row\'s "…" opens its menu, makes the row active, and does not activate it', async () => {
+    const { wrapper, body } = await mountList(vi.fn(), rows, { menu: menuFor, menuButton: true })
+
+    await wrapper.findAll('li')[2]!.get('[data-test="row-actions"]').trigger('click')
+
+    expect(menuLabels(body)).toEqual(['b-item'])
+    expect(wrapper.get('li.active').text()).toContain('beta')
+    expect(wrapper.emitted('activate')).toBeUndefined()
+  })
+
+  it('FR-WT-13 a right-click, then Shift+F10, open each active row\'s menu; no "…" buttons; a header\'s right-click opens none', async () => {
+    const { wrapper, body } = await mountList(vi.fn(), rows, { menu: menuFor })
+
+    expect(wrapper.find('[data-test="row-actions"]').exists()).toBe(false)
+
+    await wrapper.findAll('li')[0]!.trigger('contextmenu')
+    expect(menuLabels(body)).toEqual([])
+
+    await wrapper.findAll('li')[2]!.get('.main').trigger('contextmenu')
+    expect(menuLabels(body)).toEqual(['b-item'])
+
     const filter = wrapper.get('input')
-
-    await filter.trigger('keydown', { key: 'ArrowDown' })
+    await filter.trigger('keydown', { key: 'ArrowUp' })
     await filter.trigger('keydown', { key: 'F10', shiftKey: true })
-    await filter.trigger('keydown', { key: 'ContextMenu' })
-    await filter.trigger('keydown', { key: 'F10' })
-
-    const menus = wrapper.emitted<[Row, MouseEvent]>('menu')!
-    expect(menus.map(([row]) => row)).toEqual([rows[2], rows[2]])
-    const { left, bottom } = wrapper.get('li.active').element.getBoundingClientRect()
-    expect([menus[0]![1].clientX, menus[0]![1].clientY]).toEqual([left, bottom])
+    expect(menuLabels(body)).toEqual(['a-item'])
   })
 
   it('FR-BR-09 a long list renders only the rows in view', async () => {
     const many = Array.from({ length: 2000 }, (_, i) => ({ key: `r${i}`, label: `ref ${i}` }))
-    const wrapper = await mountList(vi.fn(), many)
+    const { wrapper } = await mountList(vi.fn(), many)
 
     const rendered = wrapper.findAll('li')
     expect(rendered.length).toBeGreaterThan(10)
@@ -102,7 +123,7 @@ describe('PickerList', () => {
   })
 
   it('FR-WT-13 typing emits the query and makes the first row active again', async () => {
-    const wrapper = await mountList()
+    const { wrapper } = await mountList()
     const filter = wrapper.get('input')
     await filter.trigger('keydown', { key: 'ArrowDown' })
 

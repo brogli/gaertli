@@ -2,32 +2,42 @@
 import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import InputText from 'openvue/inputtext'
+import Button from 'openvue/button'
+import ContextMenu from 'openvue/contextmenu'
+import type { MenuItem } from 'openvue/menuitem'
+import { useI18n } from '@/i18n'
+import { iconClass } from '@/lib/icons'
+import { ICON_BUTTON } from '@/lib/layout'
 import type { PickerRow } from './pickerRow'
 
 // PickerList is the searchable list of the toolbar pickers: a filter field
 // that has focus, the arrow keys move the active row, Enter or a click
-// activates a row. A right-click on a row, or Shift+F10 or the context-menu
-// key in the filter for the active row, asks for the row's menu. A header
-// row only labels a group. The parent filters rows by query. Only the rows
-// in view are rendered. Each row is a clickable part holding the row slot,
-// with rowAttrs(row) as its attributes, between the lead and trail slots; a
-// button in those slots is a sibling of the clickable part, so its click
-// never activates the row. A right-button press stops at its row: OpenVue's
-// Popover counts any mousedown in it as a click inside, and a right-click
-// sends no click to reset that, so the next click outside would not close
-// the list.
+// activates a row. It owns the row menu too: a right-click on a row, or
+// Shift+F10 or the context-menu key in the filter for the active row, opens
+// it; a picker asking for a "…" button also gets one on each row whose menu
+// holds items. A header row only labels a group, has no menu. The parent
+// filters rows by query. Only the rows in view are rendered. Each row is a
+// clickable part holding the row slot, with rowAttrs(row) as its
+// attributes, between the lead and trail slots; a button in those slots is
+// a sibling of the clickable part, so its click never activates the row. A
+// right-button press stops at its row: OpenVue's Popover counts any
+// mousedown in it as a click inside, and a right-click sends no click to
+// reset that, so the next click outside would not close the list.
 const props = defineProps<{
   rows: Row[]
   placeholder: string
   rowAttrs?: (row: Row) => Record<string, string>
+  menu?: (row: Row) => MenuItem[]
+  menuButton?: boolean
 }>()
 const query = defineModel<string>('query', { default: '' })
-const emit = defineEmits<{ activate: [row: Row]; menu: [row: Row, event: MouseEvent] }>()
+const emit = defineEmits<{ activate: [row: Row] }>()
 defineSlots<{
   lead?(props: { row: Row }): unknown
   row(props: { row: Row }): unknown
   trail?(props: { row: Row }): unknown
 }>()
+const { t } = useI18n()
 
 // Every row is one line of this height, so the virtualizer never measures.
 const ROW_HEIGHT = 28
@@ -86,10 +96,31 @@ function activate(row: Row): void {
   if (!row.header) emit('activate', row)
 }
 
+// rowMenu is row's menu items, empty for a header row or without a menu
+// prop.
+function rowMenu(row: Row): MenuItem[] {
+  return row.header ? [] : (props.menu?.(row) ?? [])
+}
+
+const contextMenu = useTemplateRef<InstanceType<typeof ContextMenu>>('contextMenu')
+const menuModel = ref<MenuItem[]>([])
+
+// openMenu makes row the active row and opens its menu at event, unless it
+// holds no items.
 function openMenu(row: Row, event: MouseEvent): void {
-  if (row.header) return
+  const items = rowMenu(row)
+  if (!items.length) return
   activeKey.value = row.key
-  emit('menu', row, event)
+  menuModel.value = items
+  contextMenu.value?.show(event)
+}
+
+// cornerEvent builds the MouseEvent a menu opens at from the keyboard or a
+// "…" button: never the real click, which openvue/contextmenu's show()
+// would stop from propagating.
+function cornerEvent(el: Element): MouseEvent {
+  const { left, bottom } = el.getBoundingClientRect()
+  return new MouseEvent('contextmenu', { clientX: left, clientY: bottom })
 }
 
 // openActiveMenu asks for the active row's menu at the row's lower left
@@ -98,8 +129,11 @@ function openActiveMenu(): void {
   const row = activeRow()
   const item = scroller.value?.querySelector('li.active')
   if (!row || !item) return
-  const { left, bottom } = item.getBoundingClientRect()
-  emit('menu', row, new MouseEvent('contextmenu', { clientX: left, clientY: bottom }))
+  openMenu(row, cornerEvent(item))
+}
+
+function openMenuFromButton(row: Row, event: MouseEvent): void {
+  if (event.currentTarget instanceof Element) openMenu(row, cornerEvent(event.currentTarget))
 }
 
 const root = useTemplateRef<HTMLElement>('root')
@@ -143,8 +177,19 @@ onMounted(() => root.value?.querySelector('input')?.focus())
             <slot name="row" :row="rows[index]!" />
           </div>
           <slot name="trail" :row="rows[index]!" />
+          <Button
+            v-if="menuButton && rowMenu(rows[index]!).length"
+            v-bind="ICON_BUTTON"
+            :icon="iconClass('rowActions')"
+            data-test="row-actions"
+            :title="t('picker.rowActions')"
+            :aria-label="t('picker.rowActions')"
+            aria-haspopup="menu"
+            @click="openMenuFromButton(rows[index]!, $event)"
+          />
         </li>
       </ul>
     </div>
+    <ContextMenu ref="contextMenu" :model="menuModel" />
   </div>
 </template>

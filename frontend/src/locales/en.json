@@ -308,6 +308,7 @@
     }
   },
   "layout": {
+    "views": "Views",
     "switchLog": "Log",
     "switchDetails": "Details",
     "switchChanges": "Changes",
@@ -338,6 +339,9 @@
     "abort": "Abort",
     "updateBranch": "Update {branch}"
   },
+  "picker": {
+    "rowActions": "Actions"
+  },
   "repoPicker": {
     "openFolder": "Open folder…",
     "newWindow": "New window",
@@ -349,6 +353,7 @@
   },
   "worktreePicker": {
     "newWorktree": "New worktree…",
+    "switchTo": "Switch to worktree",
     "cleanUpStale": "Clean up stale entries",
     "searchPlaceholder": "Search worktrees",
     "openInNewWindow": "Open in new window",
