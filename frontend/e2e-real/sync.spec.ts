@@ -58,6 +58,10 @@ const syncButton = (page: Page, name: string) =>
   page.locator('.sync-controls').getByRole('button', { name })
 const pullButton = (page: Page) => page.locator('.sync-controls .p-splitbutton-button')
 const aheadBehind = (page: Page) => page.locator('[data-test=ahead-behind]')
+const messageBox = (page: Page) => page.getByPlaceholder('Commit message')
+const commitButton = (page: Page) => page.locator('[data-test=commit-submit]')
+const pushAfterCommitCheckbox = (page: Page) =>
+  page.locator('.commit-box label', { hasText: 'Push after commit' }).locator('input')
 
 // remoteAheadAndLocalAhead leaves main diverged: other pushed a commit that
 // work lacks, and work has a commit of its own.
@@ -156,7 +160,7 @@ test('FR-SYNC-03 Push sends the current branch and the ahead count drops to zero
   expect(rev(git, repos.remote, 'main')).toBe(rev(git, repos.work, 'HEAD'))
 })
 
-test('FR-SYNC-03 a branch without upstream offers to push and set one on its only remote', async ({
+test('FR-SYNC-03 a branch without upstream asks before pushing and sets one on its only remote', async ({
   openApp,
   repos,
   git,
@@ -165,9 +169,11 @@ test('FR-SYNC-03 a branch without upstream offers to push and set one on its onl
   const app = await openApp(repos.work)
 
   await expect(syncButton(app, 'Pull')).toHaveCount(0)
-  await expect(app.locator('[data-test=upstream-remote]')).toHaveCount(0)
-  await expect(syncButton(app, 'Push and set upstream')).toHaveAttribute('title', 'origin')
-  await syncButton(app, 'Push and set upstream').click()
+  await expect(syncButton(app, 'Push')).toHaveAttribute('title', 'Push')
+  await syncButton(app, 'Push').click()
+
+  const dialog = app.getByRole('dialog', { name: 'Push and set upstream' })
+  await dialog.getByRole('button', { name: 'Push and set upstream' }).click()
 
   await expect
     .poll(() =>
@@ -180,6 +186,35 @@ test('FR-SYNC-03 a branch without upstream offers to push and set one on its onl
     )
     .toBe('origin/no-upstream')
   await expect(pullButton(app)).toBeVisible()
+})
+
+test('FR-CHG-09 push after commit on a new branch pushes and sets the upstream, without asking, when push.autoSetupRemote is set', async ({
+  openApp,
+  repos,
+  git,
+}) => {
+  git(repos.work, 'checkout', '-q', '-b', 'auto-upstream')
+  git(repos.work, 'config', 'push.autoSetupRemote', 'true')
+  fs.writeFileSync(path.join(repos.work, 'staged.txt'), 'staged\n')
+  git(repos.work, 'add', 'staged.txt')
+  const app = await openApp(repos.work)
+
+  await messageBox(app).fill('first commit on a new branch')
+  await pushAfterCommitCheckbox(app).check()
+  await commitButton(app).click()
+
+  await expect(app.getByRole('dialog')).toHaveCount(0)
+  await expect
+    .poll(() =>
+      git(
+        repos.work,
+        'for-each-ref',
+        '--format=%(upstream:short)',
+        'refs/heads/auto-upstream',
+      ).trim(),
+    )
+    .toBe('origin/auto-upstream')
+  expect(rev(git, repos.remote, 'auto-upstream')).toBe(rev(git, repos.work, 'HEAD'))
 })
 
 test("FR-SYNC-04 a rejected push names git's reason and offers Pull and Force push", async ({
