@@ -63,6 +63,12 @@ const pullMode = computed<PullMode>(() =>
 const pullLabel = computed(() =>
   pullMode.value === PullMode.PullRebase ? t('toolbar.pullRebase') : t('toolbar.pullMerge'),
 )
+const pullTooltip = computed(() =>
+  t('shortcuts.withShortcut', { action: pullLabel.value, shortcut: t('shortcuts.pull') }),
+)
+const pushTooltip = computed(() =>
+  t('shortcuts.withShortcut', { action: t('toolbar.push'), shortcut: t('shortcuts.push') }),
+)
 const pullMenuItems = computed<MenuItem[]>(() => [
   { label: t('toolbar.pullWithMerge'), command: () => runPull(PullMode.PullMerge) },
   { label: t('toolbar.pullWithRebase'), command: () => runPull(PullMode.PullRebase) },
@@ -159,7 +165,7 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
         v-if="refs.current!.upstream"
         v-bind="toolbarButton"
         :label="compact ? '' : pullLabel"
-        :button-props="{ title: pullLabel, 'aria-label': pullLabel }"
+        :button-props="{ title: pullTooltip, 'aria-label': pullLabel }"
         :model="pullMenuItems"
         @click="onPull"
       >
@@ -169,7 +175,7 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
         v-bind="toolbarButton"
         :icon="iconClass('push')"
         :label="compact ? '' : t('toolbar.push')"
-        :title="t('toolbar.push')"
+        :title="pushTooltip"
         :aria-label="t('toolbar.push')"
         @click="push"
       />

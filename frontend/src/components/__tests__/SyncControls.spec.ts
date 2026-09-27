@@ -159,13 +159,13 @@ describe('SyncControls', () => {
     }
   })
 
-  it('FR-UX-09 branch without upstream: the Push button reads "Push", not the remote name; no remote select in the toolbar', async () => {
+  it('FR-UX-09 FR-UX-05 branch without upstream: the Push button reads "Push", its tooltip still names the shortcut; no remote select in the toolbar', async () => {
     setRefs({ upstream: '' }, ['origin', 'upstream'])
     const { body } = await mountControls()
 
     const push = findButton(body, 'Push')!
     expect(push.element.disabled).toBe(false)
-    expect(push.attributes('title')).toBe('Push')
+    expect(push.attributes('title')).toBe('Push · Ctrl+Shift+K')
     expect(push.attributes('aria-label')).toBe('Push')
     expect(body.find('[data-test="upstream-remote"]').exists()).toBe(false)
   })
@@ -176,7 +176,7 @@ describe('SyncControls', () => {
 
     const main = body.get('.p-splitbutton-button')
     expect(main.text()).toBe('')
-    expect(main.attributes('title')).toBe('Pull (merge)')
+    expect(main.attributes('title')).toBe('Pull (merge) · Ctrl+T')
     expect(main.attributes('aria-label')).toBe('Pull (merge)')
   })
 
@@ -207,14 +207,14 @@ describe('SyncControls', () => {
     setRefs({ upstream: 'origin/main' })
     const withUpstream = await mountControls({ compact: true })
     const push = findButton(withUpstream.body, 'Push')!
-    expect(push.attributes('title')).toBe('Push')
+    expect(push.attributes('title')).toBe('Push · Ctrl+Shift+K')
     expect(push.attributes('aria-label')).toBe('Push')
     expect(push.find('.p-button-label').exists()).toBe(false)
 
     setRefs({ upstream: '' }, ['origin', 'upstream'])
     const noUpstream = await mountControls({ compact: true })
     const pushNoUpstream = findButton(noUpstream.body, 'Push')!
-    expect(pushNoUpstream.attributes('title')).toBe('Push')
+    expect(pushNoUpstream.attributes('title')).toBe('Push · Ctrl+Shift+K')
     expect(pushNoUpstream.attributes('aria-label')).toBe('Push')
     expect(pushNoUpstream.find('.p-button-label').exists()).toBe(false)
   })
@@ -397,6 +397,16 @@ describe('SyncControls', () => {
     await flushPromises()
 
     expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
+  })
+
+  it('FR-UX-05 Pull and Push tooltips name their shortcut keys; aria-labels stay the actions alone', async () => {
+    setRefs({ upstream: 'origin/main' })
+    const { body } = await mountControls()
+
+    expect(findButton(body, 'Pull (merge)')!.attributes('title')).toBe('Pull (merge) · Ctrl+T')
+    expect(findButton(body, 'Pull (merge)')!.attributes('aria-label')).toBe('Pull (merge)')
+    expect(findButton(body, 'Push')!.attributes('title')).toBe('Push · Ctrl+Shift+K')
+    expect(findButton(body, 'Push')!.attributes('aria-label')).toBe('Push')
   })
 
   it('FR-UX-05 Ctrl+T does nothing without an upstream (no Pull to gate)', async () => {

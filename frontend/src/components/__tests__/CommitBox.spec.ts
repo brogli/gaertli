@@ -95,7 +95,7 @@ describe('CommitBox', () => {
     await wrapper.get('textarea').setValue('m')
 
     expect(submitButton(wrapper).element.disabled).toBe(false)
-    expect(submitButton(wrapper).text()).toBe('Commit (1)')
+    expect(submitButton(wrapper).text()).toContain('Commit (1)')
   })
 
   it('FR-CHG-05 clicking Commit calls Facade.Commit with the message, amend false', async () => {
@@ -302,6 +302,23 @@ describe('CommitBox', () => {
     await flushPromises()
 
     expect(Facade.Commit).not.toHaveBeenCalled()
+  })
+
+  it('FR-UX-05 FR-CHG-05 the Commit button shows a Ctrl+K hint at its right; its aria-label stays the label alone', () => {
+    const changes = useChangesStore()
+    changes.files = changedFilesFixture({
+      staged: [
+        { path: 'a.txt', status: 'M' },
+        { path: 'b.txt', status: 'M' },
+      ],
+    })
+
+    const wrapper = mount(CommitBox, { props })
+    const button = submitButton(wrapper)
+
+    expect(button.text()).toContain('Commit (2)')
+    expect(button.get('[data-test="shortcut-hint"]').text()).toBe('Ctrl+K')
+    expect(button.attributes('aria-label')).toBe('Commit (2)')
   })
 
   it('FR-CHG-09 with an upstream, checking "Push after commit" then clicking Commit calls Facade.Commit then Facade.Push', async () => {

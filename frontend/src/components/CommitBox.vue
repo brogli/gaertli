@@ -16,6 +16,7 @@ import { useShortcut } from '@/composables/useShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 import SetUpstreamDialog from './SetUpstreamDialog.vue'
+import ShortcutHint from './ShortcutHint.vue'
 
 // CommitBox is the commit box, the changes view's fixed part below the
 // change list: the message, Amend, Push after commit, and a Commit button
@@ -171,7 +172,10 @@ useShortcut(
       :disabled="commitDisabled"
       data-test="commit-submit"
       @click="onCommit"
-    />
+    >
+      {{ commitLabel }}
+      <ShortcutHint :shortcut="t('shortcuts.commit')" />
+    </Button>
   </section>
   <SetUpstreamDialog
     v-if="upstreamQuestion"
