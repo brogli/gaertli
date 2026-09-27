@@ -13,6 +13,7 @@ import {
   type LogIndexResult,
   type LogRowsResult,
   type LogSearchResult,
+  type PushTarget,
   type Refs,
   type Summary,
   type Worktree,
@@ -342,6 +343,10 @@ export const Facade = {
 
   Refs(): Promise<Refs> {
     return delay(refsFixture())
+  },
+
+  PushTarget(): Promise<PushTarget> {
+    return delay({ remote: 'origin', autoSetUpstream: false })
   },
 
   Status(): Promise<ChangedFiles> {

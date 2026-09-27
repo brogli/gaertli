@@ -214,6 +214,11 @@
       "message": "Checking out this commit detaches HEAD. Commits made in this state belong to no branch.",
       "checkOut": "Check out"
     },
+    "setUpstream": {
+      "header": "Push and set upstream",
+      "message": "\"{branch}\" has no upstream. Push it to {remote}/{branch} and set that as its upstream?",
+      "messageChoose": "\"{branch}\" has no upstream. Push it to the chosen remote as \"{branch}\" and set that as its upstream?"
+    },
     "branchInWorktree": {
       "header": "Branch checked out elsewhere",
       "message": "{branch} is checked out in the worktree {folder}.",
