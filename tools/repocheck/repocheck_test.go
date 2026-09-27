@@ -60,10 +60,8 @@ func TestTR_23_NoOtherPackageManagersLockfile(t *testing.T) {
 	}
 }
 
-// frontendToolchainAvailable reports whether the real pnpm/oxlint/vue-tsc
-// toolchain can be shelled out to. It's absent on a bare `go test ./...`
-// checkout (no network, no `frontend/node_modules`); `task ci` installs the
-// frontend deps first, so those checks run for real there.
+// frontendToolchainAvailable reports whether pnpm is on PATH and
+// frontend/node_modules exists; task ci installs the frontend deps first.
 func frontendToolchainAvailable(root string) bool {
 	if _, err := exec.LookPath("pnpm"); err != nil {
 		return false

@@ -102,9 +102,8 @@ func TestQA_PERF_06_RefreshUnder1s(t *testing.T) {
 	}
 }
 
-// TestTopoOrderCommitGraphCost records (never fails) the app's exact log
-// call on the reference repo, with and without a commit-graph file, via
-// internal/git.Runner. It measures; it has no budget of its own.
+// TestTopoOrderCommitGraphCost logs how long the app's log call takes on the
+// reference repo with and without a commit-graph file. It has no budget.
 func TestTopoOrderCommitGraphCost(t *testing.T) {
 	if err := mkrepo.Build(t.Context(), refDir, mkrepo.Params); err != nil {
 		t.Fatal(err)

@@ -1,7 +1,7 @@
 package main
 
-// themeCredits are the four hand-written dark theme palettes in
-// frontend/src/theme/themes.ts, all MIT: their notices ship alongside the
+// themeCredits are the MIT-licensed palettes behind the dark themes in
+// frontend/src/theme/themes.ts; their notices ship alongside the
 // dependencies'.
 var themeCredits = []Dependency{
 	{Name: "Gruvbox", Version: "morhetz/gruvbox", Licence: "MIT", Text: mitNotice("Copyright (c) morhetz")},

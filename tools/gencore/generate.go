@@ -41,7 +41,7 @@ var routes = map[string]route{
 	"github.com/brogli/nebegit/internal/core.RepoPath":   {method: "CoreFor"},
 }
 
-// coreArg names the translated argument in a generated facade method.
+// coreArg names the translated argument in a generated Forwarder method.
 const coreArg = "coreID"
 
 type param struct {

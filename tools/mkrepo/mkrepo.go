@@ -145,13 +145,11 @@ const (
 
 func featureBranchName(n int) string { return fmt.Sprintf("feature-%d", n) }
 
-// stream writes cfg's deterministic git fast-import stream to w: one blob +
-// one commit per history entry on branch "main" by default; cfg.FeatureBranches
-// branches open (parented on main's then-current tip), each advances every
-// branchAdvanceEvery main-line step while active and merges back into main
-// every cfg.MergeEvery steps (oldest-active-branch-first); cfg.TagCount tags
-// land on fixed, seed-derived positions. A fixed-seed math/rand/v2.Rand
-// (cfg.Seed) picks branch-open/tag positions.
+// stream writes cfg's deterministic git fast-import stream to w, one commit
+// per step: on "main", unless the step opens a feature branch off main's
+// tip, merges the oldest open branch back (every cfg.MergeEvery steps), or
+// advances an open branch, in rotation (every branchAdvanceEvery steps).
+// cfg.Seed picks the steps that open a branch or tag main's tip.
 func stream(w io.Writer, cfg Config) {
 	rng := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(cfg.Seed>>32)+1))
 	fi := &fastImport{w: w}
