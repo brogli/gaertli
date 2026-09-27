@@ -13,6 +13,7 @@ import { iconClass } from '@/lib/icons'
 import { useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 import PickerList from './PickerList.vue'
+import ShortcutHint from './ShortcutHint.vue'
 import { filterRows, type PickerRow } from './pickerRow'
 
 // RepoPicker is the toolbar button naming this window's repo; it opens a
@@ -82,12 +83,7 @@ const query = ref('')
 const rows = computed<Row[]>(() => {
   const all: Row[] = [
     actionRow('open-folder', t('repoPicker.openFolder'), openFolder),
-    actionRow(
-      'new-window',
-      t('repoPicker.newWindow'),
-      newWindow,
-      t('repoPicker.newWindowShortcut'),
-    ),
+    actionRow('new-window', t('repoPicker.newWindow'), newWindow, t('shortcuts.newWindow')),
     ...(ownRepo.value ? [repoRow(ownRepo.value, true)] : []),
     ...recents.value.filter((r) => !isOwn(r)).map((r) => repoRow(r, false)),
   ]
@@ -168,9 +164,7 @@ function newWindow(): void {
         <template #row="{ row }">
           <template v-if="row.kind === 'action'">
             <span data-test="picker-action-label" class="truncate">{{ row.label }}</span>
-            <span v-if="row.shortcut" class="ms-auto text-sm text-muted-color">{{
-              row.shortcut
-            }}</span>
+            <ShortcutHint v-if="row.shortcut" :shortcut="row.shortcut" />
           </template>
           <template v-else>
             <span class="current-marker w-[1em] flex-none" aria-hidden="true">

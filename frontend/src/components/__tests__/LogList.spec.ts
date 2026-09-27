@@ -831,6 +831,20 @@ describe('LogList', () => {
     ])
   })
 
+  it('FR-UX-05 FR-CMP-01 "Stop comparing" shows its shortcut; other entries show none', async () => {
+    const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
+    const log = useLogStore()
+    log.selection = [row('sha-a'), row('sha-b')]
+
+    await openMenu(wrapper, rowEls[0]!)
+
+    const items = body.findAll('.p-contextmenu-item-content')
+    const stopComparing = items[menuLabels(body).indexOf('Stop comparing')]!
+    expect(stopComparing.find('[data-test="shortcut-hint"]').text()).toBe('Esc')
+    const swap = items[menuLabels(body).indexOf('Swap')]!
+    expect(swap.find('[data-test="shortcut-hint"]').exists()).toBe(false)
+  })
+
   it('FR-UX-08 double-click or Enter on a row emits open', async () => {
     const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
 

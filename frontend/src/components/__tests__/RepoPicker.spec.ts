@@ -138,14 +138,12 @@ describe('RepoPicker', () => {
     expect(actionLabels(body)).toEqual(['Open folder…', 'New window'])
   })
 
-  it('FR-UX-05 "New window" shows its shortcut after the label; "Open folder…" shows none', async () => {
+  it('FR-UX-05 FR-WT-13 "New window" shows shortcuts.newWindow through ShortcutHint; "Open folder…" shows none', async () => {
     const { body } = await openPicker({ path: '/repos/alpha' })
 
     const newWindow = actionRow(body, 'New window')
-    expect(newWindow.find('[data-test="picker-action-label"] + *').text()).toBe('Ctrl+Shift+N')
-    expect(
-      actionRow(body, 'Open folder…').find('[data-test="picker-action-label"] + *').exists(),
-    ).toBe(false)
+    expect(newWindow.find('[data-test="shortcut-hint"]').text()).toBe('Ctrl+Shift+N')
+    expect(actionRow(body, 'Open folder…').find('[data-test="shortcut-hint"]').exists()).toBe(false)
   })
 
   it('FR-REPO-07 a recent repo inside WSL names its distro; a local one names none', async () => {

@@ -11,6 +11,7 @@ import GraphCell from './GraphCell.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import PickDialog from './PickDialog.vue'
 import SquashDialog from './SquashDialog.vue'
+import ShortcutHint from './ShortcutHint.vue'
 import {
   buildOneCommitMenuItems,
   buildSelectionMenuItems,
@@ -366,7 +367,14 @@ const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
       </div>
     </div>
   </div>
-  <ContextMenu ref="menuRef" :model="menuItems" />
+  <ContextMenu ref="menuRef" :model="menuItems">
+    <template #item="{ item, label, props: itemProps }">
+      <a v-bind="itemProps.action">
+        <span v-bind="itemProps.label">{{ label }}</span>
+        <ShortcutHint v-if="item.shortcut" :shortcut="item.shortcut" />
+      </a>
+    </template>
+  </ContextMenu>
   <PickDialog
     v-if="pickDialog"
     :wt="wt"

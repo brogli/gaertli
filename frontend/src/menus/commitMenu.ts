@@ -2,7 +2,7 @@ import type { Translate } from '@/i18n'
 import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
 
 export type CommitMenuItem =
-  | { label: string; command: () => void }
+  | { label: string; command: () => void; shortcut?: string }
   | { label: string; disabled: true }
   | { separator: true }
 
@@ -109,7 +109,11 @@ export function buildSelectionMenuItems(
     items.push(
       { separator: true },
       { label: t('logView.menu.swap'), command: actions.swap },
-      { label: t('logView.menu.stopComparing'), command: actions.stopComparing },
+      {
+        label: t('logView.menu.stopComparing'),
+        command: actions.stopComparing,
+        shortcut: t('shortcuts.stopComparing'),
+      },
     )
   }
   return items

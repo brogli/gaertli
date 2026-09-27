@@ -206,6 +206,16 @@ describe('buildSelectionMenuItems', () => {
     ])
   })
 
+  it('FR-UX-05 "Stop comparing" carries its shortcut; other items carry none', () => {
+    const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
+
+    const items = buildSelectionMenuItems(rows, selectionActions(), [], t)
+
+    expect(findItem(items, 'Stop comparing')).toMatchObject({ shortcut: 'Esc' })
+    expect(findItem(items, 'Swap')).not.toHaveProperty('shortcut')
+    expect(findItem(items, 'Cherry-pick 2 commits')).not.toHaveProperty('shortcut')
+  })
+
   it('FR-LOG-11 each item calls its own action', () => {
     const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
     const actions = selectionActions()

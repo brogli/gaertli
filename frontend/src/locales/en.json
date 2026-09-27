@@ -343,10 +343,18 @@
   "picker": {
     "rowActions": "Actions"
   },
+  "shortcuts": {
+    "commit": "Ctrl+K",
+    "pull": "Ctrl+T",
+    "push": "Ctrl+Shift+K",
+    "refresh": "F5",
+    "newWindow": "Ctrl+Shift+N",
+    "stopComparing": "Esc",
+    "withShortcut": "{action} · {shortcut}"
+  },
   "repoPicker": {
     "openFolder": "Open folder…",
     "newWindow": "New window",
-    "newWindowShortcut": "Ctrl+Shift+N",
     "searchPlaceholder": "Search repos",
     "wsl": "WSL",
     "wslTitle": "WSL: {distro}",
