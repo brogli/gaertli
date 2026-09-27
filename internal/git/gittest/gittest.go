@@ -21,9 +21,8 @@ type Repo struct {
 
 // Main is the TestMain of every package whose tests call New. It builds bins
 // with the developer's own environment (go build needs its module and build
-// caches), then points HOME and git's global config at one temp directory
-// for the rest of the process, disables the system config, writes the test
-// identity into that config once, runs m, and removes both directories.
+// caches), then isolates git for the rest of the process: HOME and a global
+// config holding the test identity in one temp directory, no system config.
 func Main(m *testing.M, bins ...testbin.Bin) {
 	cleanupBins, err := testbin.Build(bins...)
 	if err != nil {

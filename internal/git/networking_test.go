@@ -10,9 +10,7 @@ import (
 	"testing"
 )
 
-// TestQA_SEC_01_NoNetworkImports proves internal/git makes no network calls
-// of its own: git itself talks to the network, this package only shells out
-// to it.
+// git itself talks to the network; this package only shells out to it.
 func TestQA_SEC_01_NoNetworkImports(t *testing.T) {
 	fset := token.NewFileSet()
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {

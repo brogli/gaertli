@@ -11,10 +11,8 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-// TestFR_UX_16_AnotherProgramsLockIsDetected proves classify recognises a
-// held git lock for every kind of write, real git and a hand-made lock
-// file: the same code and key regardless of which lock or which command,
-// and the call succeeds once the lock is gone.
+// Every kind of write against a held lock gets the same code and key, and
+// succeeds once the lock is gone.
 func TestFR_UX_16_AnotherProgramsLockIsDetected(t *testing.T) {
 	cases := []struct {
 		name  string

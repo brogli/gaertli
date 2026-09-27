@@ -163,11 +163,9 @@ func withTimeout(ctx context.Context, timeout time.Duration) (context.Context, c
 }
 
 // classify turns cmd's outcome into Run's error: Cancelled beats every
-// other cause, a nil ProcessState means git never started, and everything
-// else is a plain exit-code failure, GitFailed unless another process holds
-// one of git's own lock files (Locked). This is the one place every call
-// (Run, Stream, StreamErr) is classified, so every write gets Locked
-// detection without action-specific code.
+// other cause, a nil ProcessState means git never started, and any other
+// failure is GitFailed, or Locked when another process holds one of git's
+// lock files. Run, Stream and StreamErr all classify here.
 func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, command string) error {
 	switch {
 	case ctx.Err() != nil:
@@ -188,10 +186,8 @@ func classify(ctx context.Context, cmd *exec.Cmd, err error, result Result, comm
 	}
 }
 
-// lockPattern is how git's lockfile code reports a lock file another
-// process still holds, whatever the lock (index, HEAD, a ref, config,
-// shallow, …) and whatever command hit it: an "error:" or "fatal:" line
-// ending in this text, sometimes with an explanatory hint below.
+// lockPattern matches git's report of a lock file another process holds,
+// for any lock and any command.
 var lockPattern = regexp.MustCompile(`Unable to create '([^']+)': File exists\.`)
 
 // lockedError returns Code Locked with the lock file's base name if details

@@ -18,9 +18,8 @@ import (
 // fakegit is testdata/fakegit, built once for every test in this package.
 var fakegit string
 
-// FakegitPath is fakegit's address for the package's TestMain, which lives
-// in the external git_test package (in main_test.go): gittest imports this
-// package, so a TestMain here importing gittest would be a cycle.
+// FakegitPath lets the package's TestMain, in the external test package,
+// build fakegit.
 var FakegitPath = &fakegit
 
 func TestTR_09_DefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
@@ -69,9 +68,8 @@ func TestTR_09_EnvAddsTheCallsOwnVariables(t *testing.T) {
 	assertEnv(t, env, "NEBEGIT_TODO", "pick 1")
 }
 
-// unsetenvForTest clears key for the duration of the test, restoring it
-// afterward. Some environments set GIT_EDITOR globally; the env tests need a
-// clean baseline to prove what buildEnv itself adds.
+// unsetenvForTest unsets key for the test, so an env test sees only what
+// buildEnv adds.
 func unsetenvForTest(t *testing.T, key string) {
 	t.Helper()
 	t.Setenv(key, "") // restores the original value at cleanup

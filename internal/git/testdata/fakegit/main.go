@@ -70,10 +70,8 @@ func run(isLog bool) {
 	os.Exit(code)
 }
 
-// streamFile copies path's records — each ending in one of delims — to w
-// one at a time, sleeping the duration named by delayEnv between each. The
-// shared implementation of FAKEGIT_STREAM_FILE (stdout, NUL-delimited) and
-// FAKEGIT_STDERR_FILE (stderr, \r/\n-delimited).
+// streamFile copies path's records, each ending in one of delims, to w one
+// at a time, sleeping the duration named by delayEnv between each.
 func streamFile(path, delims, delayEnv string, w io.Writer) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -95,8 +93,7 @@ func streamFile(path, delims, delayEnv string, w io.Writer) {
 	}
 }
 
-// heartbeat touches path every 50ms until the process dies (killed on
-// cancel, or exits normally alongside run).
+// heartbeat touches path every 50ms until the process ends.
 func heartbeat(path string) {
 	for {
 		_ = os.WriteFile(path, nil, 0o644)
