@@ -844,6 +844,123 @@ func TestFR_SYNC_03_PushSetUpstreamCreatesRemoteBranchAndTracks(t *testing.T) {
 	}
 }
 
+func TestFR_SYNC_03_PushTargetNamesTheSoleRemoteAndAutoSetupRemote(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "config", "push.autoSetupRemote", "true")
+
+	c, wt := openWorktree(t, repo.Dir)
+	got, err := c.PushTarget(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (core.PushTarget{Remote: "origin", AutoSetUpstream: true}); got != want {
+		t.Errorf("PushTarget = %+v, want %+v", got, want)
+	}
+}
+
+// TestFR_SYNC_03_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue covers
+// push.autoSetupRemote's three outcomes: exit 1 with nothing configured
+// means false, a true spelling means true, and a bad value is git's own
+// refusal (Code GitFailed, naming the bad value).
+func TestFR_SYNC_03_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	bareRemote(t, repo, "origin")
+	c, wt := openWorktree(t, repo.Dir)
+
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.AutoSetUpstream {
+		t.Fatalf("unset: PushTarget = %+v, %v, want AutoSetUpstream false", got, err)
+	}
+
+	gittest.Run(t, repo.Dir, "config", "push.autoSetupRemote", "yes")
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || !got.AutoSetUpstream {
+		t.Fatalf("yes: PushTarget = %+v, %v, want AutoSetUpstream true", got, err)
+	}
+
+	gittest.Run(t, repo.Dir, "config", "push.autoSetupRemote", "bogus")
+	_, err := c.PushTarget(t.Context(), wt)
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if !strings.Contains(ce.GitStderr, "bogus") {
+		t.Errorf("GitStderr = %q, want it to name the bad value", ce.GitStderr)
+	}
+}
+
+// TestFR_SYNC_03_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote
+// covers %(push:remotename)'s own three configured levels, in git's
+// priority order, with three remotes so none of them is the sole-remote
+// fallback.
+func TestFR_SYNC_03_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	bareRemote(t, repo, "up")
+	bareRemote(t, repo, "other")
+	bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "switch", "-c", "b")
+	c, wt := openWorktree(t, repo.Dir)
+
+	gittest.Run(t, repo.Dir, "config", "branch.b.pushRemote", "up")
+	gittest.Run(t, repo.Dir, "config", "remote.pushDefault", "other")
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.Remote != "up" {
+		t.Errorf("branch.b.pushRemote set: Remote = %q, %v, want up", got.Remote, err)
+	}
+
+	gittest.Run(t, repo.Dir, "config", "--unset", "branch.b.pushRemote")
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.Remote != "other" {
+		t.Errorf("only remote.pushDefault: Remote = %q, %v, want other", got.Remote, err)
+	}
+
+	gittest.Run(t, repo.Dir, "config", "--unset", "remote.pushDefault")
+	gittest.Run(t, repo.Dir, "config", "branch.b.remote", "other")
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.Remote != "other" {
+		t.Errorf("only branch.b.remote: Remote = %q, %v, want other", got.Remote, err)
+	}
+
+	gittest.Run(t, repo.Dir, "config", "--unset", "branch.b.remote")
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.Remote != "origin" {
+		t.Errorf("none configured: Remote = %q, %v, want origin (the fallback)", got.Remote, err)
+	}
+}
+
+// TestFR_SYNC_03_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured
+// covers the two fallbacks %(push:remotename) does not apply itself: the
+// sole remote, and giving up (empty) once a second, unnamed remote exists.
+func TestFR_SYNC_03_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	bareRemote(t, repo, "up")
+	c, wt := openWorktree(t, repo.Dir)
+
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.Remote != "up" {
+		t.Errorf("sole remote: Remote = %q, %v, want up", got.Remote, err)
+	}
+
+	bareRemote(t, repo, "other")
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.Remote != "" {
+		t.Errorf("two remotes, none origin, unconfigured: Remote = %q, %v, want empty", got.Remote, err)
+	}
+}
+
+func TestFR_SYNC_03_PushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	sha := gittest.HeadSHA(t, repo.Dir)
+	c, wt := openWorktree(t, repo.Dir)
+	if err := c.CheckoutCommit(t.Context(), wt, sha); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := c.PushTarget(t.Context(), wt)
+
+	coretest.AssertCode(t, err, core.GitFailed)
+}
+
 func TestFR_SYNC_04_PushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)

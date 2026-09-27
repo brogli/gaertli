@@ -270,6 +270,14 @@ type WindowAPI interface {
 	// PushRejected. GitStderr carries git's explanation.
 	Push(ctx context.Context, wt WorktreeID, remote string) (string, error)
 
+	// PushTarget is where a plain push of the current branch would go and
+	// whether it would ask first. Remote is %(push:remotename), else the
+	// only remote, else origin if it exists; "" means none applies and the
+	// UI must ask which remote. AutoSetUpstream is push.autoSetupRemote. A
+	// detached HEAD or a bad push.autoSetupRemote value is Code GitFailed
+	// with git's stderr.
+	PushTarget(ctx context.Context, wt WorktreeID) (PushTarget, error)
+
 	// ForcePush pushes with --force-with-lease --force-if-includes, never
 	// plain --force. Protected-branch warnings are the UI's job. Rejections
 	// are classified like Push's.

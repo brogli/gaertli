@@ -415,6 +415,16 @@ func (c *Client) Push(ctx context.Context, wt core.WorktreeID, remote string) (s
 	return result, err
 }
 
+type pushTargetParams struct {
+	Wt core.WorktreeID `json:"wt"`
+}
+
+func (c *Client) PushTarget(ctx context.Context, wt core.WorktreeID) (core.PushTarget, error) {
+	var result core.PushTarget
+	err := c.call(ctx, "PushTarget", pushTargetParams{Wt: wt}, &result)
+	return result, err
+}
+
 type refreshParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }

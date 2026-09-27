@@ -251,6 +251,84 @@ func (c *Core) startPushJob(ctx context.Context, id core.WorktreeID, kind core.J
 	return string(jobID), nil
 }
 
+// PushTarget implements core.API.
+func (c *Core) PushTarget(ctx context.Context, id core.WorktreeID) (core.PushTarget, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return core.PushTarget{}, err
+	}
+	ref, err := currentRef(ctx, wt.Runner, wt.Path)
+	if err != nil {
+		return core.PushTarget{}, err
+	}
+	remote, err := pushRemote(ctx, wt.Runner, wt.Path, ref)
+	if err != nil {
+		return core.PushTarget{}, err
+	}
+	autoSetUpstream, err := pushAutoSetupRemote(ctx, wt.Runner, wt.Path)
+	if err != nil {
+		return core.PushTarget{}, err
+	}
+	return core.PushTarget{Remote: remote, AutoSetUpstream: autoSetUpstream}, nil
+}
+
+// currentRef is HEAD's full ref name (e.g. "refs/heads/main"); a detached
+// HEAD is git's own refusal (Code GitFailed).
+func currentRef(ctx context.Context, r git.Runner, dir string) (string, error) {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true, Background: true,
+		Args: []string{"symbolic-ref", "--quiet", "HEAD"},
+	})
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(result.Stdout)), nil
+}
+
+// pushRemote is the remote git would push ref to: %(push:remotename)'s
+// pushRemote/pushDefault/branch.remote, else the sole remote, else origin
+// if it exists — the fallbacks %(push:remotename) does not apply itself.
+func pushRemote(ctx context.Context, r git.Runner, dir, ref string) (string, error) {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true, Background: true,
+		Args: []string{"for-each-ref", "--format=%(push:remotename)", ref},
+	})
+	if err != nil {
+		return "", err
+	}
+	if remote := strings.TrimSpace(string(result.Stdout)); remote != "" {
+		return remote, nil
+	}
+	remotes, err := remoteNames(ctx, r, dir)
+	if err != nil {
+		return "", err
+	}
+	if len(remotes) == 1 {
+		return remotes[0], nil
+	}
+	if slices.Contains(remotes, "origin") {
+		return "origin", nil
+	}
+	return "", nil
+}
+
+// pushAutoSetupRemote reads push.autoSetupRemote, false if unset. Unlike
+// configValue's bool-or-str, --type=bool rejects a bad value as git's own
+// GitFailed refusal instead of passing it through as a string.
+func pushAutoSetupRemote(ctx context.Context, r git.Runner, dir string) (bool, error) {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true, Background: true,
+		Args: []string{"config", "--type=bool", "--get", "push.autoSetupRemote"},
+	})
+	if quietFailure(err, result) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(result.Stdout)) == "true", nil
+}
+
 // UpdateBranch implements core.API.
 func (c *Core) UpdateBranch(ctx context.Context, id core.WorktreeID, branch string) (string, error) {
 	wt, err := c.sessions.Get(id)

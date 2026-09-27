@@ -128,6 +128,9 @@ func handlers(api core.API) handler.Map {
 		"Push": handler.New(func(ctx context.Context, p pushParams) (string, error) {
 			return api.Push(ctx, p.Wt, p.Remote)
 		}),
+		"PushTarget": handler.New(func(ctx context.Context, p pushTargetParams) (core.PushTarget, error) {
+			return api.PushTarget(ctx, p.Wt)
+		}),
 		"Refresh": handler.New(func(ctx context.Context, p refreshParams) error {
 			return api.Refresh(ctx, p.Wt)
 		}),

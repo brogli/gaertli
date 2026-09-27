@@ -1,5 +1,11 @@
 package core
 
+// PushTarget is PushTarget's result.
+type PushTarget struct {
+	Remote          string `json:"remote"`          // "" means the UI must ask which remote
+	AutoSetUpstream bool   `json:"autoSetUpstream"` // push.autoSetupRemote
+}
+
 // PullMode is how a pull integrates the fetched upstream.
 type PullMode string
 

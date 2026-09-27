@@ -340,6 +340,15 @@ func (f *Forwarder) Push(ctx context.Context, wt core.WorktreeID, remote string)
 	return c.Push(ctx, coreID, remote)
 }
 
+func (f *Forwarder) PushTarget(ctx context.Context, wt core.WorktreeID) (core.PushTarget, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.PushTarget
+		return zero, err
+	}
+	return c.PushTarget(ctx, coreID)
+}
+
 func (f *Forwarder) Refresh(ctx context.Context, wt core.WorktreeID) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
