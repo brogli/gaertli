@@ -14,8 +14,11 @@ import { useChangesStore } from '@/stores/changes'
 import { useDiffStore } from '@/stores/diff'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import { useFileTreeChoice } from '@/composables/useFileTreeChoice'
 import ErrorBanner from '@/components/ErrorBanner.vue'
 import ChangedFileList from '@/components/ChangedFileList.vue'
+import ChangedFileTree from '@/components/ChangedFileTree.vue'
+import FileTreeToggle from '@/components/FileTreeToggle.vue'
 import DiffView from '@/components/DiffView.vue'
 
 // DiffWindowView is the diff window's root view: the files of its target
@@ -31,6 +34,7 @@ const changes = useChangesStore()
 const diff = useDiffStore()
 const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(wt, run)
+const asTree = useFileTreeChoice()
 const { t } = useI18n()
 
 const isWorking = computed(() => target.value.kind === DiffKind.WorkingDiff)
@@ -138,10 +142,14 @@ useEventListener(
   <div class="flex h-full min-h-0 gap-4">
     <aside class="file-list max-w-[35%] flex-none overflow-auto pl-2.5">
       <ErrorBanner v-if="error" :error="error" />
+      <div class="flex justify-end">
+        <FileTreeToggle v-model:as-tree="asTree" />
+      </div>
       <template v-for="g in groups" :key="g.title">
         <template v-if="g.files.length">
           <h3 v-if="g.title" class="mt-2 mb-1 text-sm">{{ g.title }}</h3>
-          <ChangedFileList
+          <component
+            :is="asTree ? ChangedFileTree : ChangedFileList"
             :files="g.files"
             :selected="current?.staged === g.staged ? current.file : null"
             @select="(f) => show(f, g.staged)"
@@ -151,7 +159,12 @@ useEventListener(
       </template>
       <template v-if="conflicted.length">
         <h3 class="mt-2 mb-1 text-sm">{{ t('changesView.conflictedTitle') }}</h3>
-        <ChangedFileList :files="conflicted" @open="openEditor" @open-editor="openEditor" />
+        <component
+          :is="asTree ? ChangedFileTree : ChangedFileList"
+          :files="conflicted"
+          @open="openEditor"
+          @open-editor="openEditor"
+        />
       </template>
     </aside>
     <!-- The diff takes the rest of the window, not just its content's width. -->

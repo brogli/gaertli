@@ -62,6 +62,7 @@ const selectedRow = (wrapper: VueWrapper) => wrapper.get('.files li.selected .pa
 
 describe('DiffWindowView', () => {
   beforeEach(() => {
+    localStorage.clear()
     setActivePinia(createPinia())
     for (const fn of Object.values(Facade)) fn.mockReset()
     Facade.CommitDetails.mockResolvedValue({ sha: 'abc', files })
@@ -319,6 +320,47 @@ describe('DiffWindowView', () => {
     await rows(wrapper)[1]!.get('[data-test="open-editor"]').trigger('click')
 
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'b.txt', 0)
+  })
+
+  it('FR-DIFF-10 the toggle switches the working tree groups to folder trees; a file there shows its diff', async () => {
+    Facade.Status.mockResolvedValue(
+      changedFilesFixture({
+        staged: [{ path: 'src/a.txt', status: 'M' }],
+        unstaged: [{ path: 'lib/b.txt', status: 'M' }],
+      }),
+    )
+    const wrapper = await mountWindow({
+      kind: DiffKind.WorkingDiff,
+      staged: true,
+      path: 'src/a.txt',
+      oldPath: '',
+    })
+
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+
+    expect(wrapper.findAll('[role="tree"]')).toHaveLength(2)
+    expect(wrapper.find('.files').exists()).toBe(false)
+
+    const node = wrapper.get('[role="treeitem"][aria-label="b.txt"]')
+    await node.get('[data-pc-section="nodecontent"]').trigger('click')
+    await flushPromises()
+
+    expect(Facade.DiffWorking).toHaveBeenLastCalledWith('/repo', 'lib/b.txt', '', false, opts)
+  })
+
+  it('FR-DIFF-10 a choice already stored (by the commit detail view) shows the files as trees, the toggle pressed', async () => {
+    localStorage.setItem('nebegit.changedFiles.tree', 'true')
+
+    const wrapper = await mountWindow({
+      kind: DiffKind.CommitDiff,
+      sha: 'abc',
+      path: 'a.txt',
+      oldPath: '',
+    })
+
+    expect(wrapper.find('[role="tree"]').exists()).toBe(true)
+    expect(wrapper.find('.files').exists()).toBe(false)
+    expect(wrapper.get('[data-test="file-tree-toggle"]').attributes('aria-pressed')).toBe('true')
   })
 
   it('ADR-4 after a WSL core restart the window reloads its file list and its diff', async () => {
