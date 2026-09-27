@@ -21,28 +21,43 @@ describe('usePush', () => {
     Facade.PushTarget.mockReset()
   })
 
-  it('FR-SYNC-03 no upstream, PushTarget auto with a remote: pushes there without asking', async () => {
+  it('FR-SYNC-03 no upstream, PushTarget auto with a remote: pushes the named branch there without asking', async () => {
     setBranch({ upstream: '' })
-    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: true })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: true,
+      branch: 'feature',
+      hasUpstream: false,
+    })
     const { push, upstreamQuestion } = usePush('/repo', useCoreCall().run)
 
     push()
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'feature')
     expect(upstreamQuestion.value).toBeNull()
   })
 
-  it('FR-SYNC-03 no upstream, PushTarget not auto, then auto without a remote: asks both times, never pushes', async () => {
+  it('FR-SYNC-03 no upstream, PushTarget not auto, then auto without a remote: asks both times naming PushTarget’s branch, never pushes', async () => {
     setBranch({ name: 'feature', upstream: '' })
-    Facade.PushTarget.mockResolvedValueOnce({ remote: 'origin', autoSetUpstream: false })
+    Facade.PushTarget.mockResolvedValueOnce({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'feature',
+      hasUpstream: false,
+    })
     const { push, upstreamQuestion } = usePush('/repo', useCoreCall().run)
 
     push()
     await flushPromises()
     expect(upstreamQuestion.value).toEqual({ branch: 'feature', remote: 'origin' })
 
-    Facade.PushTarget.mockResolvedValueOnce({ remote: '', autoSetUpstream: true })
+    Facade.PushTarget.mockResolvedValueOnce({
+      remote: '',
+      autoSetUpstream: true,
+      branch: 'feature',
+      hasUpstream: false,
+    })
     push()
     await flushPromises()
     expect(upstreamQuestion.value).toEqual({ branch: 'feature', remote: '' })
@@ -50,14 +65,37 @@ describe('usePush', () => {
     expect(Facade.Push).not.toHaveBeenCalled()
   })
 
-  it('FR-SYNC-03 a branch with an upstream pushes plainly; PushTarget is never called', async () => {
-    setBranch({ upstream: 'origin/main' })
-    const { push } = usePush('/repo', useCoreCall().run)
+  it('FR-SYNC-03 a store without an upstream but PushTarget.hasUpstream true (a config-only change the store has not reloaded): pushes plainly', async () => {
+    setBranch({ upstream: '' })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'main',
+      hasUpstream: true,
+    })
+    const { push, upstreamQuestion } = usePush('/repo', useCoreCall().run)
 
     push()
     await flushPromises()
 
     expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
-    expect(Facade.PushTarget).not.toHaveBeenCalled()
+    expect(upstreamQuestion.value).toBeNull()
+  })
+
+  it('FR-SYNC-03 a branch with an upstream still calls PushTarget: it alone decides', async () => {
+    setBranch({ upstream: 'origin/main' })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'main',
+      hasUpstream: true,
+    })
+    const { push } = usePush('/repo', useCoreCall().run)
+
+    push()
+    await flushPromises()
+
+    expect(Facade.PushTarget).toHaveBeenCalledWith('/repo')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
   })
 })

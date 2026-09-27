@@ -309,6 +309,12 @@ describe('CommitBox', () => {
     changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
     const refs = useRefsStore()
     refs.refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'main',
+      hasUpstream: true,
+    })
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
@@ -361,7 +367,12 @@ describe('CommitBox', () => {
     changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
     const refs = useRefsStore()
     refs.refs = refsFixture({ upstream: '' }, ['origin'])
-    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: true })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: true,
+      branch: 'main',
+      hasUpstream: false,
+    })
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
@@ -371,7 +382,7 @@ describe('CommitBox', () => {
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
     expect(Facade.PushTarget).toHaveBeenCalledWith('/repo')
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'main')
   })
 
   it('FR-CHG-09 without an upstream, committing while PushTarget cannot decide opens the dialog; Cancel leaves the commit made, unpushed', async () => {
@@ -379,7 +390,12 @@ describe('CommitBox', () => {
     changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
     const refs = useRefsStore()
     refs.refs = refsFixture({ upstream: '' }, ['origin'])
-    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'main',
+      hasUpstream: false,
+    })
 
     const { wrapper, body } = await mountInBody(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')

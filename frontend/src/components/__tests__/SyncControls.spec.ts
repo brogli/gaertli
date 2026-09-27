@@ -230,30 +230,44 @@ describe('SyncControls', () => {
     }
   })
 
-  it('FR-SYNC-03 branch without upstream, PushTarget cannot push straight away: clicking Push opens the set-upstream dialog; confirming pushes to the target remote', async () => {
+  it('FR-SYNC-03, FR-SYNC-11 branch without upstream, remote with no tracking branches: Push is enabled; PushTarget cannot push straight away, so clicking it opens the dialog naming the branch; confirming pushes to it', async () => {
     setRefs({ upstream: '' })
-    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'main',
+      hasUpstream: false,
+    })
     const { body } = await mountControls()
 
-    await findButton(body, 'Push')!.trigger('click')
+    const push = findButton(body, 'Push')!
+    expect(push.element.disabled).toBe(false)
+
+    await push.trigger('click')
     await flushPromises()
 
     expect(Facade.Push).not.toHaveBeenCalled()
+    expect(body.text()).toContain('origin/main')
     await body.get('[data-test="set-upstream-confirm"]').trigger('click')
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'main')
   })
 
   it('FR-SYNC-03 Ctrl+Shift+K pushes without an upstream too, when PushTarget can push straight away (old: nothing)', async () => {
     setRefs({ upstream: '' })
-    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: true })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: true,
+      branch: 'main',
+      hasUpstream: false,
+    })
     await mountControls()
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'K', ctrlKey: true, shiftKey: true }))
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'main')
   })
 
   it('FR-SYNC-06, FR-UX-03, QA-SAFE-01 force push on a protected branch confirms first, naming it protected', async () => {
@@ -371,12 +385,18 @@ describe('SyncControls', () => {
 
   it('FR-UX-05 Ctrl+Shift+K pushes, same as clicking Push', async () => {
     setRefs({ upstream: 'origin/main' })
+    Facade.PushTarget.mockResolvedValue({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'main',
+      hasUpstream: true,
+    })
     await mountControls()
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'K', ctrlKey: true, shiftKey: true }))
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledTimes(1)
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
   })
 
   it('FR-UX-05 Ctrl+T does nothing without an upstream (no Pull to gate)', async () => {
