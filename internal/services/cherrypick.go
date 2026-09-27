@@ -13,14 +13,11 @@ import (
 	"github.com/brogli/nebegit/internal/session"
 )
 
-// candidateFormat resolves everything CherryPick/Revert need about each
-// selected sha in one process: %ct for the apply order, %P's field count
-// for the merge refusal. It is used with --no-walk, a lookup of exactly
-// these commits, so cousin and unrelated commits work too.
+// candidateFormat is a pick candidate's log format: %ct orders the commits,
+// %P's field count flags a merge.
 const candidateFormat = "%H%x1f%h%x1f%ct%x1f%P"
 
-// pickCandidate is one selected commit's own resolved facts: ordering
-// (CommitAt) and merge-refusal (Merge).
+// pickCandidate is one commit selected for cherry-pick or revert.
 type pickCandidate struct {
 	SHA, ShortSHA string
 	CommitAt      int64
@@ -85,14 +82,11 @@ func topoOrder(ctx context.Context, r git.Runner, dir string, shas []string) ([]
 	return strings.Split(strings.TrimRight(string(result.Stdout), "\n"), "\n"), nil
 }
 
-// orderedSHAs sorts candidates by committer date — ascending for
-// cherry-pick (oldest first), descending for revert (newest first).
-// Committer date, not author date: it stays monotonic along a branch after
-// a rebase. Ties (same second) are broken by topological order, children
-// before parents, reversed along with the rest for cherry-pick: the
-// selection order the frontend passes carries no ordering guarantee of its
-// own. Git applies the argument order literally, so this is the order the
-// commits are applied in.
+// orderedSHAs returns candidates in the order git applies them: by committer
+// date, oldest first for cherry-pick, newest first for revert. The selection
+// order the frontend passes carries no order. Committer date, not author
+// date: it stays monotonic along a branch after a rebase. Same-second ties go
+// by topological order.
 func orderedSHAs(ctx context.Context, r git.Runner, dir string, candidates []pickCandidate, oldestFirst bool) ([]string, error) {
 	rank := map[string]int{}
 	if tied := tiedSHAs(candidates); len(tied) > 0 {
@@ -123,10 +117,8 @@ func orderedSHAs(ctx context.Context, r git.Runner, dir string, candidates []pic
 	return shas, nil
 }
 
-// resolveCandidates resolves everything CherryPick/Revert need to know
-// about shas in one process. Fails the whole call (nothing attempted) if
-// any sha does not resolve: git log --no-walk on a bad object fails
-// outright, with no partial output.
+// resolveCandidates looks up exactly shas (--no-walk), so unrelated commits
+// work too. A sha that does not resolve fails the whole lookup.
 func resolveCandidates(ctx context.Context, r git.Runner, dir string, shas []string) ([]pickCandidate, error) {
 	args := append([]string{"log", "--no-walk", "--format=" + candidateFormat, "--end-of-options"}, shas...)
 	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: args})

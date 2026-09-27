@@ -43,9 +43,8 @@ func stashPush(t *testing.T, dir, msg string) string {
 	return gittest.Out(t, dir, "rev-parse", "refs/stash")
 }
 
-// remoteAppendCommit adds a commit on remoteDir's default branch via a
-// throwaway clone, simulating a push from elsewhere without touching
-// repo's own history. Returns the new commit's SHA.
+// remoteAppendCommit pushes a commit to remoteDir's default branch from a
+// throwaway clone and returns its SHA.
 func remoteAppendCommit(t *testing.T, remoteDir, file, content, msg string) string {
 	t.Helper()
 	return remoteAppendCommitOnBranch(t, remoteDir, "", file, content, msg)
@@ -194,11 +193,6 @@ func TestFR_SYNC_08_QA_SEC_02_RemapAuthFailedClassifiesVerifiedPrefixes(t *testi
 	}
 }
 
-// TestFR_SYNC_09_ClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals
-// covers dirtyIntegrateReasons' three matched stderr shapes: rebase
-// blocked by unstaged changes, rebase blocked by staged changes, and a
-// fast-forward merge blocked by local changes to a file the incoming
-// commit also touches.
 func TestFR_SYNC_09_ClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -219,10 +213,8 @@ func TestFR_SYNC_09_ClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals(t *
 	}
 }
 
-// TestFR_SYNC_09_PullReclassifiesAFastForwardBlockedByLocalChangesAsDirtyWorktree:
-// a fast-forward pull succeeds despite an unstaged change to a file the
-// incoming commits don't touch; only a change to a file they *also* touch
-// blocks it. That is the fixture below.
+// Only a local change to a file the incoming commits also touch blocks a
+// fast-forward pull.
 func TestFR_SYNC_09_PullReclassifiesAFastForwardBlockedByLocalChangesAsDirtyWorktree(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
@@ -249,9 +241,8 @@ func TestFR_SYNC_09_PullWithStashStashesIntegratesAndPopsBackOnSuccess(t *testin
 	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")
 	gittest.Run(t, repo.Dir, "push", "origin", "master")
 	upstreamTip := remoteAppendCommit(t, origin, "seed.txt", "upstream change\n", "upstream commit")
-	// an unstaged change to a TRACKED file untouched by the incoming
-	// commit — git stash push (no -u) only ever captures tracked content,
-	// so the fixture's local change must be to an already-committed file.
+	// a change to a tracked file the incoming commit does not touch: git
+	// stash push without -u stashes tracked files only
 	writeFile(t, repo.Dir, "other.txt", "local uncommitted change\n")
 
 	c, wt := openWorktree(t, repo.Dir)
@@ -268,11 +259,8 @@ func TestFR_SYNC_09_PullWithStashStashesIntegratesAndPopsBackOnSuccess(t *testin
 	}
 }
 
-// TestFR_SYNC_09_PullWithStashSkipsThePopWhenThereIsNothingToStash covers a
-// worktree already clean when PullWithStash runs: `git stash push` finds
-// nothing to save and creates no entry, so refs/stash is unchanged before
-// and after — PullWithStash must not pop, or it would grab whatever stash
-// a user already had on the stack.
+// On a clean worktree git stash push creates no entry; a pop would take the
+// user's own stash.
 func TestFR_SYNC_09_PullWithStashSkipsThePopWhenThereIsNothingToStash(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
@@ -282,8 +270,7 @@ func TestFR_SYNC_09_PullWithStashSkipsThePopWhenThereIsNothingToStash(t *testing
 
 	writeFile(t, repo.Dir, "other.txt", "user's own stash\n")
 	userSHA := stashPush(t, repo.Dir, "user's own work")
-	// The worktree is clean again: PullWithStash's own `stash push` below
-	// has nothing to save.
+	// clean again: PullWithStash has nothing to stash
 
 	c, wt := openWorktree(t, repo.Dir)
 	waitForJobState(t, c, wt, jobID(t)(c.PullWithStash(t.Context(), wt, core.PullMerge)), "done")
@@ -369,9 +356,7 @@ func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) 
 	}
 }
 
-// TestFR_SYNC_09_PopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers
-// covers a marker stash whose pop conflicts with HEAD: a conflicting
-// `stash pop` leaves no state file, so it surfaces as plain GitFailed.
+// A conflicting stash pop leaves no state file, so it is plain GitFailed.
 func TestFR_SYNC_09_PopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -412,11 +397,7 @@ func TestFR_SYNC_09_DropStashDeletesTheEntry(t *testing.T) {
 	}
 }
 
-// TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop: a
-// second, unrelated stash pushed after the marker shifts stash@{n}
-// indices. DropStash resolves the marker's own SHA to its current index
-// at call time, so it drops the marker entry and leaves the user's stash
-// untouched.
+// A stash pushed after the marker shifts the stash@{n} indices.
 func TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -441,9 +422,6 @@ func TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *tes
 	}
 }
 
-// TestFR_SYNC_09_PopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop is
-// DropStash's above sibling for PopStash: it restores the marker entry's
-// content and leaves the user's own stash in place.
 func TestFR_SYNC_09_PopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -472,9 +450,7 @@ func TestFR_SYNC_09_PopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *t
 	}
 }
 
-// TestFR_SYNC_09_PopStashWithAnUnknownSHAReturnsAClearError covers a SHA
-// that names no current stash entry (already popped/dropped elsewhere): a
-// stale caller-supplied ID, Code Internal, not a git call.
+// A SHA already popped or dropped elsewhere is a stale ID: Code Internal.
 func TestFR_SYNC_09_PopStashWithAnUnknownSHAReturnsAClearError(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -888,9 +864,7 @@ func TestFR_SYNC_04_PushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
 	}
 }
 
-// TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason covers the
-// PushRejected branch: a rejection --porcelain reports with a reason other
-// than the fast-forward ones, here a pre-receive hook that refuses every push.
+// A rejection reason other than the fast-forward ones: PushRejected.
 func TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)

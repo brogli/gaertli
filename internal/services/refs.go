@@ -105,11 +105,10 @@ func parseTrack(s string) (ahead, behind int, gone bool) {
 	return ahead, behind, false
 }
 
-// toRefs buckets parsed refs by refname prefix — for-each-ref sorts its
-// output globally by refname, not by input pattern order — and groups
-// refs/remotes/<remote>/... by <remote> in first-seen order. Everything
-// arrives alphabetically sorted, so no sort step is needed. remoteNames are
-// the configured remotes, needed because a remote's name may contain a slash.
+// toRefs buckets parsed refs by refname prefix and groups remote branches by
+// remote. for-each-ref sorts by refname, so every list arrives sorted.
+// remoteNames are the configured remotes: a remote's name may contain a
+// slash.
 func toRefs(parsed []parsedRef, remoteNames []string) core.Refs {
 	var refs core.Refs
 	for _, p := range parsed {

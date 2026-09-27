@@ -378,7 +378,7 @@ func TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath(t *testing.T) {
 	repo := gittest.New(t)
 	base := strings.Repeat("line unchanged\n", 20)
 	gittest.Commit(t, repo.Dir, "a.txt", base+"old ending\n", "add a.txt")
-	renameWithEdit(t, repo.Dir, "a.txt", "b.txt", "new ending") // compare_test.go
+	renameWithEdit(t, repo.Dir, "a.txt", "b.txt", "new ending")
 	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)

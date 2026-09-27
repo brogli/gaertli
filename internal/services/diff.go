@@ -147,10 +147,9 @@ func (d fileDiff) patch(ctx context.Context, r git.Runner, dir string, opts ...s
 	return parsePatch(result.Stdout, d.path)
 }
 
-// contents splits file, git's full-context diff, into its old side (context
-// and deleted lines) and new side (context and added lines). Without a hunk
-// (equal content: no change, a pure rename, a mode change) both sides are
-// the old side's object.
+// contents returns both sides of file, git's full-context diff. Without a
+// hunk (equal content: no change, a pure rename, a mode change) both sides
+// are the old side's object.
 func (d fileDiff) contents(ctx context.Context, r git.Runner, dir string, file *gitdiff.File) (oldContent, newContent []byte, err error) {
 	if file == nil || len(file.TextFragments) == 0 {
 		blob, err := objectContent(ctx, r, dir, d.oldRev)

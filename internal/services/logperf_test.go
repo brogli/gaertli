@@ -9,8 +9,6 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-// TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration proves a row
-// is usable long before the whole (delayed) stream finishes.
 func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
@@ -45,9 +43,7 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 	waitForLogDone(t, c, id) // drain the background stream so it doesn't leak noise into later tests
 }
 
-// TestQA_PERF_07_LogMemoryStaysBoundedPerRow checks per-row memory at a
-// scale a unit test runs fast. The 500MB-at-100k-commits target is the
-// benchmark's job.
+// The 500MB-at-100k-commits target is tools/bench's case.
 func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
 	const rows = 20000
 	repo := gittest.New(t)

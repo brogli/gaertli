@@ -193,12 +193,9 @@ func TestFR_CMP_04_DiffAgainstWorkingComparesHeadContentToTheLiteralOnDiskFile(t
 	}
 }
 
-// TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTheNewOne
-// pins a real rename: a git-detected rename (-M, matching CompareWithWorking's
-// own detection) where the old content is binary and the new content is not.
-// The binary check must diff old.dat -> new.dat (a paired rename, binary
-// under git's own "either side binary" rule), not new.dat against itself
-// (an unpaired add, which reads as plain text).
+// A rename git detects, with binary old content and text new content: the
+// binary check diffs old.dat against new.dat (binary if either side is), not
+// new.dat alone (an add, plain text).
 func TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTheNewOne(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)

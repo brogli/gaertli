@@ -148,9 +148,8 @@ func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T
 	waitForLog(t, c, id) // drain the background stream so it doesn't leak noise into later tests
 }
 
-// TestFR_LOG_02_LogRowsJoinAMergeAndItsForkPointToBothLanes: the merge
-// row has a line out to each parent's lane, the base row a line in from
-// each branch's lane.
+// The merge row has a line out to each parent's lane, the base row a line
+// in from each branch's lane.
 func TestFR_LOG_02_LogRowsJoinAMergeAndItsForkPointToBothLanes(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

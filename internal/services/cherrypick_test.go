@@ -161,18 +161,16 @@ func TestFR_CP_04_CherryPickFailsWhenAnotherPickIsAlreadyStuck(t *testing.T) {
 	gittest.Run(t, repo.Dir, "checkout", "master")
 	gittest.Commit(t, repo.Dir, "conflict.txt", "master\n", "master change")
 
-	// The other, unrelated sha the second call tries: created now, while
-	// the tree is still clean — switching branches once a pick is stuck
-	// below is refused by git itself (unmerged paths), so this must not
-	// happen after that point.
+	// The unrelated commit the second call picks, made before the conflict
+	// below: git refuses to switch branches with unmerged paths.
 	gittest.Run(t, repo.Dir, "branch", "other")
 	gittest.Run(t, repo.Dir, "checkout", "other")
 	gittest.Commit(t, repo.Dir, "other.txt", "x", "unrelated commit")
 	otherSHA := gittest.HeadSHA(t, repo.Dir)
 	gittest.Run(t, repo.Dir, "checkout", "master")
 
-	// Real conflict, set up directly via the runner, not via our own
-	// CherryPick — leaves CHERRY_PICK_HEAD stuck, unresolved.
+	// A conflict made with git directly, not CherryPick: leaves
+	// CHERRY_PICK_HEAD.
 	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
 		Dir: repo.Dir, Args: []string{"cherry-pick", "--end-of-options", conflSHA},
 	})
@@ -247,8 +245,7 @@ func TestFR_CP_02_CherryPickAppliesOldestFirstRegardlessOfCallOrder(t *testing.T
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	// Deliberately out of order: the service must sort to oldest-first
-	// (A, B, C) before calling git, regardless of this call's own order.
+	// Out of order: the service applies oldest first (A, B, C).
 	if err := c.CherryPick(t.Context(), wt, []string{cSHA, aSHA, bSHA}, core.PickOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -356,9 +353,8 @@ func TestFR_RV_02_RevertAppliesNewestFirstRegardlessOfCallOrder(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	// Deliberately oldest-first call order: the service must reorder to
-	// newest-first (C, then B) before calling git — the reverse order
-	// conflicts on this same fixture.
+	// Oldest first: the service reverts newest first (C, then B); the other
+	// order conflicts on this fixture.
 	if err := c.Revert(t.Context(), wt, []string{bSHA, cSHA}, core.PickOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -543,12 +539,9 @@ func TestFR_RV_04_RevertWithNoCommitStagesWithoutAdvancingHEAD(t *testing.T) {
 	}
 }
 
-// Real git leaves no CHERRY_PICK_HEAD behind for a no-commit cherry-pick
-// that stops on a real conflict (checked against git itself, unlike
-// -n's own revert equivalent below): the error stays GitFailed rather
-// than being remapped to Conflicts, and operation() reports nothing in
-// progress, so ConflictBanner never shows. The conflicted file itself
-// still surfaces through Status, for the changes view's own resolve flow.
+// git leaves no CHERRY_PICK_HEAD for a no-commit cherry-pick stopped on a
+// conflict: the error stays GitFailed and no operation is in progress. The
+// conflicted file still shows in Status.
 func TestFR_CP_06_CherryPickWithNoCommitOnARealConflictLeavesNoOperationState(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -571,9 +564,8 @@ func TestFR_CP_06_CherryPickWithNoCommitOnARealConflictLeavesNoOperationState(t 
 	}
 }
 
-// Unlike -n cherry-pick, real git does write REVERT_HEAD for a no-commit
-// revert that stops on a real conflict, so this one does get remapped to
-// Conflicts and ConflictBanner does show, with a working Continue/Abort.
+// Unlike a no-commit cherry-pick, a no-commit revert stopped on a conflict
+// leaves REVERT_HEAD, so the error is Conflicts.
 func TestFR_RV_04_RevertWithNoCommitOnARealConflictStillReportsConflicts(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

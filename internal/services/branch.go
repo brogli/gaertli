@@ -127,12 +127,9 @@ func resetFlag(mode core.ResetMode) (string, error) {
 	}
 }
 
-// remapDirty turns a "would be overwritten" checkout refusal (exit 1) into
-// Code DirtyWorktree: a tracked file's local change, or an untracked file,
-// in the way of a switch. Every other failure (exit 128 "fatal:": bad or
-// duplicate branch name, a remote branch whose local name is taken, the branch
-// already checked out elsewhere) stays plain GitFailed with git's own
-// message.
+// remapDirty turns a switch refused with exit 1 (a local change or untracked
+// file would be overwritten) into Code DirtyWorktree. Every other failure
+// (exit 128) stays GitFailed with git's own message.
 func remapDirty(err error, result git.Result) error {
 	if ce := gitFailure(err); ce != nil && result.ExitCode == 1 {
 		ce.Code = core.DirtyWorktree

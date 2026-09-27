@@ -89,12 +89,9 @@ func (c *Core) SetMessageDraft(ctx context.Context, id core.WorktreeID, message 
 	return nil
 }
 
-// parseStatus splits git status --porcelain=v2 -z output into four
-// groups: each record is placed by its X (staged, vs HEAD) and Y
-// (unstaged, vs the index) halves independently, so a file changed both
-// ways (a "MM" record) lands in both groups with its two distinct letters.
-// Header lines ("# ...") are skipped by prefix, not position — a
-// "# stash <N>" line is framed identically to an ordinary record.
+// parseStatus splits git status --porcelain=v2 -z output into four groups. A
+// record's X (staged) and Y (unstaged) halves are placed independently, so an
+// "MM" file lands in both groups.
 func parseStatus(data []byte) core.ChangedFiles {
 	var out core.ChangedFiles
 	records := splitRecords(data)

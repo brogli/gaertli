@@ -11,8 +11,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-// writeHook installs dir/.git/hooks/name as an executable shell script,
-// same convention TestQA_COMP_01_HooksRunUnmodified (gittest_test.go) uses.
+// writeHook installs dir/.git/hooks/name as an executable shell script.
 func writeHook(t *testing.T, dir, name, script string) {
 	t.Helper()
 	path := filepath.Join(dir, ".git", "hooks", name)
@@ -125,9 +124,6 @@ func TestFR_CHG_06_CommitAmendOnAnUnbornHeadFailsCleanly(t *testing.T) {
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
-// TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr
-// proves the existing GitFailed/GitStderr path already covers this case: no
-// production code changes needed.
 func TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

@@ -113,7 +113,6 @@ func classifyDirtyIntegrate(err error, result git.Result) error {
 	return err
 }
 
-// containsAny reports whether s contains any of subs.
 func containsAny(s string, subs []string) bool {
 	return slices.ContainsFunc(subs, func(sub string) bool { return strings.Contains(s, sub) })
 }
@@ -123,11 +122,11 @@ func containsAny(s string, subs []string) bool {
 const stashMarker = "nebegit: local changes before pull"
 
 // integrateWithStash is integrateStep with local changes stashed around
-// it. git stash push exits 0 without a new entry when there is nothing to
-// save, so refs/stash is read before and after the push: unchanged means
-// nothing to pop; changed names this call's own entry, which is popped by
-// its commit, never as a bare "stash pop" that could take someone else's.
-// A failed integrate keeps the stash. Caller holds wt's write lock.
+// it. git stash push exits 0 without an entry when there is nothing to
+// save, so refs/stash is compared before and after the push. The new entry
+// is popped by its commit, never by a bare "stash pop" that could take
+// someone else's. A failed integrate keeps the stash. Caller holds wt's
+// write lock.
 func integrateWithStash(ctx context.Context, wt *session.Worktree, integrateArgs []string) error {
 	before, err := verifyRev(ctx, wt.Runner, wt.Path, "refs/stash")
 	if err != nil {
@@ -239,8 +238,7 @@ func (c *Core) ForcePush(ctx context.Context, id core.WorktreeID) (string, error
 	return c.startPushJob(ctx, id, core.ForcePushJob, args)
 }
 
-// startPushJob starts kind (PushJob or ForcePushJob) running args as a job,
-// classifying a rejection from --porcelain's summary line on stdout.
+// startPushJob starts a push job of kind running args.
 func (c *Core) startPushJob(ctx context.Context, id core.WorktreeID, kind core.JobKind, args []string) (string, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -416,11 +414,9 @@ func configValue(ctx context.Context, r git.Runner, dir, key string) (string, er
 // stdout.
 const pushRejectPrefix = "!\t"
 
-// classifyPushRejection reads a push's git.Result after remapAuthFailed (an
-// auth failure never reaches the per-ref summary line). The four named
-// reasons all mean the remote has commits not yet fetched and integrated
-// locally, classified NotFastForward; every other explained rejection is
-// PushRejected.
+// classifyPushRejection classifies a rejection from --porcelain's per-ref
+// line: NotFastForward when the remote has commits not integrated locally,
+// else PushRejected.
 func classifyPushRejection(err error, result git.Result) error {
 	ce := gitFailure(err)
 	if ce == nil {
@@ -428,7 +424,7 @@ func classifyPushRejection(err error, result git.Result) error {
 	}
 	reason, found := rejectReason(result.Stdout)
 	if !found {
-		return err // refused before any per-ref line printed (e.g. no upstream at all) — plain GitFailed
+		return err // refused before any per-ref line: stays GitFailed
 	}
 	switch reason {
 	case "fetch first":

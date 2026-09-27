@@ -519,9 +519,6 @@ func TestFR_CP_07_SkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvi
 	}
 }
 
-// Skipping the last (here, only) pending commit of a sequence leaves
-// nothing for git to apply next: the sequence just ends, same as any other
-// skip, with the operation state file gone and HEAD unmoved.
 func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
 	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
@@ -539,7 +536,6 @@ func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothi
 	assertOperation(t, c, wt, "")
 }
 
-// Same as above, for revert.
 func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
 	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")

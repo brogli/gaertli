@@ -78,10 +78,8 @@ func asStop(err error, conflicted bool) error {
 // operation half done.
 const operationTimeout = 10 * time.Minute
 
-// remapOperationConflict reclassifies a failed operation step as Code
-// Conflicts while an operation-state file is left under gitDir: the
-// operation is still stopped. Without one, err is unrelated and returned
-// as-is.
+// remapOperationConflict reclassifies git's failure as Code Conflicts while
+// an operation is still in progress under gitDir.
 func remapOperationConflict(err error, gitDir string) error {
 	return remapIfPending(err, operation(gitDir) != "")
 }

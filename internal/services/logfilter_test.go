@@ -416,9 +416,7 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	}
 }
 
-// TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration
-// proves a filtered row is usable long before the whole (delayed) stream
-// finishes. The ≤2s-at-100k-commits number is tools/bench's case.
+// The ≤2s-at-100k-commits target is tools/bench's case.
 func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)

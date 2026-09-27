@@ -73,9 +73,8 @@ func (c *Core) SetLogFilter(ctx context.Context, id core.WorktreeID, filter core
 	return nil
 }
 
-// streamFilteredLog runs in its own goroutine, mirroring streamLog but
-// writing into wt's own filtered view and emitting a Worktree-targeted
-// "log:progress" instead of the repo-wide one.
+// streamFilteredLog is streamLog for wt's own filtered view: its
+// "log:progress" goes to the worktree, not the repo.
 func (c *Core) streamFilteredLog(ctx context.Context, wt *session.Worktree, filter core.LogFilter, gen int) {
 	progress := func(loaded int, done bool) { c.emitFilterProgress(wt.ID, gen, loaded, done, nil) }
 	loaded, logErr := streamCommits(ctx, wt, filter, false,

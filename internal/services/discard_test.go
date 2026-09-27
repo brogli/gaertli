@@ -53,12 +53,8 @@ func TestFR_CHG_10_DiscardFileRemovesAnUntrackedFile(t *testing.T) {
 	}
 }
 
-// TestFR_CHG_10_DiscardFileRemovesAnUntrackedDirectory: an untracked
-// directory (Status reports it as one "?" record, the path ending in "/")
-// is fully removed by plain `git clean -f -- path`, with no -d needed —
-// an explicit pathspec naming a wholly-untracked directory matches and
-// removes it without -d, unlike a directory-less `git clean -f` scanning
-// the whole tree.
+// An untracked directory is one "?" record, its path ending in "/". git
+// clean -f removes it without -d: an explicit pathspec names it.
 func TestFR_CHG_10_DiscardFileRemovesAnUntrackedDirectory(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

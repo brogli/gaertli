@@ -515,10 +515,8 @@ func TestFR_CHG_03_BuildPartialPatchFoldedNoEOLLineKeepsItsOwnMarkerDroppedLineL
 	}
 }
 
-// TestFR_CHG_03_BuildPartialPatchReverseFoldsTheOppositeSide locks down
-// that for a reverse (unstage) patch, sourced from `git diff --cached` and
-// applied with --reverse, "+" is the removal side — the opposite of the
-// stage-direction fold above.
+// In a reverse (unstage) patch, applied with --reverse, "+" is the removal
+// side.
 func TestFR_CHG_03_BuildPartialPatchReverseFoldsTheOppositeSide(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
@@ -544,9 +542,7 @@ func TestFR_CHG_03_BuildPartialPatchReverseFoldsTheOppositeSide(t *testing.T) {
 	}
 }
 
-// TestFR_CHG_03_BuildPartialPatchPairsABlockOfDeletesThenAddsByPosition
-// covers adjacent changed lines, which git lists as every "-" line followed
-// by every "+" line.
+// git lists adjacent changed lines as every "-" line, then every "+" line.
 func TestFR_CHG_03_BuildPartialPatchPairsABlockOfDeletesThenAddsByPosition(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
@@ -719,9 +715,6 @@ func TestFR_CHG_03_StageLinesReverseUnstagesOnlyTheSelectedChange(t *testing.T) 
 	}
 }
 
-// TestFR_CHG_03_StageLinesSelectsTheRequestedChangeEvenWhenGitMergesTwoChangesIntoOneHunk
-// stages, and separately unstages, one of the two edits git reports as a
-// single hunk.
 func TestFR_CHG_03_StageLinesSelectsTheRequestedChangeEvenWhenGitMergesTwoChangesIntoOneHunk(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -755,9 +748,7 @@ func TestFR_CHG_03_StageLinesSelectsTheRequestedChangeEvenWhenGitMergesTwoChange
 	}
 }
 
-// TestFR_CHG_03_StageLinesSelectingNoLongerChangedLinesIsInternal proves a
-// selection that once matched a change but no longer does — repeating a
-// stage call for lines that call already staged — is a stale selection,
+// Repeating a stage call for lines it already staged is a stale selection:
 // Code Internal, not a git failure.
 func TestFR_CHG_03_StageLinesSelectingNoLongerChangedLinesIsInternal(t *testing.T) {
 	t.Parallel()
@@ -780,9 +771,6 @@ func TestFR_CHG_03_StageLinesSelectingNoLongerChangedLinesIsInternal(t *testing.
 	}
 }
 
-// TestFR_CHG_03_StageLinesSelectingLinesNotInTheDiffIsInternal proves a
-// selection naming line numbers the current diff never changed is also a
-// stale selection, Code Internal, applying nothing.
 func TestFR_CHG_03_StageLinesSelectingLinesNotInTheDiffIsInternal(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -801,8 +789,7 @@ func TestFR_CHG_03_StageLinesSelectingLinesNotInTheDiffIsInternal(t *testing.T) 
 	}
 }
 
-// TestFR_CHG_03_StageLinesOnAPathWithNoDiffIsAClearInternalError covers a
-// re-diff that lists no file at all, as for an untracked path.
+// The re-diff of an untracked path lists no file.
 func TestFR_CHG_03_StageLinesOnAPathWithNoDiffIsAClearInternalError(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -833,9 +820,7 @@ func TestFR_CHG_03_StageLinesPreservesTheFinalLineExactlyWhenItsChangeIsNotSelec
 
 	c, id := openWorktree(t, repo.Dir)
 	ctx := t.Context()
-	// The line2 change and the final line's own change are both single-line
-	// substitutions, so each keeps its own line number (2 and 3) on both
-	// diff sides. Select only the line2 change.
+	// only the line2 change, line 2 on both sides
 	sel := shown(t, c, id, "f.txt", false, []int{2}, []int{2})
 	if err := c.StageLines(ctx, id, "f.txt", sel, false); err != nil {
 		t.Fatal(err)

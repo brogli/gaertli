@@ -128,9 +128,8 @@ func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha string) (
 	return core.LogIndexResult{Index: index, Found: found}, nil
 }
 
-// streamLog runs in its own goroutine under a ctx detached from the
-// cancellation of LoadLog's (done as soon as LoadLog returns): a background
-// load outlives one RPC call. gen guards every LogAppend/LogFinish against a
+// streamLog loads the repo's log. It runs detached from the calling RPC,
+// which returns at once. gen guards every LogAppend/LogFinish against a
 // reload that superseded it.
 func (c *Core) streamLog(ctx context.Context, wt *session.Worktree, gen int) {
 	repo := wt.Repo
@@ -140,8 +139,7 @@ func (c *Core) streamLog(ctx context.Context, wt *session.Worktree, gen int) {
 
 	var tips map[string]string
 	if logErr == nil {
-		// best-effort: a failure here just means the next ReloadLog always
-		// refreshes, rather than failing an otherwise-successful load.
+		// a failure only makes the next ReloadLog reload
 		tips, _ = refTips(ctx, wt.Runner, wt.Path)
 	}
 	repo.LogFinish(gen, logErr, tips)
@@ -154,8 +152,7 @@ func (c *Core) streamLog(ctx context.Context, wt *session.Worktree, gen int) {
 // streamCommits runs filter's git log call, parses every record into a
 // LogCommit (with its graph row unless filter is flat), and hands each to
 // appendRow; progress fires for the first row and then every
-// progressInterval, never with done. Returns the row count and the call's
-// error, if any.
+// progressInterval, never with done.
 func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFilter, background bool,
 	appendRow func(core.LogCommit), progress func(loaded int, done bool),
 ) (loaded int, err *core.Error) {
@@ -192,10 +189,9 @@ func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFil
 	return loaded, nil
 }
 
-// writeCommitGraphIfLarge runs `git commit-graph write --reachable` after
-// the load's done signal, the first time a load reaches largeRepoRows rows:
-// it cuts git log's time-to-first-record and peak memory at real scale.
-// Skipped once the file exists. A failure is never surfaced: the file is an
+// writeCommitGraphIfLarge writes git's commit-graph file when a load reaches
+// largeRepoRows rows and the repo has none: it cuts git log's
+// time-to-first-record and peak memory. A failure is ignored: the file is an
 // optimisation, not app state.
 func writeCommitGraphIfLarge(ctx context.Context, wt *session.Worktree, loaded int) {
 	if int64(loaded) < largeRepoRows.Load() {
@@ -257,8 +253,7 @@ func (c *Core) emitLogProgress(repoKey string, gen, loaded int, done bool, err *
 	c.sink(core.Event{Name: "log:progress", Repo: repoKey, Payload: payload})
 }
 
-// parseLogRecord parses one logFormat record (7 fields, %x1f-separated) as
-// streamed by git log --format=logFormat.
+// parseLogRecord parses one logFormat record.
 func parseLogRecord(record []byte) (commit core.LogCommit, parents []string, err error) {
 	fields := strings.Split(string(record), "\x1f")
 	if len(fields) != 7 {
