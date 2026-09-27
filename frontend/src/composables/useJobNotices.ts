@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n'
 import { useJobsStore } from '@/stores/jobs'
+import { useRefsStore } from '@/stores/refs'
 import {
   Code,
   JobKind,
@@ -39,6 +40,7 @@ interface JobNoticeActions {
 // confirm-gated recovery calls the rejection and blocked-pull notices offer.
 export function useJobNotices(actions: JobNoticeActions): void {
   const jobs = useJobsStore()
+  const refs = useRefsStore()
   const { show, clear } = useNotices()
   const t = i18n.global.t
 
@@ -61,13 +63,15 @@ export function useJobNotices(actions: JobNoticeActions): void {
     if (job.state !== JobState.JobFailed || !error) return null
     const push = job.kind === JobKind.PushJob || job.kind === JobKind.ForcePushJob
     if (push && (error.code === Code.PushRejected || error.code === Code.NotFastForward)) {
-      return [
-        'rejection',
-        errorNotice(error, [
-          { label: t('toolbar.pull'), run: actions.onPull },
-          { label: t('toolbar.forcePush'), run: actions.onForcePush },
-        ]),
-      ]
+      // Pull and force push both need an upstream; a first push's rejection
+      // sets none.
+      const offers = refs.current?.upstream
+        ? [
+            { label: t('toolbar.pull'), run: actions.onPull },
+            { label: t('toolbar.forcePush'), run: actions.onForcePush },
+          ]
+        : []
+      return ['rejection', errorNotice(error, offers)]
     }
     if (job.kind === JobKind.PullJob && error.code === Code.DirtyWorktree) {
       return [

@@ -8,6 +8,7 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Fac
 
 import { useJobNotices } from '../useJobNotices'
 import { useJobsStore } from '@/stores/jobs'
+import { useRefsStore } from '@/stores/refs'
 import {
   Code,
   JobKind,
@@ -19,6 +20,16 @@ import NoticeArea from '@/components/NoticeArea.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { findButton } from '@/testing/findButton'
 import { jobFixture } from '@/testing/fixtures/job'
+import { branchFixture } from '@/testing/fixtures/branch'
+
+// setUpstream gives the repo one current branch with an upstream.
+function setUpstream(): void {
+  useRefsStore().refs = {
+    branches: [branchFixture({ upstream: 'origin/main' })],
+    remotes: [{ name: 'origin', branches: [] }],
+    tags: [],
+  }
+}
 
 function rejectedPushJob(code: Code): JobInfo {
   return jobFixture({
@@ -90,6 +101,7 @@ describe('useJobNotices', () => {
 
   it('FR-SYNC-04 a failed push job shows a notice with the reason and Pull/Force push, running the actions', async () => {
     const notice = await mountNotices()
+    setUpstream()
 
     useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
     await nextTick()
@@ -101,12 +113,25 @@ describe('useJobNotices', () => {
 
   it('FR-SYNC-04 clicking Pull in the rejection notice runs the Pull action', async () => {
     const notice = await mountNotices()
+    setUpstream()
 
     useJobsStore().upsert(rejectedPushJob(Code.PushRejected))
     await nextTick()
 
     await findButton(notice, 'Pull')!.trigger('click')
     expect(onPull).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-SYNC-04 a rejected push on a branch without upstream shows the error and no Pull or Force push', async () => {
+    const notice = await mountNotices()
+    useRefsStore().refs = { branches: [branchFixture()], remotes: [], tags: [] }
+
+    useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
+    await nextTick()
+
+    expect(notice.text()).toContain('Updates were rejected')
+    expect(findButton(notice, 'Pull')).toBeUndefined()
+    expect(findButton(notice, 'Force push')).toBeUndefined()
   })
 
   it('FR-SYNC-04 a later pull clears the rejection notice', async () => {
