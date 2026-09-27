@@ -9,7 +9,7 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { DiffKind, fileTarget } from '@/lib/diffTarget'
-import { shortSha, timeAgo } from '@/lib/format'
+import { exactDate, shortSha, timeAgo } from '@/lib/format'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ChangedFiles from './ChangedFiles.vue'
 import ErrorBanner from './ErrorBanner.vue'
@@ -38,10 +38,6 @@ function openDiff(f: ChangedFile): void {
 }
 
 const pickedCount = computed(() => log.selection.length)
-
-function absoluteDate(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toLocaleString()
-}
 
 // subject is the message's first line; restBody is the rest, its leading
 // blank lines dropped, shown separately below it.
@@ -88,13 +84,13 @@ const committerDiffers = computed(() => {
         <dt class="text-muted-color">{{ t('commitDetailView.commit') }}</dt>
         <dd class="truncate" :title="log.details.sha">{{ shortSha(log.details.sha) }}</dd>
         <dt class="text-muted-color">{{ t('commitDetailView.author') }}</dt>
-        <dd class="truncate" :title="absoluteDate(log.details.authorAt)">
+        <dd class="truncate" :title="exactDate(log.details.authorAt)">
           {{ log.details.author }} &lt;{{ log.details.authorEmail }}&gt; ·
           {{ timeAgo(log.details.authorAt) }}
         </dd>
         <template v-if="committerDiffers">
           <dt class="text-muted-color">{{ t('commitDetailView.committer') }}</dt>
-          <dd class="truncate" :title="absoluteDate(log.details.committerAt)">
+          <dd class="truncate" :title="exactDate(log.details.committerAt)">
             {{ log.details.committer }} &lt;{{ log.details.committerEmail }}&gt; ·
             {{ timeAgo(log.details.committerAt) }}
           </dd>

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/i18n'
-import { timeAgo } from '../format'
+import { exactDate, timeAgo } from '../format'
 
 const NOW = new Date('2026-09-24T12:00:00Z')
 const threeDaysAgo = NOW.getTime() / 1000 - 3 * 24 * 3600
@@ -24,5 +24,21 @@ describe('timeAgo', () => {
     vi.useFakeTimers({ now: NOW })
 
     expect(timeAgo(NOW.getTime() / 1000 - 20)).toBe('just now')
+  })
+})
+
+describe('exactDate', () => {
+  it('FR-UX-10 formats the date and time in the system date format', () => {
+    const date = new Date('2026-09-24T12:34:56Z')
+    const expected = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    }).format(date)
+
+    const result = exactDate(date.getTime() / 1000)
+
+    expect(result).toBe(expected)
+    expect(result).toContain('2026')
+    expect(result).toMatch(/:56\b/)
   })
 })

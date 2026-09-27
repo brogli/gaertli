@@ -28,6 +28,7 @@ import { useLogStore } from '@/stores/log'
 import { useCompareStore } from '@/stores/compare'
 import { commitRow } from '@/testing/fixtures/log-rows'
 import { commitDetailsFixture } from '@/testing/fixtures/commitDetails'
+import { exactDate } from '@/lib/format'
 
 describe('CommitDetailView', () => {
   beforeEach(() => {
@@ -166,6 +167,11 @@ describe('CommitDetailView', () => {
     expect(parents).toHaveLength(2)
     expect(parents[0]!.text()).toBe('b'.repeat(7))
     expect(parents[0]!.attributes('title')).toBe('b'.repeat(40))
+
+    const authorField = wrapper.findAll('dd').find((d) => d.text().includes('alice@example.com'))
+    expect(authorField!.attributes('title')).toBe(exactDate(1_700_000_000))
+    const committerField = wrapper.findAll('dd').find((d) => d.text().includes('bob@example.com'))
+    expect(committerField!.attributes('title')).toBe(exactDate(1_700_000_100))
   })
 
   it('FR-UX-10 hides the Committer field when author and committer match', async () => {

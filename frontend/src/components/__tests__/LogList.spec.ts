@@ -1,6 +1,6 @@
 import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '@/testing/mountInBody'
 
 const { Facade } = vi.hoisted(() => ({
@@ -31,6 +31,7 @@ import {
 import { commitRow } from '@/testing/fixtures/log-rows'
 import { commitDetailsFixture } from '@/testing/fixtures/commitDetails'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
+import { exactDate } from '@/lib/format'
 
 const gitDefaults = { noCommit: false, recordOrigin: false }
 
@@ -78,6 +79,10 @@ describe('LogList', () => {
     Facade.Revert.mockReset().mockResolvedValue(undefined)
     Facade.SquashCheck.mockReset().mockResolvedValue({ pushed: false, message: 'A\n\nB' })
     Facade.Fixup.mockReset().mockResolvedValue({ previousHead: 'prev' })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('FR-LOG-11 right-click opens a context menu with copy, branch, checkout-commit, reset, cherry-pick, and revert items', async () => {
@@ -253,15 +258,26 @@ describe('LogList', () => {
     ])
   })
 
-  it('FR-UX-09 the subject, author and date show their whole text on hover', async () => {
+  it('FR-UX-09 the subject and author show their whole text on hover', async () => {
     const { wrapper } = await mountWithRows([
       commitRow({ subject: 'A long subject', author: 'Ada Lovelace', authorAt: 0 }),
     ])
 
-    for (const part of ['subject', 'author', 'date']) {
+    for (const part of ['subject', 'author']) {
       const el = wrapper.get(`.row .${part}`)
       expect(el.attributes('title')).toBe(el.text())
     }
+  })
+
+  it('FR-UX-10 hovering the date shows its exact date and time, not the relative text again', async () => {
+    vi.useFakeTimers({ now: new Date('2026-09-24T12:00:00Z') })
+    const authorAt = Date.now() / 1000 - 3 * 24 * 3600
+
+    const { wrapper } = await mountWithRows([commitRow({ authorAt })])
+
+    const date = wrapper.get('.row .date')
+    expect(date.text()).toBe('3 days ago')
+    expect(date.attributes('title')).toBe(exactDate(authorAt))
   })
 
   it('FR-LOG-09 the visible rows not yet cached load in one LogRows call', async () => {

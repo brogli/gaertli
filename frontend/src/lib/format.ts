@@ -17,3 +17,12 @@ export function timeAgo(unixSeconds: number): string {
     ? t('common.justNow')
     : formatTimeAgoIntl(date, { locale: locale.value })
 }
+
+// exactDate is a git timestamp (Unix seconds) as the exact date and time, in
+// the user's system date format.
+export function exactDate(unixSeconds: number): string {
+  const date = new Date(unixSeconds * 1000)
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(
+    date,
+  )
+}

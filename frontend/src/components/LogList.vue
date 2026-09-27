@@ -17,7 +17,7 @@ import {
   buildSquashMenuItems,
   type CommitMenuItem,
 } from '@/menus/commitMenu'
-import { timeAgo } from '@/lib/format'
+import { exactDate, timeAgo } from '@/lib/format'
 import { laneSpan } from '@/lib/graphLanes'
 import { errorHeadline } from '@/lib/errorText'
 import type {
@@ -356,7 +356,7 @@ const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
           >
           <span
             class="date text-muted-color min-w-0 flex-[0_1_7em] truncate @max-[360px]:hidden"
-            :title="timeAgo(row.authorAt)"
+            :title="exactDate(row.authorAt)"
             >{{ timeAgo(row.authorAt) }}</span
           >
           <span class="hash text-muted-color w-(--hash-width) flex-none font-mono">{{
