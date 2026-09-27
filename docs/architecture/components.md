@@ -108,10 +108,11 @@ view 25%, remembered per layout):
 └───────────────────────────┴──────────────────────┴───────────────────────┘
 ```
 
-Medium, resizable panes hold the log view (60%) and a side panel (40%): a switch [Details, Changes
-(n)] on top, the chosen view below. Narrow, a switch [Log, Details, Changes (n)] on top and the
+Medium, resizable panes hold the log view (60%) and a side panel (40%): a tab row [Details, Changes
+(n)] on top, the chosen view below. Narrow, a tab row [Log, Details, Changes (n)] on top and the
 chosen view below at full width. "(n)" is the changes view's file count (FR-UX-08), absent at 0.
-Hidden views stay mounted, so switching keeps the scroll position and the typed commit message.
+Hidden views stay mounted, so switching keeps the scroll position and the typed commit message. The
+arrow keys move between tabs and pick as they go.
 
 - **Toolbar**: every action is a button with one shared look, Pull a split button. Below wide the
   buttons show their icon only, below medium they are the small size, and in narrow the three
@@ -126,11 +127,12 @@ Hidden views stay mounted, so switching keeps the scroll position and the typed 
   on its control in muted text: at the right inside the Commit button and beside a menu entry, after
   the action's name in a tooltip ("Push · Ctrl+Shift+K").
 - **Pickers** (FR-WT-13, FR-BR-09): one button style and one list: a filter field, keyboard
-  navigation, and row buttons that never activate the row. A right-click on a row, or Shift+F10 or
-  the context-menu key on the active row, opens that row's menu, a context menu at the pointer or
-  below the row.
+  navigation, and row buttons that never activate the row. The list owns each row's menu: a
+  right-click opens it at the pointer; Shift+F10, the context-menu key, or the row's "…" button
+  (where the picker asks for one) open it below the row or the button.
   - The worktree picker's entry shows the folder name, then its branch in smaller text, then its
-    always-visible buttons (new window, editor, remove).
+    always-visible buttons (new window, editor, remove). Its menu repeats the buttons plus Switch to
+    worktree, so it needs no "…". Every entry action closes the list; a refusal shows as a notice.
   - The repo picker names a repo by its main worktree. It starts no core until a repo is chosen, so
     no WSL core starts uninvited. If the worktree it would switch to is gone, it falls back to the
     repo's main worktree.
@@ -138,7 +140,7 @@ Hidden views stay mounted, so switching keeps the scroll position and the typed 
     local branch has a checkbox; checked branches update together (FR-UPD-06), and entry names line
     up whether or not an entry has a checkbox. A menu action's refusal shows as a notice; a row
     click's refusal stays in the list. A tag's Show history sets the log's filter and brings the log
-    view forward.
+    view forward. Every entry action is menu-only, so each entry has a "…" button.
 - **Settings** (FR-UX-04): a dialog over the window, opened from the toolbar's gear button, laid out
   like every dialog, with a group per editor environment and a base-folder field per environment
   found (local and each WSL distro).
