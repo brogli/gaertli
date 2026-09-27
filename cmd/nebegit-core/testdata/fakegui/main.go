@@ -1,8 +1,7 @@
-// Command fakegui is a test fixture only (excluded from the module's own
-// build): a stand-in for the Windows GUI binary nebegit-core's launch mode
-// hands off to. It sleeps briefly, so the test can prove
-// nebegit-core does not wait for it, then writes its own argv to argv.txt
-// in its working directory and exits.
+// Command fakegui is a test fixture: a stand-in for the Windows app
+// nebegit-core's launch mode hands off to. It sleeps briefly, so a test can
+// check nebegit-core does not wait for it, then writes its arguments to
+// argv.txt in its working directory.
 package main
 
 import (

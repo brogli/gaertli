@@ -85,8 +85,6 @@ func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
 	}
 }
 
-// TestDIST_03_LdflagsStampAppVersion proves the release build's version
-// stamping mechanism: -ldflags -X into buildinfo.App, surfaced by --version.
 func TestDIST_03_LdflagsStampAppVersion(t *testing.T) {
 	stamped := filepath.Join(t.TempDir(), testbin.Exe("nebegit-core-stamped"))
 	build := exec.CommandContext(t.Context(), "go", "build",
@@ -105,9 +103,7 @@ func TestDIST_03_LdflagsStampAppVersion(t *testing.T) {
 	}
 }
 
-// TestADR_3_UnknownArgumentExits2 uses a flag-shaped bad argument: a bare
-// word is a legitimate path (launch mode), so "bogus" alone would not reach
-// usage().
+// A bare word is a path to launch, so the bad argument is flag-shaped.
 func TestADR_3_UnknownArgumentExits2(t *testing.T) {
 	err := exec.CommandContext(t.Context(), bin, "--bogus").Run()
 	if exit, ok := errors.AsType[*exec.ExitError](err); !ok || exit.ExitCode() != 2 {

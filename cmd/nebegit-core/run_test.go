@@ -7,12 +7,8 @@ import (
 	"testing"
 )
 
-// TestFR_REPO_06_RunDispatchesBareArgsToLaunchAndKeepsFlagsWorking is a
-// white-box, in-process test of run's dispatch: WSL_DISTRO_NAME is cleared
-// so a routed-to-launch call fails deterministically (its own case, below)
-// rather than depending on a real WSL/editor — proving routing without
-// needing either. --stdio is not dispatched here: it blocks on stdin,
-// already covered by the subprocess tests in main_test.go.
+// With WSL_DISTRO_NAME cleared, a call routed to launch fails with exit 1
+// without WSL. --stdio blocks on stdin; the subprocess tests cover it.
 func TestFR_REPO_06_RunDispatchesBareArgsToLaunchAndKeepsFlagsWorking(t *testing.T) {
 	t.Setenv("WSL_DISTRO_NAME", "")
 
