@@ -188,11 +188,17 @@ Hidden views stay mounted, so switching keeps the scroll position and the typed 
   target is a commit, a range, a commit against the working tree, or a working-tree side. In every
   file list of the main window a click selects a row and a double-click or Enter opens it; opening
   another file retargets the open diff window (`diff:show`). A working-tree list and diff reload on
-  `repo:changed` with scope `index`.
+  `repo:changed` with scope `index`. Splitters between the file list and the diff, and between the
+  diff's two sides, are remembered like the main window's view widths. The list's flat/tree toggle
+  and its remembered choice are the commit detail view's. The window's size is kept in the settings
+  file beside the open windows; its position is not, since a stored position can land off-screen
+  after a monitor change and the window opens centred on the current screen.
 - **Diff view** (ADR-7): git's diff drawn by CodeMirror, with git's hunks mapped onto it. Hunk and
   line actions appear for a modified working-tree file with whitespace shown. Its toolbar, with the
   side-by-side/unified and whitespace toggles (FR-DIFF-01, FR-DIFF-06), stays in view while the diff
-  scrolls.
+  scrolls. Side by side, the two editors sit in a splitter's panels and scroll sideways together.
+  Added and removed lines take their colours from the theme, mixed strong enough to meet FR-DIFF-11
+  in every theme; an e2e check measures each theme.
 
 ## Communication
 
