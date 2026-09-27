@@ -17,11 +17,20 @@ import (
 const maxRecent = 10
 
 // Settings is the whole persisted file: the shell's own record of recent
-// repos and open windows, and the user's Preferences.
+// repos, open windows and the diff window's size, and the user's
+// Preferences.
 type Settings struct {
-	RecentRepos   []RecentRepo `json:"recentRepos"`   // most-recent-first, capped at maxRecent
-	OpenWorktrees []string     `json:"openWorktrees"` // windows open at last quit
+	RecentRepos    []RecentRepo `json:"recentRepos"`              // most-recent-first, capped at maxRecent
+	OpenWorktrees  []string     `json:"openWorktrees"`            // windows open at last quit
+	DiffWindowSize *WindowSize  `json:"diffWindowSize,omitempty"` // nil until a diff window has closed once
 	Preferences
+}
+
+// WindowSize is a window's width and height, in the units Wails' own
+// Size() reports and WebviewWindowOptions takes.
+type WindowSize struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
 }
 
 // Preferences are the settings the user edits; the frontend reads and saves

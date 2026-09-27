@@ -62,8 +62,9 @@ func load(t *testing.T, path string) settings.Settings {
 
 func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
 	want := settings.Settings{
-		RecentRepos:   []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
-		OpenWorktrees: []string{"/a", "/b"},
+		RecentRepos:    []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
+		OpenWorktrees:  []string{"/a", "/b"},
+		DiffWindowSize: &settings.WindowSize{Width: 900, Height: 600},
 		Preferences: settings.Preferences{
 			EditorProfiles:           map[string]core.EditorProfile{"": {Name: "the editor", FolderCmd: "editor {path}"}},
 			ProtectedBranches:        []string{"main"},

@@ -69,6 +69,26 @@ func TestFR_UX_04_SettingsServiceSetKeepsTheRecentReposAndOpenWorktrees(t *testi
 	}
 }
 
+// Set replaces the preferences only: the diff window's remembered size
+// (outside Preferences, like RecentRepos and OpenWorktrees) survives it too.
+func TestFR_UX_04_SettingsServiceSetKeepsTheDiffWindowSize(t *testing.T) {
+	reg, _ := newTestRegistry()
+	store := newTestStore(t)
+	want := &settings.WindowSize{Width: 900, Height: 600}
+	if err := store.Update(func(s *settings.Settings) { s.DiffWindowSize = want }); err != nil {
+		t.Fatal(err)
+	}
+	s := NewSettingsService(store, reg, &fakeEmitter{}, &slog.LevelVar{})
+
+	if err := s.Set(t.Context(), settings.Preferences{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := store.Get().DiffWindowSize; got == nil || *got != *want {
+		t.Errorf("DiffWindowSize = %+v, want %+v kept", got, want)
+	}
+}
+
 func TestFR_UX_19_SetSwitchesTheLogLevelAtOnce(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)

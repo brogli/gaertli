@@ -33,15 +33,22 @@ func newEmittedEvent(name string, data []any) emittedEvent {
 }
 
 // fakeWindow is a shellWindow that records what was called on it, and lets
-// a test simulate the OS focusing or closing it.
+// a test simulate the OS focusing or closing it. width/height are what it
+// was created with; sizeW/sizeH/maximised are what it currently reports
+// through Size/IsMaximised, settable by a test to simulate a resize.
 type fakeWindow struct {
-	id         uint
-	title      string
-	url        string
-	minWidth   int
-	focusCount int
-	emitted    []emittedEvent
-	handlers   map[events.WindowEventType]func(*application.WindowEvent)
+	id           uint
+	title        string
+	url          string
+	width        int
+	height       int
+	minWidth     int
+	focusCount   int
+	emitted      []emittedEvent
+	handlers     map[events.WindowEventType]func(*application.WindowEvent)
+	hooks        map[events.WindowEventType]func(*application.WindowEvent)
+	sizeW, sizeH int
+	maximised    bool
 }
 
 func (w *fakeWindow) ID() uint { return w.id }
@@ -68,6 +75,20 @@ func (w *fakeWindow) OnWindowEvent(eventType events.WindowEventType, callback fu
 	return func() {}
 }
 
+// RegisterHook records a hook, kept apart from OnWindowEvent's listeners: a
+// real window runs its hooks first, synchronously, before its listeners.
+func (w *fakeWindow) RegisterHook(eventType events.WindowEventType, hook func(*application.WindowEvent)) func() {
+	if w.hooks == nil {
+		w.hooks = map[events.WindowEventType]func(*application.WindowEvent){}
+	}
+	w.hooks[eventType] = hook
+	return func() {}
+}
+
+func (w *fakeWindow) Size() (int, int) { return w.sizeW, w.sizeH }
+
+func (w *fakeWindow) IsMaximised() bool { return w.maximised }
+
 // fire simulates the OS sending the window eventType.
 func (w *fakeWindow) fire(eventType events.WindowEventType) {
 	if handler := w.handlers[eventType]; handler != nil {
@@ -75,8 +96,14 @@ func (w *fakeWindow) fire(eventType events.WindowEventType) {
 	}
 }
 
-// close simulates the OS destroying the window.
-func (w *fakeWindow) close() { w.fire(events.Common.WindowClosing) }
+// close simulates the OS destroying the window: its hooks run first, then
+// its listeners.
+func (w *fakeWindow) close() {
+	if hook := w.hooks[events.Common.WindowClosing]; hook != nil {
+		hook(&application.WindowEvent{})
+	}
+	w.fire(events.Common.WindowClosing)
+}
 
 // fakeOpener is a windowOpener that hands out fakeWindows and records them
 // in creation order.
@@ -85,7 +112,10 @@ type fakeOpener struct {
 }
 
 func (o *fakeOpener) NewWithOptions(opts application.WebviewWindowOptions) shellWindow {
-	w := &fakeWindow{id: uint(len(o.windows)) + 1, title: opts.Title, url: opts.URL, minWidth: opts.MinWidth}
+	w := &fakeWindow{
+		id: uint(len(o.windows)) + 1, title: opts.Title, url: opts.URL,
+		width: opts.Width, height: opts.Height, minWidth: opts.MinWidth,
+	}
 	o.windows = append(o.windows, w)
 	return w
 }
@@ -123,6 +153,65 @@ func TestFR_UX_08_MainWindowGetsTheMinimumWidthADiffWindowDoesNot(t *testing.T) 
 	}
 	if got := opener.windows[1].minWidth; got != 0 {
 		t.Errorf("diff window MinWidth = %d, want 0 (unset)", got)
+	}
+}
+
+func TestFR_DIFF_12_ADiffWindowOpensAtTheDefaultSizeWithNothingStored(t *testing.T) {
+	r, opener := newTestRegistry()
+	r.SetStore(newTestStore(t))
+
+	r.OpenOrFocusDiff(diffWindowKey{wt: "wt"}, "wt", DiffTarget{Kind: WorkingDiff, Path: "f"})
+
+	if got := opener.windows[0]; got.width != 1200 || got.height != 800 {
+		t.Errorf("diff window size = %dx%d, want 1200x800", got.width, got.height)
+	}
+}
+
+// The WindowClosing hook, not a listener, reads the closing window's size:
+// a listener races Wails' own WindowClosing listener, which destroys the
+// window (reading Size/IsMaximised back as zero).
+func TestFR_DIFF_12_ClosingADiffWindowRemembersItsSizeForTheNextOne(t *testing.T) {
+	r, opener := newTestRegistry()
+	store := newTestStore(t)
+	r.SetStore(store)
+
+	r.OpenOrFocusDiff(diffWindowKey{wt: "wt"}, "wt", DiffTarget{Kind: WorkingDiff, Path: "f"})
+	first := opener.windows[0]
+	first.sizeW, first.sizeH = 900, 600
+	first.close()
+
+	r.OpenOrFocusDiff(diffWindowKey{wt: "wt"}, "wt", DiffTarget{Kind: WorkingDiff, Path: "f"})
+
+	if len(opener.windows) != 2 {
+		t.Fatalf("windows created = %d, want 2", len(opener.windows))
+	}
+	if second := opener.windows[1]; second.width != 900 || second.height != 600 {
+		t.Errorf("second diff window size = %dx%d, want 900x600", second.width, second.height)
+	}
+	want := &settings.WindowSize{Width: 900, Height: 600}
+	if got := store.Get().DiffWindowSize; got == nil || *got != *want {
+		t.Errorf("store DiffWindowSize = %+v, want %+v", got, want)
+	}
+}
+
+// A maximised window's size is not what the user sized it to, so closing it
+// leaves any already-stored size untouched.
+func TestFR_DIFF_12_ClosingAMaximisedDiffWindowKeepsTheStoredSize(t *testing.T) {
+	r, opener := newTestRegistry()
+	store := newTestStore(t)
+	r.SetStore(store)
+	if err := store.Update(func(s *settings.Settings) { s.DiffWindowSize = &settings.WindowSize{Width: 900, Height: 600} }); err != nil {
+		t.Fatal(err)
+	}
+
+	r.OpenOrFocusDiff(diffWindowKey{wt: "wt"}, "wt", DiffTarget{Kind: WorkingDiff, Path: "f"})
+	window := opener.windows[0]
+	window.sizeW, window.sizeH, window.maximised = 1920, 1080, true
+	window.close()
+
+	want := &settings.WindowSize{Width: 900, Height: 600}
+	if got := store.Get().DiffWindowSize; got == nil || *got != *want {
+		t.Errorf("store DiffWindowSize = %+v, want unchanged %+v", got, want)
 	}
 }
 

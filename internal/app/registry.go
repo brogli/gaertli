@@ -34,6 +34,15 @@ type windowOpener interface {
 	NewWithOptions(application.WebviewWindowOptions) shellWindow
 }
 
+// resizableWindow is what a window needs to remember its own size once
+// closed; satisfied by *application.WebviewWindow and the test fake, not by
+// a server-mode page (FR-DIFF-12 concerns only the desktop diff window).
+type resizableWindow interface {
+	RegisterHook(eventType events.WindowEventType, callback func(*application.WindowEvent)) func()
+	Size() (int, int)
+	IsMaximised() bool
+}
+
 // wailsOpener adapts *application.WindowManager to windowOpener.
 type wailsOpener struct{ wm *application.WindowManager }
 
@@ -282,7 +291,7 @@ func (r *Registry) openOrRegister(id core.WorktreeID, path, distro string) shell
 // entry.window before it is assigned: safe, because newWindow returns
 // before the OS can fire WindowClosing.
 func (r *Registry) addWindowLocked(entry *windowEntry) {
-	entry.window = r.newWindow(windowTitle(entry.path, ""), selectionURL(entry.path, entry.distro), mainWindowMinWidth, func() {
+	entry.window = r.newWindow(windowTitle(entry.path, ""), selectionURL(entry.path, entry.distro), defaultWindowWidth, defaultWindowHeight, mainWindowMinWidth, func() {
 		r.Release(r.closeWindow(entry.window.ID()))
 		r.rememberOpenWorktrees()
 	})
@@ -408,19 +417,48 @@ func (r *Registry) recordFocus(e *windowEntry, focused bool) (wt core.WorktreeID
 // has no such floor.
 const mainWindowMinWidth = 400
 
+// defaultWindowWidth, defaultWindowHeight is a main window's size, and a
+// diff window's first-run size before any has been closed once.
+const defaultWindowWidth, defaultWindowHeight = 1200, 800
+
 // newWindow creates a window that drops itself from the registry when the
 // OS closes it (Wails destroys the window on WindowClosing). minWidth is 0
 // for a window with no minimum.
-func (r *Registry) newWindow(title, url string, minWidth int, onClose func()) shellWindow {
+func (r *Registry) newWindow(title, url string, width, height, minWidth int, onClose func()) shellWindow {
 	window := r.opener.NewWithOptions(application.WebviewWindowOptions{
 		Title:    title,
 		URL:      url,
-		Width:    1200,
-		Height:   800,
+		Width:    width,
+		Height:   height,
 		MinWidth: minWidth,
 	})
 	window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) { onClose() })
 	return window
+}
+
+// diffWindowSize is the size the next diff window opens at: the settings
+// store's remembered size, or the default.
+func (r *Registry) diffWindowSize() (width, height int) {
+	if r.store != nil {
+		if s := r.store.Get().DiffWindowSize; s != nil {
+			return s.Width, s.Height
+		}
+	}
+	return defaultWindowWidth, defaultWindowHeight
+}
+
+// rememberDiffWindowSize stores window's current size for the next diff
+// window to open at, unless it is maximised (that size is not what the user
+// sized it to) or reads 0×0 (already destroyed).
+func (r *Registry) rememberDiffWindowSize(window resizableWindow) {
+	if r.store == nil || window.IsMaximised() {
+		return
+	}
+	width, height := window.Size()
+	if width == 0 && height == 0 {
+		return
+	}
+	_ = r.store.Update(func(s *settings.Settings) { s.DiffWindowSize = &settings.WindowSize{Width: width, Height: height} })
 }
 
 // OpenOrFocusDiff opens key's diff window on wt's target, or focuses it and
@@ -452,9 +490,13 @@ func (r *Registry) openOrRetargetDiff(key diffWindowKey, wt core.WorktreeID, tar
 	}
 	entry := &windowEntry{}
 	r.showLocked(entry, wt)
-	entry.window = r.newWindow(diffWindowTitle(wt, target), diffURL(wt, target), 0, func() {
+	width, height := r.diffWindowSize()
+	entry.window = r.newWindow(diffWindowTitle(wt, target), diffURL(wt, target), width, height, 0, func() {
 		r.Release(r.closeDiffWindow(key))
 	})
+	if window, ok := entry.window.(resizableWindow); ok {
+		window.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) { r.rememberDiffWindowSize(window) })
+	}
 	r.wireFocus(entry)
 	r.diffWindows[key] = entry
 	return nil, ""
