@@ -323,7 +323,6 @@
     "pullRebase": "Pull (rebase)",
     "pullWithMerge": "Pull with merge",
     "pullWithRebase": "Pull with rebase",
-    "pushAndSetUpstream": "Push and set upstream",
     "forcePush": "Force push",
     "forcePushConfirm": "Force push \"{branch}\"?{warning} This can overwrite work on the remote.",
     "forcePushProtectedWarning": " \"{branch}\" is a protected branch.",

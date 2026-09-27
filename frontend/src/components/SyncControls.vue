@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from '@/i18n'
 import { onKeyStroke } from '@vueuse/core'
 import Button from 'openvue/button'
 import SplitButton from 'openvue/splitbutton'
-import Select from 'openvue/select'
 import type { MenuItem } from 'openvue/menuitem'
 import { useRefsStore } from '@/stores/refs'
 import { useSettingsStore } from '@/stores/settings'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useJobNotices } from '@/composables/useJobNotices'
+import { usePush } from '@/composables/usePush'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   JobKind,
@@ -20,6 +20,7 @@ import {
 import { iconClass } from '@/lib/icons'
 import { useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
+import SetUpstreamDialog from './SetUpstreamDialog.vue'
 
 // SyncControls is the Fetch/Pull/Push controls: it only starts jobs and
 // offers what can act. JobsMenu shows their progress; useJobNotices shows
@@ -29,6 +30,7 @@ const refs = useRefsStore()
 const settings = useSettingsStore()
 const { confirmAction } = useConfirmAction()
 const { error, run } = useCoreCall()
+const { push, upstreamQuestion } = usePush(() => props.wt, run)
 const { t } = useI18n()
 const layout = useLayout()
 const toolbarButton = useToolbarButton()
@@ -66,19 +68,6 @@ const pullMenuItems = computed<MenuItem[]>(() => [
   { label: t('toolbar.pullWithRebase'), command: () => runPull(PullMode.PullRebase) },
 ])
 
-const upstreamRemote = ref('')
-
-// Preselects "origin" once its remotes are known, else the first remote;
-// also fires when refs load after mount. Leaves a value the user already
-// picked alone.
-watch(
-  remoteNames,
-  (names) => {
-    upstreamRemote.value ||= names.includes('origin') ? 'origin' : (names[0] ?? '')
-  },
-  { immediate: true },
-)
-
 function onFetch(): void {
   void run(() => Facade.Fetch(props.wt, ''))
 }
@@ -87,9 +76,6 @@ function runPull(mode: PullMode): void {
 }
 function onPull(): void {
   runPull(pullMode.value)
-}
-function onPush(): void {
-  void run(() => Facade.Push(props.wt, refs.current?.upstream ? '' : upstreamRemote.value))
 }
 function onForcePush(): void {
   const branchName = refs.current?.name ?? ''
@@ -111,7 +97,7 @@ function onStashPull(): void {
 const JOB_RETRIES: Partial<Record<JobKind, (job: JobInfo) => void>> = {
   [JobKind.FetchJob]: onFetch,
   [JobKind.PullJob]: onPull,
-  [JobKind.PushJob]: onPush,
+  [JobKind.PushJob]: push,
   [JobKind.ForcePushJob]: onForcePush,
   [JobKind.UpdateBranchJob]: (job) =>
     void run(() => Facade.UpdateBranch(props.wt, job.branch ?? '')),
@@ -133,7 +119,7 @@ onKeyStroke(
   (event) => event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'k',
   (event) => {
     event.preventDefault()
-    if (refs.current?.upstream) onPush()
+    if (!disabledReason.value) push()
   },
 )
 
@@ -170,8 +156,9 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
         :aria-label="t('toolbar.push')"
       />
     </template>
-    <template v-else-if="refs.current!.upstream">
+    <template v-else>
       <SplitButton
+        v-if="refs.current!.upstream"
         v-bind="toolbarButton"
         :label="compact ? '' : pullLabel"
         :button-props="{ title: pullLabel, 'aria-label': pullLabel }"
@@ -186,25 +173,15 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
         :label="compact ? '' : t('toolbar.push')"
         :title="t('toolbar.push')"
         :aria-label="t('toolbar.push')"
-        @click="onPush"
+        @click="push"
       />
     </template>
-    <template v-else>
-      <Select
-        v-if="remoteNames.length > 1"
-        v-model="upstreamRemote"
-        :options="remoteNames"
-        data-test="upstream-remote"
-      />
-      <Button
-        v-bind="toolbarButton"
-        :icon="iconClass('push')"
-        :label="compact ? '' : t('toolbar.pushAndSetUpstream')"
-        :disabled="!upstreamRemote"
-        :title="remoteNames.length === 1 ? remoteNames[0] : t('toolbar.pushAndSetUpstream')"
-        :aria-label="t('toolbar.pushAndSetUpstream')"
-        @click="onPush"
-      />
-    </template>
+    <SetUpstreamDialog
+      v-if="upstreamQuestion"
+      :wt="wt"
+      :branch="upstreamQuestion.branch"
+      :remote="upstreamQuestion.remote"
+      @close="upstreamQuestion = null"
+    />
   </div>
 </template>

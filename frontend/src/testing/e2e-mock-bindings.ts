@@ -72,11 +72,11 @@ function statusFixture(): ChangedFiles {
 
 // refsFixture: the current branch (no upstream, unless ?upstream=1 asks for
 // one, for the toolbar-fit case that needs the Pull/Push pair instead of
-// "Push and set upstream"), a second branch with an upstream and a long
-// name, a remote branch and a tag, so the branch picker and the sync
-// controls render real content; or, with ?crowdedRefs=1, the picker case's
-// mixed local branches (one with an upstream, one without), a remote branch
-// and a tag, all short, to check where their names line up.
+// Push alone), a second branch with an upstream and a long name, a remote
+// branch and a tag, so the branch picker and the sync controls render real
+// content; or, with ?crowdedRefs=1, the picker case's mixed local branches
+// (one with an upstream, one without), a remote branch and a tag, all
+// short, to check where their names line up.
 function refsFixture(): Refs {
   if (query.has('crowdedRefs')) {
     return {

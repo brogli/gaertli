@@ -8,6 +8,7 @@ const { Facade } = vi.hoisted(() => ({
     Fetch: vi.fn(),
     Pull: vi.fn(),
     Push: vi.fn(),
+    PushTarget: vi.fn(),
     ForcePush: vi.fn(),
     PullWithStash: vi.fn(),
   },
@@ -87,6 +88,7 @@ describe('SyncControls', () => {
     Facade.Fetch.mockReset().mockResolvedValue('job-1')
     Facade.Pull.mockReset().mockResolvedValue('job-1')
     Facade.Push.mockReset().mockResolvedValue('job-1')
+    Facade.PushTarget.mockReset().mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
     Facade.ForcePush.mockReset().mockResolvedValue('job-1')
     Facade.PullWithStash.mockReset().mockResolvedValue('job-1')
     confirmRequire.mockReset()
@@ -157,12 +159,14 @@ describe('SyncControls', () => {
     }
   })
 
-  it('FR-SYNC-11 one remote, branch without upstream: "Push and set upstream" enabled, no remote select', async () => {
-    setRefs({ upstream: '' })
+  it('FR-UX-09 branch without upstream: the Push button reads "Push", not the remote name; no remote select in the toolbar', async () => {
+    setRefs({ upstream: '' }, ['origin', 'upstream'])
     const { body } = await mountControls()
 
-    const push = findButton(body, 'Push and set upstream')!
+    const push = findButton(body, 'Push')!
     expect(push.element.disabled).toBe(false)
+    expect(push.attributes('title')).toBe('Push')
+    expect(push.attributes('aria-label')).toBe('Push')
     expect(body.find('[data-test="upstream-remote"]').exists()).toBe(false)
   })
 
@@ -199,7 +203,7 @@ describe('SyncControls', () => {
     }
   })
 
-  it('FR-UX-09 below wide, Push and Push-and-set-upstream show icon only with title and aria-label', async () => {
+  it('FR-UX-09 below wide, Push shows icon only with title and aria-label "Push", with or without an upstream', async () => {
     setRefs({ upstream: 'origin/main' })
     const withUpstream = await mountControls({ compact: true })
     const push = findButton(withUpstream.body, 'Push')!
@@ -209,10 +213,10 @@ describe('SyncControls', () => {
 
     setRefs({ upstream: '' }, ['origin', 'upstream'])
     const noUpstream = await mountControls({ compact: true })
-    const pushAndSet = findButton(noUpstream.body, 'Push and set upstream')!
-    expect(pushAndSet.attributes('title')).toBe('Push and set upstream')
-    expect(pushAndSet.attributes('aria-label')).toBe('Push and set upstream')
-    expect(pushAndSet.find('.p-button-label').exists()).toBe(false)
+    const pushNoUpstream = findButton(noUpstream.body, 'Push')!
+    expect(pushNoUpstream.attributes('title')).toBe('Push')
+    expect(pushNoUpstream.attributes('aria-label')).toBe('Push')
+    expect(pushNoUpstream.find('.p-button-label').exists()).toBe(false)
   })
 
   it('FR-UX-09 below wide, the disabled Pull and Push also show icon only, title unchanged', async () => {
@@ -226,20 +230,29 @@ describe('SyncControls', () => {
     }
   })
 
-  it('FR-SYNC-11 two remotes, branch without upstream: a Select lists both, origin preselected', async () => {
-    setRefs({ upstream: '' }, ['upstream', 'origin'])
+  it('FR-SYNC-03 branch without upstream, PushTarget cannot push straight away: clicking Push opens the set-upstream dialog; confirming pushes to the target remote', async () => {
+    setRefs({ upstream: '' })
+    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
     const { body } = await mountControls()
 
-    expect(body.get('[data-test="upstream-remote"]').text()).toBe('origin')
+    await findButton(body, 'Push')!.trigger('click')
+    await flushPromises()
+
+    expect(Facade.Push).not.toHaveBeenCalled()
+    await body.get('[data-test="set-upstream-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
   })
 
-  it('FR-SYNC-03 picking a remote then clicking "Push and set upstream" calls Facade.Push with that remote', async () => {
-    setRefs({ upstream: '' }, ['upstream', 'origin'])
-    const { body } = await mountControls()
+  it('FR-SYNC-03 Ctrl+Shift+K pushes without an upstream too, when PushTarget can push straight away (old: nothing)', async () => {
+    setRefs({ upstream: '' })
+    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: true })
+    await mountControls()
 
-    await findButton(body, 'Push and set upstream')!.trigger('click')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'K', ctrlKey: true, shiftKey: true }))
+    await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledTimes(1)
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
   })
 

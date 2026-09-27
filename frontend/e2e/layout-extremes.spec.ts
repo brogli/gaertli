@@ -42,7 +42,7 @@ async function assertToolbarFitsOneRow(page: Page, width: number, query = ''): P
   expectNoOverlap(known)
 }
 
-test('FR-UX-09 narrow (400 x 800, the window minimum): the toolbar stays one row, a branch without an upstream ("Push and set upstream")', async ({
+test('FR-UX-09 narrow (400 x 800, the window minimum): the toolbar stays one row, a branch without an upstream (Push alone)', async ({
   page,
 }) => {
   await assertToolbarFitsOneRow(page, 400)
