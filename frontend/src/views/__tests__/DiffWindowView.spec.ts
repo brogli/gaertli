@@ -322,6 +322,23 @@ describe('DiffWindowView', () => {
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'b.txt', 0)
   })
 
+  it('FR-DIFF-09 the file list and the diff sit in the outer splitter, sized as last remembered', async () => {
+    localStorage.setItem('nebegit.layout.diffWindow', JSON.stringify([30, 70]))
+
+    const wrapper = await mountWindow({
+      kind: DiffKind.CommitDiff,
+      sha: 'abc',
+      path: 'a.txt',
+      oldPath: '',
+    })
+
+    const panels = wrapper.findAll('.p-splitterpanel')
+    expect(panels).toHaveLength(2)
+    expect(panels[0]!.find('.file-list').exists()).toBe(true)
+    expect(panels[0]!.attributes('style')).toContain('calc(30%')
+    expect(panels[1]!.findComponent(DiffView).exists()).toBe(true)
+  })
+
   it('FR-DIFF-10 the toggle switches the working tree groups to folder trees; a file there shows its diff', async () => {
     Facade.Status.mockResolvedValue(
       changedFilesFixture({

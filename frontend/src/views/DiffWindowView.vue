@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { Window } from '@wailsio/runtime'
 import { useEventListener } from '@vueuse/core'
+import Splitter from 'openvue/splitter'
+import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
@@ -139,41 +141,49 @@ useEventListener(
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 gap-4">
-    <aside class="file-list max-w-[35%] flex-none overflow-auto pl-2.5">
-      <ErrorBanner v-if="error" :error="error" />
-      <div class="flex justify-end">
-        <FileTreeToggle v-model:as-tree="asTree" />
-      </div>
-      <template v-for="g in groups" :key="g.title">
-        <template v-if="g.files.length">
-          <h3 v-if="g.title" class="mt-2 mb-1 text-sm">{{ g.title }}</h3>
+  <Splitter
+    layout="horizontal"
+    class="flex h-full min-h-0"
+    state-key="nebegit.layout.diffWindow"
+    state-storage="local"
+  >
+    <SplitterPanel :size="25" :min-size="10" class="flex min-h-0 flex-col">
+      <ErrorBanner v-if="error" :error="error" class="mx-2.5 mt-2.5" />
+      <aside class="file-list min-h-0 flex-1 overflow-auto pl-2.5">
+        <div class="flex justify-end">
+          <FileTreeToggle v-model:as-tree="asTree" />
+        </div>
+        <template v-for="g in groups" :key="g.title">
+          <template v-if="g.files.length">
+            <h3 v-if="g.title" class="mt-2 mb-1 text-sm">{{ g.title }}</h3>
+            <component
+              :is="asTree ? ChangedFileTree : ChangedFileList"
+              :files="g.files"
+              :selected="current?.staged === g.staged ? current.file : null"
+              @select="(f) => show(f, g.staged)"
+              @open-editor="openEditor"
+            />
+          </template>
+        </template>
+        <template v-if="conflicted.length">
+          <h3 class="mt-2 mb-1 text-sm">{{ t('changesView.conflictedTitle') }}</h3>
           <component
             :is="asTree ? ChangedFileTree : ChangedFileList"
-            :files="g.files"
-            :selected="current?.staged === g.staged ? current.file : null"
-            @select="(f) => show(f, g.staged)"
+            :files="conflicted"
+            @open="openEditor"
             @open-editor="openEditor"
           />
         </template>
-      </template>
-      <template v-if="conflicted.length">
-        <h3 class="mt-2 mb-1 text-sm">{{ t('changesView.conflictedTitle') }}</h3>
-        <component
-          :is="asTree ? ChangedFileTree : ChangedFileList"
-          :files="conflicted"
-          @open="openEditor"
-          @open-editor="openEditor"
-        />
-      </template>
-    </aside>
-    <!-- The diff takes the rest of the window, not just its content's width. -->
-    <DiffView
-      class="min-w-0 flex-auto overflow-auto"
-      :wt="wt"
-      :target="target"
-      :status="current?.file.status ?? ''"
-      @step-file="stepFile"
-    />
-  </div>
+      </aside>
+    </SplitterPanel>
+    <SplitterPanel :size="75" :min-size="30">
+      <DiffView
+        class="h-full overflow-auto"
+        :wt="wt"
+        :target="target"
+        :status="current?.file.status ?? ''"
+        @step-file="stepFile"
+      />
+    </SplitterPanel>
+  </Splitter>
 </template>
