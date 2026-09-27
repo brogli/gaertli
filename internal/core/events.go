@@ -23,7 +23,7 @@ type RepoChanged struct {
 type ChangeScope string
 
 const (
-	RefsChanged      ChangeScope = "refs"      // HEAD, refs/, packed-refs — any worktree's
+	RefsChanged      ChangeScope = "refs"      // HEAD, refs/, packed-refs, config — any worktree's
 	IndexChanged     ChangeScope = "index"     // a worktree's index file, or its working tree (status poll)
 	WorktreesChanged ChangeScope = "worktrees" // an entry added/removed under worktrees/
 	StateChanged     ChangeScope = "state"     // MERGE_HEAD, CHERRY_PICK_HEAD, REVERT_HEAD, rebase-*, sequencer/
