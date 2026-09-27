@@ -33,9 +33,8 @@ func Open(debugMode bool) (logger *slog.Logger, path string, closer io.Closer, l
 	return slog.New(slog.NewTextHandler(f, opts)), path, f, level, nil
 }
 
-// SetLevel sets level to Debug when debugMode is true, or when
-// NEBEGIT_LOG=debug is set (which forces Debug regardless of debugMode),
-// else Info.
+// SetLevel sets level to Debug when debugMode is true or NEBEGIT_LOG=debug
+// is set, else Info.
 func SetLevel(level *slog.LevelVar, debugMode bool) {
 	if debugMode || os.Getenv("NEBEGIT_LOG") == "debug" {
 		level.Set(slog.LevelDebug)
@@ -60,8 +59,7 @@ func openFile() (*os.File, string, error) {
 }
 
 // rotate renames an oversized path to path+".1", replacing an older one. A
-// missing or undersized file is left alone; a failed rename is not fatal —
-// Open still proceeds, appending to the existing file.
+// failed rename leaves Open appending to the existing file.
 func rotate(path string) {
 	info, err := os.Stat(path)
 	if err != nil || info.Size() <= maxSize {

@@ -154,8 +154,7 @@ func (w *RepoWatcher) fallbackLoop(interval time.Duration, check func()) {
 	}
 }
 
-// CheckNow runs one immediate fallback-walk pass, independent of its own
-// timer. Used by the fallback ticker and by Refresh.
+// CheckNow runs one fallback-walk pass now, outside the ticker's schedule.
 func (w *RepoWatcher) CheckNow() {
 	next := w.walk()
 

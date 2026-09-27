@@ -27,8 +27,7 @@ func TestFR_LOG_02_LinearHistoryDrawsOneLaneIntoAndOutOfEachDot(t *testing.T) {
 	}
 }
 
-// TestFR_LOG_02_MergeDrawsALineToEachParentsLane: B and C, both off A,
-// merge into M. Topo order (newest first) feeds M, B, C, A.
+// B and C, both off A, merge into M. Topo order (newest first) feeds M, B, C, A.
 func TestFR_LOG_02_MergeDrawsALineToEachParentsLane(t *testing.T) {
 	l := NewLayout()
 
@@ -48,8 +47,7 @@ func TestFR_LOG_02_MergeDrawsALineToEachParentsLane(t *testing.T) {
 	}
 }
 
-// TestFR_LOG_02_ForkDrawsEachBranchIntoTheSharedCommit: the same history;
-// A is where B's and C's lanes meet.
+// The same history: A is where B's and C's lanes meet.
 func TestFR_LOG_02_ForkDrawsEachBranchIntoTheSharedCommit(t *testing.T) {
 	l := NewLayout()
 	l.Next(Commit{SHA: "M", Parents: []string{"B", "C"}})
@@ -75,9 +73,9 @@ func TestFR_LOG_02_OctopusMergeDrawsALineToEveryParent(t *testing.T) {
 	}
 }
 
-// TestFR_LOG_02_LinesMeetAtRowBoundaries: on a random history, the lanes
-// leaving a row at its bottom (through, out) are exactly the lanes entering
-// the next row at its top (through, in), each in the same colour.
+// On a random history, the lanes leaving a row at its bottom (through, out)
+// are exactly the lanes entering the next row at its top (through, in),
+// each in the same colour.
 func TestFR_LOG_02_LinesMeetAtRowBoundaries(t *testing.T) {
 	l := NewLayout()
 	var above map[int]int
@@ -94,8 +92,6 @@ func TestFR_LOG_02_LinesMeetAtRowBoundaries(t *testing.T) {
 	}
 }
 
-// TestFR_LOG_02_FreedLaneIsReusedBelowTheFork: a lane that ends in a fork
-// is free for the next branch tip.
 func TestFR_LOG_02_FreedLaneIsReusedBelowTheFork(t *testing.T) {
 	l := NewLayout()
 	l.Next(Commit{SHA: "X", Parents: []string{"R"}})
@@ -111,8 +107,7 @@ func TestFR_LOG_02_FreedLaneIsReusedBelowTheFork(t *testing.T) {
 	}
 }
 
-// TestFR_LOG_02_WideForkOverflowsPastCap: 40 branches share one root, past
-// the 32-lane cap. The 8 tips past the cap draw only their dot.
+// 40 branches share one root, past the 32-lane cap. The 8 tips past the cap draw only their dot.
 func TestFR_LOG_02_WideForkOverflowsPastCap(t *testing.T) {
 	l := NewLayout()
 

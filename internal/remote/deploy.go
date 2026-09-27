@@ -11,9 +11,7 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// wslRunner runs a command inside a distro: production wires it to the real
-// wsl.exe (Windows-only, distrocore_windows.go/distrocore_other.go), tests
-// wire it to a fake.
+// wslRunner runs a command inside a distro: WslRun, or a fake in tests.
 type wslRunner func(ctx context.Context, distro string, args ...string) (*exec.Cmd, error)
 
 // Consent asks before the shell places its helper program and the nebegit

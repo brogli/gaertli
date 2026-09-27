@@ -291,8 +291,6 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 	}
 }
 
-// TestFR_ED_11_EditorProfilesRoundTripPerEnvironment round-trips one
-// profile for local ("") and one for a WSL distro.
 func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
 	want := settings.Settings{Preferences: settings.Preferences{
 		EditorProfiles: map[string]core.EditorProfile{
@@ -306,9 +304,7 @@ func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
 	}
 }
 
-// TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey: an older settings
-// file's bare "editor" key is ignored by encoding/json's unknown-field
-// handling, with no migration to write.
+// encoding/json ignores an older settings file's bare "editor" key.
 func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
 	if got := loadJSON(t, `{"editor": "editor"}`); len(got.EditorProfiles) != 0 {
 		t.Errorf("EditorProfiles = %+v, want empty", got.EditorProfiles)

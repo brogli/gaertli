@@ -162,9 +162,8 @@ func (m *Manager) finish(ctx context.Context, id ID, result any, err error) {
 	}
 }
 
-// trimHistoryLocked drops the oldest finished jobs beyond historyCap,
-// newest-first; a running job is never counted or dropped.
-// m.mu must be held.
+// trimHistoryLocked keeps the historyCap newest finished jobs; a running job
+// is never dropped. m.mu must be held.
 func (m *Manager) trimHistoryLocked() {
 	finished := 0
 	for i, id := range slices.Backward(m.order) {

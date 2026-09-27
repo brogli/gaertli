@@ -58,14 +58,12 @@ func (d *DistroCore) LiveClient() (*Client, bool) {
 	return d.client, d.client != nil
 }
 
-// Ensure returns a live client, (re)spawning the core process if none is
-// running or the last one exited. respawned is true only when a spawn just
-// happened; the caller then re-opens every worktree it had open against
-// this distro, since a fresh core has no sessions. A spawn also sets up the
+// Ensure returns a live client, spawning the core process if none runs.
+// respawned is true only when a spawn just happened: a fresh core has no
+// sessions, so the caller re-opens its worktrees. A spawn also sets up the
 // nebegit command. Concurrent callers during a spawn share the one attempt.
-// A failure to start is logged at Warn, naming distro; one because distro
-// is not installed is core.DistroNotFound, one because it runs on WSL 1
-// core.WslUnsupported.
+// A failed start is logged; a distro not installed is core.DistroNotFound,
+// one on WSL 1 core.WslUnsupported.
 func (d *DistroCore) Ensure(ctx context.Context) (*Client, bool, error) {
 	// One start lists the distros at most once, for the WSL 1 check and a
 	// failure alike.

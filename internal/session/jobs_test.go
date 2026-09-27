@@ -55,9 +55,8 @@ func TestFR_SYNC_07_RepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 	}
 }
 
-// TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock proves a
-// job whose fn takes the worktree lock is not a bypass: a concurrent direct
-// Lock() waits for it, like any other write.
+// A job whose fn takes the worktree lock is no bypass: a concurrent direct
+// Lock() waits for it.
 func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
@@ -83,9 +82,7 @@ func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T
 	}
 }
 
-// TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock proves
-// a job whose fn takes no lock (fetch/push touch refs and objects only)
-// runs to completion regardless of a concurrent Worktree.Lock() section.
+// fetch and push touch refs and objects only, so their jobs take no lock.
 func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
@@ -119,9 +116,7 @@ func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing
 	}
 }
 
-// TestQA_SAFE_04_CancelReleasesAWorktreeLockHeldByTheJob proves cancelling
-// a job whose fn holds wt.Lock() releases it: the fn's deferred Unlock runs
-// once ctx.Done() unblocks it.
+// The fn's deferred Unlock runs once ctx.Done() unblocks it.
 func TestQA_SAFE_04_CancelReleasesAWorktreeLockHeldByTheJob(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})

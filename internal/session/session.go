@@ -127,10 +127,8 @@ func (r *Repo) release() bool {
 	return r.refcount == 0
 }
 
-// LogBeginLoad marks a load started, returning the generation it started
-// (threaded through streamLog to LogAppend/LogFinish). ok is false (no-op
-// for the caller) if a load is already running or has already finished —
-// LoadLog's idempotency.
+// LogBeginLoad marks a load started and returns its generation. ok is false
+// if a load is running or has finished.
 func (r *Repo) LogBeginLoad() (gen int, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -202,8 +200,7 @@ type LogView struct {
 }
 
 // LogSnapshot returns a snapshot of rows [from, to), clamped to
-// [0, len(log)), the current loaded count, and whether the load has
-// finished.
+// [0, len(log)).
 func (r *Repo) LogSnapshot(from, to int) LogView {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -437,13 +434,9 @@ func NewManager(sink core.EventSink) *Manager {
 }
 
 // Resolve validates path and returns its worktree's identity (toplevel, git
-// dir, repo key) without minting or reusing any session: Open's stateless
-// half, so listing a repo's worktrees never starts a poller or watcher for
-// a repo no window has selected. Errors are exactly Open's own:
-//   - Code GitTooOld: from Runner.CheckVersion (git absent, unparsable, or
-//     older than MinVersion)
-//   - Code NotARepo: rev-parse failed (bad Dir, or not inside a work tree)
-//     or --is-inside-work-tree printed anything but "true"
+// dir, repo key) without minting or reusing a session, so listing a repo's
+// worktrees starts no poller or watcher. A missing or too old git is Code
+// GitTooOld; a path outside a work tree is Code NotARepo.
 func (m *Manager) Resolve(ctx context.Context, path core.RepoPath) (toplevel, gitDir, repoKey string, err error) {
 	if _, err := m.discover.CheckVersion(ctx); err != nil {
 		return "", "", "", err
