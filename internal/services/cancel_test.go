@@ -109,13 +109,10 @@ func (h stalledHook) release() { _ = os.Remove(h.hold) }
 // waits for it to end cancelled.
 func (h stalledHook) cancel(t *testing.T, c *Core, wt core.WorktreeID, job string) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for _, err := os.Stat(h.stalled); err != nil; _, err = os.Stat(h.stalled) {
-		if time.Now().After(deadline) {
-			t.Fatal("git did not reach the stalling hook within 5s")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	waitFor(t, func() bool {
+		_, err := os.Stat(h.stalled)
+		return err == nil
+	})
 	start := time.Now()
 	if err := c.CancelJob(t.Context(), wt, job); err != nil {
 		t.Fatal(err)

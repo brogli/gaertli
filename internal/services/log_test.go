@@ -664,19 +664,16 @@ func waitFor(t *testing.T, cond func() bool) {
 // finishes.
 func waitForLogRows(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsResult {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		res, err := c.LogRows(t.Context(), id, 0, 1000)
+	var res core.LogRowsResult
+	waitFor(t, func() bool {
+		var err error
+		res, err = c.LogRows(t.Context(), id, 0, 1000)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res.Done {
-			return res
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("log did not finish loading in time")
-	return core.LogRowsResult{}
+		return res.Done
+	})
+	return res
 }
 
 func commitOrphan(t *testing.T, dir, branch, file, msg string) {

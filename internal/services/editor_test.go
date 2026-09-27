@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/core/coretest"
@@ -48,15 +47,13 @@ func pushArgvWriter(t *testing.T, c *Core) string {
 // returns its content, failing t if it never shows up.
 func waitForFile(t *testing.T, outFile string) string {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if content, err := os.ReadFile(outFile); err == nil {
-			return string(content)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("helper never wrote its argv file")
-	return ""
+	var content []byte
+	waitFor(t, func() bool {
+		var err error
+		content, err = os.ReadFile(outFile)
+		return err == nil
+	})
+	return string(content)
 }
 
 // assertNoEditorStarted fails t if outFile exists: the helper never ran.

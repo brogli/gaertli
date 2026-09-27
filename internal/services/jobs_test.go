@@ -59,24 +59,24 @@ func TestFR_SYNC_07_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T)
 }
 
 // waitForJob polls Jobs until it returns a job matching want, and fails the
-// test if none arrives within 3s.
+// test if none arrives in time.
 func waitForJob(t *testing.T, c *Core, id core.WorktreeID, want func(core.JobInfo) bool) core.JobInfo {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
+	var match core.JobInfo
+	waitFor(t, func() bool {
 		list, err := c.Jobs(t.Context(), id)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, j := range list {
 			if want(j) {
-				return j
+				match = j
+				return true
 			}
 		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("timed out waiting for a matching job")
-	return core.JobInfo{}
+		return false
+	})
+	return match
 }
 
 // waitForJobState waits for job id to reach state.

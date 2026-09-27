@@ -390,17 +390,13 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
+	waitFor(t, func() bool {
 		res, err := c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(res.Rows) > 0 {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+		return len(res.Rows) > 0
+	})
 
 	// Swap in a different, faster fixture before the first load can finish,
 	// and start a second filter.
