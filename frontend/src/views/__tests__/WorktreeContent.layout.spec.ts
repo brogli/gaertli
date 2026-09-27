@@ -232,4 +232,16 @@ describe('WorktreeContent layouts', () => {
 
     expect(wrapper.get('textarea').element.value).toBe('WIP message')
   })
+
+  it('FR-UX-08 narrow (600): switching to Changes and back keeps the log list scroll position', async () => {
+    const wrapper = await mountAt(600)
+    const logList = wrapper.get('.log-list').element
+    logList.scrollTop = 42
+
+    await switchTo(wrapper, 'Changes')
+    await switchTo(wrapper, 'Log')
+
+    expect(wrapper.get('.log-list').element).toBe(logList)
+    expect(logList.scrollTop).toBe(42)
+  })
 })

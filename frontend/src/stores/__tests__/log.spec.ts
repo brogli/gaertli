@@ -357,4 +357,32 @@ describe('log store', () => {
       vi.useRealTimers()
     }
   })
+
+  it('FR-LOG-05 nextMatch and prevMatch wrap at the ends', async () => {
+    vi.useFakeTimers()
+    try {
+      const log = useLogStore()
+      await log.load('/repo')
+      Facade.SearchLog.mockResolvedValueOnce({ indices: [1, 2, 3], generation: 0, filtered: false })
+
+      log.query = 'fix'
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+      log.nextMatch() // current: first -> second
+      await flushPromises()
+      log.nextMatch() // current: second -> last
+      await flushPromises()
+      expect(log.current).toBe(2)
+
+      log.nextMatch() // wraps: last -> first
+      await flushPromises()
+      expect(log.current).toBe(0)
+
+      log.prevMatch() // wraps: first -> last
+      await flushPromises()
+      expect(log.current).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

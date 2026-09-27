@@ -95,4 +95,12 @@ describe('CompareWorkingView', () => {
 
     expect(compare.workingCommit).toBeNull()
   })
+
+  it('FR-UX-05 FR-CMP-04 pressing Escape leaves the working-tree compare', async () => {
+    const { compare } = await mountAgainstWorking()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+    expect(compare.workingCommit).toBeNull()
+  })
 })
