@@ -51,7 +51,7 @@ test('FR-CHG-06 Amend fills in the last message and replaces an unpushed commit 
   await checkbox(app, 'Amend last commit').check()
   await expect(messageBox(app)).toHaveValue('local subject\n\nlocal body')
   await expect(app.locator('.commit-box')).not.toContainText('already been pushed')
-  await expect(commitButton(app)).toHaveText('Amend')
+  await expect(commitButton(app)).toHaveAccessibleName('Amend')
 
   await messageBox(app).fill('amended')
   await commitButton(app).click()

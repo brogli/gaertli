@@ -169,7 +169,7 @@ test('FR-SYNC-03 a branch without upstream asks before pushing and sets one on i
   const app = await openApp(repos.work)
 
   await expect(syncButton(app, 'Pull')).toHaveCount(0)
-  await expect(syncButton(app, 'Push')).toHaveAttribute('title', 'Push')
+  await expect(syncButton(app, 'Push')).toHaveAttribute('title', 'Push · Ctrl+Shift+K')
   await syncButton(app, 'Push').click()
 
   const dialog = app.getByRole('dialog', { name: 'Push and set upstream' })
@@ -256,7 +256,7 @@ test('FR-SYNC-02 Pull with Rebase replays local commits on the upstream', async 
 }) => {
   remoteAheadAndLocalAhead(git, repos.work, repos.other)
   const app = await openApp(repos.work)
-  await expect(pullButton(app)).toHaveAttribute('title', 'Pull (merge)')
+  await expect(pullButton(app)).toHaveAttribute('title', 'Pull (merge) · Ctrl+T')
 
   await choosePull(app, 'rebase')
 
@@ -267,7 +267,7 @@ test('FR-SYNC-02 Pull with Rebase replays local commits on the upstream', async 
   // The menu's choice does not change the button: a reload still shows
   // Settings' default (merge, unset here).
   await app.reload()
-  await expect(pullButton(app)).toHaveAttribute('title', 'Pull (merge)')
+  await expect(pullButton(app)).toHaveAttribute('title', 'Pull (merge) · Ctrl+T')
 })
 
 test.describe('the Pull button follows the default pull mode', () => {
