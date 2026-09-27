@@ -119,6 +119,7 @@ describe('DiffView', () => {
   // it rather than loading it itself, so its tests preload it too.
   beforeEach(async () => {
     setActivePinia(createPinia())
+    localStorage.clear()
     for (const fn of Object.values(Facade)) fn.mockReset().mockResolvedValue(undefined)
     Facade.Status.mockResolvedValue(changedFilesFixture())
     SettingsService.Get.mockReset().mockResolvedValue(settings)
@@ -1232,6 +1233,31 @@ describe('DiffView', () => {
     oldA!.scrollLeft = 99
     oldA!.dispatchEvent(new Event('scroll'))
     expect(oldB!.scrollLeft).toBe(0)
+  })
+
+  it('FR-DIFF-09 side by side restores its saved sides splitter sizes, side a and b each in their own panel', async () => {
+    localStorage.setItem('nebegit.layout.diffSides', JSON.stringify([40, 60]))
+
+    const wrapper = await mountSideBySide()
+
+    const panels = wrapper.findAll<HTMLElement>('.p-splitterpanel')
+    expect(panels).toHaveLength(2)
+    expect(panels[0]!.element.style.flexBasis).toContain('40%')
+    expect(panels[0]!.find('.cm-merge-a').exists()).toBe(true)
+    expect(panels[1]!.find('.cm-merge-b').exists()).toBe(true)
+    expect(wrapper.get('.cm-mergeView').find('.cm-merge-a').exists()).toBe(true)
+    expect(wrapper.get('.cm-mergeView').find('.cm-merge-b').exists()).toBe(true)
+  })
+
+  it('FR-DIFF-09 unified mode has no sides splitter, one editor', async () => {
+    Facade.DiffFile.mockResolvedValue(
+      diffFileFixture({ oldContent: 'old\n', newContent: 'new\n', hunks: [hunk(1, 1, 1, 1)] }),
+    )
+
+    const wrapper = await mountCommit()
+
+    expect(wrapper.find('.p-splitter').exists()).toBe(false)
+    expect(wrapper.findAll('.cm-editor')).toHaveLength(1)
   })
 
   it('FR-UX-09 every toolbar button has a title and aria-label; the mode and ignore-whitespace toggles expose aria-pressed', async () => {

@@ -15,6 +15,8 @@ import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { classHighlighter } from '@lezer/highlight'
 import Button from 'openvue/button'
+import Splitter from 'openvue/splitter'
+import SplitterPanel from 'openvue/splitterpanel'
 import ToggleButton from 'openvue/togglebutton'
 import { useI18n } from '@/i18n'
 import { useDiffStore } from '@/stores/diff'
@@ -62,6 +64,11 @@ const { openEditor: openInEditor } = useOpenInEditor(() => props.wt, run)
 const { t } = useI18n()
 
 const container = ref<HTMLElement | null>(null)
+// hostA/hostB hold side-by-side's two editors, one in each splitter panel;
+// MergeView is built without a parent so they can live there instead of its
+// own wrappers (@codemirror/merge has no API to move an existing view).
+const hostA = ref<HTMLElement | null>(null)
+const hostB = ref<HTMLElement | null>(null)
 let view: EditorView | MergeView | null = null
 let untieScrollX: (() => void) | null = null
 
@@ -159,8 +166,12 @@ async function mountView(): Promise<void> {
   const seq = ++loadSeq
   destroyView()
   const file = diff.file
+  const sideBySide = mode.value === DiffMode.SideBySideDiff
   const el = container.value
-  if (!el || !file || file.binary || file.tooLarge) return
+  const a = hostA.value
+  const b = hostB.value
+  if (!file || file.binary || file.tooLarge) return
+  if (sideBySide ? !a || !b : !el) return
 
   const language = await languageExtensionFor(props.target.path)
   if (seq !== loadSeq) return
@@ -180,40 +191,45 @@ async function mountView(): Promise<void> {
     diffConfig: { override: hunkChanges(file.hunks ?? []) },
     highlightChanges: false,
   }
-  view =
-    mode.value === DiffMode.UnifiedDiff
-      ? new EditorView({
-          parent: el,
-          state: EditorState.create({
-            doc: file.newContent ?? '',
-            extensions: [
-              ...docExtensions,
-              unifiedMergeView({
-                original: Text.of((file.oldContent ?? '').split('\n')),
-                mergeControls: false,
-                ...gitDiff,
-              }),
-              EditorView.updateListener.of((update) => {
-                if (update.selectionSet) updateSelectedLinesEnabled()
-              }),
-            ],
+  if (sideBySide) {
+    if (!a || !b) return
+    const merge = new MergeView({
+      a: { doc: file.oldContent ?? '', extensions: docExtensions },
+      b: { doc: file.newContent ?? '', extensions: docExtensions },
+      ...gitDiff,
+    })
+    a.append(merge.a.dom)
+    b.append(merge.b.dom)
+    untieScrollX = useSyncedScrollX(merge.a.scrollDOM, merge.b.scrollDOM)
+    view = merge
+  } else {
+    if (!el) return
+    view = new EditorView({
+      parent: el,
+      state: EditorState.create({
+        doc: file.newContent ?? '',
+        extensions: [
+          ...docExtensions,
+          unifiedMergeView({
+            original: Text.of((file.oldContent ?? '').split('\n')),
+            mergeControls: false,
+            ...gitDiff,
           }),
-        })
-      : new MergeView({
-          parent: el,
-          a: { doc: file.oldContent ?? '', extensions: docExtensions },
-          b: { doc: file.newContent ?? '', extensions: docExtensions },
-          ...gitDiff,
-        })
-  if (view instanceof MergeView) untieScrollX = useSyncedScrollX(view.a.scrollDOM, view.b.scrollDOM)
+          EditorView.updateListener.of((update) => {
+            if (update.selectionSet) updateSelectedLinesEnabled()
+          }),
+        ],
+      }),
+    })
+  }
   chunks.value = view instanceof MergeView ? view.chunks : (getChunks(view.state)?.chunks ?? [])
   updateSelectedLinesEnabled()
 }
 
-// flush: 'post', so the .cm-container div exists when mountView reads it.
-// The "Loading…" placeholder replaces that div during a fetch, so a new div
+// flush: 'post', so the mount point(s) mountView reads exist. The
+// "Loading…" placeholder replaces them during a fetch, so a new element
 // mounts the view again even when the fetch returned the same diff.
-watch([() => diff.file, mode, container], mountView, { flush: 'post' })
+watch([() => diff.file, mode, container, hostA, hostB], mountView, { flush: 'post' })
 
 onBeforeUnmount(destroyView)
 
@@ -481,7 +497,19 @@ const toolbar = computed<ToolbarButton[]>(() => {
           </template>
         </div>
       </template>
-      <div v-if="showsContent" ref="container" class="cm-container"></div>
+      <template v-if="showsContent">
+        <Splitter
+          v-if="mode === DiffMode.SideBySideDiff"
+          class="cm-mergeView"
+          layout="horizontal"
+          state-key="nebegit.layout.diffSides"
+          state-storage="local"
+        >
+          <SplitterPanel :size="50" :min-size="15"><div ref="hostA"></div></SplitterPanel>
+          <SplitterPanel :size="50" :min-size="15"><div ref="hostB"></div></SplitterPanel>
+        </Splitter>
+        <div v-else ref="container" class="cm-container"></div>
+      </template>
     </template>
   </section>
 </template>
