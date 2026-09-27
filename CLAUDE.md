@@ -33,8 +33,9 @@ needs.
 - `docs/requirements/` is the only source of truth for what the app does. Rows read as generic,
   goal-oriented requirements written by people: what the user can do and gets, goal first, current
   state. Every behaviour an owner remark, a task plan or a review round settles becomes a row before
-  it is built. No UI arrangement, widget or library names, pixel values, log levels, file names,
-  dates or history.
+  it is built. UI rows (`ui.md` and each area's UI rows) may say how the UI is arranged: a toolbar,
+  a picker, a splitter, a shortcut shown on its button. No library or component names, pixel values,
+  log levels, file names, dates or history.
 - `docs/architecture/` reads like a design doc written by people: decisions and their reasons,
   structure, UI design, git command shapes. No implementation detail (file names below package
   level, per-method notes, mechanical flags, exit codes): that lives in code, tests and doc

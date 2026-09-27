@@ -232,7 +232,7 @@ test("FR-WT-03 a target folder with files in it is refused with git's message an
   expect(branchTip(git, repos.work, 'refused')).toBe('')
 })
 
-test('FR-WT-06 Create worktree here… on a log commit makes a worktree on a new branch at that commit', async ({
+test('FR-WT-02 Create worktree here… on a log commit makes a worktree on a new branch at that commit', async ({
   app,
   repos,
   sandbox,
@@ -251,7 +251,7 @@ test('FR-WT-06 Create worktree here… on a log commit makes a worktree on a new
   expect(branchTip(git, repos.work, 'at-logo')).toBe(commitSha(git, repos.work, 'add logo'))
 })
 
-test('FR-WT-06 New worktree from here… on a branch in the branch picker makes a worktree on that branch', async ({
+test('FR-WT-02 New worktree from here… on a branch in the branch picker makes a worktree on that branch', async ({
   app,
   repos,
   sandbox,

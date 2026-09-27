@@ -132,7 +132,7 @@ tasks:
       - sh -c 'cd dist && sha256sum * > SHA256SUMS'
 
   bench:
-    summary: Builds/refreshes the reference repo and runs the perf checks (on demand, also nightly)
+    summary: Builds/refreshes the reference repo and runs the perf checks (on demand)
     env: { GOPROXY: off, GOFLAGS: -mod=readonly, GOTOOLCHAIN: local }
     cmds:
       - go run ./tools/mkrepo/cmd/mkrepo --out .bench/reference-repo

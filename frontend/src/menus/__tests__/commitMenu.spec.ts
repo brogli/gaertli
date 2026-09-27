@@ -48,7 +48,7 @@ describe('buildOneCommitMenuItems', () => {
     ])
   })
 
-  it('FR-WT-06, FR-LOG-11 "Create worktree here…" calls openCreateWorktree with the row\'s sha', () => {
+  it('FR-WT-02, FR-LOG-11 "Create worktree here…" calls openCreateWorktree with the row\'s sha', () => {
     const a = oneCommitActions()
     const items = buildOneCommitMenuItems(row(), a, t)
 

@@ -294,7 +294,7 @@ describe('CreateWorktreeDialog', () => {
     expect(wrapper.emitted('close')).toBeUndefined()
   })
 
-  it('FR-WT-06 an existing-branch start preselects that branch in the dropdown', async () => {
+  it('FR-WT-02 an existing-branch start preselects that branch in the dropdown', async () => {
     const { body } = await mountDialog({
       repoPath: '/repo',
       start: { newBranch: false, branch: 'feature' },

@@ -351,7 +351,7 @@ describe('WorktreeContent', () => {
     wrapper.unmount()
   })
 
-  it('FR-WT-06, FR-LOG-11 "Create worktree here…" from the log opens the dialog pre-filled at that commit', async () => {
+  it('FR-WT-02, FR-LOG-11 "Create worktree here…" from the log opens the dialog pre-filled at that commit', async () => {
     const { wrapper } = await mountAndPickRowMenuItem('Create worktree here…')
 
     const dialog = wrapper.findComponent(CreateWorktreeDialog)
@@ -377,7 +377,7 @@ describe('WorktreeContent', () => {
     wrapper.unmount()
   })
 
-  it('FR-WT-06 "New worktree from here…" in the branch picker opens the dialog with its start', async () => {
+  it('FR-WT-02 "New worktree from here…" in the branch picker opens the dialog with its start', async () => {
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 

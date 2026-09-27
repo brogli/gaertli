@@ -100,7 +100,7 @@ describe('LogList', () => {
     ])
   })
 
-  it('FR-WT-06 clicking "Create worktree here…" emits create-worktree with the row\'s sha', async () => {
+  it('FR-WT-02 clicking "Create worktree here…" emits create-worktree with the row\'s sha', async () => {
     const { wrapper, body, rowEls } = await mountWithRows([sampleRow])
     await openMenu(wrapper, rowEls[0]!)
 

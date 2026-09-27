@@ -387,7 +387,7 @@ describe('BranchPicker', () => {
     ])
   })
 
-  it('FR-WT-06 "New worktree from here…" uses a free local branch itself, else starts a new branch at the ref', async () => {
+  it('FR-WT-02 "New worktree from here…" uses a free local branch itself, else starts a new branch at the ref', async () => {
     const { wrapper, body } = await openPicker()
 
     for (const name of ['feat', 'main', 'origin/x', 'v1']) {

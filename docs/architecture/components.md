@@ -85,9 +85,6 @@ editor start (Warn), a WSL core's stderr (Warn). A successful git command or edi
     with "Switch to worktree" and Cancel.
 - An error shown in place is an inline error message with the same headline, Try again and details
   as an error notice.
-- Models, for ideas only (OSS-05): the toolbar pickers take after the editor's title-bar pickers, the
-  branch picker after an IDE's branch popup, the diff window after an IDE's diff dialog; the
-  reset mode keep and updating a branch that is not checked out come from an IDE.
 
 ### Main layout
 

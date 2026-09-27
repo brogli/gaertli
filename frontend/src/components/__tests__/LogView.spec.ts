@@ -76,7 +76,7 @@ describe('LogView', () => {
     expect(wrapper.emitted('open')).toHaveLength(1)
   })
 
-  it("FR-WT-06 forwards LogList's create-worktree event with the row's sha", () => {
+  it("FR-WT-02 forwards LogList's create-worktree event with the row's sha", () => {
     const wrapper = mount(LogView, { props: { wt: '/repo' } })
 
     wrapper.findComponent(LogList).vm.$emit('create-worktree', 'abc123')

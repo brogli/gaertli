@@ -12,7 +12,7 @@ The test name carries the requirement ID (TR-30).
 | Frontend component tests | Stores and components with mocked bindings. The default for UI cases (TR-31).                                                                                                                                                                                   | Vitest, Vue Test Utils                |
 | Frontend e2e             | Cases a component test cannot prove (TR-31), against the Vite dev server with a mocked Go layer.                                                                                                                                                                | Playwright                            |
 | Real-backend e2e         | Flows that mocks cannot prove (TR-31). The app runs in Wails server mode with the real core; each test gets its own scratch repos, settings file and stand-in editor. Linux only.                                                                               | Playwright                            |
-| Performance checks       | A generated 100k-commit repo; asserts QA-PERF-02/04/06/07. On demand and nightly.                                                                                                                                                                               | Go test (`bench` tag), `tools/mkrepo` |
+| Performance checks       | A generated 100k-commit repo; asserts QA-PERF-02/04/06/07. On demand.                                                                                                                                                                                           | Go test (`bench` tag), `tools/mkrepo` |
 | Manual checklist         | What needs real windows, a real WSL distro or a human judgement (below).                                                                                                                                                                                        | owner, per platform                   |
 | Traceability check       | Every MUST FR ID has a test name or a manual entry.                                                                                                                                                                                                             | `tools/trace`, in CI                  |
 
@@ -55,6 +55,7 @@ an automated test.
 ## CI
 
 CI follows TR-14, TR-26 and TR-42. The mock and the real-backend e2e suites each run as their own
-Linux job on every push; the performance checks run nightly. One Linux job runs the Go tests with
-the race detector against the oldest supported git, built from source (QA-COMP-03). A Windows job
-runs the Go tests on Windows; the Windows app is cross-compiled in the Linux job (TR-26).
+Linux job on every push; the performance checks run on demand (`task bench`). One Linux job runs the
+Go tests with the race detector against the oldest supported git, built from source (QA-COMP-03). A
+Windows job runs the Go tests on Windows; the Windows app is cross-compiled in the Linux job
+(TR-26).
