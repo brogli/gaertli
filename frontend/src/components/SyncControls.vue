@@ -112,8 +112,8 @@ function onRetryJob(job: JobInfo): void {
   JOB_RETRIES[job.kind]?.(job)
 }
 
-// Gated the same as the Pull/Push buttons: a shortcut is never a bypass of
-// their own visibility (no upstream means no plain Pull/Push here).
+// Ctrl+T pulls only with an upstream, as the Pull button shows only then;
+// Ctrl+Shift+K pushes only where the Push button is enabled.
 useShortcut(
   (event) => event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 't',
   () => {
