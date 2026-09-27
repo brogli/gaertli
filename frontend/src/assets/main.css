@@ -81,6 +81,16 @@
        neither the green nor the red a diff uses for added/removed lines. */
     --nb-from: var(--nb-tone-blue);
     --nb-to: var(--nb-tone-orange);
+
+    /* A diff's added/removed line backgrounds: the tone mixed into the
+       editor background, distinct enough to meet FR-DIFF-11 in every
+       theme (measured in frontend/e2e/diff-colours.spec.ts). Markers use
+       darker shades in a light theme, where a line background this faint
+       cannot also reach 3:1 without failing the text's 4.5:1. */
+    --nb-diff-added: color-mix(in srgb, var(--nb-tone-green) 25%, var(--p-content-background));
+    --nb-diff-removed: color-mix(in srgb, var(--nb-tone-red) 25%, var(--p-content-background));
+    --nb-diff-added-marker: var(--p-green-600);
+    --nb-diff-removed-marker: var(--p-red-600);
   }
 
   :root.nebegit-dark {
@@ -94,6 +104,8 @@
     --nb-tone-cyan: var(--p-cyan-400);
     --nb-tone-purple: var(--p-purple-400);
     --nb-tone-indigo: var(--p-indigo-400);
+    --nb-diff-added-marker: var(--nb-tone-green);
+    --nb-diff-removed-marker: var(--nb-tone-red);
   }
 
   /* Headings are compact labels, not document titles: h1 is the start

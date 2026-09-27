@@ -24,6 +24,7 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useSyncedScrollX } from '@/composables/useSyncedScrollX'
+import { diffColours } from '@/lib/diffColours'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
 import { basename } from '@/lib/path'
 import { iconClass, type IconName } from '@/lib/icons'
@@ -171,6 +172,7 @@ async function mountView(): Promise<void> {
     EditorState.readOnly.of(true),
     EditorState.lineSeparator.of('\n'),
     FIXED_WIDTH_FONT,
+    diffColours,
     ...lang,
   ]
   // git's diff is line-based, so changed lines are marked whole.
