@@ -74,6 +74,31 @@ test("FR-BR-09 choosing a branch entry's action from its context menu closes the
   expect(pageErrors).toEqual([])
 })
 
+test('FR-BR-09, FR-UX-14 a branch entry\'s "…" menu opens below its button; one outside click closes the menu and the list', async ({
+  page,
+}) => {
+  await openBranchList(page)
+  const row = page
+    .locator('.p-popover .picker-rows > li')
+    .filter({ has: page.locator('[data-test=ref-row]') })
+    .nth(1)
+  const button = row.locator('[data-test=row-actions]')
+  const box = (await button.boundingBox())!
+  await button.click()
+  const menu = page.locator('.p-contextmenu')
+
+  const corner = await settledBox(page, menu)
+  expect(Math.abs(corner.x - box.x)).toBeLessThanOrEqual(2)
+  expect(Math.abs(corner.y - (box.y + box.height))).toBeLessThanOrEqual(2)
+
+  // Outside both: the log column's lower left, clear of the menu.
+  const logColumn = (await page.locator('.log-column').boundingBox())!
+  await page.mouse.click(logColumn.x + 10, logColumn.y + logColumn.height - 10)
+
+  await expect(menu).toBeHidden()
+  await expect(page.locator('.p-popover')).toBeHidden()
+})
+
 test("FR-BR-09 Shift+F10 in the branch list opens the active entry's context menu below it; Escape closes both", async ({
   page,
 }) => {
