@@ -5,5 +5,5 @@ defineProps<{ shortcut: string }>()
 </script>
 
 <template>
-  <span data-test="shortcut-hint" class="ms-auto text-sm text-muted-color">{{ shortcut }}</span>
+  <span data-test="shortcut-hint" class="ms-auto text-sm opacity-60">{{ shortcut }}</span>
 </template>
