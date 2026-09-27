@@ -1,26 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Theme as ThemeService } from '@openuxkit/themes'
 import { Theme } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+import { contrastRatio } from '@/testing/colour'
 import { applyTheme, darkThemes } from '../themes'
-
-// contrastRatio is the WCAG relative-luminance contrast ratio between two
-// sRGB hex colours (1 to 21).
-function contrastRatio(hexA: string, hexB: string): number {
-  const a = relativeLuminance(hexA)
-  const b = relativeLuminance(hexB)
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
-}
-
-function relativeLuminance(hex: string): number {
-  const channels = [1, 3, 5].map((start) =>
-    srgbToLinear(parseInt(hex.slice(start, start + 2), 16) / 255),
-  )
-  return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!
-}
-
-function srgbToLinear(c: number): number {
-  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-}
 
 describe('themes', () => {
   it('FR-UX-06 each theme meets WCAG AA contrast for its text and its accent button text', () => {

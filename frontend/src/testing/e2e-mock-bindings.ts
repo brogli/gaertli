@@ -19,9 +19,11 @@ import {
   type Worktree,
   type WorktreeID,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
-import type {
-  RecentRepo,
-  Preferences,
+import {
+  DiffMode,
+  Theme,
+  type RecentRepo,
+  type Preferences,
 } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import type { LogPathInfo } from '../../bindings/github.com/brogli/nebegit/internal/app/models'
 import { branchFixture } from '@/testing/fixtures/branch'
@@ -387,10 +389,20 @@ export const AppService = {
     return Promise.resolve({ path: '/mock/nebegit.log', error: '' })
   },
 }
+// themeParam/diffModeParam: ?theme= and ?diffMode=, matched against the
+// enums' own values, so a test reaches a theme or diff mode the app would
+// otherwise only apply by saving Settings.
+const themeParam = Object.values(Theme).find((t) => t === query.get('theme'))
+const diffModeParam = Object.values(DiffMode).find((m) => m === query.get('diffMode'))
+
 // storedSettings is the mock's whole persisted state: Set replaces it, Get
 // reads it back, so a save shows up without a reload, as the shell's
 // settings:changed event does.
-let storedSettings: Preferences = defaultSettingsFixture({ debugMode: query.has('debug') })
+let storedSettings: Preferences = defaultSettingsFixture({
+  debugMode: query.has('debug'),
+  ...(themeParam !== undefined ? { theme: themeParam } : {}),
+  ...(diffModeParam !== undefined ? { diffMode: diffModeParam } : {}),
+})
 
 export const SettingsService = {
   Get(): Promise<Preferences> {
