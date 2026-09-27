@@ -82,6 +82,14 @@ describe('CompareView', () => {
     expect(toTag.classes()).toContain('to')
   })
 
+  it('FR-UX-05 the close button names its shortcut in the tooltip, not in aria-label', async () => {
+    const { wrapper } = await mountComparing()
+
+    const exit = wrapper.get('[data-test="exit"]')
+    expect(exit.attributes('title')).toBe('Stop comparing · Esc')
+    expect(exit.attributes('aria-label')).toBe('Stop comparing')
+  })
+
   it('FR-CMP-01 pressing Escape exits the comparison', async () => {
     const { log } = await mountComparing()
 

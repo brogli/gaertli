@@ -71,7 +71,12 @@ useShortcut('Escape', () => compare.exit(), { inTextField: false })
         v-bind="ICON_BUTTON"
         :icon="iconClass('close')"
         data-test="exit"
-        :title="t('compareView.stopComparing')"
+        :title="
+          t('shortcuts.withShortcut', {
+            action: t('compareView.stopComparing'),
+            shortcut: t('shortcuts.stopComparing'),
+          })
+        "
         :aria-label="t('compareView.stopComparing')"
         @click="compare.exit"
       />

@@ -208,7 +208,12 @@ const sideView = computed<'details' | 'changes'>(() =>
         v-bind="toolbarButton"
         :icon="iconClass('refresh')"
         :label="compact ? '' : t('toolbar.refresh')"
-        :title="t('toolbar.refresh')"
+        :title="
+          t('shortcuts.withShortcut', {
+            action: t('toolbar.refresh'),
+            shortcut: t('shortcuts.refresh'),
+          })
+        "
         :aria-label="t('toolbar.refresh')"
         @click="refresh"
       />

@@ -176,7 +176,7 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findAll('.p-togglebutton').map((b) => b.text())).toContain('Changes (4)')
   })
 
-  it('FR-UX-09 medium (1200): Fetch, Refresh and Open in editor show icon only, with title and aria-label', async () => {
+  it('FR-UX-09 medium (1200): Fetch and Open in editor show icon only, with title and aria-label', async () => {
     Facade.Refs.mockResolvedValue({
       branches: [],
       remotes: [{ name: 'origin', branches: [] }],
@@ -184,7 +184,7 @@ describe('WorktreeContent layouts', () => {
     })
     const wrapper = await mountAt(1200)
 
-    for (const label of ['Fetch', 'Refresh', 'Open in editor']) {
+    for (const label of ['Fetch', 'Open in editor']) {
       const button = findButton(wrapper, label)!
       expect(button.classes()).toContain('p-button')
       button.get('.p-button-icon') // throws if the icon is missing
@@ -192,6 +192,14 @@ describe('WorktreeContent layouts', () => {
       expect(button.attributes('aria-label')).toBe(label)
       expect(button.find('.p-button-label').exists()).toBe(false)
     }
+  })
+
+  it('FR-UX-05 Refresh names its shortcut in the tooltip, not in aria-label', async () => {
+    const wrapper = await mountAt(1200)
+
+    const button = findButton(wrapper, 'Refresh')!
+    expect(button.attributes('title')).toBe('Refresh · F5')
+    expect(button.attributes('aria-label')).toBe('Refresh')
   })
 
   it('FR-UX-09 medium (1200): "Create branch here" also shows icon only, with title and aria-label', async () => {

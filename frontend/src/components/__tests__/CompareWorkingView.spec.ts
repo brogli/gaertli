@@ -88,6 +88,14 @@ describe('CompareWorkingView', () => {
     expect(fromTag.classes()).toContain('from')
   })
 
+  it('FR-UX-05 the close button names its shortcut in the tooltip, not in aria-label', async () => {
+    const { wrapper } = await mountAgainstWorking()
+
+    const exit = wrapper.get('[data-test="exit"]')
+    expect(exit.attributes('title')).toBe('Close · Esc')
+    expect(exit.attributes('aria-label')).toBe('Close')
+  })
+
   it('FR-CMP-04 clicking exit leaves the working-tree compare', async () => {
     const { wrapper, compare } = await mountAgainstWorking()
 
