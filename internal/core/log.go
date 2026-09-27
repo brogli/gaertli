@@ -21,9 +21,8 @@ type LogCommit struct {
 	Graph        GraphRow   `json:"graph"`
 }
 
-// RefLabel is one decoration on a commit. Name is the short
-// display form ("main", "origin/main", "v1.0", "HEAD"); Kind disambiguates
-// what --decorate=full's full ref path said it was.
+// RefLabel is one decoration on a commit. Name is the short display form
+// ("main", "origin/main", "v1.0", "HEAD").
 type RefLabel struct {
 	Name string  `json:"name"`
 	Kind RefKind `json:"kind"`
@@ -111,10 +110,9 @@ func (f LogFilter) Flat() bool {
 }
 
 // LogSearchResult is SearchLog's result: the matching rows' indices, in log
-// order, in the view Generation and Filtered identify together (as
-// LogProgress's own Filtered does): the worktree's filtered view, or the
-// repo's shared log. The two views number their generations separately, so
-// a frontend must check both to tell a stale answer from a fresh one.
+// order, in the view Filtered names (the worktree's filtered view or the
+// repo's shared log) at Generation. The two views number their generations
+// separately, so telling a stale answer needs both fields.
 type LogSearchResult struct {
 	Indices    []int `json:"indices,omitempty"`
 	Generation int   `json:"generation"`

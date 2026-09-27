@@ -53,11 +53,10 @@ type WindowAPI interface {
 	// StageLines stages (or, if reverse, unstages) the changed lines sel
 	// names in a fresh diff of path: the unstaged diff, or the staged diff
 	// if reverse. If that diff's sides no longer match sel.Fingerprint,
-	// path changed since it was shown: Code Internal, nothing written. Of
-	// the selected lines, those the fresh diff changes are staged; one it
-	// shows unchanged is skipped (as can happen for a selection taken from
-	// git diff -w's hunks), and a selection with no changed line is Code
-	// Internal too. Other refusals are GitFailed.
+	// path changed since it was shown: Code Internal, nothing written. A
+	// selected line the fresh diff shows unchanged is skipped (as for a
+	// selection from git diff -w's hunks); a selection with no changed line
+	// is Code Internal too. Other refusals are GitFailed.
 	StageLines(ctx context.Context, wt WorktreeID, path string, sel LineSelection, reverse bool) error
 
 	// DiscardFile discards path's working-tree changes: git clean for an
@@ -159,10 +158,9 @@ type WindowAPI interface {
 	// CheckoutCommit detaches wt's HEAD at sha. Same errors as Checkout.
 	CheckoutCommit(ctx context.Context, wt WorktreeID, sha string) error
 
-	// Reset moves wt's current branch, or its detached HEAD, to sha: always
-	// a resolved hash, so no --end-of-options or --. Refusals are
-	// GitFailed, e.g. --soft during a merge. --mixed and --hard never refuse
-	// a dirty tree or a conflict.
+	// Reset moves wt's current branch, or its detached HEAD, to sha, a
+	// resolved hash. Refusals are GitFailed, e.g. --soft during a merge.
+	// --mixed and --hard never refuse a dirty tree or a conflict.
 	Reset(ctx context.Context, wt WorktreeID, sha string, mode ResetMode) (ResetResult, error)
 
 	// UncommittedCount is the hard-reset dialog's number: tracked paths with
@@ -171,7 +169,7 @@ type WindowAPI interface {
 	UncommittedCount(ctx context.Context, wt WorktreeID) (int, error)
 
 	// CherryPick applies shas onto wt's HEAD, oldest first by committer date
-	// (ties: reverse of the given order, so pass log order). A merge commit
+	// (same-second ties in topological order). A merge commit
 	// among shas refuses the whole call before git runs. A stop that leaves
 	// CHERRY_PICK_HEAD (a conflict or an empty result) is Code Conflicts,
 	// left in place; any other refusal is GitFailed.
@@ -277,12 +275,11 @@ type WindowAPI interface {
 	// are classified like Push's.
 	ForcePush(ctx context.Context, wt WorktreeID) (string, error)
 
-	// UpdateBranch fast-forwards branch from its upstream as a job, before
-	// any job starts refusing branch with no upstream configured (Code
-	// NoUpstream) or checked out in any worktree (Code GitFailed, key
-	// branchCheckedOutElsewhere). Otherwise fetched straight into the
-	// branch; a diverged branch is NotFastForward. The job's Result is an
-	// UpdateBranchResult.
+	// UpdateBranch fast-forwards branch from its upstream as a job, fetching
+	// straight into it. Refused before the job starts: no upstream configured
+	// (Code NoUpstream), or checked out in a worktree (Code GitFailed, key
+	// branchCheckedOutElsewhere). A diverged branch is NotFastForward. The
+	// job's Result is an UpdateBranchResult.
 	UpdateBranch(ctx context.Context, wt WorktreeID, branch string) (string, error)
 
 	// ContinueOperation runs --continue for wt's in-progress merge, rebase,
@@ -351,10 +348,9 @@ type API interface {
 	// generated Forwarder would route it to the local core only.
 	SetEditorProfile(ctx context.Context, profile EditorProfile) error
 
-	// MainWorktree finds a repo's main worktree straight from its common
-	// git dir (gitDir), with no worktree of the caller's own needed: the
-	// repo picker's fallback when a repo's remembered worktree is gone.
-	// Bare with no worktree left is Code NotARepo.
+	// MainWorktree finds a repo's main worktree from its common git dir,
+	// for when the repo's remembered worktree is gone. A bare repo with no
+	// worktree left is Code NotARepo.
 	MainWorktree(ctx context.Context, gitDir RepoPath) (Worktree, error)
 }
 
