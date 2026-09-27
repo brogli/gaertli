@@ -183,8 +183,7 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
     <SetUpstreamDialog
       v-if="upstreamQuestion"
       :wt="wt"
-      :branch="upstreamQuestion.branch"
-      :remote="upstreamQuestion.remote"
+      v-bind="upstreamQuestion"
       @close="upstreamQuestion = null"
     />
   </div>

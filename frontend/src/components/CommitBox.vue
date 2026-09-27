@@ -26,7 +26,7 @@ const changes = useChangesStore()
 const repo = useRepoStore()
 const refs = useRefsStore()
 const { error, run, runAndClose } = useCoreCall()
-const { push, upstreamQuestion } = usePush(props.wt, run)
+const { push, upstreamQuestion } = usePush(() => props.wt, run)
 const { t } = useI18n()
 
 // The message lives in the changes store, where the window finds it on a
@@ -179,8 +179,7 @@ useShortcut(
     <SetUpstreamDialog
       v-if="upstreamQuestion"
       :wt="wt"
-      :branch="upstreamQuestion.branch"
-      :remote="upstreamQuestion.remote"
+      v-bind="upstreamQuestion"
       @close="upstreamQuestion = null"
     />
   </section>
