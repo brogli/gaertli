@@ -5,10 +5,9 @@ vars:
   BIN_DIR: 'bin'
   PACKAGE_MANAGER: pnpm
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
-  # Target OS for build/package/run. Defaults to the host OS, and is overridden
-  # by the Task variable (`task build GOOS=windows`) for cross-compilation. An
-  # exported GOOS=windows makes Task's shell miss pnpm, go and wails3 on PATH.
-  # The tasks below dispatch to the matching platform Taskfile via this variable.
+  # Target OS for build/package/run. Cross-compile with the Task variable
+  # (`task build GOOS=windows`): an exported GOOS=windows makes Task's shell
+  # miss pnpm, go and wails3 on PATH.
   GOOS: '{{.GOOS | default OS}}'
   # Stamped into internal/buildinfo.App via -ldflags -X. Set to a release tag
   # (e.g. v0.1.0) by the release workflow; "dev" for every local build.

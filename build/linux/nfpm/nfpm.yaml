@@ -20,7 +20,7 @@ contents:
     dst: '/usr/share/applications/nebegit.desktop'
 
 # GTK4, WebKitGTK 6.0, and git itself, unversioned: the app checks the
-# running git's version at start and shows a clear message if it's too old,
+# running git's version at start and shows a message if it's too old,
 # so the package avoids a version floor a package manager can't compare
 # reliably against upstream git's numbering across distros.
 depends:
