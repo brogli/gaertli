@@ -8,11 +8,9 @@ import (
 	"github.com/brogli/nebegit/internal/git"
 )
 
-// checkGit runs runner's "git --version" and reports whether it is on PATH
-// and at least git.MinVersion. When it is not, msg is the native message to
-// show: gitOutdated with the found and minimum versions when git ran but is
-// older, missingGit otherwise (not on PATH, or its version output could not
-// be parsed — the latter never happens with a real git).
+// checkGit reports whether runner's git runs and is at least
+// git.MinVersion. When not, msg is the native message to show: gitOutdated
+// with both versions when git ran but is older, else missingGit.
 func checkGit(ctx context.Context, runner git.Runner) (ok bool, msg string) {
 	_, err := runner.CheckVersion(ctx)
 	if err == nil {

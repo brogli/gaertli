@@ -240,9 +240,8 @@ type callingWindow interface {
 	SetTitle(title string) application.Window
 }
 
-// switchTo moves w's selection to path (selectInWindow), validated like
-// open. Unlike open, a failure is returned rather than shown: the picker
-// that asked has an ErrorBanner.
+// switchTo moves w's selection to path, validated like open. Unlike open, a
+// failure is returned rather than shown: the picker that asked shows it.
 func (sh shell) switchTo(ctx context.Context, w callingWindow, path string) error {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {
@@ -252,10 +251,8 @@ func (sh shell) switchTo(ctx context.Context, w callingWindow, path string) erro
 	return nil
 }
 
-// switchOrFocus is switchTo, except that when another window already shows
-// path's worktree that window is brought forward instead, leaving w
-// unchanged: "Open folder…"'s own rule, unlike SelectWorktree and
-// SelectRecentRepo, which always switch this window.
+// switchOrFocus is switchTo, except that a window already showing path's
+// worktree is brought forward instead, leaving w unchanged.
 func (sh shell) switchOrFocus(ctx context.Context, w callingWindow, path string) error {
 	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
 	if err != nil {

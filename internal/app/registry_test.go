@@ -702,8 +702,7 @@ func TestADR_9_DispatchReachesEveryWindowSharingASelection(t *testing.T) {
 	}
 }
 
-// inUse is the safety check a switch relies on before
-// releasing a worktree — true here since a second window still selects it.
+// A switch releases a worktree only when inUse is false.
 func TestADR_9_InUseIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
 	r, opener := newTestRegistry()
 

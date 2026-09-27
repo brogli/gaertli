@@ -421,8 +421,7 @@ func TestFR_WT_13_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t
 	}
 }
 
-// No RepoKey (an entry from before this fallback existed): the entry's own
-// error is returned as-is, no fallback attempted.
+// Without a RepoKey the entry's own error is returned as-is.
 func TestFR_WT_13_SelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")

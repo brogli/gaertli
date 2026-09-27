@@ -69,10 +69,9 @@ func TestTR_28_ForwarderCallsTheCoreWithTheIDTheRouterReturns(t *testing.T) {
 	}
 }
 
-// TestTR_28_FacadeMethodSetIsExactlyWindowAPI proves the bound Facade's
-// method set from the two interfaces, not from a list of names: every
-// Facade method is a WindowAPI method, and every API method outside
-// WindowAPI is absent from Facade.
+// Checked against the two interfaces, not a list of names: every Facade
+// method is a WindowAPI method, and no API method outside WindowAPI is on
+// Facade.
 func TestTR_28_FacadeMethodSetIsExactlyWindowAPI(t *testing.T) {
 	facade := reflect.TypeFor[*app.Facade]()
 	windowAPI := reflect.TypeFor[core.WindowAPI]()
