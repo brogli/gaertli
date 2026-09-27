@@ -20,17 +20,6 @@ const ADDED_MARKER_SELECTOR = '.cm-merge-b .cm-changedLineGutter'
 const REMOVED_MARKER_SELECTOR = '.cm-merge-a .cm-changedLineGutter, .cm-deletedLineGutter'
 const EDITOR_SELECTOR = '.cm-editor'
 
-// alphaOf reads a CSS colour's alpha channel: 1 for #rrggbb and for
-// rgb()/color(srgb …) with none given. parseColor (colour.ts) reads the
-// same three forms but only their r/g/b.
-function alphaOf(value: string): number {
-  const rgb = /^rgba?\(\s*[\d.]+[,\s]+[\d.]+[,\s]+[\d.]+(?:[,\s/]+([\d.]+))?\s*\)$/i.exec(value)
-  if (rgb) return rgb[1] === undefined ? 1 : Number(rgb[1])
-  const srgb = /^color\(srgb\s+[\d.]+\s+[\d.]+\s+[\d.]+(?:\s*\/\s*([\d.]+))?\s*\)$/i.exec(value)
-  if (srgb) return srgb[1] === undefined ? 1 : Number(srgb[1])
-  return 1
-}
-
 // resolvedBackground is the opaque colour the page paints behind selector's
 // first match, as a "rgb()" string: its own background-color, composited
 // ("source over") onto each ancestor's in turn, up to <html>. A diff
@@ -46,15 +35,12 @@ async function resolvedBackground(page: Page, selector: string): Promise<string>
     return colours
   }, selector)
 
-  let [r, g, b, a] = [0, 0, 0, 0]
-  for (let i = chain.length - 1; i >= 0; i--) {
-    const css = chain[i]!
-    const rgb = parseColor(css)
-    const ca = alphaOf(css)
-    r = rgb.r * ca + r * (1 - ca)
-    g = rgb.g * ca + g * (1 - ca)
-    b = rgb.b * ca + b * (1 - ca)
-    a = ca + a * (1 - ca)
+  let [r, g, b] = [0, 0, 0]
+  for (const css of chain.reverse()) {
+    const c = parseColor(css)
+    r = c.r * c.a + r * (1 - c.a)
+    g = c.g * c.a + g * (1 - c.a)
+    b = c.b * c.a + b * (1 - c.a)
   }
   return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`
 }

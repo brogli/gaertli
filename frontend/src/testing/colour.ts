@@ -1,22 +1,32 @@
-// RGB is an opaque sRGB colour, channels 0-255.
+// RGB is an sRGB colour, channels 0-255, with its alpha a, 0-1.
 export interface RGB {
   r: number
   g: number
   b: number
+  a: number
 }
 
 // parseColor reads a CSS colour in any form the app or a browser's
 // getComputedStyle produces: #rrggbb, rgb()/rgba(), or Chromium's
-// color(srgb r g b) serialization of a color-mix() result.
+// color(srgb r g b [/ a]) serialization of a color-mix() result. Alpha is 1
+// where none is given.
 export function parseColor(value: string): RGB {
   const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(value)
-  if (hex) return { r: parseInt(hex[1]!, 16), g: parseInt(hex[2]!, 16), b: parseInt(hex[3]!, 16) }
+  if (hex)
+    return { r: parseInt(hex[1]!, 16), g: parseInt(hex[2]!, 16), b: parseInt(hex[3]!, 16), a: 1 }
 
-  const rgb = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i.exec(value)
-  if (rgb) return { r: Number(rgb[1]), g: Number(rgb[2]), b: Number(rgb[3]) }
+  const rgb = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?/i.exec(value)
+  if (rgb)
+    return { r: Number(rgb[1]), g: Number(rgb[2]), b: Number(rgb[3]), a: Number(rgb[4] ?? 1) }
 
-  const srgb = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i.exec(value)
-  if (srgb) return { r: Number(srgb[1]) * 255, g: Number(srgb[2]) * 255, b: Number(srgb[3]) * 255 }
+  const srgb = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?/i.exec(value)
+  if (srgb)
+    return {
+      r: Number(srgb[1]) * 255,
+      g: Number(srgb[2]) * 255,
+      b: Number(srgb[3]) * 255,
+      a: Number(srgb[4] ?? 1),
+    }
 
   throw new Error(`unrecognised colour: ${value}`)
 }
