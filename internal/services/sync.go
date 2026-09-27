@@ -295,8 +295,7 @@ func currentRef(ctx context.Context, r git.Runner, dir string) (string, error) {
 
 // pushRemoteAndUpstream is the remote git would push ref to, and whether ref
 // has an upstream configured. Remote is %(push:remotename)'s
-// pushRemote/pushDefault/branch.remote, else the sole remote, else origin
-// if it exists — the fallbacks %(push:remotename) does not apply itself.
+// pushRemote/pushDefault/branch.remote, else fallbackPushRemote.
 // hasUpstream is %(upstream) non-empty, read fresh so a config-only change
 // (e.g. `git branch -u`) shows without waiting on a cached refs store.
 func pushRemoteAndUpstream(ctx context.Context, r git.Runner, dir, ref string) (remote string, hasUpstream bool, err error) {
@@ -307,22 +306,26 @@ func pushRemoteAndUpstream(ctx context.Context, r git.Runner, dir, ref string) (
 	if err != nil {
 		return "", false, err
 	}
-	fields := strings.SplitN(strings.TrimSuffix(string(result.Stdout), "\n"), "\x1f", 2)
-	hasUpstream = len(fields) > 1 && fields[1] != ""
-	if remote = fields[0]; remote != "" {
-		return remote, hasUpstream, nil
+	remote, upstream, _ := strings.Cut(strings.TrimSuffix(string(result.Stdout), "\n"), "\x1f")
+	if remote == "" {
+		remote, err = fallbackPushRemote(ctx, r, dir)
 	}
+	return remote, upstream != "", err
+}
+
+// fallbackPushRemote is the sole remote, else origin if it exists, else "":
+// the fallbacks %(push:remotename) does not apply itself.
+func fallbackPushRemote(ctx context.Context, r git.Runner, dir string) (string, error) {
 	remotes, err := remoteNames(ctx, r, dir)
-	if err != nil {
-		return "", hasUpstream, err
+	switch {
+	case err != nil:
+		return "", err
+	case len(remotes) == 1:
+		return remotes[0], nil
+	case slices.Contains(remotes, "origin"):
+		return "origin", nil
 	}
-	if len(remotes) == 1 {
-		return remotes[0], hasUpstream, nil
-	}
-	if slices.Contains(remotes, "origin") {
-		return "origin", hasUpstream, nil
-	}
-	return "", hasUpstream, nil
+	return "", nil
 }
 
 // pushAutoSetupRemote reads push.autoSetupRemote, false if unset. Unlike
@@ -333,10 +336,7 @@ func pushAutoSetupRemote(ctx context.Context, r git.Runner, dir string) (bool, e
 		Dir: dir, ReadOnly: true, Background: true,
 		Args: []string{"config", "--type=bool", "--get", "push.autoSetupRemote"},
 	})
-	if quietFailure(err, result) {
-		return false, nil
-	}
-	if err != nil {
+	if err != nil && !quietFailure(err, result) {
 		return false, err
 	}
 	return strings.TrimSpace(string(result.Stdout)) == "true", nil
