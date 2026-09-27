@@ -22,6 +22,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useChangesStore } from '@/stores/changes'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useSyncedScrollX } from '@/composables/useSyncedScrollX'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
 import { basename } from '@/lib/path'
@@ -56,6 +57,7 @@ const { error, run, runAndClose } = useCoreCall()
 const refetchCall = useCoreCall()
 const shownError = computed(() => error.value ?? refetchCall.error.value)
 const { confirmAction } = useConfirmAction()
+const { openEditor: openInEditor } = useOpenInEditor(() => props.wt, run)
 const { t } = useI18n()
 
 const container = ref<HTMLElement | null>(null)
@@ -95,7 +97,7 @@ useRepoChanged([ChangeScope.IndexChanged], () => {
 function openEditor(): void {
   const cm = changeTarget()
   const line = cm ? cm.state.doc.lineAt(cm.state.selection.main.head).number : 0
-  void run(() => Facade.OpenFile(props.wt, props.target.path, line))
+  openInEditor({ path: props.target.path, status: props.status ?? '' }, line)
 }
 
 // A binary or too-large file shows only its placeholder.

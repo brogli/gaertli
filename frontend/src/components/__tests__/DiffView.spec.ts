@@ -31,6 +31,8 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { Events, emit } from '@/testing/runtime'
 
 import DiffView from '../DiffView.vue'
+import NoticeArea from '../NoticeArea.vue'
+import { mountInBody } from '@/testing/mountInBody'
 import { DiffKind } from '@/lib/diffTarget'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
@@ -570,6 +572,24 @@ describe('DiffView', () => {
     await wrapper.get('[data-test="open-editor"]').trigger('click')
 
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'big.txt', 0)
+  })
+
+  it('FR-ED-06 the toolbar\'s "Open in editor" failing EDITOR_NOT_FOUND shows a notice, the diff stays', async () => {
+    Facade.DiffFile.mockResolvedValue(
+      diffFileFixture({ oldContent: 'old\n', newContent: 'new\n', hunks: [hunk(1, 1, 1, 1)] }),
+    )
+    Facade.OpenFile.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
+    )
+    const wrapper = await mountCommit()
+    const { body: notice } = await mountInBody(NoticeArea)
+
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+    await flushPromises()
+
+    expect(notice.text()).toContain('myed')
+    expect(wrapper.find('.cm-editor').exists()).toBe(true)
+    expect(wrapper.find('.error-banner').exists()).toBe(false)
   })
 
   it('FR-ED-02 "Open in editor" calls Facade.OpenFile with the commit-mode file, in commit mode', async () => {
