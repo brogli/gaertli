@@ -71,8 +71,7 @@ async function submit(): Promise<void> {
   if (wt) created.value = wt
 }
 
-// createdPath is the created worktree's path as core calls take it, called
-// only from the footer buttons shown once created is set.
+// createdPath is the created worktree's path as core calls take it.
 function createdPath(): string {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by the v-if="created" the calling buttons render under
   return toRepoPath(created.value!.path, props.distro)

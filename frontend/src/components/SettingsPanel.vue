@@ -155,7 +155,7 @@ const environments = computed(() => ['', ...distros.value])
 
 // editorEnvironments lists every environment with an editor form: each of
 // environments, and any distro no longer installed whose profile is still
-// stored (case: a stored "Debian" profile with only "Ubuntu" installed).
+// stored.
 const editorEnvironments = computed(() => [
   ...new Set([...environments.value, ...Object.keys(editorProfiles)]),
 ])
@@ -170,8 +170,7 @@ watch(
   { immediate: true },
 )
 
-// profile reads name's editor form state; the watch above guarantees an
-// entry exists for every name in editorEnvironments before it renders.
+// profile reads name's editor form state.
 function profile(name: string): EditorProfile {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- the watch above guarantees an entry for every name in editorEnvironments
   return editorProfiles[name]!

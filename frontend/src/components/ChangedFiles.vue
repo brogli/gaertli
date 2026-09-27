@@ -47,7 +47,6 @@ const listeners = {
         @click="asTree = !asTree"
       />
     </div>
-    <!-- The header stays; the files below it scroll. -->
     <div class="file-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       <ChangedFileTree v-if="asTree" :files="files" :selected="selected" v-on="listeners" />
       <ChangedFileList v-else :files="files" :selected="selected" v-on="listeners" />

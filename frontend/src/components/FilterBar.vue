@@ -14,8 +14,7 @@ import type { LogFilter } from '../../bindings/github.com/brogli/nebegit/interna
 // branches or tags narrow the log; the search field highlights matches
 // instead (debounced in the store) and steps through them with
 // Enter/Shift+Enter. Each field carries its own clear icon and applies at
-// once when cleared; there is no active-filter list or clear-all. The
-// branch field shows the log store's own filter, which the branch picker's
+// once when cleared. The branch field shows the log store's own filter, which the branch picker's
 // Show history also sets.
 const log = useLogStore()
 const refs = useRefsStore()

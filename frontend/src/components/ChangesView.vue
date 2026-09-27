@@ -117,8 +117,7 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
 </script>
 
 <template>
-  <!-- Sizing is the parent layout's job (WorktreeContent.vue). The change list
-       scrolls on its own; the commit box below it does not. -->
+  <!-- Sizing is the parent layout's job (WorktreeContent.vue). -->
   <aside class="changes-column flex h-full min-h-0 flex-col">
     <section class="changes-body flex flex-1 flex-col gap-3 overflow-auto py-2 px-2.5">
       <!-- The buttons move below the heading, together, when both do not fit. -->

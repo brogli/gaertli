@@ -121,8 +121,8 @@ async function onCommit(): Promise<void> {
   }
 }
 
-// an IDE's own commit binding. Gated the same as the Commit button: a
-// shortcut is never a bypass of the button's disabled state.
+// Ctrl+K is gated the same as the Commit button: a shortcut never bypasses
+// the button's disabled state.
 onKeyStroke(
   (event) => event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'k',
   (event) => {

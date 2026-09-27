@@ -55,7 +55,7 @@ onMounted(() => {
 const parentRef = ref<HTMLElement | null>(null)
 
 // Rows are one fixed-height line (subject ellipsised), so the virtualizer
-// never measures them: measuring shifted scrollTop while rows streamed in,
+// never measures them: measuring shifts scrollTop while rows stream in,
 // leaving a fresh list scrolled away from the top or blank.
 const ROW_HEIGHT = 24
 

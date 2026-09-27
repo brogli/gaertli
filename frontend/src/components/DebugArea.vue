@@ -19,8 +19,7 @@ function sample(kind: string, severity: 'error' | 'warn' | 'success', summary: s
 </script>
 
 <template>
-  <!-- A low strip along the window's bottom, the same shape as the toolbar
-       above the body (WorktreeContent.vue): fixed height, never grown or
+  <!-- The same shape as the toolbar (WorktreeContent.vue): never grown or
        shrunk by its siblings. -->
   <div class="flex flex-none items-center gap-2 py-1.5 px-2.5 border-t border-surface">
     <Button
