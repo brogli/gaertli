@@ -10,7 +10,7 @@ declare module 'vue-i18n' {
   export interface DefineLocaleMessage extends MessageSchema {}
 }
 
-// Composition API needs legacy: false, not yet v11's default.
+// Composition API needs legacy: false; v11 defaults to true.
 export const i18n = createI18n({
   legacy: false,
   locale: 'en',

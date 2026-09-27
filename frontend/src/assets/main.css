@@ -46,18 +46,15 @@
     height: 100%;
   }
 
-  /* A dense, tool-like base size: OpenVue's own component tokens (button
-     and form-field padding, tree indents, icon sizes, ...) are rem-based,
-     so this one change tightens paddings and gaps everywhere, not just in
-     app code. */
+  /* OpenVue's component tokens (paddings, tree indents, icon sizes) are
+     rem-based, so this base size tightens them too, not just app code. */
   html {
     font-size: 13px;
   }
 
   /* The page paints its own theme background: a host that shows a plain
      window colour behind a transparent page (WebView2 on Windows) would
-     otherwise show through wherever nothing else paints, in the theme's
-     own colours or not. */
+     otherwise show through wherever nothing else paints. */
   body {
     background: var(--p-content-background);
     color: var(--p-text-color);
