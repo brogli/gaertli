@@ -239,6 +239,24 @@ func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesTogether(t *t
 	}
 }
 
+func TestFR_CMP_04_CompareWithWorkingLeavesOutUntrackedFiles(t *testing.T) {
+	t.Parallel()
+	repo, c, id := openCompareRepo(t)
+	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
+	head := gittest.HeadSHA(t, repo.Dir)
+	writeFile(t, repo.Dir, "f1", "one, edited unstaged\n")
+	writeFile(t, repo.Dir, "untracked.txt", "new")
+
+	files, err := c.CompareWithWorking(t.Context(), id, head)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(files) != 1 || files[0].Path != "f1" || files[0].Status != "M" {
+		t.Errorf("CompareWithWorking = %+v, want only f1 modified, untracked.txt left out", files)
+	}
+}
+
 func TestFR_CMP_02_DiffRangeOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)

@@ -397,7 +397,7 @@ func TestFR_LOG_01_LogIndexOfFindsRowBySHA(t *testing.T) {
 	}
 }
 
-func TestQA_PERF_02_LargeLoadWritesCommitGraphOnce(t *testing.T) {
+func TestQA_PERF_08_LargeLoadWritesCommitGraphOnce(t *testing.T) {
 	prev := largeRepoRows.Load()
 	largeRepoRows.Store(3)
 	t.Cleanup(func() { largeRepoRows.Store(prev) })
