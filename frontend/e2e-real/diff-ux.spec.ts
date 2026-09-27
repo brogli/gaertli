@@ -149,7 +149,7 @@ test('FR-ED-02 a file opens in the editor from the commit detail view and the ch
   expect(editorCalls()[1]).toBe(`stand-in-editor ${path.join(repos.work, 'hunks.txt')}`)
 
   fs.rmSync(path.join(repos.work, 'docs/readme.md'))
-  await app.getByRole('button', { name: 'Details', exact: true }).click()
+  await app.getByRole('tab', { name: 'Details', exact: true }).click()
   await commitFile(app, 'readme.md').locator('[data-test=open-editor]').click()
   await expect(app.locator('.commit-details .error-banner')).toContainText(
     'docs/readme.md no longer exists in this worktree',

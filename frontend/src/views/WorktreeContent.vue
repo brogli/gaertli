@@ -3,7 +3,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from '@/i18n'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
-import SelectButton from 'openvue/selectbutton'
+import Tabs from 'openvue/tabs'
+import TabList from 'openvue/tablist'
+import Tab from 'openvue/tab'
+import TabPanels from 'openvue/tabpanels'
+import TabPanel from 'openvue/tabpanel'
 import Button from 'openvue/button'
 import { useRepoStore } from '@/stores/repo'
 import { useRefsStore } from '@/stores/refs'
@@ -150,15 +154,6 @@ const changesLabel = computed(() =>
     : t('layout.switchChanges'),
 )
 
-const sideOptions = computed(() => [
-  { label: t('layout.switchDetails'), value: 'details' as const },
-  { label: changesLabel.value, value: 'changes' as const },
-])
-const narrowOptions = computed(() => [
-  { label: t('layout.switchLog'), value: 'log' as const },
-  ...sideOptions.value,
-])
-
 // The medium layout's side panel never shows Log; a stale 'log' value
 // (carried over from narrow, before a resize) falls back to Details.
 const sideView = computed<'details' | 'changes'>(() =>
@@ -266,40 +261,49 @@ const sideView = computed<'details' | 'changes'>(() =>
       <!-- The medium layout's side panel: the switch fixed on top, the
            chosen view below filling the rest. -->
       <SplitterPanel :size="40" :min-size="20" class="side-column flex min-h-0 min-w-0 flex-col">
-        <SelectButton
-          v-model="view"
-          :options="sideOptions"
-          option-label="label"
-          option-value="value"
-          :allow-empty="false"
-        />
-        <div v-show="sideView === 'details'" class="flex min-h-0 flex-1 flex-col">
-          <CommitDetailView :wt="wt" />
-        </div>
-        <div v-show="sideView === 'changes'" class="flex min-h-0 flex-1 flex-col">
-          <ChangesView :wt="wt" />
-        </div>
+        <Tabs
+          :value="sideView"
+          select-on-focus
+          :show-navigators="false"
+          class="min-h-0 flex-1"
+          @update:value="view = $event as 'details' | 'changes'"
+        >
+          <TabList :pt="{ tabList: { 'aria-label': t('layout.views') } }">
+            <Tab value="details">{{ t('layout.switchDetails') }}</Tab>
+            <Tab value="changes">{{ changesLabel }}</Tab>
+          </TabList>
+          <TabPanels class="flex min-h-0 flex-1 flex-col p-0">
+            <TabPanel value="details" class="flex min-h-0 flex-1 flex-col p-0">
+              <CommitDetailView :wt="wt" />
+            </TabPanel>
+            <TabPanel value="changes" class="flex min-h-0 flex-1 flex-col p-0">
+              <ChangesView :wt="wt" />
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
       </SplitterPanel>
     </Splitter>
     <!-- The narrow layout's single view is the side panel's same shape,
          full width instead of a side panel. -->
     <div v-else class="worktree-body flex min-h-0 min-w-0 flex-1 flex-col">
-      <SelectButton
-        v-model="view"
-        :options="narrowOptions"
-        option-label="label"
-        option-value="value"
-        :allow-empty="false"
-      />
-      <div v-show="view === 'log'" class="flex min-h-0 flex-1 flex-col">
-        <LogView :wt="wt" v-on="logViewListeners" />
-      </div>
-      <div v-show="view === 'details'" class="flex min-h-0 flex-1 flex-col">
-        <CommitDetailView :wt="wt" />
-      </div>
-      <div v-show="view === 'changes'" class="flex min-h-0 flex-1 flex-col">
-        <ChangesView :wt="wt" />
-      </div>
+      <Tabs v-model:value="view" select-on-focus :show-navigators="false" class="min-h-0 flex-1">
+        <TabList :pt="{ tabList: { 'aria-label': t('layout.views') } }">
+          <Tab value="log">{{ t('layout.switchLog') }}</Tab>
+          <Tab value="details">{{ t('layout.switchDetails') }}</Tab>
+          <Tab value="changes">{{ changesLabel }}</Tab>
+        </TabList>
+        <TabPanels class="flex min-h-0 flex-1 flex-col p-0">
+          <TabPanel value="log" class="flex min-h-0 flex-1 flex-col p-0">
+            <LogView :wt="wt" v-on="logViewListeners" />
+          </TabPanel>
+          <TabPanel value="details" class="flex min-h-0 flex-1 flex-col p-0">
+            <CommitDetailView :wt="wt" />
+          </TabPanel>
+          <TabPanel value="changes" class="flex min-h-0 flex-1 flex-col p-0">
+            <ChangesView :wt="wt" />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
     <CreateBranchDialog
       v-if="createBranchStart"

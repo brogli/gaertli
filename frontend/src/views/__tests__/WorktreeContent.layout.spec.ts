@@ -39,11 +39,11 @@ async function mountAt(width: number): Promise<VueWrapper> {
   return wrapper
 }
 
-// switchTo clicks the switch option labelled label (e.g. "Log", "Details",
-// "Changes", or "Changes (4)").
+// switchTo clicks the tab labelled label (e.g. "Log", "Details", "Changes",
+// or "Changes (4)").
 async function switchTo(wrapper: VueWrapper, label: string): Promise<void> {
-  const button = wrapper.findAll('.p-togglebutton').find((b) => b.text() === label)
-  await button!.trigger('click')
+  const tab = wrapper.findAll('[role="tab"]').find((t) => t.text() === label)
+  await tab!.trigger('click')
 }
 
 // clickRow selects a commit so the commit detail view has content to show
@@ -75,22 +75,44 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
     expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(true)
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(true)
-    expect(wrapper.find('.p-selectbutton').exists()).toBe(false)
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
   })
 
-  it('FR-UX-08 medium (1200): the switch starts on Details, before any commit is selected', async () => {
+  it('FR-UX-08 medium (1200): a tablist labelled "Views" holds tabs Details and Changes; clicking Changes selects it and shows the changes view', async () => {
     const wrapper = await mountAt(1200)
 
-    const details = wrapper.findAll('.p-togglebutton').find((b) => b.text() === 'Details')!
-    expect(details.attributes('aria-pressed')).toBe('true')
+    const tablist = wrapper.get('[role="tablist"]')
+    expect(tablist.attributes('aria-label')).toBe('Views')
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map((tab) => tab.text())).toEqual(['Details', 'Changes'])
+    expect(tabs[0]!.attributes('aria-selected')).toBe('true')
+    expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
+
+    await switchTo(wrapper, 'Changes')
+
+    expect(wrapper.findAll('[role="tab"]')[1]!.attributes('aria-selected')).toBe('true')
+    expect(wrapper.findComponent(ChangesView).isVisible()).toBe(true)
   })
 
   it('FR-UX-08 narrow (600): the switch starts on Log, before any commit is selected', async () => {
     const wrapper = await mountAt(600)
 
     expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
-    const log = wrapper.findAll('.p-togglebutton').find((b) => b.text() === 'Log')!
-    expect(log.attributes('aria-pressed')).toBe('true')
+    const log = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Log')!
+    expect(log.attributes('aria-selected')).toBe('true')
+  })
+
+  it('FR-UX-08 narrow (600): keydown ArrowRight on the focused Log tab selects Details and shows the commit detail view', async () => {
+    const wrapper = await mountAt(600)
+
+    const logTab = wrapper.findAll<HTMLElement>('[role="tab"]').find((tab) => tab.text() === 'Log')!
+    logTab.element.focus()
+    await logTab.trigger('keydown', { code: 'ArrowRight' })
+    await flushPromises()
+
+    const details = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Details')!
+    expect(details.attributes('aria-selected')).toBe('true')
+    expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(true)
   })
 
   it('FR-UX-08 medium (1200): the log shows; the switch defaults to Details', async () => {
@@ -100,7 +122,7 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
     expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(true)
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
-    expect(wrapper.findAll('.p-togglebutton').map((b) => b.text())).toEqual(['Details', 'Changes'])
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Details', 'Changes'])
   })
 
   it('FR-UX-08 medium (1200): clicking a commit switches the side panel back to Details', async () => {
@@ -121,7 +143,7 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
     expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(false)
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
-    expect(wrapper.findAll('.p-togglebutton').map((b) => b.text())).toEqual([
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
       'Log',
       'Details',
       'Changes',
@@ -173,7 +195,7 @@ describe('WorktreeContent layouts', () => {
     )
     const wrapper = await mountAt(1200)
 
-    expect(wrapper.findAll('.p-togglebutton').map((b) => b.text())).toContain('Changes (4)')
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Changes (4)')
   })
 
   it('FR-UX-09 medium (1200): Fetch and Open in editor show icon only, with title and aria-label', async () => {

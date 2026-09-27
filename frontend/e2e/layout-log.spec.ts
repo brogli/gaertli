@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 // so the changes view shows beside the log instead of the commit detail
 // view it defaults to.
 async function switchToChanges(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /^Changes/ }).click()
+  await page.getByRole('tab', { name: /^Changes/ }).click()
   await page.locator('.changes-body').waitFor()
 }
 

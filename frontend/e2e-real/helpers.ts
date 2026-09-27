@@ -59,7 +59,7 @@ export async function pickFromContextMenu(
 // (the fixture's default 1200 x 800), so the changes view shows beside the
 // log instead of the commit detail view it defaults to.
 export async function switchToChanges(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /^Changes/ }).click()
+  await page.getByRole('tab', { name: /^Changes/ }).click()
   await page.locator('.changes-body').waitFor()
 }
 

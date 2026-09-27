@@ -74,7 +74,7 @@ test('FR-UX-07 FR-UX-14 each picker opens inside the window, its rows on one lin
 // switchToChanges picks "Changes (n)" in the medium layout's side-panel
 // switch and waits for the change list.
 async function switchToChanges(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /^Changes/ }).click()
+  await page.getByRole('tab', { name: /^Changes/ }).click()
   await page.locator('.changes-column .files li').first().waitFor()
 }
 
