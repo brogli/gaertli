@@ -11,6 +11,7 @@ import (
 var baseScopes = map[string]core.ChangeScope{
 	"HEAD":             core.RefsChanged,
 	"packed-refs":      core.RefsChanged,
+	"config":           core.RefsChanged, // e.g. a remote added or a branch's upstream set
 	"index":            core.IndexChanged,
 	"MERGE_HEAD":       core.StateChanged,
 	"CHERRY_PICK_HEAD": core.StateChanged,

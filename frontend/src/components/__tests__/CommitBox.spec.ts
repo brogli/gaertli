@@ -318,7 +318,7 @@ describe('CommitBox', () => {
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
     expect(Facade.Push).toHaveBeenCalledTimes(1)
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', '')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
     expect(Facade.Commit.mock.invocationCallOrder[0]!).toBeLessThan(
       Facade.Push.mock.invocationCallOrder[0]!,
     )
@@ -371,7 +371,7 @@ describe('CommitBox', () => {
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
     expect(Facade.PushTarget).toHaveBeenCalledWith('/repo')
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
   })
 
   it('FR-CHG-09 without an upstream, committing while PushTarget cannot decide opens the dialog; Cancel leaves the commit made, unpushed', async () => {

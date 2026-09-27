@@ -111,7 +111,7 @@ func TestFR_SYNC_04_ClassifyPushRejectionClassifiesByReason(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := &core.Error{Code: core.GitFailed}
-			got := classifyPushRejection(err, git.Result{Stdout: []byte(tt.stdout)})
+			got := classifyPushRejection(err, git.Result{Stdout: []byte(tt.stdout)}, false)
 			ce := coretest.AsError(t, got, tt.want)
 			if tt.wantInMsg != "" && !strings.Contains(ce.Message, tt.wantInMsg) {
 				t.Errorf("message = %q, want it to name the reason %q", ce.Message, tt.wantInMsg)
@@ -815,7 +815,7 @@ func TestFR_SYNC_03_PushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 	rec := recordCommands(t, c, wt)
-	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "")), "done")
+	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")), "done")
 
 	if got := gittest.Out(t, origin, "rev-parse", "master"); got != localTip {
 		t.Errorf("origin's master = %q, want %q", got, localTip)
@@ -834,10 +834,39 @@ func TestFR_SYNC_03_PushSetUpstreamCreatesRemoteBranchAndTracks(t *testing.T) {
 	localTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin")), "done")
+	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "feature")), "done")
 
 	if got := gittest.Out(t, origin, "rev-parse", "feature"); got != localTip {
 		t.Errorf("origin's feature = %q, want %q", got, localTip)
+	}
+	if got := gittest.Out(t, repo.Dir, "rev-parse", "--abbrev-ref", "feature@{upstream}"); got != "origin/feature" {
+		t.Errorf("feature's upstream = %q, want origin/feature", got)
+	}
+}
+
+// TestFR_SYNC_03_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway
+// covers a caller that named a branch (PushTarget, or a dialog) before HEAD
+// switched elsewhere: Push must still push and track that named branch, not
+// whatever is current now.
+func TestFR_SYNC_03_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	origin := bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
+	gittest.Commit(t, repo.Dir, "f.txt", "f", "feature commit")
+	featureTip := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "switch", "-c", "other")
+	gittest.Commit(t, repo.Dir, "o.txt", "o", "other commit")
+
+	c, wt := openWorktree(t, repo.Dir)
+	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "feature")), "done")
+
+	if got := gittest.Out(t, origin, "rev-parse", "feature"); got != featureTip {
+		t.Errorf("origin's feature = %q, want %q", got, featureTip)
+	}
+	if _, ok := refSHA(t, origin, "refs/heads/other"); ok {
+		t.Error("origin gained a heads/other ref, want only feature pushed")
 	}
 	if got := gittest.Out(t, repo.Dir, "rev-parse", "--abbrev-ref", "feature@{upstream}"); got != "origin/feature" {
 		t.Errorf("feature's upstream = %q, want origin/feature", got)
@@ -856,7 +885,7 @@ func TestFR_SYNC_03_PushTargetNamesTheSoleRemoteAndAutoSetupRemote(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (core.PushTarget{Remote: "origin", AutoSetUpstream: true}); got != want {
+	if want := (core.PushTarget{Remote: "origin", AutoSetUpstream: true, Branch: "master"}); got != want {
 		t.Errorf("PushTarget = %+v, want %+v", got, want)
 	}
 }
@@ -961,6 +990,34 @@ func TestFR_SYNC_03_PushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
+// TestFR_SYNC_03_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange
+// covers a `git branch -u` run outside the app, which only edits
+// .git/config: PushTarget must reflect it immediately, unlike a cached refs
+// store the UI would otherwise rely on.
+func TestFR_SYNC_03_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "push", "origin", "HEAD") // no -u: no upstream set
+	gittest.Run(t, repo.Dir, "fetch", "origin")
+	c, wt := openWorktree(t, repo.Dir)
+
+	if got, err := c.PushTarget(t.Context(), wt); err != nil || got.HasUpstream || got.Branch != "master" {
+		t.Fatalf("before: PushTarget = %+v, %v, want HasUpstream false, Branch %q", got, err, "master")
+	}
+
+	gittest.Run(t, repo.Dir, "branch", "--set-upstream-to=origin/master", "master")
+
+	got, err := c.PushTarget(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.HasUpstream || got.Branch != "master" {
+		t.Errorf("after git branch -u: PushTarget = %+v, want HasUpstream true, Branch %q", got, "master")
+	}
+}
+
 func TestFR_SYNC_04_PushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
@@ -968,7 +1025,7 @@ func TestFR_SYNC_04_PushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "local.txt", "y", "local commit")                // diverges, unaware
 
 	c, wt := openWorktree(t, repo.Dir)
-	job := waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "")), "failed")
+	job := waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")), "failed")
 
 	if job.Error == nil || job.Error.Code != core.NotFastForward {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.NotFastForward)
@@ -992,7 +1049,7 @@ func TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "local.txt", "x", "local commit")
 
 	c, wt := openWorktree(t, repo.Dir)
-	job := waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "")), "failed")
+	job := waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")), "failed")
 
 	if job.Error == nil || job.Error.Code != core.PushRejected {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.PushRejected)
@@ -1002,6 +1059,32 @@ func TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	}
 	if !strings.Contains(job.Error.Message, "hook declined") {
 		t.Errorf("message = %q, want it to name the reason", job.Error.Message)
+	}
+}
+
+// TestFR_SYNC_04_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing
+// covers a first push (a remote given, no upstream configured yet) whose
+// remote already has a same-named branch with commits this branch lacks: it
+// still classifies NotFastForward, but with its own message, naming neither
+// pull nor force push, since neither applies without an upstream.
+func TestFR_SYNC_04_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	origin := bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "push", "origin", "HEAD:refs/heads/feature") // remote has feature; no local upstream set
+	remoteAppendCommitOnBranch(t, origin, "feature", "remote.txt", "r", "remote only")
+	gittest.Run(t, repo.Dir, "switch", "--no-track", "-c", "feature")
+	gittest.Commit(t, repo.Dir, "local.txt", "l", "local only") // diverges, unfetched
+
+	c, wt := openWorktree(t, repo.Dir)
+	job := waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "feature")), "failed")
+
+	if job.Error == nil || job.Error.Code != core.NotFastForward || job.Error.Key != "pushFirstRejected" {
+		t.Fatalf("job.Error = %+v, want Code %s, key pushFirstRejected", job.Error, core.NotFastForward)
+	}
+	if strings.Contains(job.Error.Message, "pull") || strings.Contains(job.Error.Message, "force") {
+		t.Errorf("message = %q, want no pull or force push offer", job.Error.Message)
 	}
 }
 

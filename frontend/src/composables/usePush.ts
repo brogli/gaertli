@@ -23,14 +23,14 @@ export function usePush(
 
   function push(): void {
     if (refs.current?.upstream) {
-      void run(() => Facade.Push(toValue(wt), ''))
+      void run(() => Facade.Push(toValue(wt), '', ''))
       return
     }
     upstreamQuestion.value = null
     void run(async () => {
       const target = await Facade.PushTarget(toValue(wt))
       if (target.autoSetUpstream && target.remote) {
-        await Facade.Push(toValue(wt), target.remote)
+        await Facade.Push(toValue(wt), target.remote, '')
       } else {
         upstreamQuestion.value = { branch: refs.current?.name ?? '', remote: target.remote }
       }

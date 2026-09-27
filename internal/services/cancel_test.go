@@ -56,11 +56,11 @@ func TestFR_SYNC_07_ACancelledPushLeavesNoLockAndTheNextPushWorks(t *testing.T) 
 	hook := stallRefUpdate(t, repo.Dir, "refs/remotes/origin/master")
 	c, wt := openWorktree(t, repo.Dir)
 
-	hook.cancel(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "")))
+	hook.cancel(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")))
 
 	assertNoLock(t, repo.Dir)
 	hook.release()
-	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "")), core.JobDone)
+	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")), core.JobDone)
 	if got, _ := refSHA(t, origin, "refs/heads/master"); got != local {
 		t.Errorf("origin's master = %q, want %q", got, local)
 	}

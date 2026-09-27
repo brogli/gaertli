@@ -29,7 +29,7 @@ describe('usePush', () => {
     push()
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
     expect(upstreamQuestion.value).toBeNull()
   })
 
@@ -57,7 +57,7 @@ describe('usePush', () => {
     push()
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', '')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
     expect(Facade.PushTarget).not.toHaveBeenCalled()
   })
 })

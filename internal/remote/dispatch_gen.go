@@ -126,7 +126,7 @@ func handlers(api core.API) handler.Map {
 			return api.PullWithStash(ctx, p.Wt, p.Mode)
 		}),
 		"Push": handler.New(func(ctx context.Context, p pushParams) (string, error) {
-			return api.Push(ctx, p.Wt, p.Remote)
+			return api.Push(ctx, p.Wt, p.Remote, p.Branch)
 		}),
 		"PushTarget": handler.New(func(ctx context.Context, p pushTargetParams) (core.PushTarget, error) {
 			return api.PushTarget(ctx, p.Wt)

@@ -242,7 +242,7 @@ describe('SyncControls', () => {
     await body.get('[data-test="set-upstream-confirm"]').trigger('click')
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
   })
 
   it('FR-SYNC-03 Ctrl+Shift+K pushes without an upstream too, when PushTarget can push straight away (old: nothing)', async () => {
@@ -253,7 +253,7 @@ describe('SyncControls', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'K', ctrlKey: true, shiftKey: true }))
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
   })
 
   it('FR-SYNC-06, FR-UX-03, QA-SAFE-01 force push on a protected branch confirms first, naming it protected', async () => {

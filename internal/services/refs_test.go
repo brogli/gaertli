@@ -138,6 +138,43 @@ func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
 	}
 }
 
+// TestFR_SYNC_03_RefsListsAConfiguredRemoteWithNoTrackingBranchYet covers a
+// remote added by `git remote add` before anything was ever fetched or
+// pushed to it: it must still appear (with no branches), and an existing
+// remote's own tracking branches stay listed alongside it.
+func TestFR_SYNC_03_RefsListsAConfiguredRemoteWithNoTrackingBranchYet(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "push", "-u", "origin", "HEAD")
+	gittest.Run(t, repo.Dir, "remote", "add", "empty", "https://example.invalid/empty.git")
+
+	c, wt := openWorktree(t, repo.Dir)
+	refs, err := c.Refs(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	origin := findRemote(refs.Remotes, "origin")
+	if origin == nil || len(origin.Branches) != 1 {
+		t.Errorf("origin = %+v, want its one tracking branch kept", origin)
+	}
+	empty := findRemote(refs.Remotes, "empty")
+	if empty == nil || len(empty.Branches) != 0 {
+		t.Errorf("Remotes = %+v, want an empty entry with no branches", refs.Remotes)
+	}
+}
+
+func findRemote(remotes []core.Remote, name string) *core.Remote {
+	for i, r := range remotes {
+		if r.Name == name {
+			return &remotes[i]
+		}
+	}
+	return nil
+}
+
 func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

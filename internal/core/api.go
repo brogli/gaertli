@@ -263,19 +263,24 @@ type WindowAPI interface {
 	// confirms first.
 	DropStash(ctx context.Context, wt WorktreeID, sha string) error
 
-	// Push pushes wt's current branch as a job outside the write queues:
-	// plainly if remote is "" (needs an upstream), else with --set-upstream
-	// <remote> HEAD. A rejection is classified from --porcelain's summary
-	// line: NotFastForward if the remote has unfetched commits, else
-	// PushRejected. GitStderr carries git's explanation.
-	Push(ctx context.Context, wt WorktreeID, remote string) (string, error)
+	// Push pushes branch as a job outside the write queues: plainly if
+	// remote is "" (needs an upstream; branch is ignored, HEAD's branch
+	// pushes), else refs/heads/branch with --set-upstream <remote>. A
+	// rejection is classified from --porcelain's summary line:
+	// NotFastForward if the remote has unfetched commits, else
+	// PushRejected. A first push's NotFastForward (remote given) carries
+	// its own message, naming neither pull nor force push, since neither
+	// applies without an upstream. GitStderr carries git's explanation.
+	Push(ctx context.Context, wt WorktreeID, remote, branch string) (string, error)
 
 	// PushTarget is where a plain push of the current branch would go and
 	// whether it would ask first. Remote is %(push:remotename), else the
 	// only remote, else origin if it exists; "" means none applies and the
-	// UI must ask which remote. AutoSetUpstream is push.autoSetupRemote. A
-	// detached HEAD or a bad push.autoSetupRemote value is Code GitFailed
-	// with git's stderr.
+	// UI must ask which remote. AutoSetUpstream is push.autoSetupRemote.
+	// Branch is HEAD's branch; HasUpstream is read fresh from git (unlike a
+	// cached refs store), for a caller that must still push the named
+	// branch after a config-only change elsewhere. A detached HEAD or a bad
+	// push.autoSetupRemote value is Code GitFailed with git's stderr.
 	PushTarget(ctx context.Context, wt WorktreeID) (PushTarget, error)
 
 	// ForcePush pushes with --force-with-lease --force-if-includes, never

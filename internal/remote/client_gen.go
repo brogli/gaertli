@@ -407,11 +407,12 @@ func (c *Client) PullWithStash(ctx context.Context, wt core.WorktreeID, mode cor
 type pushParams struct {
 	Wt     core.WorktreeID `json:"wt"`
 	Remote string          `json:"remote"`
+	Branch string          `json:"branch"`
 }
 
-func (c *Client) Push(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
+func (c *Client) Push(ctx context.Context, wt core.WorktreeID, remote string, branch string) (string, error) {
 	var result string
-	err := c.call(ctx, "Push", pushParams{Wt: wt, Remote: remote}, &result)
+	err := c.call(ctx, "Push", pushParams{Wt: wt, Remote: remote, Branch: branch}, &result)
 	return result, err
 }
 

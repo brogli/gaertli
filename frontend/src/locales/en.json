@@ -19,6 +19,7 @@
     "pushNotFastForward": "Your branch isn't a fast-forward of the remote (non-fast-forward). Pull first, or force push.",
     "pushStaleInfo": "The remote moved since your last fetch (stale info). Pull first, or force push.",
     "pushRefUpdatedSinceCheckout": "The remote has commits you fetched but haven't integrated (remote ref updated since checkout). Pull first, or force push.",
+    "pushFirstRejected": "The remote already has a branch of that name with commits this branch lacks. Nothing was pushed.",
     "pushRejected": "The remote refused the push ({reason}).",
     "branchDiverged": "\"{branch}\" has diverged from its upstream and can't be fast-forwarded.",
     "authFailed": "Could not sign in to the remote. Sign in once from a terminal (credential helper, SSH agent or cached login), then try again; nebegit never asks for, stores or sees credentials.",

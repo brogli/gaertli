@@ -331,13 +331,13 @@ func (f *Forwarder) PullWithStash(ctx context.Context, wt core.WorktreeID, mode 
 	return c.PullWithStash(ctx, coreID, mode)
 }
 
-func (f *Forwarder) Push(ctx context.Context, wt core.WorktreeID, remote string) (string, error) {
+func (f *Forwarder) Push(ctx context.Context, wt core.WorktreeID, remote string, branch string) (string, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero string
 		return zero, err
 	}
-	return c.Push(ctx, coreID, remote)
+	return c.Push(ctx, coreID, remote, branch)
 }
 
 func (f *Forwarder) PushTarget(ctx context.Context, wt core.WorktreeID) (core.PushTarget, error) {

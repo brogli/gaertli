@@ -17,6 +17,7 @@ func TestFR_REPO_04_ClassifyMapsPathsToTheirScope(t *testing.T) {
 		{"HEAD", core.RefsChanged, true},
 		{"refs/heads/x", core.RefsChanged, true},
 		{"packed-refs", core.RefsChanged, true},
+		{"config", core.RefsChanged, true},
 		{"index", core.IndexChanged, true},
 		{"MERGE_HEAD", core.StateChanged, true},
 		{"rebase-merge", core.StateChanged, true},

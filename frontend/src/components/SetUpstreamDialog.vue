@@ -27,7 +27,7 @@ const { t } = useI18n()
 
 async function confirm(): Promise<void> {
   await runAndClose(
-    () => Facade.Push(props.wt, chosen.value),
+    () => Facade.Push(props.wt, chosen.value, ''),
     () => emit('close'),
   )
 }

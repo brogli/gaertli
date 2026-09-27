@@ -222,12 +222,16 @@ func pullStash(ctx context.Context, r git.Runner, dir string) (string, error) {
 }
 
 // Push implements core.API.
-func (c *Core) Push(ctx context.Context, id core.WorktreeID, remote string) (string, error) {
+func (c *Core) Push(ctx context.Context, id core.WorktreeID, remote, branch string) (string, error) {
 	args := []string{"push", "--porcelain", "--progress"}
-	if remote != "" {
-		args = append(args, "--set-upstream", remote, "HEAD") // tracks a same-named remote branch
+	firstPush := remote != ""
+	if firstPush {
+		// The branch as named by the caller, not HEAD: HEAD may have moved
+		// to another branch since the caller last asked (PushTarget or the
+		// refs store) which branch to push.
+		args = append(args, "--set-upstream", remote, "refs/heads/"+branch)
 	}
-	return c.startPushJob(ctx, id, core.PushJob, args)
+	return c.startPushJob(ctx, id, core.PushJob, args, firstPush)
 }
 
 // ForcePush implements core.API.
@@ -235,18 +239,19 @@ func (c *Core) ForcePush(ctx context.Context, id core.WorktreeID) (string, error
 	// Bare --force-with-lease, never =<ref>:<expect>, which would silently
 	// disable --force-if-includes. Plain --force is never offered.
 	args := []string{"push", "--porcelain", "--progress", "--force-with-lease", "--force-if-includes"}
-	return c.startPushJob(ctx, id, core.ForcePushJob, args)
+	return c.startPushJob(ctx, id, core.ForcePushJob, args, false)
 }
 
-// startPushJob starts a push job of kind running args.
-func (c *Core) startPushJob(ctx context.Context, id core.WorktreeID, kind core.JobKind, args []string) (string, error) {
+// startPushJob starts a push job of kind running args. firstPush marks a
+// push that sets a new upstream, for classifyPushRejection.
+func (c *Core) startPushJob(ctx context.Context, id core.WorktreeID, kind core.JobKind, args []string, firstPush bool) (string, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return "", err
 	}
 	jobID := wt.Repo.Jobs().Start(ctx, kind, func(ctx context.Context, progress jobs.Progress) (any, error) {
 		result, err := runRemote(ctx, wt, args, progress)
-		return nil, classifyPushRejection(err, result)
+		return nil, classifyPushRejection(err, result, firstPush)
 	})
 	return string(jobID), nil
 }
@@ -261,7 +266,7 @@ func (c *Core) PushTarget(ctx context.Context, id core.WorktreeID) (core.PushTar
 	if err != nil {
 		return core.PushTarget{}, err
 	}
-	remote, err := pushRemote(ctx, wt.Runner, wt.Path, ref)
+	remote, hasUpstream, err := pushRemoteAndUpstream(ctx, wt.Runner, wt.Path, ref)
 	if err != nil {
 		return core.PushTarget{}, err
 	}
@@ -269,7 +274,10 @@ func (c *Core) PushTarget(ctx context.Context, id core.WorktreeID) (core.PushTar
 	if err != nil {
 		return core.PushTarget{}, err
 	}
-	return core.PushTarget{Remote: remote, AutoSetUpstream: autoSetUpstream}, nil
+	return core.PushTarget{
+		Remote: remote, AutoSetUpstream: autoSetUpstream,
+		Branch: strings.TrimPrefix(ref, "refs/heads/"), HasUpstream: hasUpstream,
+	}, nil
 }
 
 // currentRef is HEAD's full ref name (e.g. "refs/heads/main"); a detached
@@ -285,31 +293,36 @@ func currentRef(ctx context.Context, r git.Runner, dir string) (string, error) {
 	return strings.TrimSpace(string(result.Stdout)), nil
 }
 
-// pushRemote is the remote git would push ref to: %(push:remotename)'s
+// pushRemoteAndUpstream is the remote git would push ref to, and whether ref
+// has an upstream configured. Remote is %(push:remotename)'s
 // pushRemote/pushDefault/branch.remote, else the sole remote, else origin
 // if it exists — the fallbacks %(push:remotename) does not apply itself.
-func pushRemote(ctx context.Context, r git.Runner, dir, ref string) (string, error) {
+// hasUpstream is %(upstream) non-empty, read fresh so a config-only change
+// (e.g. `git branch -u`) shows without waiting on a cached refs store.
+func pushRemoteAndUpstream(ctx context.Context, r git.Runner, dir, ref string) (remote string, hasUpstream bool, err error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
-		Args: []string{"for-each-ref", "--format=%(push:remotename)", ref},
+		Args: []string{"for-each-ref", "--format=%(push:remotename)%1f%(upstream)", ref},
 	})
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	if remote := strings.TrimSpace(string(result.Stdout)); remote != "" {
-		return remote, nil
+	fields := strings.SplitN(strings.TrimSuffix(string(result.Stdout), "\n"), "\x1f", 2)
+	hasUpstream = len(fields) > 1 && fields[1] != ""
+	if remote = fields[0]; remote != "" {
+		return remote, hasUpstream, nil
 	}
 	remotes, err := remoteNames(ctx, r, dir)
 	if err != nil {
-		return "", err
+		return "", hasUpstream, err
 	}
 	if len(remotes) == 1 {
-		return remotes[0], nil
+		return remotes[0], hasUpstream, nil
 	}
 	if slices.Contains(remotes, "origin") {
-		return "origin", nil
+		return "origin", hasUpstream, nil
 	}
-	return "", nil
+	return "", hasUpstream, nil
 }
 
 // pushAutoSetupRemote reads push.autoSetupRemote, false if unset. Unlike
@@ -494,8 +507,11 @@ const pushRejectPrefix = "!\t"
 
 // classifyPushRejection classifies a rejection from --porcelain's per-ref
 // line: NotFastForward when the remote has commits not integrated locally,
-// else PushRejected.
-func classifyPushRejection(err error, result git.Result) error {
+// else PushRejected. firstPush marks a push that was setting a new upstream
+// (no upstream existed yet): its NotFastForward carries its own message,
+// since a first push has no fetched state to blame and no upstream to pull
+// from or force-push over.
+func classifyPushRejection(err error, result git.Result, firstPush bool) error {
 	ce := gitFailure(err)
 	if ce == nil {
 		return err
@@ -503,6 +519,14 @@ func classifyPushRejection(err error, result git.Result) error {
 	reason, found := rejectReason(result.Stdout)
 	if !found {
 		return err // refused before any per-ref line: stays GitFailed
+	}
+	if firstPush {
+		switch reason {
+		case "fetch first", "non-fast-forward", "stale info", "remote ref updated since checkout":
+			ce.Retag(core.NotFastForward, "pushFirstRejected", nil,
+				"The remote already has a branch of that name with commits this branch lacks. Nothing was pushed.")
+			return err
+		}
 	}
 	switch reason {
 	case "fetch first":

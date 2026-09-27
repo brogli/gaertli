@@ -87,6 +87,19 @@ func watchRepo(t *testing.T, repo *gittest.Repo) (*RepoWatcher, chan core.Change
 	return w, got
 }
 
+// TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromAConfigEditFromOutside
+// covers a terminal `git remote add` or `git branch -u`, which writes only
+// .git/config: PushTarget and Refs must reload to pick it up.
+func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromAConfigEditFromOutside(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	_, got := watchRepo(t, repo)
+
+	gittest.Run(t, repo.Dir, "remote", "add", "origin", "https://example.invalid/repo.git")
+
+	waitForScope(t, got, core.RefsChanged)
+}
+
 func TestFR_REPO_04_RepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
 	repo := gittest.New(t)
 	_, got := watchRepo(t, repo)

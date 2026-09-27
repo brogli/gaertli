@@ -21,7 +21,8 @@ type Branch struct {
 	CheckedOutIn string `json:"checkedOutIn,omitempty"`
 }
 
-// Remote is one remote's tracking branches, grouped.
+// Remote is one configured remote (git remote) with its tracking branches,
+// grouped; Branches is empty for a remote with none (e.g. just added).
 type Remote struct {
 	Name     string         `json:"name"`
 	Branches []RemoteBranch `json:"branches"`

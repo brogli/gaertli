@@ -348,7 +348,12 @@ export const Facade = {
   },
 
   PushTarget(): Promise<PushTarget> {
-    return delay({ remote: 'origin', autoSetUpstream: false })
+    return delay({
+      remote: 'origin',
+      autoSetUpstream: false,
+      branch: 'main',
+      hasUpstream: query.has('upstream'),
+    })
   },
 
   Status(): Promise<ChangedFiles> {

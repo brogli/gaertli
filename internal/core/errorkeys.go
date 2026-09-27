@@ -22,6 +22,7 @@ var ErrorKeys = map[string][]string{
 	"pushNotFastForward":          {},
 	"pushStaleInfo":               {},
 	"pushRefUpdatedSinceCheckout": {},
+	"pushFirstRejected":           {},
 	"pushRejected":                {"reason"},
 	"branchDiverged":              {"branch"},
 	"authFailed":                  {},

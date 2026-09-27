@@ -33,7 +33,7 @@ describe('SetUpstreamDialog', () => {
     await body.get('[data-test="set-upstream-confirm"]').trigger('click')
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', '')
   })
 
   it('FR-SYNC-03 cancel closes without pushing', async () => {
@@ -64,7 +64,7 @@ describe('SetUpstreamDialog', () => {
     await body.get('[data-test="set-upstream-confirm"]').trigger('click')
     await flushPromises()
 
-    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'other')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'other', '')
   })
 
   it('FR-SYNC-11 several remotes, one preselected: select shows it', async () => {

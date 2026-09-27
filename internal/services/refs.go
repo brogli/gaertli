@@ -111,6 +111,9 @@ func parseTrack(s string) (ahead, behind int, gone bool) {
 // slash.
 func toRefs(parsed []parsedRef, remoteNames []string) core.Refs {
 	var refs core.Refs
+	for _, name := range remoteNames {
+		refs.Remotes = append(refs.Remotes, core.Remote{Name: name})
+	}
 	for _, p := range parsed {
 		switch {
 		case strings.HasPrefix(p.Name, "refs/heads/"):
