@@ -58,6 +58,14 @@ describe('ChangesView', () => {
     expect(list.contains(box)).toBe(false)
   })
 
+  it('FR-CHG-11 the commit box takes the fixed, bordered-off place ChangesView gives it', () => {
+    const wrapper = mount(ChangesView, { props })
+
+    expect(wrapper.get('.commit-box').classes()).toEqual(
+      expect.arrayContaining(['flex-none', 'border-t']),
+    )
+  })
+
   it("FR-CHG-12 the commit message field has 6 rows and fills the commit box's width", () => {
     const wrapper = mount(ChangesView, { props })
 

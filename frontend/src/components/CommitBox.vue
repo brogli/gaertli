@@ -176,12 +176,12 @@ useShortcut(
       {{ commitLabel }}
       <ShortcutHint :shortcut="t('shortcuts.commit')" />
     </Button>
+    <SetUpstreamDialog
+      v-if="upstreamQuestion"
+      :wt="wt"
+      :branch="upstreamQuestion.branch"
+      :remote="upstreamQuestion.remote"
+      @close="upstreamQuestion = null"
+    />
   </section>
-  <SetUpstreamDialog
-    v-if="upstreamQuestion"
-    :wt="wt"
-    :branch="upstreamQuestion.branch"
-    :remote="upstreamQuestion.remote"
-    @close="upstreamQuestion = null"
-  />
 </template>
