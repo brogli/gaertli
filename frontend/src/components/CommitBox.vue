@@ -11,8 +11,10 @@ import { useChangesStore } from '@/stores/changes'
 import { useRepoStore } from '@/stores/repo'
 import { useRefsStore } from '@/stores/refs'
 import { useCoreCall } from '@/composables/useCoreCall'
+import { usePush } from '@/composables/usePush'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
+import SetUpstreamDialog from './SetUpstreamDialog.vue'
 
 // CommitBox is the commit box, the changes view's fixed part below the
 // change list: the message, Amend, Push after commit, and a Commit button
@@ -22,6 +24,7 @@ const changes = useChangesStore()
 const repo = useRepoStore()
 const refs = useRefsStore()
 const { error, run, runAndClose } = useCoreCall()
+const { push, upstreamQuestion } = usePush(props.wt, run)
 const { t } = useI18n()
 
 // The message lives in the changes store, where the window finds it on a
@@ -84,9 +87,11 @@ const pushedWarning = computed(() => {
 })
 
 // "Push after commit" is off while amending (a plain push of an amended,
-// pushed commit is rejected; pushedWarning names the force push it needs)
-// and without an upstream, like SyncControls' Push.
-const pushAfterCommitDisabled = computed(() => amend.value || !refs.current?.upstream)
+// pushed commit is rejected; pushedWarning names the force push it needs),
+// on a detached HEAD, and without a remote. Not gated on an upstream: usePush
+// gives a branch without one a first push instead.
+const hasRemote = computed(() => (refs.refs?.remotes ?? []).length > 0)
+const pushAfterCommitDisabled = computed(() => amend.value || !refs.current || !hasRemote.value)
 
 async function onAmendChange(checked: boolean): Promise<void> {
   // Pre-fill from HEAD's own message only when the field is still empty:
@@ -113,9 +118,7 @@ async function onCommit(): Promise<void> {
       },
     )
     // A push failure after a successful commit shows in the same ErrorBanner.
-    if (!error.value && pushAfter) {
-      await run(() => Facade.Push(props.wt, ''))
-    }
+    if (!error.value && pushAfter) push()
   } finally {
     committing.value = false
   }
@@ -170,4 +173,11 @@ onKeyStroke(
       @click="onCommit"
     />
   </section>
+  <SetUpstreamDialog
+    v-if="upstreamQuestion"
+    :wt="wt"
+    :branch="upstreamQuestion.branch"
+    :remote="upstreamQuestion.remote"
+    @close="upstreamQuestion = null"
+  />
 </template>

@@ -3,7 +3,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({
-  Facade: { Commit: vi.fn(), SetMessageDraft: vi.fn(), CommitDetails: vi.fn(), Push: vi.fn() },
+  Facade: {
+    Commit: vi.fn(),
+    SetMessageDraft: vi.fn(),
+    CommitDetails: vi.fn(),
+    Push: vi.fn(),
+    PushTarget: vi.fn(),
+  },
 }))
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
@@ -20,11 +26,16 @@ import {
   type Refs,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 import { branchFixture } from '@/testing/fixtures/branch'
+import { mountInBody } from '@/testing/mountInBody'
 
 const props = { wt: '/repo' }
 
-function refsFixture(overrides: Partial<Branch> = {}): Refs {
-  return { branches: [branchFixture(overrides)], remotes: [], tags: [] }
+function refsFixture(overrides: Partial<Branch> = {}, remotes: string[] = []): Refs {
+  return {
+    branches: [branchFixture(overrides)],
+    remotes: remotes.map((name) => ({ name, branches: [] })),
+    tags: [],
+  }
 }
 
 // amendCheckbox is the Amend checkbox's <input>, the first of the box's
@@ -47,6 +58,7 @@ describe('CommitBox', () => {
     Facade.SetMessageDraft.mockReset().mockResolvedValue(undefined)
     Facade.CommitDetails.mockReset()
     Facade.Push.mockReset().mockResolvedValue('job-1')
+    Facade.PushTarget.mockReset()
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -296,7 +308,7 @@ describe('CommitBox', () => {
     const changes = useChangesStore()
     changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
     const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main' })
+    refs.refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
@@ -316,7 +328,7 @@ describe('CommitBox', () => {
     const repo = useRepoStore()
     repo.summary = summaryFixture({ sha: 'abc123' })
     const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main' })
+    refs.refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })
     await amendCheckbox(wrapper).setValue(true)
@@ -326,22 +338,69 @@ describe('CommitBox', () => {
     ).toBe(true)
   })
 
-  it('FR-CHG-09 the "Push after commit" checkbox is disabled with no upstream', () => {
+  it('FR-CHG-09 the "Push after commit" checkbox is enabled without an upstream when a remote exists, disabled without one', async () => {
     const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: '' })
+    refs.refs = refsFixture({ upstream: '' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })
+
+    expect(
+      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
+    ).toBe(false)
+
+    refs.refs = refsFixture({ upstream: '' }, [])
+    await wrapper.vm.$nextTick()
 
     expect(
       wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
     ).toBe(true)
   })
 
+  it('FR-CHG-09 without an upstream, checking "Push after commit" and committing pushes the way PushTarget says', async () => {
+    const changes = useChangesStore()
+    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    const refs = useRefsStore()
+    refs.refs = refsFixture({ upstream: '' }, ['origin'])
+    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: true })
+
+    const wrapper = mount(CommitBox, { props })
+    await wrapper.get('textarea').setValue('a message')
+    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
+    await submitButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(Facade.Commit).toHaveBeenCalledTimes(1)
+    expect(Facade.PushTarget).toHaveBeenCalledWith('/repo')
+    expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin')
+  })
+
+  it('FR-CHG-09 without an upstream, committing while PushTarget cannot decide opens the dialog; Cancel leaves the commit made, unpushed', async () => {
+    const changes = useChangesStore()
+    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    const refs = useRefsStore()
+    refs.refs = refsFixture({ upstream: '' }, ['origin'])
+    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
+
+    const { wrapper, body } = await mountInBody(CommitBox, { props })
+    await wrapper.get('textarea').setValue('a message')
+    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
+    await submitButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(Facade.Commit).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('textarea').element.value).toBe('')
+    expect(body.find('[data-test="set-upstream-confirm"]').exists()).toBe(true)
+
+    await body.get('[data-test="dialog-cancel"]').trigger('click')
+
+    expect(Facade.Push).not.toHaveBeenCalled()
+  })
+
   it('FR-CHG-09 checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
     const repo = useRepoStore()
     repo.summary = summaryFixture({ sha: 'abc123' })
     const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main' })
+    refs.refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
