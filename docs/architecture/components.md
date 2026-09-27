@@ -67,10 +67,10 @@ editor start (Warn), a WSL core's stderr (Warn). A successful git command or edi
   OpenVue's built-in texts come from the same catalogue through OpenVue's locale option.
 - Notices (TR-36, FR-UX-15): one notice area per window, main and diff alike. It is OpenVue's Toast;
   its message adds the notice's extras: an error's details (git's command and stderr), a Copy
-  button, and recovery buttons (a push rejection offers Pull and Force push, a blocked pull Stash
-  and pull, a held lock Try again, FR-UX-16). Every notice has a kind, and a newer notice replaces
-  only its own kind's. Closing after a while and pausing under the pointer are the Toast's own
-  behaviour.
+  button, and recovery buttons (a push rejection offers Pull and Force push when the branch has an
+  upstream, a blocked pull Stash and pull, a held lock Try again, FR-UX-16). Every notice has a
+  kind, and a newer notice replaces only its own kind's. Closing after a while and pausing under the
+  pointer are the Toast's own behaviour.
 - Dialogs (FR-UX-17): a modal dialog of one width, its body a column of rows: a label above its
   control, a checkbox beside its label, the buttons (Cancel, then the action) in the footer.
   - A new worktree's folder name and location stay in step (FR-WT-02). The base folder is the
@@ -121,6 +121,10 @@ Hidden views stay mounted, so switching keeps the scroll position and the typed 
 - **Jobs menu** (FR-UX-12): a fixed-size toolbar button, a clock when idle, spinning with a count
   badge while jobs run, so the toolbar never resizes. Its popover lists each running job with git's
   progress message, a progress bar and an abort button.
+- **Keyboard** (FR-UX-05): one shortcut guard wraps every window-level shortcut. It acts only while
+  no dialog, popup or menu is open, and leaves Escape to a focused text field. Each shortcut shows
+  on its control in muted text: at the right inside the Commit button and beside a menu entry, after
+  the action's name in a tooltip ("Push · Ctrl+Shift+K").
 - **Pickers** (FR-WT-13, FR-BR-09): one button style and one list: a filter field, keyboard
   navigation, and row buttons that never activate the row. A right-click on a row, or Shift+F10 or
   the context-menu key on the active row, opens that row's menu, a context menu at the pointer or

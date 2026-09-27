@@ -2,15 +2,16 @@
 
 ### Performance (reference repo: 100k commits, normal dev machine)
 
-| ID         | Requirement                                           |
-| ---------- | ----------------------------------------------------- |
-| QA-PERF-01 | App start to usable window: ≤ 2 s.                    |
-| QA-PERF-02 | First log rows visible: ≤ 1 s after opening the repo. |
-| QA-PERF-03 | Log scrolling: no freeze longer than 100 ms.          |
-| QA-PERF-04 | Search or filter: first results ≤ 2 s.                |
-| QA-PERF-05 | Diff of a file < 1 MB opens in ≤ 500 ms.              |
-| QA-PERF-06 | Change list refresh: ≤ 1 s.                           |
-| QA-PERF-07 | Memory: ≤ 500 MB with the reference repo open.        |
+| ID         | Requirement                                                                                                                                                                                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QA-PERF-01 | App start to usable window: ≤ 2 s.                                                                                                                                                                                                                                                                      |
+| QA-PERF-02 | First log rows visible: ≤ 1 s after opening the repo.                                                                                                                                                                                                                                                   |
+| QA-PERF-03 | Log scrolling: no freeze longer than 100 ms.                                                                                                                                                                                                                                                            |
+| QA-PERF-04 | Search or filter: first results ≤ 2 s.                                                                                                                                                                                                                                                                  |
+| QA-PERF-05 | Diff of a file < 1 MB opens in ≤ 500 ms.                                                                                                                                                                                                                                                                |
+| QA-PERF-06 | Change list refresh: ≤ 1 s.                                                                                                                                                                                                                                                                             |
+| QA-PERF-07 | Memory: ≤ 500 MB with the reference repo open.                                                                                                                                                                                                                                                          |
+| QA-PERF-08 | The first time the log of a repo with 20,000 commits or more has loaded, the app has git write its commit-graph file, git's own file that speeds up reading history, unless the repo already has one. The app writes it without asking, after the log shows, and says nothing if git fails to write it. |
 
 ### Responsiveness
 
