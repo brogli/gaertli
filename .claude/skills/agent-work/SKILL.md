@@ -17,7 +17,9 @@ description:
 ## Every agent prompt carries
 
 - **Start:** an Agent-tool worktree begins at the repo's initial commit. First step:
-  `git reset --hard dev`, then confirm `git log -1` shows the dev tip.
+  `git reset --hard dev`, then confirm `git log -1` shows the dev tip. A fresh worktree has no
+  `node_modules` and no frontend bindings: `cd frontend && pnpm install --frozen-lockfile` inside
+  `nix develop`, then `nix develop --command task common:generate:bindings`, before Vitest.
 - **Every temporary rule of the session**, and which files the agent may edit: an agent that lacks a
   rule breaks it in good faith.
 - **No subagents:** implementers never spawn subagents or forks, also not for `/simplify`.
