@@ -1,12 +1,10 @@
-import { useEventListener } from '@vueuse/core'
-
-// useSyncedScrollX ties two elements' sideways scrolling together: scrolling
+// syncScrollX ties two elements' sideways scrolling together: scrolling
 // either one sets the other's scrollLeft, which the browser clamps to its
 // own scrollable width, so a longer side keeps scrolling past a shorter
 // side's end without snapping back. Setting scrollLeft fires its own scroll
 // event; that echo carries the value just written and is ignored, so the
 // two sides never bounce off each other. Returns untie.
-export function useSyncedScrollX(a: HTMLElement, b: HTMLElement): () => void {
+export function syncScrollX(a: HTMLElement, b: HTMLElement): () => void {
   // The value our own write last set into each side; a scroll event
   // reporting that same value is the echo of that write, not a user scroll.
   let echoA: number | null = null
@@ -30,10 +28,10 @@ export function useSyncedScrollX(a: HTMLElement, b: HTMLElement): () => void {
     echoA = a.scrollLeft
   }
 
-  const stopA = useEventListener(a, 'scroll', onScrollA)
-  const stopB = useEventListener(b, 'scroll', onScrollB)
+  a.addEventListener('scroll', onScrollA)
+  b.addEventListener('scroll', onScrollB)
   return () => {
-    stopA()
-    stopB()
+    a.removeEventListener('scroll', onScrollA)
+    b.removeEventListener('scroll', onScrollB)
   }
 }

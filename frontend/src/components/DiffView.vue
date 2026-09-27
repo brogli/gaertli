@@ -25,8 +25,8 @@ import { useChangesStore } from '@/stores/changes'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
-import { useSyncedScrollX } from '@/composables/useSyncedScrollX'
 import { diffColours } from '@/lib/diffColours'
+import { syncScrollX } from '@/lib/syncScrollX'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
 import { basename } from '@/lib/path'
 import { iconClass, type IconName } from '@/lib/icons'
@@ -200,7 +200,7 @@ async function mountView(): Promise<void> {
     })
     a.append(merge.a.dom)
     b.append(merge.b.dom)
-    untieScrollX = useSyncedScrollX(merge.a.scrollDOM, merge.b.scrollDOM)
+    untieScrollX = syncScrollX(merge.a.scrollDOM, merge.b.scrollDOM)
     view = merge
   } else {
     if (!el) return
