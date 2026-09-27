@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '@/i18n'
-import { onKeyStroke } from '@vueuse/core'
 import Button from 'openvue/button'
 import SplitButton from 'openvue/splitbutton'
 import type { MenuItem } from 'openvue/menuitem'
@@ -11,6 +10,7 @@ import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useJobNotices } from '@/composables/useJobNotices'
 import { usePush } from '@/composables/usePush'
+import { useShortcut } from '@/composables/useShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   JobKind,
@@ -108,17 +108,15 @@ function onRetryJob(job: JobInfo): void {
 
 // Gated the same as the Pull/Push buttons: a shortcut is never a bypass of
 // their own visibility (no upstream means no plain Pull/Push here).
-onKeyStroke(
+useShortcut(
   (event) => event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 't',
-  (event) => {
-    event.preventDefault()
+  () => {
     if (refs.current?.upstream) onPull()
   },
 )
-onKeyStroke(
+useShortcut(
   (event) => event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'k',
-  (event) => {
-    event.preventDefault()
+  () => {
     if (!disabledReason.value) push()
   },
 )

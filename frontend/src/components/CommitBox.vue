@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { onKeyStroke, useDebounceFn } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { useI18n } from '@/i18n'
 import Textarea from 'openvue/textarea'
@@ -12,6 +12,7 @@ import { useRepoStore } from '@/stores/repo'
 import { useRefsStore } from '@/stores/refs'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { usePush } from '@/composables/usePush'
+import { useShortcut } from '@/composables/useShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 import SetUpstreamDialog from './SetUpstreamDialog.vue'
@@ -126,10 +127,9 @@ async function onCommit(): Promise<void> {
 
 // Ctrl+K is gated the same as the Commit button: a shortcut never bypasses
 // the button's disabled state.
-onKeyStroke(
+useShortcut(
   (event) => event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === 'k',
-  (event) => {
-    event.preventDefault()
+  () => {
     if (!commitDisabled.value) void onCommit()
   },
 )

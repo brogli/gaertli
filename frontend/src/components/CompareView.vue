@@ -3,9 +3,9 @@ import { watch } from 'vue'
 import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
 import { useCompareStore } from '@/stores/compare'
-import { onKeyStroke } from '@vueuse/core'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import { useShortcut } from '@/composables/useShortcut'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { DiffKind, fileTarget } from '@/lib/diffTarget'
 import { iconClass } from '@/lib/icons'
@@ -40,7 +40,7 @@ watch(
   { immediate: true },
 )
 
-onKeyStroke('Escape', () => compare.exit())
+useShortcut('Escape', () => compare.exit(), { inTextField: false })
 </script>
 
 <template>

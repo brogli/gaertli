@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from '@/i18n'
-import { onKeyStroke } from '@vueuse/core'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import SelectButton from 'openvue/selectbutton'
@@ -14,6 +13,7 @@ import { useChangesStore } from '@/stores/changes'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useAutoFetch } from '@/composables/useAutoFetch'
+import { useShortcut } from '@/composables/useShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from '@/components/ErrorBanner.vue'
@@ -90,12 +90,7 @@ function refresh(): void {
   void run(() => Facade.Refresh(wt))
 }
 
-// F5 needs its own preventDefault: unlike a browser tab, the WebView would
-// otherwise reload the whole page.
-onKeyStroke('F5', (event) => {
-  event.preventDefault()
-  refresh()
-})
+useShortcut('F5', refresh)
 
 // The Open in editor button names the effective editor profile once the
 // summary loads.

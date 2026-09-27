@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { onKeyStroke } from '@vueuse/core'
 import Dialog from 'openvue/dialog'
 import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
@@ -10,6 +9,7 @@ import RepoPicker from '@/components/RepoPicker.vue'
 import DebugArea from '@/components/DebugArea.vue'
 import WorktreeContent from './WorktreeContent.vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useShortcut } from '@/composables/useShortcut'
 import { iconClass } from '@/lib/icons'
 import { ICON_BUTTON } from '@/lib/layout'
 
@@ -25,12 +25,9 @@ const showSettings = ref(false)
 
 // Ctrl+Shift+N opens a new window, anywhere in a main window; the diff
 // window has no such shortcut.
-onKeyStroke(
+useShortcut(
   (event) => event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'n',
-  (event) => {
-    event.preventDefault()
-    void AppService.NewWindow()
-  },
+  () => void AppService.NewWindow(),
 )
 </script>
 
