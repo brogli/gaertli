@@ -81,8 +81,9 @@ editor start (Warn), a WSL core's stderr (Warn). A successful git command or edi
   - Reset (FR-BR-02, FR-BR-07) names the branch and the target commit and lists the four modes one
     below the other, each with its one-line explanation. On success it closes, and the notice naming
     the previous commit is the only result (FR-BR-04).
-  - A local branch checked out in another worktree (FR-BR-05) gets a dialog naming that worktree,
-    with "Switch to worktree" and Cancel.
+  - A local branch checked out in another worktree, or being rebased or bisected there (FR-BR-05),
+    gets a dialog naming that worktree and the operation when there is one, with "Switch to
+    worktree" and Cancel.
 - An error shown in place is an inline error message with the same headline, Try again and details
   as an error notice.
 

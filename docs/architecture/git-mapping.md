@@ -54,8 +54,10 @@ Updating a branch `B` from its upstream without checking it out:
 1. `B` is checked out nowhere: `git fetch <remote> <upstream-ref>:refs/heads/B`. Git allows this
    only as a fast-forward and refuses it for a branch checked out in any worktree, so git itself is
    the safety net.
-2. `B` is checked out in a worktree, this window's included: refused before any git call, naming
-   that worktree. Bringing it up to date is a pull there.
+2. `B` is checked out in a worktree, this window's included, or a worktree is rebasing or bisecting
+   it (git lists that worktree detached; the app reads its rebase and bisect state to find the
+   branch): refused before any git call, naming that worktree. Bringing it up to date is a pull
+   there, or finishing the rebase or bisect first.
 
 A diverged branch is reported as `NOT_FAST_FORWARD`. Each update is its own job, so several branches
 can update at once. The result compares `refs/heads/B` before and after: updated by _n_ commits, or
