@@ -491,6 +491,107 @@ func TestFR_WT_13_SelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *t
 	}
 }
 
+// OpenRecentRepo opens the entry in a window of its own; a window already
+// showing another repo is left on it, and the entry moves to the front of
+// the recents.
+func TestFR_REPO_08_OpenRecentRepoOpensASecondWindow(t *testing.T) {
+	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("/a", "/a", "")
+	api := fakeAPI{openWorktree: openAsIs}
+	store := newTestStore(t)
+	s := &AppService{shell: shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}}
+
+	if err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{Path: "/b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(opener.windows) != 2 {
+		t.Fatalf("windows opened = %d, want 2", len(opener.windows))
+	}
+	if got := opener.windows[0].url; got != selectionURL("/a", "") {
+		t.Errorf("first window's url = %q, want unchanged at /a", got)
+	}
+	if recents := store.Get().RecentRepos; len(recents) == 0 || recents[0].Path != "/b" {
+		t.Errorf("recents = %+v, want /b at the front", recents)
+	}
+}
+
+// A window already showing the entry's worktree is focused instead of
+// opening a second one.
+func TestFR_REPO_08_OpenRecentRepoFocusesAWindowAlreadyShowingTheEntry(t *testing.T) {
+	reg, opener := newTestRegistry()
+	reg.OpenOrFocus("/a", "/a", "")
+	reg.OpenOrFocus("/b", "/b", "")
+	windowB := opener.windows[1]
+	api := fakeAPI{openWorktree: openAsIs}
+	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
+
+	if err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{Path: "/b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(opener.windows) != 2 {
+		t.Fatalf("windows opened = %d, want still 2", len(opener.windows))
+	}
+	if windowB.focusCount == 0 {
+		t.Error("B's window was not focused")
+	}
+}
+
+// A gone entry (Code NotARepo) with a RepoKey retries at the repo's main
+// worktree, as SelectRecentRepo does, and opens a window there.
+func TestFR_REPO_08_OpenRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T) {
+	reg, opener := newTestRegistry()
+	var mainWorktreeArg core.RepoPath
+	api := fakeAPI{
+		openWorktree: func(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
+			if path == `\\wsl.localhost\Ubuntu\home\u\r-old` {
+				return core.WorktreeInfo{}, core.Errorf(core.NotARepo, "gone")
+			}
+			return openAsIs(ctx, path)
+		},
+		mainWorktree: func(_ context.Context, gitDir core.RepoPath) (core.Worktree, error) {
+			mainWorktreeArg = gitDir
+			return core.Worktree{Path: "/home/u/r", Main: true}, nil
+		},
+	}
+	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
+
+	err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{
+		Path: "/home/u/r-old", Distro: "Ubuntu", RepoKey: "/home/u/r/.git",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := core.RepoPath(`\\wsl.localhost\Ubuntu\home\u\r\.git`); mainWorktreeArg != want {
+		t.Errorf("MainWorktree called with %q, want %q", mainWorktreeArg, want)
+	}
+	if len(opener.windows) != 1 {
+		t.Errorf("windows opened = %d, want 1 (on the main worktree)", len(opener.windows))
+	}
+}
+
+// Without a RepoKey to retry, OpenRecentRepo returns the failure instead of
+// showing it in the native dialog OpenPath would use.
+func TestFR_REPO_08_OpenRecentRepoReturnsTheErrorWithoutShowingItNatively(t *testing.T) {
+	reg, opener := newTestRegistry()
+	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
+		return core.WorktreeInfo{}, core.Errorf(core.NotARepo, "gone")
+	}}
+	notify := &fakeNotifier{}
+	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: notify}}
+
+	err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{Path: "/b"})
+
+	coretest.AssertCode(t, err, core.NotARepo)
+	if len(opener.windows) != 0 {
+		t.Errorf("windows opened = %d, want 0", len(opener.windows))
+	}
+	if notify.calls != 0 {
+		t.Errorf("notify.Show calls = %d, want 0", notify.calls)
+	}
+}
+
 // nativeConsent needs no *application.App: it must work before Wails' own
 // App.Run creates its platform layer.
 func TestQA_PORT_02_ConsentAsksItsQuestionWithoutTheWailsApp(t *testing.T) {

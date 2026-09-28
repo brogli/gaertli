@@ -90,16 +90,33 @@ func (s *AppService) SelectWorktree(ctx context.Context, path string) error {
 }
 
 // SelectRecentRepo switches the calling window to repo's remembered
-// worktree; if that worktree is gone (Code NotARepo) and repo names its
-// common git dir, it retries at the repo's main worktree, found there
-// directly with no worktree of its own needed. A second failure is
+// worktree, with resolveRecentRepo's fallback. A second failure is
 // returned as-is; the repo picker shows it.
 func (s *AppService) SelectRecentRepo(ctx context.Context, repo settings.RecentRepo) error {
 	w, err := requireCallingWindow(ctx)
 	if err != nil {
 		return err
 	}
-	err = s.switchTo(ctx, w, shellPath(repo.Path, repo.Distro))
+	return s.resolveRecentRepo(ctx, repo, func(path string) error {
+		return s.switchTo(ctx, w, path)
+	})
+}
+
+// OpenRecentRepo opens repo in a window of its own, with resolveRecentRepo's
+// fallback, or brings forward the window already showing that worktree. A
+// second failure is returned as-is; the repo picker shows it.
+func (s *AppService) OpenRecentRepo(ctx context.Context, repo settings.RecentRepo) error {
+	return s.resolveRecentRepo(ctx, repo, func(path string) error {
+		return s.openOrFocus(ctx, path)
+	})
+}
+
+// resolveRecentRepo runs action on repo's remembered worktree path; if that
+// fails (Code NotARepo) and repo names its common git dir, it retries action
+// at the repo's main worktree, found there directly with no worktree of its
+// own needed.
+func (s *AppService) resolveRecentRepo(ctx context.Context, repo settings.RecentRepo, action func(path string) error) error {
+	err := action(shellPath(repo.Path, repo.Distro))
 	ce, isCoreError := errors.AsType[*core.Error](err)
 	if !isCoreError || ce.Code != core.NotARepo || repo.RepoKey == "" {
 		return err
@@ -108,7 +125,7 @@ func (s *AppService) SelectRecentRepo(ctx context.Context, repo settings.RecentR
 	if err != nil {
 		return err
 	}
-	return s.switchTo(ctx, w, shellPath(main.Path, repo.Distro))
+	return action(shellPath(main.Path, repo.Distro))
 }
 
 // UpdateWindowTitle sets the calling window's OS title from its worktree's

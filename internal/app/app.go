@@ -252,20 +252,28 @@ func (sh shell) launch(ctx context.Context, path string) bool {
 	return sh.open(ctx, path)
 }
 
-// open validates path, opens or focuses its window, and records it in
-// settings. On failure it shows a message and does nothing else. It
-// reports whether the window opened.
+// open is openOrFocus, showing a failure in the native dialog instead of
+// returning it. It reports whether the window opened.
 func (sh shell) open(ctx context.Context, path string) bool {
-	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
-	if err != nil {
+	if err := sh.openOrFocus(ctx, path); err != nil {
 		sh.notify.Show(text(appName, nil), core.ErrorOf(err).Message)
 		return false
+	}
+	return true
+}
+
+// openOrFocus validates path, opens or focuses its window, and records it
+// in settings.
+func (sh shell) openOrFocus(ctx context.Context, path string) error {
+	wt, err := sh.api.OpenWorktree(ctx, core.RepoPath(path))
+	if err != nil {
+		return err
 	}
 	distro, _, _ := remote.ClassifyWSLPath(path)
 	sh.reg.OpenOrFocus(wt.ID, wt.Path, distro)
 	sh.reg.SetRepo(wt.ID, wt.RepoKey)
 	sh.remember(wt, distro)
-	return true
+	return nil
 }
 
 // remember records wt as its repo's recent entry and the open windows for
