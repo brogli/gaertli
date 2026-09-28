@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/url"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/services"
 	"github.com/brogli/nebegit/internal/settings"
+	"github.com/brogli/nebegit/internal/userpath"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	wailslog "github.com/wailsapp/wails/v3/pkg/services/log"
 )
@@ -25,12 +27,17 @@ const singleInstanceID = "nebegit" // stable per machine; no reverse-domain owne
 
 // Run starts the shell. args is os.Args (argv[0] included, see pathArg).
 func Run(assets fs.FS, args []string) error {
+	if action := pathActionArg(args); action != noPathAction {
+		return runPathAction(action)
+	}
+
 	if ok, msg := checkGit(context.Background(), git.Runner{}); !ok {
 		showFatal(text(appName, nil), msg)
 		return errors.New("git prerequisite not met")
 	}
 
-	path, ok := pathArg(args)
+	wd, _ := os.Getwd()
+	path, ok := firstLaunchPath(args, wd)
 	if !ok {
 		showFatal(text(appName, nil), text(usage, nil))
 		return errors.New("bad arguments")
@@ -154,6 +161,79 @@ func resolveFrom(dir, path string) string {
 		return path
 	}
 	return filepath.Join(dir, path)
+}
+
+// firstLaunchPath is pathArg resolved against wd (os.Getwd() at the call
+// site), the same way the second-instance relay resolves a relayed path
+// against its own working directory.
+func firstLaunchPath(args []string, wd string) (path string, ok bool) {
+	path, ok = pathArg(args)
+	if !ok {
+		return "", false
+	}
+	return resolveFrom(wd, path), true
+}
+
+// pathAction is the PATH action argv selects, if any.
+type pathAction string
+
+const (
+	noPathAction   pathAction = ""
+	addToPath      pathAction = "--add-to-path"
+	removeFromPath pathAction = "--remove-from-path"
+)
+
+// pathActionArg reads exactly argv[0] plus one of the two installer flags;
+// any other argv, including a repo path, selects no action.
+func pathActionArg(args []string) pathAction {
+	if len(args) != 2 {
+		return noPathAction
+	}
+	switch action := pathAction(args[1]); action {
+	case addToPath, removeFromPath:
+		return action
+	default:
+		return noPathAction
+	}
+}
+
+// runPathAction adds or removes the exe's own bin folder in the user PATH.
+// It reports the outcome for main to turn into an exit code (nil: 0, an
+// error: 1); a failure's reason also goes to the app log.
+func runPathAction(action pathAction) error {
+	dir, err := exeBinDir()
+	if err == nil {
+		switch action {
+		case addToPath:
+			err = userpath.Add(dir)
+		case removeFromPath:
+			err = userpath.Remove(dir)
+		}
+	}
+	if err != nil {
+		logPathActionFailure(action, err)
+	}
+	return err
+}
+
+// exeBinDir is the bin folder beside the running executable, the folder the
+// installer adds to and removes from the user PATH.
+func exeBinDir() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(exe), "bin"), nil
+}
+
+// logPathActionFailure writes why action failed to the app log; the
+// settings-driven debug level is not available yet this early in Run.
+func logPathActionFailure(action pathAction, err error) {
+	logger, _, closer, _, _ := applog.Open(false)
+	if closer != nil {
+		defer func() { _ = closer.Close() }()
+	}
+	logger.Error("could not update the user PATH", "action", string(action), "error", err)
 }
 
 // errorNotifier shows a message outside any specific window.
