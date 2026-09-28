@@ -24,7 +24,6 @@ contents:
 # so the package avoids a version floor a package manager can't compare
 # reliably against upstream git's numbering across distros.
 depends:
-  - git
   - libgtk-4-1
   - libwebkitgtk-6.0-4
 
@@ -32,13 +31,11 @@ overrides:
   # Fedora / RHEL / AlmaLinux / Rocky Linux
   rpm:
     depends:
-      - git
       - gtk4
       - webkitgtk6.0
 
   archlinux:
     depends:
-      - git
       - gtk4
       - webkitgtk-6.0
 
