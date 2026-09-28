@@ -225,6 +225,9 @@
     "branchInWorktree": {
       "header": "Branch checked out elsewhere",
       "message": "{branch} is checked out in the worktree {folder}.",
+      "headerInUse": "Branch in use elsewhere",
+      "messageRebasing": "{branch} is being rebased in the worktree {folder}.",
+      "messageBisecting": "{branch} is being bisected in the worktree {folder}.",
       "switch": "Switch to worktree"
     },
     "pick": {

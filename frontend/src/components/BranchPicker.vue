@@ -6,7 +6,11 @@ import Button from 'openvue/button'
 import Checkbox from 'openvue/checkbox'
 import type { MenuItem } from 'openvue/menuitem'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { Code, type Branch } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  Code,
+  type Branch,
+  type BranchInUse,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { useRefsStore } from '@/stores/refs'
 import { useRepoStore } from '@/stores/repo'
 import { useLogStore } from '@/stores/log'
@@ -33,7 +37,7 @@ const emit = defineEmits<{
   'create-branch': [start: StartPoint]
   'create-worktree': [start: WorktreeStart]
   'checkout-commit': [sha: string]
-  'checkout-elsewhere': [branch: string, path: string]
+  'checkout-elsewhere': [branch: string, path: string, inUse?: BranchInUse]
   'show-log': []
 }>()
 const refs = useRefsStore()
@@ -209,7 +213,7 @@ function checkout(row: RefRow, runCall: Runner = inList): void {
   else if (row.branch.current) hide()
   else if (row.branch.checkedOutIn) {
     const path = row.branch.checkedOutIn
-    closeAnd(() => emit('checkout-elsewhere', row.name, path))
+    closeAnd(() => emit('checkout-elsewhere', row.name, path, row.branch.inUse))
   } else void runCall(() => Facade.Checkout(props.wt, row.name))
 }
 

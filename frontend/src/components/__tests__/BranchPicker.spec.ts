@@ -27,6 +27,7 @@ import { useRefsStore } from '@/stores/refs'
 import { useRepoStore } from '@/stores/repo'
 import { useLogStore } from '@/stores/log'
 import {
+  BranchInUse,
   Operation,
   type Branch,
   type Refs,
@@ -237,10 +238,28 @@ describe('BranchPicker', () => {
     await pickAction(body, 'side', 'Check out')
 
     expect(wrapper.emitted('checkout-elsewhere')).toEqual([
-      ['side', '/repo-side'],
-      ['side', '/repo-side'],
+      ['side', '/repo-side', ''],
+      ['side', '/repo-side', ''],
     ])
     expect(AppService.SelectWorktree).not.toHaveBeenCalled()
+    expect(Facade.Checkout).not.toHaveBeenCalled()
+  })
+
+  it('FR-BR-05 a local branch another worktree is rebasing or bisecting includes that in the event', async () => {
+    const rebasing = branchFixture({
+      name: 'side',
+      sha: 'sha-side',
+      current: false,
+      checkedOutIn: '/repo-side',
+      inUse: BranchInUse.BranchRebasing,
+    })
+    const { wrapper, body } = await openPicker(refsWith([main, feat, rebasing]))
+
+    await checkoutRow(body, 'side')
+
+    expect(wrapper.emitted('checkout-elsewhere')).toEqual([
+      ['side', '/repo-side', BranchInUse.BranchRebasing],
+    ])
     expect(Facade.Checkout).not.toHaveBeenCalled()
   })
 
@@ -254,7 +273,7 @@ describe('BranchPicker', () => {
 
     await checkoutRow(body, 'origin/side')
 
-    expect(wrapper.emitted('checkout-elsewhere')).toEqual([['side', '/repo-side']])
+    expect(wrapper.emitted('checkout-elsewhere')).toEqual([['side', '/repo-side', '']])
     expect(AppService.SelectWorktree).not.toHaveBeenCalled()
     expect(Facade.Checkout).not.toHaveBeenCalled()
   })

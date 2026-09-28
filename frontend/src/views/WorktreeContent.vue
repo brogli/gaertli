@@ -19,7 +19,7 @@ import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useAutoFetch } from '@/composables/useAutoFetch'
 import { useShortcut } from '@/composables/useShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { BranchInUse, ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from '@/components/ErrorBanner.vue'
 import JobsMenu from '@/components/JobsMenu.vue'
 import LogView from '@/components/LogView.vue'
@@ -70,7 +70,7 @@ useAutoFetch(() => wt)
 const createBranchStart = ref<StartPoint | null>(null)
 const createWorktreeStart = ref<WorktreeStart | null>(null)
 const checkoutCommitSha = ref<string | null>(null)
-const checkoutElsewhere = ref<{ branch: string; path: string } | null>(null)
+const checkoutElsewhere = ref<{ branch: string; path: string; inUse: BranchInUse } | null>(null)
 const resetTarget = ref<{ sha: string; subject: string } | null>(null)
 
 onMounted(() => {
@@ -183,7 +183,10 @@ const sideView = computed<'details' | 'changes'>(() =>
         @create-branch="createBranchStart = $event"
         @create-worktree="createWorktreeStart = $event"
         @checkout-commit="checkoutCommitSha = $event"
-        @checkout-elsewhere="(branch, path) => (checkoutElsewhere = { branch, path })"
+        @checkout-elsewhere="
+          (branch, path, inUse) =>
+            (checkoutElsewhere = { branch, path, inUse: inUse ?? BranchInUse.$zero })
+        "
         @show-log="showLog"
       />
       <Button
@@ -321,6 +324,7 @@ const sideView = computed<'details' | 'changes'>(() =>
       v-if="checkoutElsewhere"
       :branch="checkoutElsewhere.branch"
       :path="checkoutElsewhere.path"
+      :in-use="checkoutElsewhere.inUse"
       :distro="distro"
       @close="checkoutElsewhere = null"
     />
