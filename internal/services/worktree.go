@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 
@@ -88,6 +89,9 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 		args = []string{"worktree", "add", "-b", branch, "--", target}
 		if start != "" { // none: git branches from HEAD
 			args = append(args, start)
+		}
+		if startsAtARemoteBranch(start) { // its own first push gives it its own upstream, not this one's
+			args = slices.Insert(args, 2, "--no-track")
 		}
 	}
 	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args}); err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -33,8 +34,17 @@ func (c *Core) CreateBranch(ctx context.Context, id core.WorktreeID, name, start
 	if checkout {
 		args = []string{"switch", "-c", name, "--end-of-options", start} // atomic: no orphan branch if the checkout fails
 	}
+	if startsAtARemoteBranch(start) { // its own first push gives it its own upstream, not this one's
+		args = slices.Insert(args, 1, "--no-track")
+	}
 	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
 	return remapDirty(err, result)
+}
+
+// startsAtARemoteBranch reports whether start is a remote-tracking branch's
+// full ref.
+func startsAtARemoteBranch(start string) bool {
+	return strings.HasPrefix(start, "refs/remotes/")
 }
 
 // validateBranchName rejects an invalid name before any mutating call as
@@ -54,7 +64,7 @@ func validateBranchName(ctx context.Context, r git.Runner, dir, name string) err
 // ref with --track: a bare name's DWIM refuses when a tag has that name.
 func (c *Core) Checkout(ctx context.Context, id core.WorktreeID, branch string) error {
 	args := []string{"switch", "--end-of-options", branch}
-	if strings.HasPrefix(branch, "refs/remotes/") {
+	if startsAtARemoteBranch(branch) {
 		args = []string{"switch", "--track", "--end-of-options", branch}
 	}
 	result, err := c.runLocked(ctx, id, args...)

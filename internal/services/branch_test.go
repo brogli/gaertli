@@ -344,20 +344,67 @@ func TestFR_BR_01_CreateBranchStartsAtTheFullRefNamedWhenATagAndABranchShareItsN
 	}
 }
 
-func TestFR_BR_01_CreateBranchFromARemoteBranchsFullRefTracksIt(t *testing.T) {
+func TestFR_BR_01_CreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, remoteBranch, newName string }{
+		{"a different name", "master", "topic"},
+		{"the remote branch's own name", "feature", "feature"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			repo := gittest.New(t)
+			gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+			withOrigin(t, repo.Dir, tc.remoteBranch)
+			originTip := gittest.Out(t, repo.Dir, "rev-parse", "refs/remotes/origin/"+tc.remoteBranch)
+
+			c, wt := openWorktree(t, repo.Dir)
+
+			if err := c.CreateBranch(t.Context(), wt, tc.newName, "refs/remotes/origin/"+tc.remoteBranch, false); err != nil {
+				t.Fatal(err)
+			}
+
+			if got := branchTip(t, repo.Dir, tc.newName); got != originTip {
+				t.Errorf("%s = %s, want the remote branch's commit %s", tc.newName, got, originTip)
+			}
+			if got := upstreamOf(t, repo.Dir, tc.newName); got != "" {
+				t.Errorf("upstream = %q, want none", got)
+			}
+		})
+	}
+}
+
+// TestFR_BR_01_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush
+// covers the owner's decision end to end: a branch started at a remote
+// branch tracks nothing until it is pushed, then gets its own upstream.
+func TestFR_BR_01_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	withOrigin(t, repo.Dir, "feature")
+	origin := bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "push", "origin", "master")
+	gittest.Run(t, repo.Dir, "fetch", "origin")
+	localTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-
-	if err := c.CreateBranch(t.Context(), wt, "feature", "refs/remotes/origin/feature", false); err != nil {
+	if err := c.CreateBranch(t.Context(), wt, "topic", "refs/remotes/origin/master", true); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := upstreamOf(t, repo.Dir, "feature"); got != "origin/feature" {
-		t.Errorf("upstream = %q, want origin/feature", got)
+	target, err := c.PushTarget(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (core.PushTarget{Remote: "origin", Branch: "topic", HasUpstream: false}); target != want {
+		t.Errorf("PushTarget = %+v, want %+v", target, want)
+	}
+
+	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "topic")), "done")
+
+	if got := gittest.Out(t, origin, "rev-parse", "topic"); got != localTip {
+		t.Errorf("origin's topic = %q, want %q", got, localTip)
+	}
+	if got := upstreamOf(t, repo.Dir, "topic"); got != "origin/topic" {
+		t.Errorf("upstream = %q, want origin/topic", got)
 	}
 }
 

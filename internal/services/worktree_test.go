@@ -319,6 +319,31 @@ func TestFR_WT_02_AddWorktreeCreatesANewBranchFromAGivenStart(t *testing.T) {
 	}
 }
 
+func TestFR_WT_02_AddWorktreeWithANewBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	withOrigin(t, repo.Dir, "master")
+	originTip := gittest.Out(t, repo.Dir, "rev-parse", "refs/remotes/origin/master")
+	target := filepath.Join(t.TempDir(), "wt")
+
+	c, _ := openWorktree(t, repo.Dir)
+	got, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "topic", "refs/remotes/origin/master", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Branch != "topic" || got.SHA != originTip {
+		t.Errorf("AddWorktree = %+v, want Branch \"topic\" at %s", got, originTip)
+	}
+	if branch := currentBranch(t, target); branch != "topic" {
+		t.Errorf("checked-out branch in %s = %q, want topic", target, branch)
+	}
+	if upstream := upstreamOf(t, repo.Dir, "topic"); upstream != "" {
+		t.Errorf("upstream = %q, want none", upstream)
+	}
+}
+
 func TestFR_WT_02_AddWorktreeStartsANewBranchAtTheFullRefNamedWhenATagAndABranchShareItsName(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
