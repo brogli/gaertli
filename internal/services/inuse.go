@@ -22,9 +22,10 @@ type branchInUse struct {
 // list shows only "detached"), so each detached worktree's own git dir is
 // read for git's rebase and bisect state files. Rebase wins when both are
 // present. A worktree whose .git cannot be read is skipped: git's own
-// commands still refuse it with their own text. Read-only.
-func branchesInUse(ctx context.Context, r git.Runner, dir string) (map[string]branchInUse, error) {
-	worktrees, err := worktreeList(ctx, r, dir, false)
+// commands still refuse it with their own text. Read-only; background
+// selects an app-driven read over a user command, as worktreeList's own.
+func branchesInUse(ctx context.Context, r git.Runner, dir string, background bool) (map[string]branchInUse, error) {
+	worktrees, err := worktreeList(ctx, r, dir, background)
 	if err != nil {
 		return nil, err
 	}

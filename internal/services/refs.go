@@ -34,7 +34,25 @@ func (c *Core) Refs(ctx context.Context, id core.WorktreeID) (core.Refs, error) 
 	if err != nil {
 		return core.Refs{}, err
 	}
-	return toRefs(parseRefRecords(result.Stdout), names), nil
+	inUse, err := branchesInUse(ctx, wt.Runner, wt.Path, true)
+	if err != nil {
+		return core.Refs{}, err
+	}
+	refs := toRefs(parseRefRecords(result.Stdout), names)
+	markBranchesInUse(refs.Branches, inUse)
+	return refs, nil
+}
+
+// markBranchesInUse fills CheckedOutIn and InUse for a branch some
+// worktree is rebasing or bisecting: for-each-ref's %(worktreepath) is
+// empty for it, since that worktree's HEAD is detached mid-operation.
+func markBranchesInUse(branches []core.Branch, inUse map[string]branchInUse) {
+	for i, b := range branches {
+		if use, ok := inUse[b.Name]; ok {
+			branches[i].CheckedOutIn = use.path
+			branches[i].InUse = core.BranchInUse(use.kind)
+		}
+	}
 }
 
 // parsedRef is one for-each-ref record, before bucketing into core.Refs'

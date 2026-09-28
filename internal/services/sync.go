@@ -359,7 +359,7 @@ func (c *Core) UpdateBranch(ctx context.Context, id core.WorktreeID, branch stri
 		args := map[string]string{"branch": branch, "path": b.checkedOutIn}
 		return "", core.ErrorfArgs(core.GitFailed, "branchCheckedOutElsewhere", args, "%q is checked out in %s. Pull it in that worktree.", branch, b.checkedOutIn)
 	}
-	uses, err := branchesInUse(ctx, wt.Runner, wt.Path)
+	uses, err := branchesInUse(ctx, wt.Runner, wt.Path, false)
 	if err != nil {
 		return "", err
 	}

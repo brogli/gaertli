@@ -16,10 +16,22 @@ type Branch struct {
 	Behind       int    `json:"behind"`
 	UpstreamGone bool   `json:"upstreamGone"` // upstream configured but its ref no longer exists
 	Current      bool   `json:"current"`      // this worktree's own HEAD
-	// CheckedOutIn is the worktree with this branch checked out, "" if
-	// none; git checks a branch out in at most one worktree.
-	CheckedOutIn string `json:"checkedOutIn,omitempty"`
+	// CheckedOutIn is the worktree holding this branch, "" if none: git
+	// checks a branch out in at most one worktree. Also set, with InUse,
+	// for a worktree that has the branch's HEAD detached mid-rebase or
+	// mid-bisect.
+	CheckedOutIn string      `json:"checkedOutIn,omitempty"`
+	InUse        BranchInUse `json:"inUse,omitempty"` // "" unless CheckedOutIn is mid-rebase or mid-bisect
 }
+
+// BranchInUse is why CheckedOutIn's worktree has the branch's HEAD detached
+// instead of the branch itself checked out.
+type BranchInUse string
+
+const (
+	BranchRebasing  BranchInUse = "rebase"
+	BranchBisecting BranchInUse = "bisect"
+)
 
 // Remote is one configured remote (git remote) with its tracking branches,
 // grouped; Branches is empty for a remote with none (e.g. just added).

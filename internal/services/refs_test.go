@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -267,6 +268,69 @@ func findBranch(branches []core.Branch, name string) *core.Branch {
 		}
 	}
 	return nil
+}
+
+// TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere covers the
+// four linked worktrees a branch can be held by: X stopped mid-rebase of B,
+// Y mid-bisect of C, Z mid-rebase from a detached HEAD (not attributable to
+// any branch), and W with D plainly checked out.
+func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	seedSHA := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "branch", "B")
+	gittest.Run(t, repo.Dir, "branch", "C")
+	gittest.Run(t, repo.Dir, "branch", "D")
+	gittest.Run(t, repo.Dir, "branch", "E") // never checked out or touched
+
+	xDir := filepath.Join(t.TempDir(), "x")
+	gittest.Run(t, repo.Dir, "worktree", "add", xDir, "B")
+	gittest.Commit(t, xDir, "conflict.txt", "b-side\n", "b change")
+	gittest.Commit(t, repo.Dir, "conflict.txt", "master-side\n", "master change")
+	if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: xDir, Args: []string{"rebase", "master"}}); err == nil {
+		t.Fatal("X's rebase did not conflict as the fixture expects")
+	}
+
+	yDir := filepath.Join(t.TempDir(), "y")
+	gittest.Run(t, repo.Dir, "worktree", "add", yDir, "C")
+	gittest.Commit(t, yDir, "c1.txt", "1", "c1")
+	gittest.Commit(t, yDir, "c2.txt", "2", "c2")
+	gittest.Run(t, yDir, "bisect", "start")
+	gittest.Run(t, yDir, "bisect", "bad", "HEAD")
+	gittest.Run(t, yDir, "bisect", "good", "HEAD~2")
+
+	wDir := filepath.Join(t.TempDir(), "w")
+	gittest.Run(t, repo.Dir, "worktree", "add", wDir, "D")
+
+	zDir := filepath.Join(t.TempDir(), "z")
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", zDir, seedSHA)
+	gittest.Commit(t, zDir, "conflict2.txt", "z-side\n", "z change")
+	gittest.Commit(t, wDir, "conflict2.txt", "d-side\n", "d change")
+	if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: zDir, Args: []string{"rebase", "D"}}); err == nil {
+		t.Fatal("Z's rebase did not conflict as the fixture expects")
+	}
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	refs, err := c.Refs(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, cb, d, e := findBranch(refs.Branches, "B"), findBranch(refs.Branches, "C"), findBranch(refs.Branches, "D"), findBranch(refs.Branches, "E")
+	if b == nil || b.CheckedOutIn != gitPath(t, xDir) || b.InUse != core.BranchRebasing {
+		t.Errorf("B = %+v, want CheckedOutIn %s, InUse rebase", b, gitPath(t, xDir))
+	}
+	if cb == nil || cb.CheckedOutIn != gitPath(t, yDir) || cb.InUse != core.BranchBisecting {
+		t.Errorf("C = %+v, want CheckedOutIn %s, InUse bisect", cb, gitPath(t, yDir))
+	}
+	if d == nil || d.CheckedOutIn != gitPath(t, wDir) || d.InUse != "" {
+		t.Errorf("D = %+v, want CheckedOutIn %s, InUse \"\"", d, gitPath(t, wDir))
+	}
+	if e == nil || e.CheckedOutIn != "" || e.InUse != "" {
+		t.Errorf("E = %+v, want CheckedOutIn and InUse empty", e)
+	}
 }
 
 func TestFR_LOG_01_RefsGroupsARemoteWhoseNameHasASlashUnderItsWholeName(t *testing.T) {
