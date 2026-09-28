@@ -2,8 +2,8 @@
 name: agent-work
 description:
   Use when spawning an agent for nebegit work (implementer, reviewer, plan drafter, cleanup) or
-  merging an agent's worktree into dev. Holds the rules every agent prompt must carry, how to watch
-  agents, and the merge flow with its usual rebase conflicts.
+  merging an agent's worktree into the current feature branch. Holds the rules every agent prompt
+  must carry, how to watch agents, and the merge flow with its usual rebase conflicts.
 ---
 
 # Agent work
@@ -17,9 +17,10 @@ description:
 ## Every agent prompt carries
 
 - **Start:** an Agent-tool worktree begins at the repo's initial commit. First step:
-  `git reset --hard dev`, then confirm `git log -1` shows the dev tip. A fresh worktree has no
-  `node_modules` and no frontend bindings: `cd frontend && pnpm install --frozen-lockfile` inside
-  `nix develop`, then `nix develop --command task common:generate:bindings`, before Vitest.
+  `git reset --hard <feature branch>` (the main checkout's current branch, named in the prompt),
+  then confirm `git log -1` shows its tip. A fresh worktree has no `node_modules` and no frontend
+  bindings: `cd frontend && pnpm install --frozen-lockfile` inside `nix develop`, then
+  `nix develop --command task common:generate:bindings`, before Vitest.
 - **Every temporary rule of the session**, and which files the agent may edit: an agent that lacks a
   rule breaks it in good faith.
 - **No subagents:** implementers never spawn subagents or forks, also not for `/simplify`.
@@ -67,7 +68,7 @@ history), duplicated test helpers, single-use wrappers, copy-pasted mocks, wordy
 
 ## Merging a worktree
 
-1. Rebase the branch onto `dev`. The usual conflicts:
+1. Rebase the branch onto the current feature branch. The usual conflicts:
    - `*_gen.go`: resolve `internal/core/api.go`, then regenerate
      (`cd internal/core && go run ../../tools/gencore`).
    - Test fakes: "both added", keep both. `internal/app/facade_test.go`'s `stubCore` and
@@ -82,8 +83,8 @@ history), duplicated test helpers, single-use wrappers, copy-pasted mocks, wordy
 3. A read-only review: correctness first for anything that writes the index, stash, branches or
    worktrees, then reuse, simplification and comments. Apply the findings through one fix agent;
    rerun ci.
-4. On `dev`: `git merge --ff-only <branch>`; `git worktree unlock` (a finished agent may leave its
-   lock), `git worktree remove --force`, delete the branch.
+4. On the feature branch: `git merge --ff-only <branch>`; `git worktree unlock` (a finished agent
+   may leave its lock), `git worktree remove --force`, delete the branch.
 5. In the plans dir: delete the plan, remove its roadmap row and raise the done count. A check only
    the owner can do goes into `notes/manual-checks.md` "For you", but not while the owner is
    testing.
