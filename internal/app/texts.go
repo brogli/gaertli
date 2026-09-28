@@ -31,7 +31,7 @@ var texts = map[textID]string{
 	settingsPathErr:    "could not determine the settings location: {error}",
 	settingsLoadErr:    "could not load settings: {error}",
 	startupFailed:      "nebegit could not start its web view. On Windows, install the WebView2 runtime; on Linux, install the webkitgtk package. ({error})",
-	deployConsent:      "nebegit needs a small helper inside the WSL distro {distro} to work with repos there. Install it now? It also adds the nebegit command to {distro}, which works from the next login shell if its folder is new.",
+	deployConsent:      "nebegit needs a small helper inside the WSL distro {distro} to work with repos there. Install it now?",
 	worktreeTitle:      "{name} [{branch}]",
 	diffCommitTitle:    "{name}: {sha}",
 	diffRangeTitle:     "{name}: compare {from}..{to}",

@@ -12,12 +12,15 @@ func TestFR_UX_11_TextFillsNamedPlaceholders(t *testing.T) {
 	}
 }
 
-func TestQA_PORT_02_TheConsentNamesTheDistroAndTheNextLoginShellCaveat(t *testing.T) {
+func TestQA_PORT_02_TheConsentNamesTheDistroAndOnlyTheHelper(t *testing.T) {
 	got := consentMessage("Ubuntu")
 
-	for _, want := range []string{"Ubuntu", "next login shell"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("consent = %q, want it to name %q", got, want)
+	if !strings.Contains(got, "Ubuntu") {
+		t.Errorf("consent = %q, want it to name the distro", got)
+	}
+	for _, unwanted := range []string{"command", "login shell"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("consent = %q, want no mention of %q", got, unwanted)
 		}
 	}
 }

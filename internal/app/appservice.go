@@ -31,10 +31,10 @@ func (p wailsPicker) Pick(dir string) (path string, ok bool) {
 	return selection, true
 }
 
-// nativeConsent asks before installing the shell's helper and the nebegit
-// command in a distro, through ask rather than a Wails dialog: a distro
-// deploy can happen while restoring windows at startup, before Wails' own
-// App.Run creates its platform layer, and a Wails dialog needs that layer.
+// nativeConsent asks before installing the shell's helper in a distro,
+// through ask rather than a Wails dialog: a distro deploy can happen while
+// restoring windows at startup, before Wails' own App.Run creates its
+// platform layer, and a Wails dialog needs that layer.
 type nativeConsent struct {
 	ask func(title, msg string) bool
 }
