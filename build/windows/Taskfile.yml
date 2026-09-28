@@ -126,19 +126,13 @@ tasks:
       Builds the zip (exe, LICENSE, bin/) and the NSIS installer into dist/, mirroring release.yml's
       windows job
     deps:
-      - task: build
       - task: create:nsis:installer
     cmds:
       - mkdir -p dist
-      - rm -rf dist/{{.APP_NAME}}-windows-amd64
-      - mkdir -p dist/{{.APP_NAME}}-windows-amd64/bin
-      - cp {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE dist/{{.APP_NAME}}-windows-amd64/
-      - cp build/windows/bin/nebegit build/windows/bin/nebegit.cmd
-        dist/{{.APP_NAME}}-windows-amd64/bin/
-      - chmod 755 dist/{{.APP_NAME}}-windows-amd64/bin/nebegit
       - rm -f dist/{{.APP_NAME}}-windows-amd64.zip
-      - sh -c 'cd dist/{{.APP_NAME}}-windows-amd64 && zip -r ../{{.APP_NAME}}-windows-amd64.zip .'
-      - rm -rf dist/{{.APP_NAME}}-windows-amd64
+      - zip -j dist/{{.APP_NAME}}-windows-amd64.zip {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE
+      - cd build/windows && zip ../../dist/{{.APP_NAME}}-windows-amd64.zip bin/nebegit
+        bin/nebegit.cmd
       - cp {{.BIN_DIR}}/{{.APP_NAME}}-amd64-installer.exe dist/{{.APP_NAME}}-windows-amd64-setup.exe
 
   generate:syso:

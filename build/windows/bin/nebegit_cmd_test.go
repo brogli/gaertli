@@ -12,14 +12,10 @@ import (
 )
 
 func TestFR_REPO_06_CmdScriptStartsTheAppDetached(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, "bin"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	copyFile(t, "nebegit.cmd", filepath.Join(dir, "bin", "nebegit.cmd"), 0o644)
-	copyFile(t, fakeExePath, filepath.Join(dir, "nebegit.exe"), 0o755)
+	t.Parallel()
+	dir, scriptPath := newApp(t, "nebegit.cmd", 0o644)
 
-	cmd := exec.Command("cmd", "/c", filepath.Join("bin", "nebegit.cmd"), `C:\x`)
+	cmd := exec.Command("cmd", "/c", scriptPath, `C:\x`)
 	cmd.Dir = dir
 
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -29,11 +25,7 @@ func TestFR_REPO_06_CmdScriptStartsTheAppDetached(t *testing.T) {
 		t.Error("nebegit.cmd waited for the app")
 	}
 
-	got, ok := readArgvEventually(t, filepath.Join(dir, "argv.txt"))
-	if !ok {
-		t.Fatal("the app never recorded its arguments")
-	}
-	if want := `C:\x`; got != want {
+	if got, want := readArgvEventually(t, dir), `C:\x`; got != want {
 		t.Errorf("app argv = %q, want %q", got, want)
 	}
 }
