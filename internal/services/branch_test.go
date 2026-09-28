@@ -364,6 +364,33 @@ func TestFR_BR_10_DeleteBranchRefusesABranchBeingBisectedElsewhere(t *testing.T)
 	}
 }
 
+// TestFR_BR_10_DeleteBranchSucceedsOnTheBareMainReposHEADBranch covers a
+// bare main repo: its HEAD points to a branch, but a bare repo has no
+// checkout, so that branch is not "checked out" anywhere and delete must
+// not refuse it the way it would a branch actually checked out in another
+// worktree.
+func TestFR_BR_10_DeleteBranchSucceedsOnTheBareMainReposHEADBranch(t *testing.T) {
+	t.Parallel()
+	src := gittest.New(t)
+	gittest.Commit(t, src.Dir, "seed.txt", "a", "first")
+	head := currentBranch(t, src.Dir)
+	bareDir := filepath.Join(t.TempDir(), "bare.git")
+	gittest.Run(t, src.Dir, "clone", "-q", "--bare", src.Dir, bareDir)
+	gittest.Run(t, bareDir, "branch", "other")
+	linkedDir := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, bareDir, "worktree", "add", "-q", linkedDir, "other")
+
+	c, wt := openWorktree(t, linkedDir)
+
+	if err := c.DeleteBranch(t.Context(), wt, head, true); err != nil {
+		t.Fatal(err)
+	}
+
+	if branchExists(t, bareDir, head) {
+		t.Errorf("%s still exists, want deleted", head)
+	}
+}
+
 func TestFR_BR_07_ResetFlagMapsKeepToGitFlag(t *testing.T) {
 	t.Parallel()
 	got, err := resetFlag(core.ResetKeep)

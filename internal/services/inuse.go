@@ -83,26 +83,25 @@ func refuseBranchRebasingOrBisecting(ctx context.Context, r git.Runner, dir, bra
 }
 
 // refuseBranchInUse is Delete's up-front refusal (FR-BR-10): a branch
-// checked out in another worktree, read from %(worktreepath) (empty for a
-// missing branch, so git's own delete call refuses it with its own text),
-// or a worktree rebasing or bisecting it. Rename keeps git's own behaviour
-// for a branch checked out elsewhere instead (it renames it there too and
-// moves that worktree's HEAD along), so it calls
+// checked out in another worktree, read from worktreeList's own Branch (a
+// bare worktree has none: a bare repo's HEAD names a branch but has no
+// checkout, unlike git's own %(worktreepath), which reports the bare
+// repo's path for it), or a worktree rebasing or bisecting it. Rename keeps
+// git's own behaviour for a branch checked out elsewhere instead (it
+// renames it there too and moves that worktree's HEAD along), so it calls
 // refuseBranchRebasingOrBisecting alone, not this.
 func refuseBranchInUse(ctx context.Context, r git.Runner, dir, branch string) error {
-	result, err := r.Run(ctx, git.Call{
-		Dir: dir, ReadOnly: true,
-		Args: []string{"for-each-ref", "--format=%(worktreepath)", "refs/heads/" + branch},
-	})
+	worktrees, err := worktreeList(ctx, r, dir, false)
 	if err != nil {
 		return err
 	}
-	if path := strings.TrimSpace(string(result.Stdout)); path != "" {
-		dirInfo, _ := os.Stat(dir)
-		if !sameWorktree(dirInfo, path) {
-			args := map[string]string{"branch": branch, "path": path}
-			return core.ErrorfArgs(core.GitFailed, "branchCheckedOutSwitchFirst", args, "%q is checked out in %s. Check out another branch there first.", branch, path)
+	dirInfo, _ := os.Stat(dir)
+	for _, wt := range worktrees {
+		if wt.Bare || wt.Branch != branch || sameWorktree(dirInfo, wt.Path) {
+			continue
 		}
+		args := map[string]string{"branch": branch, "path": wt.Path}
+		return core.ErrorfArgs(core.GitFailed, "branchCheckedOutSwitchFirst", args, "%q is checked out in %s. Check out another branch there first.", branch, wt.Path)
 	}
 	return refuseBranchRebasingOrBisecting(ctx, r, dir, branch)
 }
