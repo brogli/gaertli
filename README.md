@@ -1,10 +1,15 @@
 # nebegit
 
+[![ci](https://github.com/brogli/nebegit/actions/workflows/ci.yml/badge.svg)](https://github.com/brogli/nebegit/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/brogli/nebegit)](https://github.com/brogli/nebegit/releases)
+[![licence](https://img.shields.io/github/license/brogli/nebegit)](LICENSE)
+[![go](https://img.shields.io/github/go-mod/go-version/brogli/nebegit)](go.mod)
+
 Swiss German _näbe_ ("beside") + git: a desktop git GUI that sits beside your editor.
 
-For developers whose editor lacks strong git tooling. Log viewer with graph,
-commit compare, worktree handling, safe sync actions. Go core, Wails v3 shell, Vue 3 frontend; every
-git operation runs the system `git`.
+For developers whose editor lacks strong git tooling. Log viewer with graph, commit compare,
+worktree handling, safe sync actions. Go core, Wails v3 shell, Vue 3 frontend; every git operation
+runs the system `git`.
 
 Status: pre-alpha. Windows and Linux are the targets, including repos inside WSL from a native
 Windows window.
@@ -50,8 +55,8 @@ cd nebegit
 nix develop --command task setup   # downloads Go modules and frontend packages
 ```
 
-- **Windows**: `nix develop --command task windows:package:dryrun` builds the installer and the zip
-  into `dist/`, the same as a release; install from there as under Install.
+- **Windows**: `nix develop --command task windows:build` builds `bin/nebegit.exe`, which runs on
+  Windows as it is.
 - **Linux**: `nix develop --command task build` builds `bin/nebegit`. It uses the Nix shell's
   libraries, so start it from there: `nix develop --command bin/nebegit`. For an app that runs on
   its own, install a release package.
@@ -79,9 +84,8 @@ path it reopens the windows that were open at last quit. This needs the `nebegit
 
 ## Editor setup
 
-In Settings (the toolbar's gear), pick a preset or enter a custom "open folder" /
-"open file" command. Each WSL distro has its own editor setting, since the command runs where the
-repo lives.
+In Settings (the toolbar's gear), pick a preset or enter a custom "open folder" / "open file"
+command. Each WSL distro has its own editor setting, since the command runs where the repo lives.
 
 ## Logs
 
