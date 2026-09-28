@@ -20,7 +20,7 @@ type WindowAPI interface {
 	Summary(ctx context.Context, wt WorktreeID) (Summary, error)
 
 	// Refs lists local branches, remote-tracking branches, and tags. Not
-	// cached: two git calls, whatever the ref count.
+	// cached: three git calls, whatever the ref count.
 	Refs(ctx context.Context, wt WorktreeID) (Refs, error)
 
 	// LoadLog starts loading the repo's commit log and graph unless already
