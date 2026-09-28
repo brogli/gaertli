@@ -203,10 +203,16 @@ arrow keys move between tabs and pick as they go.
   line actions appear for a modified working-tree file with whitespace shown. Its toolbar, with the
   side-by-side/unified and whitespace toggles (FR-DIFF-01, FR-DIFF-06), stays in view while the diff
   scrolls. Side by side, the two editors sit in a splitter's panels and scroll sideways together.
-  Added and removed lines take their colours from the theme, mixed strong enough to meet FR-DIFF-11
-  in every theme, measured as: each changed line's background differs from the diff's background,
-  and added from removed, by at least 0.08 ΔE in OKLab; text on them keeps 4.5:1 contrast; the
-  change marker keeps 3:1 against the diff's background. An e2e check measures each theme.
+  The other side follows through the scroll event, which the browser fires after drawing the
+  scrolled side, so it trails by a frame. Taking over wheel input to move both sides in one frame
+  would give up the browser's asynchronous and smooth scrolling for the whole diff (a non-passive
+  wheel listener blocks every wheel scroll over it), and scrollbar and keyboard scrolling would
+  still go through the scroll event; one shared sideways scroller cannot serve two panes that each
+  have their own width. Added and removed lines take their colours from the theme, mixed strong
+  enough to meet FR-DIFF-11 in every theme, measured as: each changed line's background differs from
+  the diff's background, and added from removed, by at least 0.08 ΔE in OKLab; text on them keeps
+  4.5:1 contrast; the change marker keeps 3:1 against the diff's background. An e2e check measures
+  each theme.
 
 ## Communication
 
