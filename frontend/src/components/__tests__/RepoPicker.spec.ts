@@ -1,7 +1,8 @@
-import { flushPromises, type DOMWrapper } from '@vue/test-utils'
+import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '@/testing/mountInBody'
+import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 
 const { AppService, Facade } = vi.hoisted(() => ({
   AppService: {
@@ -10,6 +11,8 @@ const { AppService, Facade } = vi.hoisted(() => ({
     RecentRepos: vi.fn(),
     ListWSLDistros: vi.fn(),
     SelectRecentRepo: vi.fn(),
+    OpenRecentRepo: vi.fn(),
+    RemoveRecentRepo: vi.fn(),
   },
   Facade: { ListWorktrees: vi.fn() },
 }))
@@ -18,6 +21,7 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ App
 
 import RepoPicker from '../RepoPicker.vue'
 import ErrorBanner from '../ErrorBanner.vue'
+import NoticeArea from '../NoticeArea.vue'
 import { worktreeFixture } from '@/testing/fixtures/worktree'
 
 const alpha = {
@@ -56,6 +60,36 @@ function actionLabels(body: DOMWrapper<Element>): string[] {
   return body.findAll('[data-test="picker-action-label"]').map((r) => r.text())
 }
 
+// rowLiFor is el's row, for checking the "…" button beside it.
+function rowLiFor(el: DOMWrapper<Element>): DOMWrapper<Element> {
+  return new DOMWrapper(el.element.closest('li'))
+}
+
+// repoMenu right-clicks path's row, opening its menu.
+async function repoMenu(body: DOMWrapper<Element>, path: string): Promise<void> {
+  await repoRow(body, path).trigger('contextmenu')
+  await flushPromises()
+}
+
+// pickRepoMenuAction opens path's menu and clicks the item labelled action.
+async function pickRepoMenuAction(
+  body: DOMWrapper<Element>,
+  path: string,
+  action: string,
+): Promise<void> {
+  await repoMenu(body, path)
+  await clickMenuItem(body, action)
+  await flushPromises()
+}
+
+// listOpen tells whether the repo list is showing.
+async function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
+  await flushPromises()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  await flushPromises()
+  return body.find('.repo-list').exists()
+}
+
 describe('RepoPicker', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -64,6 +98,8 @@ describe('RepoPicker', () => {
     AppService.RecentRepos.mockReset().mockResolvedValue([alpha, beta])
     AppService.ListWSLDistros.mockReset().mockResolvedValue([])
     AppService.SelectRecentRepo.mockReset().mockResolvedValue(undefined)
+    AppService.OpenRecentRepo.mockReset().mockResolvedValue(undefined)
+    AppService.RemoveRecentRepo.mockReset().mockResolvedValue(undefined)
     Facade.ListWorktrees.mockReset().mockResolvedValue([
       worktreeFixture({ path: '/repos/alpha', branch: 'main', main: true }),
       worktreeFixture({ path: '/repos/alpha-feat', branch: 'feat' }),
@@ -167,5 +203,91 @@ describe('RepoPicker', () => {
     expect(button.text()).toBe('')
     expect(button.attributes('title')).toBe('/repos/alpha')
     expect(button.attributes('aria-label')).toBe('/repos/alpha')
+  })
+
+  it('FR-REPO-08 a recent repo other than the window\'s own gets a "…" button; the current row and the actions get none', async () => {
+    const { body } = await openPicker({ path: '/repos/alpha' })
+
+    expect(rowLiFor(repoRow(body, alpha.path)).find('[data-test="row-actions"]').exists()).toBe(
+      false,
+    )
+    expect(
+      rowLiFor(actionRow(body, 'Open folder…')).find('[data-test="row-actions"]').exists(),
+    ).toBe(false)
+    expect(rowLiFor(repoRow(body, beta.path)).find('[data-test="row-actions"]').exists()).toBe(true)
+  })
+
+  it('FR-REPO-08 a right-click opens a recent repo\'s menu with "Open in new window" and "Remove from recents"; the current row has none', async () => {
+    const { body } = await openPicker({ path: '/repos/alpha' })
+
+    await repoMenu(body, alpha.path)
+    expect(menuLabels(body)).toEqual([])
+
+    await repoMenu(body, beta.path)
+    expect(menuLabels(body)).toEqual(['Open in new window', 'Remove from recents'])
+  })
+
+  it("FR-REPO-08 Shift+F10 and the context-menu key in the filter open the active row's menu", async () => {
+    const { body } = await openPicker({ path: '/repos/alpha' })
+    const filter = body.get('.picker-list input')
+
+    await filter.trigger('keydown', { key: 'ArrowDown' })
+    await filter.trigger('keydown', { key: 'ArrowDown' })
+    await filter.trigger('keydown', { key: 'ArrowDown' })
+    await filter.trigger('keydown', { key: 'F10', shiftKey: true })
+    expect(menuLabels(body)).toEqual(['Open in new window', 'Remove from recents'])
+
+    await filter.trigger('keydown', { key: 'ContextMenu' })
+    expect(menuLabels(body)).toEqual(['Open in new window', 'Remove from recents'])
+  })
+
+  it('FR-REPO-08 "…" then "Open in new window" closes the list and calls OpenRecentRepo with the whole entry', async () => {
+    const { body } = await openPicker({ path: '/repos/alpha' })
+
+    await rowLiFor(repoRow(body, beta.path)).get('[data-test="row-actions"]').trigger('click')
+    await clickMenuItem(body, 'Open in new window')
+
+    expect(AppService.OpenRecentRepo).toHaveBeenCalledWith(beta)
+    expect(await listOpen(body)).toBe(false)
+  })
+
+  it("FR-REPO-08 Open in new window failing shows the refusal as a notice, not the list's banner", async () => {
+    AppService.OpenRecentRepo.mockRejectedValueOnce(
+      new Error('boom', { cause: { message: 'boom' } }),
+    )
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker({ path: '/repos/alpha' })
+
+    await pickRepoMenuAction(body, beta.path, 'Open in new window')
+
+    expect(notice.get('.p-toast').text()).toContain('boom')
+    expect(body.find('.error-banner').exists()).toBe(false)
+  })
+
+  it('FR-REPO-08 page form: Remove from recents removes the row and reloads the recents, the list stays', async () => {
+    AppService.RecentRepos.mockReset()
+      .mockResolvedValueOnce([alpha, beta])
+      .mockResolvedValueOnce([alpha])
+    const { wrapper, body } = await openPicker({ path: '', asPage: true })
+
+    await pickRepoMenuAction(body, beta.path, 'Remove from recents')
+
+    expect(AppService.RemoveRecentRepo).toHaveBeenCalledWith(beta)
+    expect(body.findAll('[data-test="repo-row"]').map((r) => r.attributes('title'))).toEqual([
+      alpha.path,
+    ])
+    expect(wrapper.find('.repo-list').exists()).toBe(true)
+  })
+
+  it('FR-REPO-08 Remove from recents failing shows the refusal as a notice', async () => {
+    AppService.RemoveRecentRepo.mockRejectedValueOnce(
+      new Error('boom', { cause: { message: 'boom' } }),
+    )
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker({ path: '/repos/alpha' })
+
+    await pickRepoMenuAction(body, beta.path, 'Remove from recents')
+
+    expect(notice.get('.p-toast').text()).toContain('boom')
   })
 })

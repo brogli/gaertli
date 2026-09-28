@@ -4,6 +4,7 @@ import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import Tag from 'openvue/tag'
+import type { MenuItem } from 'openvue/menuitem'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import type { RecentRepo } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import type { Worktree } from '../../bindings/github.com/brogli/nebegit/internal/core'
@@ -11,6 +12,7 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { basename, repoPath } from '@/lib/path'
 import { iconClass } from '@/lib/icons'
 import { useLayout, useToolbarButton } from '@/lib/layout'
+import { errorNotice, useNotices } from '@/lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
 import PickerList from './PickerList.vue'
 import ShortcutHint from './ShortcutHint.vue'
@@ -22,6 +24,17 @@ import { filterRows, type PickerRow } from './pickerRow'
 const props = defineProps<{ path: string; distro?: string | undefined; asPage?: boolean }>()
 
 const { error, run } = useCoreCall()
+const notices = useNotices()
+
+// outOfList runs a menu action's call: its refusal shows as a notice, since
+// the action has already closed the list.
+function outOfList<T>(call: () => Promise<T>): Promise<T | undefined> {
+  return run(call, (e) => {
+    notices.show('repo-picker', errorNotice(e))
+    return true
+  })
+}
+
 const { t } = useI18n()
 const layout = useLayout()
 const toolbarButton = useToolbarButton()
@@ -112,7 +125,25 @@ function rowAttrs(row: Row): Record<string, string> {
     : { 'data-test': 'repo-row', title: row.repo.path }
 }
 
+// menuFor is a row's menu, held by PickerList: an action row and the
+// window's own repo get none.
+function menuFor(row: Row): MenuItem[] {
+  return row.kind === 'repo' && !row.current
+    ? [
+        { label: t('repoPicker.openInNewWindow'), command: () => openInNewWindow(row.repo) },
+        { label: t('repoPicker.removeFromRecents'), command: () => removeFromRecents(row.repo) },
+      ]
+    : []
+}
+
 const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
+
+// closeAnd closes the popover, then runs action; the page form has no
+// popover and stays.
+function closeAnd(action: () => void): void {
+  if (!props.asPage) popover.value?.hide()
+  action()
+}
 
 // openFolder opens the folder dialog; the folder picked tells a local repo
 // from one inside a WSL distro.
@@ -123,6 +154,18 @@ function openFolder(): void {
 // newWindow opens a window with no selection.
 function newWindow(): void {
   void AppService.NewWindow()
+}
+
+function openInNewWindow(repo: RecentRepo): void {
+  closeAnd(() => void outOfList(() => AppService.OpenRecentRepo(repo)))
+}
+
+function removeFromRecents(repo: RecentRepo): void {
+  closeAnd(() => void removeRecent(repo))
+}
+
+async function removeRecent(repo: RecentRepo): Promise<void> {
+  if (await outOfList(() => AppService.RemoveRecentRepo(repo).then(() => true))) void loadRecents()
 }
 </script>
 
@@ -159,6 +202,8 @@ function newWindow(): void {
         :rows="rows"
         :placeholder="t('repoPicker.searchPlaceholder')"
         :row-attrs="rowAttrs"
+        :menu="menuFor"
+        menu-button
         @activate="activate"
       >
         <template #row="{ row }">

@@ -364,7 +364,9 @@
     "searchPlaceholder": "Search repos",
     "wsl": "WSL",
     "wslTitle": "WSL: {distro}",
-    "pathWithWsl": "{path} (WSL: {distro})"
+    "pathWithWsl": "{path} (WSL: {distro})",
+    "openInNewWindow": "Open in new window",
+    "removeFromRecents": "Remove from recents"
   },
   "worktreePicker": {
     "newWorktree": "New worktree…",

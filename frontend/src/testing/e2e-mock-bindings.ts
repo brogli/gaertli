@@ -393,6 +393,12 @@ export const AppService = {
   LogPath(): Promise<LogPathInfo> {
     return Promise.resolve({ path: '/mock/nebegit.log', error: '' })
   },
+  OpenRecentRepo(): Promise<void> {
+    return Promise.resolve(undefined)
+  },
+  RemoveRecentRepo(): Promise<void> {
+    return Promise.resolve(undefined)
+  },
 }
 // themeParam/diffModeParam: ?theme= and ?diffMode=, matched against the
 // enums' own values, so a test reaches a theme or diff mode the app would
