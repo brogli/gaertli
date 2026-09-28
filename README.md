@@ -41,33 +41,20 @@ You also need:
 
 ## Build from source
 
-Builds the same app as the downloads, linked against your system's libraries.
-
-You need git, and:
-
-- Go 1.26 or newer ([go.dev/dl](https://go.dev/dl)), with `$(go env GOPATH)/bin` on `PATH` (the
-  Windows installer adds it).
-- Node 24 ([nodejs.org](https://nodejs.org)) and pnpm 11
-  ([pnpm.io/installation](https://pnpm.io/installation)).
-- Linux only: a C compiler, pkg-config and the GTK 4 and WebKitGTK 6.0 development packages. Windows
-  needs no C compiler.
-  - Ubuntu 24.04+, Debian 13+:
-    `sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev`
-  - Fedora: `sudo dnf install gcc-c++ pkgconf-pkg-config gtk4-devel webkitgtk6.0-devel`
-  - Arch: `sudo pacman -S gcc pkgconf gtk4 webkitgtk-6.0`
+You need git, [Go](https://go.dev/dl) 1.26 or newer and [Nix](https://nixos.org/download) with
+flakes enabled; on Windows, all three inside WSL. The Nix shell brings everything else.
 
 ```sh
 git clone https://github.com/brogli/nebegit
 cd nebegit
-go tool task setup   # downloads Go modules and frontend packages
-go install tool      # puts task and wails3 on PATH
-task build           # bin/nebegit, or bin\nebegit.exe on Windows
+nix develop --command task setup   # downloads Go modules and frontend packages
 ```
 
-Run it from `bin`; it needs git and the web view as listed under Install. On Windows it has no
-`nebegit` command; the installer and the zip bring one. `wails3 doctor` names missing Linux
-packages. From Linux or WSL, `task windows:build` builds `bin/nebegit.exe` too, without the GTK
-packages.
+- **Windows**: `nix develop --command task windows:package:dryrun` builds the installer and the zip
+  into `dist/`, the same as a release; install from there as under Install.
+- **Linux**: `nix develop --command task build` builds `bin/nebegit`. It uses the Nix shell's
+  libraries, so start it from there: `nix develop --command bin/nebegit`. For an app that runs on
+  its own, install a release package.
 
 ## First start
 

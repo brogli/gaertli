@@ -27,8 +27,8 @@ task dev              # hot reload: Vite dev server + app window
 `task` and `wails3` are pinned in `go.mod` as `tool` directives; the shell puts thin wrappers on
 `PATH`. Outside the shell run `go tool task <name>`.
 
-Binaries built in the shell link against the shell's GTK and WebKitGTK and run only inside it. For
-an app that runs outside the shell, build as the README's "Build from source" says.
+Linux binaries built in the shell link against the shell's GTK and WebKitGTK and run only inside it;
+the cross-compiled Windows binary runs on its own.
 
 Release binaries come from CI on stock runners, never from a developer machine.
 
@@ -43,7 +43,8 @@ shell:
 task windows:build            # -> bin/nebegit.exe, no Docker, no extra tools
 ```
 
-Native Windows without Nix: install the tools under the README's "Build from source", plus the
+Native Windows without Nix: install Go, Node 24 and pnpm 11 (the
+[pnpm installer](https://pnpm.io/installation); the Nix shell pins the exact versions), and the
 [golangci-lint binary](https://golangci-lint.run/docs/welcome/install/). Then:
 
 ```powershell
