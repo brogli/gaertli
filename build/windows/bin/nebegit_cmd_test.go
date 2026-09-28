@@ -18,8 +18,10 @@ func TestFR_REPO_06_CmdScriptStartsTheAppDetached(t *testing.T) {
 	cmd := exec.Command("cmd", "/c", scriptPath, `C:\x`)
 	cmd.Dir = dir
 
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("nebegit.cmd: %v\n%s", err, out)
+	// No output pipes: the started app inherits them, and reading them would
+	// wait until the app exits.
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("nebegit.cmd: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "argv.txt")); err == nil {
 		t.Error("nebegit.cmd waited for the app")

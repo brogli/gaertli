@@ -121,17 +121,18 @@ func newTestStore(t *testing.T) *settings.Store {
 }
 
 func TestFR_REPO_06_LaunchPath(t *testing.T) {
+	abs := t.TempDir()
 	cases := []struct {
 		args     []string
 		wantPath string
 		wantOK   bool
 	}{
 		{[]string{"nebegit"}, "", true},
-		{[]string{"nebegit", "/a"}, "/a", true},
-		{[]string{"nebegit", "/a", "/b"}, "", false},
+		{[]string{"nebegit", abs}, abs, true},
+		{[]string{"nebegit", abs, abs}, "", false},
 	}
 	for _, c := range cases {
-		path, ok := launchPath(c.args, "/wd")
+		path, ok := launchPath(c.args, t.TempDir())
 		if path != c.wantPath || ok != c.wantOK {
 			t.Errorf("launchPath(%v, ...) = (%q, %v), want (%q, %v)", c.args, path, ok, c.wantPath, c.wantOK)
 		}
