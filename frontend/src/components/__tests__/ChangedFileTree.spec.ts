@@ -78,4 +78,51 @@ describe('ChangedFileTree', () => {
     expect(name.text()).toBe('old.ts → b.ts')
     expect(name.attributes('title')).toBe('src/b.ts')
   })
+
+  it("FR-CHG-13 a file node's label holds, in order, the action button, the status icon, the name, open in editor and the second action; a folder node has no button", () => {
+    const wrapper = mount(ChangedFileTree, {
+      props: { files, action: 'stage', secondAction: 'discard' },
+    })
+
+    const label = node(wrapper, 'b.ts').get('[data-pc-section="nodelabel"]')
+    const order = [...label.element.children].map(
+      (el) => el.getAttribute('data-test') || el.className,
+    )
+    expect(order[0]).toBe('action')
+    expect(order[1]).toContain('status')
+    expect(order[2]).toContain('name')
+    expect(order[3]).toBe('open-editor')
+    expect(order[4]).toBe('second-action')
+
+    expect(node(wrapper, 'src').get('[data-pc-section="nodelabel"]').find('button').exists()).toBe(
+      false,
+    )
+  })
+
+  it("FR-CHG-13 clicking a file's action button, then its second action, emits action and second-action with that file, not select or open", async () => {
+    const wrapper = mount(ChangedFileTree, {
+      props: { files, action: 'stage', secondAction: 'discard' },
+    })
+
+    await row(wrapper, 'b.ts').get('[data-test="action"]').trigger('click')
+    await row(wrapper, 'b.ts').get('[data-test="second-action"]').trigger('click')
+
+    expect(wrapper.emitted('action')).toEqual([[b]])
+    expect(wrapper.emitted('second-action')).toEqual([[b]])
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(wrapper.emitted('open')).toBeUndefined()
+  })
+
+  it("FR-CHG-13 Enter on a file's action button does not select or open the file, or fold the tree", async () => {
+    const wrapper = mount(ChangedFileTree, {
+      props: { files, action: 'stage', secondAction: 'discard' },
+    })
+    const before = labels(wrapper)
+
+    await row(wrapper, 'b.ts').get('[data-test="action"]').trigger('keydown', { code: 'Enter' })
+
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(wrapper.emitted('open')).toBeUndefined()
+    expect(labels(wrapper)).toEqual(before)
+  })
 })

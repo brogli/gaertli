@@ -5,18 +5,30 @@ import type { TreeNode } from 'openvue/treenode'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { fileTree, folderKeys } from '@/lib/fileTree'
 import { iconClass } from '@/lib/icons'
+import type { ChangedFileAction } from './changedFileAction'
 import ChangedFileButton from './ChangedFileButton.vue'
 import FileStatusIcon from './FileStatusIcon.vue'
 
 // ChangedFileTree shows changed files by folder in OpenVue's Tree, every
 // folder unfolded whenever the files change. A click selects a file, a
 // double-click or Enter opens it; a click or Enter on a folder folds or
-// unfolds it.
-const props = defineProps<{ files: ChangedFile[]; selected?: ChangedFile | null }>()
+// unfolds it. action, when set, adds a per-file button before the status
+// icon (the changes view's stage/unstage); secondAction adds one after Open
+// in editor (discard). A folder node gets no buttons.
+const props = defineProps<{
+  files: ChangedFile[]
+  selected?: ChangedFile | null
+  action?: ChangedFileAction
+  // | undefined, not just optional: ChangesView binds a per-group value that
+  // may be undefined, which exactOptionalPropertyTypes tells from absent.
+  secondAction?: ChangedFileAction | undefined
+}>()
 const emit = defineEmits<{
   select: [file: ChangedFile]
   open: [file: ChangedFile]
   'open-editor': [file: ChangedFile]
+  action: [file: ChangedFile]
+  'second-action': [file: ChangedFile]
 }>()
 
 const nodes = computed(() => fileTree(props.files))
@@ -68,20 +80,33 @@ const pt = {
     @node-select="onNodeSelect"
   >
     <template #nodeicon="{ node }">
-      <FileStatusIcon v-if="node.data" :status="node.data.status" />
-      <i v-else :class="iconClass('folder')"></i>
+      <i v-if="!node.data" :class="iconClass('folder')"></i>
     </template>
     <template #default="{ node }">
+      <ChangedFileButton
+        v-if="node.data && action"
+        :kind="action"
+        data-test="action"
+        @click.stop="emit('action', node.data)"
+      />
+      <FileStatusIcon v-if="node.data" :status="node.data.status" />
       <span class="name flex-1 min-w-0 truncate" :title="node.data?.path ?? node.label">
         <template v-if="node.data?.oldPath">{{ node.data.oldPath }} &rarr; </template
         >{{ node.label }}
       </span>
-      <ChangedFileButton
-        v-if="node.data"
-        kind="openEditor"
-        data-test="open-editor"
-        @click.stop="emit('open-editor', node.data)"
-      />
+      <template v-if="node.data">
+        <ChangedFileButton
+          kind="openEditor"
+          data-test="open-editor"
+          @click.stop="emit('open-editor', node.data)"
+        />
+        <ChangedFileButton
+          v-if="secondAction"
+          :kind="secondAction"
+          data-test="second-action"
+          @click.stop="emit('second-action', node.data)"
+        />
+      </template>
     </template>
   </Tree>
 </template>
