@@ -25,16 +25,28 @@ export function overflows(locator: Locator): Promise<boolean> {
   return locator.evaluate((el) => el.scrollWidth > el.clientWidth)
 }
 
-// openBranchPicker opens the toolbar's branch picker.
+// settleAnimations waits until the page's running animations, such as a
+// popover's scale-in, have ended or were cancelled (a cancelled one
+// rejects). Boxes measured during one are scaled, each by the frame it is
+// measured in.
+export async function settleAnimations(page: Page): Promise<void> {
+  await page.evaluate(() => Promise.allSettled(document.getAnimations().map((a) => a.finished)))
+}
+
+// openBranchPicker opens the toolbar's branch picker and waits until it
+// stands still.
 export async function openBranchPicker(page: Page): Promise<void> {
   await page.locator('[data-test=branch-picker]').click()
   await page.locator('.p-popover .branch-list').waitFor()
+  await settleAnimations(page)
 }
 
-// openWorktreePicker opens the toolbar's worktree picker.
+// openWorktreePicker opens the toolbar's worktree picker and waits until it
+// stands still.
 export async function openWorktreePicker(page: Page): Promise<void> {
   await page.locator('[data-test=worktree-picker]').click()
   await page.locator('.p-popover .worktree-list').waitFor()
+  await settleAnimations(page)
 }
 
 // refLi is the open picker's <li> of the ref or worktree named exactly name.

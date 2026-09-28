@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { openMockRepo } from './helpers'
+import { openMockRepo, settleAnimations } from './helpers'
 
 // A click inside a popover that stops its own propagation never reaches the
 // document listener that resets OpenVue Popover's outside-click bookkeeping,
@@ -7,9 +7,9 @@ import { openMockRepo } from './helpers'
 // browser's click bubbling and layout; happy-dom does not prove them.
 
 // settledBox is locator's box once the page's animations (the list's and
-// the menu's enter) have ended or were cancelled (a cancelled one rejects).
+// the menu's enter) have settled.
 async function settledBox(page: Page, locator: Locator) {
-  await page.evaluate(() => Promise.allSettled(document.getAnimations().map((a) => a.finished)))
+  await settleAnimations(page)
   return (await locator.boundingBox())!
 }
 
