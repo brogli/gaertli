@@ -136,7 +136,9 @@ arrow keys move between tabs and pick as they go.
     worktree, so it needs no "…". Every entry action closes the list; a refusal shows as a notice.
   - The repo picker names a repo by its main worktree. It starts no core until a repo is chosen, so
     no WSL core starts uninvited. If the worktree it would switch to is gone, it falls back to the
-    repo's main worktree.
+    repo's main worktree. Each recent entry but the window's own has a menu (Open in new window,
+    Remove from recents) with a "…" button. Open in new window resolves the entry as choosing it
+    does, falling back to the repo's main worktree, then opens or focuses that worktree's window.
   - The branch picker lists "New branch…" first, then local branches, remote branches and tags. Each
     local branch has a checkbox; checked branches update together (FR-UPD-06), and entry names line
     up whether or not an entry has a checkbox. A menu action's refusal shows as a notice; a row
