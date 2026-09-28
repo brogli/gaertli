@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import type { DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '@/testing/mountInBody'
@@ -27,19 +28,24 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import ChangesView from '../ChangesView.vue'
+import ChangedFiles from '../ChangedFiles.vue'
 import CommitBox from '../CommitBox.vue'
 import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
-import type { ChangedFiles } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFiles as ChangedFilesData } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
 const props = { wt: '/repo' }
 
 // mountWith mounts ChangesView over a change list holding files.
-function mountWith(files: Partial<ChangedFiles>) {
+function mountWith(files: Partial<ChangedFilesData>) {
   useChangesStore().files = changedFilesFixture(files)
   return mount(ChangesView, { props })
 }
+
+// treeLabels reads a mounted Tree's items, in DOM order (folders first).
+const treeLabels = (tree: DOMWrapper<Element>) =>
+  tree.findAll('[role="treeitem"]').map((n) => n.attributes('aria-label'))
 
 describe('ChangesView', () => {
   beforeEach(() => {
@@ -48,6 +54,7 @@ describe('ChangesView', () => {
     Facade.Status.mockResolvedValue(changedFilesFixture())
     confirmRequire.mockReset()
     AppService.OpenDiff.mockReset()
+    localStorage.clear()
   })
 
   it('FR-CHG-11 CommitBox renders after the change list, outside its scrolling region', () => {
@@ -244,5 +251,108 @@ describe('ChangesView', () => {
     const wrapper = mountWith({ staged: [{ path: 'a.txt', status: 'M' }] })
 
     expect(wrapper.findAll('[data-test="second-action"]').length).toBe(0)
+  })
+
+  it('FR-CHG-13 the header toggle switches every group between flat lists and folder trees, folders first, each group showing only its own files', async () => {
+    const wrapper = mountWith({
+      staged: [{ path: 'sub/a.ts', status: 'M' }],
+      unstaged: [{ path: 'b.txt', status: 'M' }],
+      untracked: [{ path: 'n.txt', status: '?' }],
+      conflicted: [{ path: 'c.txt', status: 'UU' }],
+    })
+    const header = wrapper.get('header')
+    expect(header.text()).toContain('Stage all')
+    expect(header.text()).toContain('Unstage all')
+    const toggle = header.get('[data-test="file-tree-toggle"]')
+
+    await toggle.trigger('click')
+
+    expect(wrapper.findAll('h3').map((h) => h.text())).toEqual([
+      'Staged',
+      'Unstaged',
+      'Untracked',
+      'Conflicted',
+    ])
+    const trees = wrapper.findAll('[role="tree"]')
+    expect(trees).toHaveLength(4)
+    expect(treeLabels(trees[0]!)).toEqual(['sub', 'a.ts'])
+    expect(treeLabels(trees[1]!)).toEqual(['b.txt'])
+    expect(treeLabels(trees[2]!)).toEqual(['n.txt'])
+    expect(treeLabels(trees[3]!)).toEqual(['c.txt'])
+
+    await toggle.trigger('click')
+
+    expect(wrapper.find('[role="tree"]').exists()).toBe(false)
+    expect(wrapper.findAll('.files li')).toHaveLength(4)
+  })
+
+  it('FR-CHG-13 the changes view shares its choice with ChangedFiles, and a fresh mount starts from the remembered choice', async () => {
+    const wrapper = mountWith({ staged: [{ path: 'a.txt', status: 'M' }] })
+    const otherFiles = [{ path: 'x.txt', status: 'M' }]
+    const other = mount(ChangedFiles, { props: { files: otherFiles, selected: null } })
+
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+
+    expect(other.find('[role="tree"]').exists()).toBe(true)
+    expect(localStorage.getItem('nebegit.changedFiles.tree')).toBe('true')
+
+    const fresh = mountWith({ staged: [{ path: 'a.txt', status: 'M' }] })
+    expect(fresh.find('[role="tree"]').exists()).toBe(true)
+  })
+
+  it('FR-CHG-13 in tree mode, stage, unstage, discard and mark-resolved buttons on tree nodes call the right facade method with the file path', async () => {
+    const wrapper = mountWith({
+      staged: [{ path: 'a.txt', status: 'M' }],
+      unstaged: [{ path: 'a.txt', status: 'M' }],
+      untracked: [{ path: 'n.txt', status: '?' }],
+      conflicted: [{ path: 'c.txt', status: 'UU' }],
+    })
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+    const [staged, unstaged, untracked, conflicted] = wrapper.findAll('[role="tree"]')
+    const button = (tree: DOMWrapper<Element>, label: string, test: string) =>
+      tree.get(`[role="treeitem"][aria-label="${label}"] [data-test="${test}"]`)
+
+    await button(staged!, 'a.txt', 'action').trigger('click')
+    await button(unstaged!, 'a.txt', 'action').trigger('click')
+    await button(untracked!, 'n.txt', 'second-action').trigger('click')
+    confirmOptions().accept()
+    await button(conflicted!, 'c.txt', 'action').trigger('click')
+
+    expect(Facade.UnstageFile).toHaveBeenCalledWith('/repo', 'a.txt')
+    expect(Facade.StageFile).toHaveBeenCalledWith('/repo', 'a.txt')
+    expect(Facade.DiscardFile).toHaveBeenCalledWith('/repo', 'n.txt', true)
+    expect(Facade.StageFile).toHaveBeenCalledWith('/repo', 'c.txt')
+  })
+
+  it('FR-CHG-13 in tree mode, a click selects a row per group and a double-click opens it the same way as list mode', async () => {
+    const wrapper = mountWith({
+      staged: [{ path: 'a.txt', status: 'M' }],
+      unstaged: [{ path: 'a.txt', status: 'M' }],
+      untracked: [{ path: 'n.txt', status: '?' }],
+      conflicted: [{ path: 'c.txt', status: 'UU' }],
+    })
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+    const [staged, unstaged, , conflicted] = wrapper.findAll('[role="tree"]')
+    const row = (tree: DOMWrapper<Element>, label: string) =>
+      tree.get(`[role="treeitem"][aria-label="${label}"] [data-pc-section="nodecontent"]`)
+
+    await row(unstaged!, 'a.txt').trigger('click')
+
+    expect(row(unstaged!, 'a.txt').attributes('data-p-selected')).toBe('true')
+    expect(row(staged!, 'a.txt').attributes('data-p-selected')).toBe('false')
+
+    await row(unstaged!, 'a.txt').trigger('dblclick')
+    await row(conflicted!, 'c.txt').trigger('dblclick')
+    await row(conflicted!, 'c.txt').trigger('click')
+
+    expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: 'working',
+      staged: false,
+      path: 'a.txt',
+      oldPath: '',
+    })
+    expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'c.txt', 0)
+    expect(row(conflicted!, 'c.txt').attributes('data-p-selected')).toBe('false')
   })
 })

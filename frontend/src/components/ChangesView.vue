@@ -7,24 +7,30 @@ import { useChangesStore } from '@/stores/changes'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useFileTreeChoice } from '@/composables/useFileTreeChoice'
 import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { DiffKind, fileTarget } from '@/lib/diffTarget'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ChangedFileList from './ChangedFileList.vue'
+import ChangedFileTree from './ChangedFileTree.vue'
 import CommitBox from './CommitBox.vue'
 import ErrorBanner from './ErrorBanner.vue'
+import FileTreeToggle from './FileTreeToggle.vue'
 import type { ChangedFileAction } from './changedFileAction'
 
 // ChangesView is the changes view: the change list, which scrolls on its
 // own, above the commit box, which never does. A click selects a row, a
 // double-click opens its side of the change in the diff window. A
 // conflicted file has no working-tree diff: it opens in the editor, and
-// "Mark resolved" stages it (git add).
+// "Mark resolved" stages it (git add). Each group shows as a flat list or a
+// folder tree, the same remembered choice (useFileTreeChoice) as the commit
+// detail view and the diff window.
 const props = defineProps<{ wt: string }>()
 const changes = useChangesStore()
 const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(() => props.wt, run)
 const { confirmAction } = useConfirmAction()
+const asTree = useFileTreeChoice()
 const { t } = useI18n()
 
 // The selected row, with its group's side: one path can be both staged
@@ -130,6 +136,7 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
             :label="t('changesView.unstageAll')"
             @click="unstageAll"
           />
+          <FileTreeToggle v-model:as-tree="asTree" />
         </div>
       </header>
       <ErrorBanner v-if="error" :error="error" />
@@ -137,7 +144,8 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
       <section v-for="g in groups" :key="g.title" class="flex flex-col gap-1">
         <h3>{{ g.title }}</h3>
         <p v-if="!g.files.length">{{ g.empty }}</p>
-        <ChangedFileList
+        <component
+          :is="asTree ? ChangedFileTree : ChangedFileList"
           :files="g.files"
           :selected="selected?.staged === g.staged ? selected.file : null"
           :action="g.action"
@@ -153,7 +161,8 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
       <section class="flex flex-col gap-1">
         <h3>{{ t('changesView.conflictedTitle') }}</h3>
         <p v-if="!conflicted.length">{{ t('changesView.conflictedEmpty') }}</p>
-        <ChangedFileList
+        <component
+          :is="asTree ? ChangedFileTree : ChangedFileList"
           :files="conflicted"
           action="markResolved"
           @open="openEditor"
