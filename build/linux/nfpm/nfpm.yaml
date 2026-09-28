@@ -19,10 +19,8 @@ contents:
   - src: './build/linux/nebegit.desktop'
     dst: '/usr/share/applications/nebegit.desktop'
 
-# GTK4, WebKitGTK 6.0, and git itself, unversioned: the app checks the
-# running git's version at start and shows a message if it's too old,
-# so the package avoids a version floor a package manager can't compare
-# reliably against upstream git's numbering across distros.
+# GTK4 and WebKitGTK 6.0. git is the user's own: the app checks its
+# version at start.
 depends:
   - libgtk-4-1
   - libwebkitgtk-6.0-4
