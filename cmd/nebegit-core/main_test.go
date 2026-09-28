@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,23 +15,11 @@ import (
 	"github.com/brogli/nebegit/internal/testbin"
 )
 
-// bin is nebegit-core; guiBin is a fake GUI standing in for the Windows app
-// the launch hands off to.
-var bin, guiBin string
+// bin is nebegit-core.
+var bin string
 
 func TestMain(m *testing.M) {
-	testbin.Main(m,
-		testbin.Bin{Path: &bin, Pkg: "."},
-		testbin.Bin{Path: &guiBin, Pkg: "./testdata/fakegui"},
-	)
-}
-
-// envWithout drops every existing entry for key from os.Environ(), so a
-// caller can append its own override without relying on which duplicate a
-// child process's libc resolves first (under WSL, WSL_DISTRO_NAME is
-// already set).
-func envWithout(key string) []string {
-	return slices.DeleteFunc(os.Environ(), func(e string) bool { return strings.HasPrefix(e, key+"=") })
+	testbin.Main(m, testbin.Bin{Path: &bin, Pkg: "."})
 }
 
 func TestADR_3_StdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
@@ -103,7 +89,6 @@ func TestDIST_03_LdflagsStampAppVersion(t *testing.T) {
 	}
 }
 
-// A bare word is a path to launch, so the bad argument is flag-shaped.
 func TestADR_3_UnknownArgumentExits2(t *testing.T) {
 	err := exec.CommandContext(t.Context(), bin, "--bogus").Run()
 	if exit, ok := errors.AsType[*exec.ExitError](err); !ok || exit.ExitCode() != 2 {
@@ -111,43 +96,12 @@ func TestADR_3_UnknownArgumentExits2(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_06_LaunchHandsOffToTheGUIWithoutWaiting(t *testing.T) {
-	guiPath := filepath.Join(filepath.Dir(bin), "gui-path")
-	if err := os.WriteFile(guiPath, []byte(guiBin), 0o644); err != nil {
-		t.Fatal(err)
+func TestADR_3_ABarePathExits2WithTheUsageLine(t *testing.T) {
+	out, err := exec.CommandContext(t.Context(), bin, "/some/path").CombinedOutput()
+	if exit, ok := errors.AsType[*exec.ExitError](err); !ok || exit.ExitCode() != 2 {
+		t.Errorf("err = %v, want exit 2", err)
 	}
-	t.Cleanup(func() { _ = os.Remove(guiPath) })
-
-	cwd := t.TempDir()
-	argvFile := filepath.Join(cwd, "argv.txt")
-
-	cmd := exec.CommandContext(t.Context(), bin)
-	cmd.Env = append(envWithout("WSL_DISTRO_NAME"), "WSL_DISTRO_NAME=Ubuntu-22.04")
-	cmd.Dir = cwd
-	start := time.Now()
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("nebegit-core: %v\n%s", err, out)
-	}
-	if elapsed := time.Since(start); elapsed > 250*time.Millisecond {
-		t.Errorf("nebegit-core took %v to exit, want promptly (not waiting on the helper)", elapsed)
-	}
-
-	deadline := time.Now().Add(2 * time.Second)
-	var content []byte
-	for time.Now().Before(deadline) {
-		content, err = os.ReadFile(argvFile)
-		if err == nil {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if err != nil {
-		t.Fatal("fake GUI helper never wrote its argv file")
-	}
-
-	want := remote.BuildWSLPath("Ubuntu-22.04", cwd)
-	if got := strings.TrimSpace(string(content)); got != want {
-		t.Errorf("helper argv = %q, want %q", got, want)
+	if !bytes.Contains(out, []byte("usage: nebegit-core")) {
+		t.Errorf("output = %q, want the usage line", out)
 	}
 }

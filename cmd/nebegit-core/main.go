@@ -1,23 +1,16 @@
 // Command nebegit-core is the headless core: started by the shell inside a
 // WSL distro, it serves core.API over JSON-RPC on stdio. Pure Go. Logs go
-// to stderr; stdout is the wire. Given a path, or none for the current
-// folder, it is the distro's nebegit command and hands that folder to the
-// Windows app.
+// to stderr; stdout is the wire.
 package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 
 	"github.com/brogli/nebegit/internal/buildinfo"
 	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/proc"
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/services"
 )
@@ -33,56 +26,14 @@ func run(args []string) int {
 		return 0
 	case len(args) == 1 && args[0] == "--stdio":
 		return serve()
-	case len(args) == 0:
-		return launch(".")
-	case len(args) == 1 && !strings.HasPrefix(args[0], "-"):
-		return launch(args[0])
 	default:
 		return usage()
 	}
 }
 
 func usage() int {
-	fmt.Fprintln(os.Stderr, "usage: nebegit-core [path] | --stdio | --version")
+	fmt.Fprintln(os.Stderr, "usage: nebegit-core --stdio | --version")
 	return 2
-}
-
-// launch hands path, in UNC form, to the Windows app named in the gui-path
-// file the app writes next to this binary on connect, as `nebegit.exe
-// <path>` would.
-func launch(path string) int {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return fail(err)
-	}
-	distro := os.Getenv("WSL_DISTRO_NAME")
-	if distro == "" {
-		return fail(errors.New("not running inside a WSL distro shell (WSL_DISTRO_NAME is unset)"))
-	}
-	self, err := os.Executable()
-	if err == nil {
-		self, err = filepath.EvalSymlinks(self)
-	}
-	if err != nil {
-		return fail(err)
-	}
-	guiExe, err := os.ReadFile(filepath.Join(filepath.Dir(self), "gui-path"))
-	if err != nil {
-		return fail(fmt.Errorf("open a repo of this distro in the nebegit app first: %w", err))
-	}
-	cmd := exec.Command(strings.TrimSpace(string(guiExe)), remote.BuildWSLPath(distro, abs))
-	proc.Detach(cmd)
-	if err := cmd.Start(); err != nil {
-		return fail(err)
-	}
-	_ = cmd.Process.Release()
-	return 0
-}
-
-// fail prints err to stderr and returns launch's failure exit code.
-func fail(err error) int {
-	fmt.Fprintln(os.Stderr, "nebegit:", err)
-	return 1
 }
 
 func serve() int {
