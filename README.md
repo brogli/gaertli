@@ -11,7 +11,7 @@ Windows window.
 
 - What it will do: [docs/requirements.md](docs/requirements.md)
 - How it is built: [docs/architecture.md](docs/architecture.md)
-- Building from source: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Developing nebegit: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Install
 
@@ -43,6 +43,36 @@ Two prerequisites, installed separately unless noted above:
 - **The OS web view**: WebView2 on Windows (preinstalled on Windows 11; a small Microsoft installer
   on Windows 10), or the `webkitgtk` system package on Linux — the deb/rpm install it as a
   dependency; the tar.gz does not bundle it.
+
+## Build from source
+
+Builds the same app as the downloads, linked against your system's libraries.
+
+You need git, and:
+
+- Go 1.26 or newer ([go.dev/dl](https://go.dev/dl)), with `$(go env GOPATH)/bin` on `PATH` (the
+  Windows installer adds it).
+- Node 24 ([nodejs.org](https://nodejs.org)) and pnpm 11
+  ([pnpm.io/installation](https://pnpm.io/installation)).
+- Linux only: a C compiler, pkg-config and the GTK 4 and WebKitGTK 6.0 development packages. Windows
+  needs no C compiler.
+  - Ubuntu 24.04+, Debian 13+:
+    `sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev`
+  - Fedora: `sudo dnf install gcc-c++ pkgconf-pkg-config gtk4-devel webkitgtk6.0-devel`
+  - Arch: `sudo pacman -S gcc pkgconf gtk4 webkitgtk-6.0`
+
+```sh
+git clone https://github.com/brogli/nebegit
+cd nebegit
+go tool task setup   # downloads Go modules and frontend packages
+go install tool      # puts task and wails3 on PATH
+task build           # bin/nebegit, or bin\nebegit.exe on Windows
+```
+
+This gives only the app: run it from `bin`, with the same git and web view as a download (see
+Install). On Windows it has no `nebegit` command; the installer and the zip bring one.
+`wails3 doctor` names missing Linux packages. From Linux or WSL, `task windows:build` builds
+`bin/nebegit.exe` too, without the GTK packages.
 
 ## First start
 
