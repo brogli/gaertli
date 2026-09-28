@@ -146,6 +146,12 @@ func (s *AppService) RecentRepos() []settings.RecentRepo {
 	return s.store.Get().RecentRepos
 }
 
+// RemoveRecentRepo takes repo off the recent repos; OpenWorktrees and every
+// open window are left untouched.
+func (s *AppService) RemoveRecentRepo(repo settings.RecentRepo) error {
+	return s.store.Update(func(cur *settings.Settings) { cur.RemoveRecent(repo) })
+}
+
 // ListWSLDistros names the installed distros for Settings' per-distro
 // editor profiles. A host without WSL has none; that is an answer, not an
 // error.

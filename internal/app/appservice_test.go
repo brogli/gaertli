@@ -107,6 +107,29 @@ func TestFR_REPO_02_RecentReposListsStoredEntries(t *testing.T) {
 	}
 }
 
+func TestFR_REPO_08_RemoveRecentRepoDropsItLeavingOpenWorktreesUnchanged(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.Update(func(s *settings.Settings) {
+		s.RecentRepos = []settings.RecentRepo{{Path: "/a"}, {Path: "/b"}}
+		s.OpenWorktrees = []string{"/a"}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	s := &AppService{shell: shell{store: store}}
+
+	if err := s.RemoveRecentRepo(settings.RecentRepo{Path: "/b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got := store.Get()
+	if len(got.RecentRepos) != 1 || got.RecentRepos[0].Path != "/a" {
+		t.Errorf("RecentRepos = %+v, want only /a", got.RecentRepos)
+	}
+	if !slices.Equal(got.OpenWorktrees, []string{"/a"}) {
+		t.Errorf("OpenWorktrees = %v, want unchanged [/a]", got.OpenWorktrees)
+	}
+}
+
 // The one folder dialog reaches a distro through its network share; the
 // picked path alone decides the core.
 func TestFR_REPO_07_OpenFolderOpensAFolderInsideADistroOnItsCore(t *testing.T) {

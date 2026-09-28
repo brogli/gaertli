@@ -169,3 +169,15 @@ func (s *Settings) AddRecent(repo RecentRepo, now time.Time) {
 	}
 	s.RecentRepos = entries[:min(len(entries), maxRecent)]
 }
+
+// RemoveRecent drops every entry that sameRepo(repo), keeping the others in
+// order.
+func (s *Settings) RemoveRecent(repo RecentRepo) {
+	entries := make([]RecentRepo, 0, len(s.RecentRepos))
+	for _, r := range s.RecentRepos {
+		if !r.sameRepo(repo) {
+			entries = append(entries, r)
+		}
+	}
+	s.RecentRepos = entries
+}

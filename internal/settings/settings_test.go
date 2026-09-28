@@ -236,6 +236,38 @@ func TestFR_REPO_02_AddRecentCapsAtTen(t *testing.T) {
 	}
 }
 
+func TestFR_REPO_08_RemoveRecentDropsTheMatchingEntry(t *testing.T) {
+	s := settings.Settings{}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	s.AddRecent(settings.RecentRepo{Path: "/a"}, now)
+	s.AddRecent(settings.RecentRepo{Path: "/b"}, now)
+	s.AddRecent(settings.RecentRepo{Path: "/c"}, now)
+
+	s.RemoveRecent(settings.RecentRepo{Path: "/b"})
+
+	want := []string{"/c", "/a"} // AddRecent inserts most-recent-first
+	got := make([]string, len(s.RecentRepos))
+	for i, r := range s.RecentRepos {
+		got[i] = r.Path
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("RecentRepos paths = %v, want %v", got, want)
+	}
+}
+
+func TestFR_REPO_08_RemoveRecentKeepsAnotherDistrosSamePathEntry(t *testing.T) {
+	s := settings.Settings{}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	s.AddRecent(settings.RecentRepo{Path: "/r/main", RepoKey: "K"}, now)
+	s.AddRecent(settings.RecentRepo{Path: "/r/main", Distro: "Ubuntu", RepoKey: "K"}, now)
+
+	s.RemoveRecent(settings.RecentRepo{Path: "/r/other-worktree", RepoKey: "K"})
+
+	if len(s.RecentRepos) != 1 || s.RecentRepos[0].Distro != "Ubuntu" {
+		t.Errorf("RecentRepos = %+v, want only the Ubuntu entry", s.RecentRepos)
+	}
+}
+
 func TestFR_REPO_07_AddRecentRoundTripsDistroOmittingItForLocal(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
