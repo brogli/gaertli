@@ -126,11 +126,17 @@ export async function openSettings(page: Page): Promise<Locator> {
   return dialog
 }
 
-// choosePull opens the sync controls' Pull split button's menu and picks
-// mode, running a pull with it once.
-export async function choosePull(page: Page, mode: 'merge' | 'rebase'): Promise<void> {
+// choosePullMode opens the sync controls' Pull split button's menu and
+// picks mode, pulling nothing.
+export async function choosePullMode(page: Page, mode: 'merge' | 'rebase'): Promise<void> {
   await page.locator('.sync-controls .p-splitbutton-dropdown').click()
-  await page.locator('.p-tieredmenu-item-content', { hasText: `Pull with ${mode}` }).click()
+  await page.locator('.p-tieredmenu-item-content', { hasText: `Pull (${mode})` }).click()
+}
+
+// pull clicks the sync controls' Pull split button, pulling with its
+// current mode.
+export async function pull(page: Page): Promise<void> {
+  await page.locator('.sync-controls .p-splitbutton-button').click()
 }
 
 // commitFiles writes files (path to content) in repo and commits them.

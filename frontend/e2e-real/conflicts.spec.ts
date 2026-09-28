@@ -4,7 +4,6 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import type { Git, Repos } from './repos'
 import {
-  choosePull,
   clickConfirm,
   commitFiles,
   commitSha,
@@ -15,6 +14,7 @@ import {
   logRow,
   parents,
   pickFromContextMenu,
+  pull,
   pushFromClone,
   rev,
 } from './helpers'
@@ -189,7 +189,7 @@ test('FR-CONF-01 a pull that stops on conflicts shows the merge in the banner; A
   commitFiles(git, repos.work, 'local: conflict.txt', { 'conflict.txt': 'local side\n' })
   const head = rev(git, repos.work, 'HEAD')
 
-  await choosePull(app, 'merge')
+  await pull(app)
 
   await expect(conflictBanner(app)).toContainText('merge stopped on conflicts')
   await abort(app)

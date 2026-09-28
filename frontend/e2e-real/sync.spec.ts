@@ -7,7 +7,7 @@ import { PullMode } from '../bindings/github.com/brogli/nebegit/internal/core/mo
 import { gitAfterHistory, type Git } from './repos'
 import type { Sandbox } from './sandbox'
 import {
-  choosePull,
+  choosePullMode,
   clickConfirm,
   commitFiles,
   confirmDialog,
@@ -20,6 +20,7 @@ import {
   openBranchPicker,
   openJobsMenu,
   parents,
+  pull,
   pushFromClone,
   refRow,
   rev,
@@ -234,22 +235,7 @@ test("FR-SYNC-04 a rejected push names git's reason and offers Pull and Force pu
   expect(rev(git, repos.remote, 'main')).toBe(remoteTip)
 })
 
-test('FR-SYNC-02 Pull with Merge merges the upstream into the current branch', async ({
-  openApp,
-  repos,
-  git,
-}) => {
-  remoteAheadAndLocalAhead(git, repos.work, repos.other)
-  const app = await openApp(repos.work)
-
-  await choosePull(app, 'merge')
-
-  await expect.poll(() => parents(git, repos.work)).toBe(2)
-  git(repos.work, 'merge-base', '--is-ancestor', 'origin/main', 'HEAD')
-  git(repos.work, 'merge-base', '--is-ancestor', rev(git, repos.other, 'main'), 'HEAD')
-})
-
-test('FR-SYNC-02 Pull with Rebase replays local commits on the upstream', async ({
+test('FR-SYNC-02 choosing Pull (rebase) changes the button without pulling; Pull then rebases, and the mode survives a reload', async ({
   openApp,
   repos,
   git,
@@ -257,17 +243,21 @@ test('FR-SYNC-02 Pull with Rebase replays local commits on the upstream', async 
   remoteAheadAndLocalAhead(git, repos.work, repos.other)
   const app = await openApp(repos.work)
   await expect(pullButton(app)).toHaveAttribute('title', 'Pull (merge) · Ctrl+T')
+  const head = rev(git, repos.work, 'HEAD')
 
-  await choosePull(app, 'rebase')
+  await choosePullMode(app, 'rebase')
+
+  await expect(pullButton(app)).toHaveAttribute('title', 'Pull (rebase) · Ctrl+T')
+  expect(rev(git, repos.work, 'HEAD')).toBe(head)
+
+  await pull(app)
 
   await expect.poll(() => rev(git, repos.work, 'HEAD~1')).toBe(rev(git, repos.other, 'main'))
   expect(parents(git, repos.work)).toBe(1)
   expect(git(repos.work, 'log', '-1', '--format=%s').trim()).toBe('local ahead')
 
-  // The menu's choice does not change the button: a reload still shows
-  // Settings' default (merge, unset here).
   await app.reload()
-  await expect(pullButton(app)).toHaveAttribute('title', 'Pull (merge) · Ctrl+T')
+  await expect(pullButton(app)).toHaveAttribute('title', 'Pull (rebase) · Ctrl+T')
 })
 
 test.describe('the Pull button follows the default pull mode', () => {
@@ -375,7 +365,7 @@ test('FR-SYNC-09 a pull blocked by local changes offers Stash and pull; the pull
   fs.writeFileSync(hunksFile, hunksText({ 25: 'line 25 LOCAL' }))
   const app = await openApp(repos.work)
 
-  await choosePull(app, 'merge')
+  await pull(app)
   await notice(app).getByRole('button', { name: 'Stash and pull' }).click()
 
   await expect
@@ -404,7 +394,7 @@ test("FR-SYNC-09 a stash-and-pull that stops on conflicts keeps the stash; Resto
   fs.writeFileSync(file('hunks.txt'), hunksText({ 25: 'line 25 LOCAL' }))
   const app = await openApp(repos.work)
 
-  await choosePull(app, 'merge')
+  await pull(app)
   await notice(app).getByRole('button', { name: 'Stash and pull' }).click()
   const banner = conflictBanner(app)
   await expect(banner).toBeVisible()
