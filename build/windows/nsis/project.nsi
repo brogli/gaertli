@@ -31,9 +31,15 @@ Unicode true
 ## !define REQUEST_EXECUTION_LEVEL "admin"            # Default "admin"  see also https://nsis.sourceforge.io/Docs/Chapter4.html
 ## !define WAILS_INSTALL_SCOPE     "user"             # Default "machine" - set to "user" for per-user install ($LOCALAPPDATA) without UAC prompt
 ####
+!define INFO_PRODUCTNAME "nebegit"
+!define INFO_COMPANYNAME "brogli" # the installed app's Publisher, as in the winget manifest
+!define INFO_COPYRIGHT   "Copyright (c) 2026, brogli"
+!define UNINST_KEY_NAME  "nebegit"
+####
 ## Include the wails tools
 ####
 !include "wails_tools.nsh"
+!include "LogicLib.nsh"
 
 # The version information for this two must consist of 4 parts
 VIProductVersion "${INFO_PRODUCTVERSION}.0"
@@ -87,14 +93,24 @@ FunctionEnd
 Section
     !insertmacro wails.setShellContext
 
-    !insertmacro wails.webview2runtime
-
     SetOutPath $INSTDIR
     
     !insertmacro wails.files
 
+    SetOutPath $INSTDIR\bin
+    File "..\bin\nebegit" "..\bin\nebegit.cmd"
+    SetOutPath $INSTDIR
+
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
-    CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
+
+    # The exe edits the user PATH: NSIS strings stop at 1024 characters.
+    ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --add-to-path' $0
+    ${If} $0 <> 0
+        DetailPrint "The user PATH was left as it was. Add $INSTDIR\bin to it to use the nebegit command."
+        ${IfNot} ${Silent}
+            MessageBox MB_OK|MB_ICONEXCLAMATION "The user PATH was left as it was.$\r$\nTo use the nebegit command, add this folder to it:$\r$\n$INSTDIR\bin"
+        ${EndIf}
+    ${EndIf}
 
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
@@ -105,12 +121,19 @@ SectionEnd
 Section "uninstall" 
     !insertmacro wails.setShellContext
 
+    ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --remove-from-path' $0
+    ${If} $0 <> 0
+        DetailPrint "The user PATH still holds $INSTDIR\bin: remove it by hand."
+        ${IfNot} ${Silent}
+            MessageBox MB_OK|MB_ICONEXCLAMATION "The user PATH still holds this folder; remove it by hand:$\r$\n$INSTDIR\bin"
+        ${EndIf}
+    ${EndIf}
+
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 
     RMDir /r $INSTDIR
 
     Delete "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk"
-    Delete "$DESKTOP\${INFO_PRODUCTNAME}.lnk"
 
     !insertmacro wails.unassociateFiles
     !insertmacro wails.unassociateCustomProtocols
