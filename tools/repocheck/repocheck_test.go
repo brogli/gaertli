@@ -491,3 +491,23 @@ func TestTR_43_TreefmtCIFailsOnAStyleBlockRuleUtilitiesCanExpress(t *testing.T) 
 		"  to {\n    transform: rotate(360deg);\n  }\n}\n\n.cm-editor {\n  height: 100%;\n}\n</style>\n")
 	assertTreefmtCIPasses(t, root, pass)
 }
+
+func TestDIST_03_ReleaseVersionIsConfigMajorMinorAndTheRunNumber(t *testing.T) {
+	dir := t.TempDir()
+	script := readFile(t, repoRoot(t), "build/release-version.sh")
+	if err := os.WriteFile(filepath.Join(dir, "release-version.sh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := "version: '3'\n\ninfo:\n  productName: 'nebegit'\n  version: '2.7.0'\n"
+	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := exec.Command(filepath.Join(dir, "release-version.sh"), "57").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "2.7.57" {
+		t.Errorf("got %q, want 2.7.57", got)
+	}
+}

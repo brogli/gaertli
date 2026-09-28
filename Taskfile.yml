@@ -9,9 +9,14 @@ vars:
   # (`task build GOOS=windows`): an exported GOOS=windows makes Task's shell
   # miss pnpm, go and wails3 on PATH.
   GOOS: '{{.GOOS | default OS}}'
-  # Stamped into internal/buildinfo.App via -ldflags -X. Set to a release tag
-  # (e.g. v0.1.0) by the release workflow; "dev" for every local build.
+  # Stamped into internal/buildinfo via -ldflags -X: the release version
+  # X.Y.RUN (build/release-version.sh) and the short commit, set by the
+  # release workflow; "dev" and no commit for every local build.
   VERSION: '{{.VERSION | default "dev"}}'
+  COMMIT: '{{.COMMIT | default ""}}'
+  # The numeric version installers and packages need: 0.0.0 outside releases.
+  PRODUCT_VERSION:
+    sh: echo "{{.VERSION}}" | grep -xE '[0-9]+\.[0-9]+\.[0-9]+' || echo 0.0.0
 
 includes:
   common: ./build/Taskfile.yml
@@ -119,12 +124,15 @@ tasks:
       Builds this platform's release artifact and licence notices into dist/, mirroring release.yml
       without publishing
     vars:
-      VERSION: '{{.VERSION | default "v0.0.0-dryrun"}}'
+      VERSION:
+        sh: build/release-version.sh {{.RUN | default 0}}
+      COMMIT:
+        sh: git rev-parse --short=7 HEAD
     cmds:
       - rm -rf dist && mkdir -p dist
-      - task: build
-        vars: { VERSION: '{{.VERSION}}' }
-      - task: '{{OS}}:package:dryrun'
+      # Command-line vars, like the workflow's environment, reach every
+      # Taskfile's vars; vars passed to a called task do not.
+      - '{{.TASK_EXE}} build {{OS}}:package:dryrun VERSION={{.VERSION}} COMMIT={{.COMMIT}}'
       - task: licence-check
         vars: { OUT: dist/THIRD-PARTY-NOTICES.txt }
       - cp LICENSE dist/

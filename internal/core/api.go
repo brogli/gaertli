@@ -369,14 +369,16 @@ type API interface {
 	MainWorktree(ctx context.Context, gitDir RepoPath) (Worktree, error)
 }
 
-// Version of a core. App is "dev" until a release build stamps it.
+// Version of a core. App and Commit are "dev" and "" until a release build
+// stamps them.
 type Version struct {
 	App      string `json:"app"`
+	Commit   string `json:"commit"`
 	Protocol int    `json:"protocol"`
 }
 
 // Protocol is bumped whenever the wire format of API changes.
-const Protocol = 3
+const Protocol = 4
 
 // WorktreeID names a worktree session. Issued by the core that owns the
 // repo; opaque to the UI. The shell and the UI name a WSL distro's

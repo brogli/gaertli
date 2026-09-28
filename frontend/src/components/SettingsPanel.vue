@@ -143,6 +143,11 @@ const worktreeFolders = reactive<Record<string, string>>({})
 
 const distros = ref<string[]>([])
 const version = ref<Version | null>(null)
+const versionLabel = computed(() =>
+  version.value
+    ? `nebegit ${version.value.app}${version.value.commit ? ` (${version.value.commit})` : ''}`
+    : '',
+)
 const logPath = ref('')
 const logError = ref('')
 
@@ -380,7 +385,7 @@ async function submit(): Promise<void> {
 
     <div class="flex justify-end items-center gap-1.5">
       <p v-if="version" data-test="app-version" class="text-sm text-muted-color">
-        nebegit {{ version.app }}
+        {{ versionLabel }}
       </p>
       <Button type="submit" :label="t('settings.save')" />
     </div>

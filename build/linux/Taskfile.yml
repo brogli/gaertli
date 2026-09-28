@@ -61,7 +61,8 @@ tasks:
         {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED
         "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath
         -buildvcs=false -ldflags="-w -s -X
-        github.com/brogli/nebegit/internal/buildinfo.App={{.VERSION}}"{{end}}'
+        github.com/brogli/nebegit/internal/buildinfo.App={{.VERSION}} -X
+        github.com/brogli/nebegit/internal/buildinfo.Commit={{.COMMIT}}"{{end}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:
@@ -170,18 +171,24 @@ tasks:
     cmds:
       - wails3 tool package -name "{{.APP_NAME}}" -format deb -config ./build/linux/nfpm/nfpm.yaml
         -out {{.ROOT_DIR}}/bin
+    env:
+      PRODUCT_VERSION: '{{.PRODUCT_VERSION}}'
 
   generate:rpm:
     summary: Creates a rpm package
     cmds:
       - wails3 tool package -name "{{.APP_NAME}}" -format rpm -config ./build/linux/nfpm/nfpm.yaml
         -out {{.ROOT_DIR}}/bin
+    env:
+      PRODUCT_VERSION: '{{.PRODUCT_VERSION}}'
 
   generate:aur:
     summary: Creates a arch linux packager package
     cmds:
       - wails3 tool package -name "{{.APP_NAME}}" -format archlinux -config
         ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
+    env:
+      PRODUCT_VERSION: '{{.PRODUCT_VERSION}}'
 
   generate:dotdesktop:
     summary: Generates a `.desktop` file

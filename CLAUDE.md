@@ -17,6 +17,7 @@ needs.
   `research/`. Research uses primary sources (official docs, release notes, source code); each
   finding has a link and a date.
 - Commit messages name the task plan as `plan NN`.
+- PR titles are written for users: GitHub's generated release notes list them.
 - Work on a branch off `main` (`dev` for now; later feature branches) and merge `main` into it to
   take in dependency updates. Never commit to `main`. Push only when the owner asks. No release
   until the owner says so.

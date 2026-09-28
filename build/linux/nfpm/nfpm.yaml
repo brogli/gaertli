@@ -1,7 +1,7 @@
 name: 'nebegit'
 arch: ${GOARCH}
 platform: 'linux'
-version: '0.1.0'
+version: '${PRODUCT_VERSION}'
 section: 'default'
 priority: 'extra'
 maintainer: 'nebegit <28339986+brogli@users.noreply.github.com>'

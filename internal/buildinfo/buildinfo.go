@@ -3,3 +3,6 @@ package buildinfo
 
 // App is the application version; "dev" outside release builds.
 var App = "dev"
+
+// Commit is the short commit hash; empty outside release builds.
+var Commit = ""

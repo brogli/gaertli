@@ -30,5 +30,5 @@ func New(sink core.EventSink) *Core {
 
 // Version implements core.API.
 func (c *Core) Version(context.Context) (core.Version, error) {
-	return core.Version{App: buildinfo.App, Protocol: core.Protocol}, nil
+	return core.Version{App: buildinfo.App, Commit: buildinfo.Commit, Protocol: core.Protocol}, nil
 }

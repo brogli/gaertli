@@ -53,7 +53,7 @@ describe('SettingsPanel', () => {
       path: '/home/user/.local/state/nebegit/nebegit.log',
       error: '',
     })
-    Facade.Version.mockReset().mockResolvedValue({ app: 'v0.1.0', protocol: 1 })
+    Facade.Version.mockReset().mockResolvedValue({ app: 'v0.1.0', commit: '', protocol: 1 })
   })
 
   afterEach(() => {
@@ -433,10 +433,18 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('DIST-03 renders the app version fetched on mount', async () => {
+  it('DIST-03 shows the app version and commit fetched on mount', async () => {
+    Facade.Version.mockResolvedValue({ app: '0.1.57', commit: 'abc1234', protocol: 1 })
     const wrapper = await mountPanel()
 
-    expect(wrapper.text()).toContain('v0.1.0')
+    expect(wrapper.find('[data-test="app-version"]').text()).toBe('nebegit 0.1.57 (abc1234)')
+  })
+
+  it('DIST-03 shows no commit when it is empty', async () => {
+    Facade.Version.mockResolvedValue({ app: 'dev', commit: '', protocol: 1 })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('[data-test="app-version"]').text()).toBe('nebegit dev')
   })
 
   it('FR-SYNC-06 the stored protected branches show as chips', async () => {
