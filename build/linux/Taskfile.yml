@@ -4,13 +4,6 @@ includes:
   common: ../Taskfile.yml
 
 vars:
-  # Signing configuration - edit these values for your project
-  # PGP_KEY: "path/to/signing-key.asc"
-  # SIGN_ROLE: "builder"  # Options: origin, maint, archive, builder
-  #
-  # Password is stored securely in system keychain. Run: wails3 setup signing
-
-  # Docker image for cross-compilation (used when building on non-Linux or no CC available)
   CROSS_IMAGE: wails-cross
 
 tasks:
@@ -34,9 +27,7 @@ tasks:
     vars:
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
-      # Determine target architecture (defaults to host ARCH if not specified)
       TARGET_ARCH: '{{.ARCH | default ARCH}}'
-      # Check if a C compiler is available (gcc or clang) — cross-platform via wails3 tool
       HAS_CC:
         sh: 'wails3 tool has "gcc|clang"'
 
@@ -108,8 +99,6 @@ tasks:
       DOCKER_ARCH: '{{.ARCH | default "amd64"}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
-      # Generate Docker volume mounts: Go module cache + go.mod replace directives
-      # Uses wails3 tool docker-mounts for cross-platform compatibility (Windows/Linux/macOS)
       DOCKER_MOUNTS:
         sh: 'wails3 tool docker-mounts'
 
@@ -222,8 +211,6 @@ tasks:
     deps:
       - task: create:deb
     cmds:
-      # PGP_KEY is optional: if unset, `wails3 tool sign` falls back to the key
-      # configured globally via `wails3 setup`.
       - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}*.deb" {{if .PGP_KEY}}--pgp-key
         "{{.PGP_KEY}}"{{end}} {{if .SIGN_ROLE}}--role "{{.SIGN_ROLE}}"{{end}}
 
