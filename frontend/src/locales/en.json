@@ -9,6 +9,8 @@
     "fileNotFound": "{path} no longer exists in this worktree",
     "noUpstream": "\"{branch}\" has no upstream configured.",
     "branchCheckedOutElsewhere": "\"{branch}\" is checked out in {path}. Pull it in that worktree.",
+    "branchRebasingElsewhere": "\"{branch}\" is being rebased in {path}. Finish or abort the rebase there first.",
+    "branchBisectingElsewhere": "\"{branch}\" is being bisected in {path}. End the bisect there first.",
     "worktreeExists": "'{path}' already exists",
     "mergeCommitNotPickable": "{sha} is a merge commit; {verb} does not support a merge commit",
     "gitTooOld": "git {version} is older than the minimum {minVersion}",

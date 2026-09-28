@@ -359,6 +359,17 @@ func (c *Core) UpdateBranch(ctx context.Context, id core.WorktreeID, branch stri
 		args := map[string]string{"branch": branch, "path": b.checkedOutIn}
 		return "", core.ErrorfArgs(core.GitFailed, "branchCheckedOutElsewhere", args, "%q is checked out in %s. Pull it in that worktree.", branch, b.checkedOutIn)
 	}
+	uses, err := branchesInUse(ctx, wt.Runner, wt.Path)
+	if err != nil {
+		return "", err
+	}
+	if use, found := uses[branch]; found {
+		args := map[string]string{"branch": branch, "path": use.path}
+		if use.kind == "bisect" {
+			return "", core.ErrorfArgs(core.GitFailed, "branchBisectingElsewhere", args, "%q is being bisected in %s. End the bisect there first.", branch, use.path)
+		}
+		return "", core.ErrorfArgs(core.GitFailed, "branchRebasingElsewhere", args, "%q is being rebased in %s. Finish or abort the rebase there first.", branch, use.path)
+	}
 
 	jobID := wt.Repo.Jobs().StartForBranch(ctx, core.UpdateBranchJob, branch, func(ctx context.Context, progress jobs.Progress) (any, error) {
 		if err := fetchIntoLocalBranch(ctx, wt, b, progress); err != nil {

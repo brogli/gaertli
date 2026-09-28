@@ -290,9 +290,11 @@ type WindowAPI interface {
 
 	// UpdateBranch fast-forwards branch from its upstream as a job, fetching
 	// straight into it. Refused before the job starts: no upstream configured
-	// (Code NoUpstream), or checked out in a worktree (Code GitFailed, key
-	// branchCheckedOutElsewhere). A diverged branch is NotFastForward. The
-	// job's Result is an UpdateBranchResult.
+	// (Code NoUpstream), checked out in a worktree (Code GitFailed, key
+	// branchCheckedOutElsewhere), or being rebased or bisected in a worktree
+	// (Code GitFailed, key branchRebasingElsewhere or branchBisectingElsewhere).
+	// A diverged branch is NotFastForward. The job's Result is an
+	// UpdateBranchResult.
 	UpdateBranch(ctx context.Context, wt WorktreeID, branch string) (string, error)
 
 	// ContinueOperation runs --continue for wt's in-progress merge, rebase,

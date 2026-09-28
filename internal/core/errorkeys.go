@@ -12,6 +12,8 @@ var ErrorKeys = map[string][]string{
 	"fileNotFound":                {"path"},
 	"noUpstream":                  {"branch"},
 	"branchCheckedOutElsewhere":   {"branch", "path"},
+	"branchRebasingElsewhere":     {"branch", "path"},
+	"branchBisectingElsewhere":    {"branch", "path"},
 	"worktreeExists":              {"path"},
 	"mergeCommitNotPickable":      {"sha", "verb"},
 	"gitTooOld":                   {"version", "minVersion"},

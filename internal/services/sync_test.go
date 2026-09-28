@@ -1395,3 +1395,201 @@ func TestFR_UPD_01_UpdateBranchCheckedOutInThisWindowRefusesNamingItsOwnPath(t *
 		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
 	}
 }
+
+// rebaseInProgressFixture is updateBranchFixture with "B" checked out in a
+// second linked worktree (wtDir), stopped mid-rebase on a conflict: a local
+// commit and an upstream commit both add conflict.txt with different
+// content. applyBackend selects `rebase --apply` over the default merge
+// backend.
+func rebaseInProgressFixture(t *testing.T, applyBackend bool) (repo *gittest.Repo, origin, wtDir string) {
+	t.Helper()
+	repo, origin = updateBranchFixture(t)
+	wtDir = filepath.Join(t.TempDir(), "wt")
+	gittest.Run(t, repo.Dir, "worktree", "add", wtDir, "B")
+	gittest.Commit(t, wtDir, "conflict.txt", "local\n", "local change")
+	remoteAppendCommitOnBranch(t, origin, "B", "conflict.txt", "remote\n", "remote change")
+	gittest.Run(t, wtDir, "fetch", "origin")
+	args := []string{"rebase"}
+	if applyBackend {
+		args = append(args, "--apply")
+	}
+	args = append(args, "origin/B")
+	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: wtDir, Args: args}); err == nil {
+		t.Fatal("rebase did not conflict as the fixture expects")
+	}
+	return repo, origin, wtDir
+}
+
+func TestFR_UPD_04_UpdateBranchRebasingElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	wtPath := gitPath(t, wtDir)
+	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
+
+	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
+
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchRebasingElsewhere" {
+		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
+	}
+	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
+	}
+	jobs, jobsErr := c.Jobs(t.Context(), wt)
+	if jobsErr != nil {
+		t.Fatal(jobsErr)
+	}
+	if len(jobs) != 0 {
+		t.Errorf("Jobs = %+v, want none started", jobs)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.Contains(e.Command, "fetch") {
+			t.Errorf("recorded %q, want no fetch before the refusal", e.Command)
+		}
+	}
+	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
+		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
+	}
+	wtGitDir := gittest.Out(t, wtDir, "rev-parse", "--absolute-git-dir")
+	if _, err := os.Stat(filepath.Join(wtGitDir, "rebase-merge")); err != nil {
+		t.Errorf("wtDir's rebase-merge is gone, want it still in progress: %v", err)
+	}
+}
+
+func TestFR_UPD_04_UpdateBranchRebasingElsewhereApplyBackendRefuses(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := rebaseInProgressFixture(t, true)
+	wtPath := gitPath(t, wtDir)
+
+	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
+
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchRebasingElsewhere" {
+		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
+	}
+	if ce.Args["path"] != wtPath {
+		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.Contains(e.Command, "fetch") {
+			t.Errorf("recorded %q, want no fetch before the refusal", e.Command)
+		}
+	}
+}
+
+// bisectInProgressFixture is updateBranchFixture with "B" checked out in a
+// second linked worktree (wtDir), mid-bisect from a two-commit history on B.
+func bisectInProgressFixture(t *testing.T) (repo *gittest.Repo, origin, wtDir string) {
+	t.Helper()
+	repo, origin = updateBranchFixture(t)
+	wtDir = filepath.Join(t.TempDir(), "wt")
+	gittest.Run(t, repo.Dir, "worktree", "add", wtDir, "B")
+	gittest.Commit(t, wtDir, "c1.txt", "1", "c1")
+	gittest.Commit(t, wtDir, "c2.txt", "2", "c2")
+	gittest.Run(t, wtDir, "bisect", "start")
+	gittest.Run(t, wtDir, "bisect", "bad", "HEAD")
+	gittest.Run(t, wtDir, "bisect", "good", "HEAD~2")
+	return repo, origin, wtDir
+}
+
+func TestFR_UPD_04_UpdateBranchBisectingElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := bisectInProgressFixture(t)
+	wtPath := gitPath(t, wtDir)
+
+	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
+
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchBisectingElsewhere" {
+		t.Errorf("Key = %q, want branchBisectingElsewhere", ce.Key)
+	}
+	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
+	}
+	jobs, jobsErr := c.Jobs(t.Context(), wt)
+	if jobsErr != nil {
+		t.Fatal(jobsErr)
+	}
+	if len(jobs) != 0 {
+		t.Errorf("Jobs = %+v, want none started", jobs)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.Contains(e.Command, "fetch") {
+			t.Errorf("recorded %q, want no fetch before the refusal", e.Command)
+		}
+	}
+}
+
+func TestFR_UPD_04_UpdateBranchRebasingInMainWorktreeRefusesNamingIt(t *testing.T) {
+	t.Parallel()
+	repo, origin := updateBranchFixture(t)
+	gittest.Run(t, repo.Dir, "checkout", "B")
+	mainPath := gitPath(t, repo.Dir)
+	otherDir := filepath.Join(t.TempDir(), "other")
+	gittest.Run(t, repo.Dir, "worktree", "add", "-b", "other", otherDir, "master")
+	gittest.Commit(t, repo.Dir, "conflict.txt", "local\n", "local change")
+	remoteAppendCommitOnBranch(t, origin, "B", "conflict.txt", "remote\n", "remote change")
+	gittest.Run(t, repo.Dir, "fetch", "origin")
+	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: repo.Dir, Args: []string{"rebase", "origin/B"}}); err == nil {
+		t.Fatal("rebase did not conflict as the fixture expects")
+	}
+
+	c, wt := openWorktree(t, otherDir)
+
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchRebasingElsewhere" {
+		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
+	}
+	if ce.Args["path"] != mainPath {
+		t.Errorf("Args[path] = %q, want the main worktree %s", ce.Args["path"], mainPath)
+	}
+}
+
+// rewriteGitDirRelative rewrites worktreeDir's .git file to a "gitdir:"
+// target relative to worktreeDir, as worktree.useRelativePaths would.
+func rewriteGitDirRelative(t *testing.T, worktreeDir string) {
+	t.Helper()
+	dotGit := filepath.Join(worktreeDir, ".git")
+	content, err := os.ReadFile(dotGit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(content)), "gitdir:"))
+	rel, err := filepath.Rel(worktreeDir, target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dotGit, []byte("gitdir: "+rel+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithRelativeGitDirRefuses(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	wtPath := gitPath(t, wtDir)
+	rewriteGitDirRelative(t, wtDir)
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchRebasingElsewhere" {
+		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
+	}
+	if ce.Args["path"] != wtPath {
+		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
+	}
+}
