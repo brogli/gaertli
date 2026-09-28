@@ -116,20 +116,30 @@ tasks:
           '{{if eq (.FORMAT | default "nsis")
           "msix"}}create:msix:package{{else}}create:nsis:installer{{end}}'
         vars:
-          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
     vars:
       FORMAT: '{{.FORMAT | default "nsis"}}'
-      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
 
   package:dryrun:
     summary:
-      Zips the cross-compiled .exe and LICENSE into dist/, mirroring release.yml's windows job
+      Builds the zip (exe, LICENSE, bin/) and the NSIS installer into dist/, mirroring release.yml's
+      windows job
     deps:
       - task: build
+      - task: create:nsis:installer
     cmds:
       - mkdir -p dist
+      - rm -rf dist/{{.APP_NAME}}-windows-amd64
+      - mkdir -p dist/{{.APP_NAME}}-windows-amd64/bin
+      - cp {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE dist/{{.APP_NAME}}-windows-amd64/
+      - cp build/windows/bin/nebegit build/windows/bin/nebegit.cmd
+        dist/{{.APP_NAME}}-windows-amd64/bin/
+      - chmod 755 dist/{{.APP_NAME}}-windows-amd64/bin/nebegit
       - rm -f dist/{{.APP_NAME}}-windows-amd64.zip
-      - zip -j dist/{{.APP_NAME}}-windows-amd64.zip {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE
+      - sh -c 'cd dist/{{.APP_NAME}}-windows-amd64 && zip -r ../{{.APP_NAME}}-windows-amd64.zip .'
+      - rm -rf dist/{{.APP_NAME}}-windows-amd64
+      - cp {{.BIN_DIR}}/{{.APP_NAME}}-amd64-installer.exe dist/{{.APP_NAME}}-windows-amd64-setup.exe
 
   generate:syso:
     summary: Generates Windows `.syso` file
@@ -149,18 +159,20 @@ tasks:
       - sh: '[ "{{.INSTALL_SCOPE}}" = "user" ] || [ "{{.INSTALL_SCOPE}}" = "machine" ]'
         msg: "INSTALL_SCOPE must be 'user' or 'machine', got '{{.INSTALL_SCOPE}}'"
     cmds:
-      # Create the Microsoft WebView2 bootstrapper if it doesn't exist
-      - wails3 generate webview2bootstrapper -dir "{{.ROOT_DIR}}/build/windows/nsis"
       - |
         {{if eq OS "windows"}}
-        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" project.nsi
+        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DINFO_PRODUCTVERSION="{{.PRODUCT_VERSION}}" -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" project.nsi
         {{else}}
-        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" project.nsi
+        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DINFO_PRODUCTVERSION="{{.PRODUCT_VERSION}}" -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" project.nsi
         {{end}}
     vars:
       ARCH: '{{.ARCH | default ARCH}}'
       ARG_FLAG: '{{if eq .ARCH "amd64"}}AMD64{{else}}ARM64{{end}}'
-      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
+      # A release tag vX.Y.Z[-…] gives X.Y.Z; anything else (a branch build,
+      # "dev") gives 0.0.0, since VIProductVersion needs numbers.
+      PRODUCT_VERSION:
+        sh: echo "{{.VERSION}}" | sed -E 's/^v([0-9]+\.[0-9]+\.[0-9]+).*/\1/; t; s/.*/0.0.0/'
 
   create:msix:package:
     summary: Creates an MSIX package
@@ -219,9 +231,9 @@ tasks:
     deps:
       - task: create:nsis:installer
         vars:
-          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+          INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
     vars:
-      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+      INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
     cmds:
       - wails3 tool sign --input "build/windows/nsis/{{.APP_NAME}}-installer.exe" {{if
         .SIGN_CERTIFICATE}}--certificate "{{.SIGN_CERTIFICATE}}"{{end}} {{if

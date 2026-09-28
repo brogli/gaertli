@@ -35,6 +35,7 @@
               webkitgtk_6_0
               adwaita-icon-theme # mouse cursor for the X11 backend under WSLg
               playwright-driver.browsers
+              nsis # makensis, to cross-build the Windows installer
             ];
 
           shellHook = ''

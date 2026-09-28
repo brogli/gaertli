@@ -189,4 +189,4 @@ tasks:
       - task: test
       - task: build
       - task: build:core
-      - task: windows:build
+      - task: windows:package:dryrun
