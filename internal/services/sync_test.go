@@ -1593,3 +1593,32 @@ func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithRelativeGitDirRefuses(t *tes
 		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
 	}
 }
+
+// TestFR_UPD_04_UpdateBranchRebasingElsewhereWithGitDirSymlinkRefuses covers
+// a worktree whose .git is a symlink to its git dir (not the usual "gitdir:"
+// file): os.Lstat would see the symlink itself, not a directory.
+func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithGitDirSymlinkRefuses(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	wtPath := gitPath(t, wtDir)
+	wtGitDir := gittest.Out(t, wtDir, "rev-parse", "--absolute-git-dir")
+	dotGit := filepath.Join(wtDir, ".git")
+	if err := os.Remove(dotGit); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(wtGitDir, dotGit); err != nil {
+		t.Fatal(err)
+	}
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, err := c.UpdateBranch(t.Context(), wt, "B")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchRebasingElsewhere" {
+		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
+	}
+	if ce.Args["path"] != wtPath {
+		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
+	}
+}

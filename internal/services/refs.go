@@ -43,12 +43,14 @@ func (c *Core) Refs(ctx context.Context, id core.WorktreeID) (core.Refs, error) 
 	return refs, nil
 }
 
-// markBranchesInUse fills CheckedOutIn and InUse for a branch some
+// markBranchesInUse fills CheckedOutIn and InUse for a branch some other
 // worktree is rebasing or bisecting: for-each-ref's %(worktreepath) is
-// empty for it, since that worktree's HEAD is detached mid-operation.
+// empty for it whenever that worktree's HEAD is detached mid-operation. A
+// use in this worktree itself is left unmarked: it is not held "elsewhere",
+// and for a plain checkout %(worktreepath) already covers it.
 func markBranchesInUse(branches []core.Branch, inUse map[string]branchInUse) {
 	for i, b := range branches {
-		if use, ok := inUse[b.Name]; ok {
+		if use, ok := inUse[b.Name]; ok && !use.own {
 			branches[i].CheckedOutIn = use.path
 			branches[i].InUse = core.BranchInUse(use.kind)
 		}

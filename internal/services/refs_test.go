@@ -333,6 +333,96 @@ func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T)
 	}
 }
 
+// TestFR_BR_05_RefsDoesNotMarkItsOwnWorktreesBisectAsInUse covers worktree W,
+// bisecting B, asking Refs about itself: W is not "elsewhere" from its own
+// point of view. Asked from another worktree, B is still marked.
+func TestFR_BR_05_RefsDoesNotMarkItsOwnWorktreesBisectAsInUse(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "branch", "B")
+
+	wDir := filepath.Join(t.TempDir(), "w")
+	gittest.Run(t, repo.Dir, "worktree", "add", wDir, "B")
+	gittest.Commit(t, wDir, "c1.txt", "1", "c1")
+	gittest.Commit(t, wDir, "c2.txt", "2", "c2")
+	gittest.Run(t, wDir, "bisect", "start")
+	gittest.Run(t, wDir, "bisect", "bad", "HEAD")
+	gittest.Run(t, wDir, "bisect", "good", "HEAD~2")
+	wPath := gitPath(t, wDir)
+
+	cW, wtW := openWorktree(t, wDir)
+	refsFromW, err := cW.Refs(t.Context(), wtW)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := findBranch(refsFromW.Branches, "B"); b == nil || b.CheckedOutIn != "" || b.InUse != "" {
+		t.Errorf("B from W's own Refs = %+v, want CheckedOutIn and InUse empty", b)
+	}
+
+	cMain, wtMain := openWorktree(t, repo.Dir)
+	refsFromMain, err := cMain.Refs(t.Context(), wtMain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := findBranch(refsFromMain.Branches, "B"); b == nil || b.CheckedOutIn != wPath || b.InUse != core.BranchBisecting {
+		t.Errorf("B from the main worktree's Refs = %+v, want CheckedOutIn %s, InUse bisect", b, wPath)
+	}
+}
+
+// TestFR_BR_05_RefsMarksBothARebaseAndAStaleBisectFromOneWorktree covers a
+// worktree that started a bisect on C, then moved on: first a plain checkout
+// of D (not detached, C's BISECT_START left stale), then a rebase of D that
+// conflicts (detached again). Both checkpoints must still show C bisecting.
+func TestFR_BR_05_RefsMarksBothARebaseAndAStaleBisectFromOneWorktree(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	gittest.Run(t, repo.Dir, "branch", "C")
+	gittest.Run(t, repo.Dir, "branch", "D")
+	gittest.Commit(t, repo.Dir, "conflict.txt", "master-side\n", "master change") // master diverges from D
+
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gittest.Run(t, repo.Dir, "worktree", "add", wtDir, "C")
+	gittest.Commit(t, wtDir, "c1.txt", "1", "c1")
+	gittest.Commit(t, wtDir, "c2.txt", "2", "c2")
+	gittest.Run(t, wtDir, "bisect", "start")
+	gittest.Run(t, wtDir, "bisect", "bad", "HEAD")
+	gittest.Run(t, wtDir, "bisect", "good", "HEAD~2")
+	gittest.Run(t, wtDir, "switch", "D")
+	wtPath := gitPath(t, wtDir)
+
+	c, wt := openWorktree(t, repo.Dir)
+	refs, err := c.Refs(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cb, d := findBranch(refs.Branches, "C"), findBranch(refs.Branches, "D")
+	if cb == nil || cb.CheckedOutIn != wtPath || cb.InUse != core.BranchBisecting {
+		t.Errorf("C (not detached, stale bisect) = %+v, want CheckedOutIn %s, InUse bisect", cb, wtPath)
+	}
+	if d == nil || d.CheckedOutIn != wtPath || d.InUse != "" {
+		t.Errorf("D (plainly checked out) = %+v, want CheckedOutIn %s, InUse \"\"", d, wtPath)
+	}
+
+	gittest.Commit(t, wtDir, "conflict.txt", "wt-side\n", "wt change")
+	if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: wtDir, Args: []string{"rebase", "master"}}); err == nil {
+		t.Fatal("wt's rebase did not conflict as the fixture expects")
+	}
+
+	refs, err = c.Refs(t.Context(), wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cb, d = findBranch(refs.Branches, "C"), findBranch(refs.Branches, "D")
+	if cb == nil || cb.CheckedOutIn != wtPath || cb.InUse != core.BranchBisecting {
+		t.Errorf("C (stale bisect, wt now rebasing D) = %+v, want CheckedOutIn %s, InUse bisect", cb, wtPath)
+	}
+	if d == nil || d.CheckedOutIn != wtPath || d.InUse != core.BranchRebasing {
+		t.Errorf("D (mid-rebase) = %+v, want CheckedOutIn %s, InUse rebase", d, wtPath)
+	}
+}
+
 func TestFR_LOG_01_RefsGroupsARemoteWhoseNameHasASlashUnderItsWholeName(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
