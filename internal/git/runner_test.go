@@ -2,6 +2,8 @@ package git
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -435,9 +437,14 @@ func assertStopped(t *testing.T, heartbeat string) {
 	}
 }
 
+// mtime is the zero time for a missing file: a process killed before its
+// first heartbeat never wrote one.
 func mtime(t *testing.T, path string) time.Time {
 	t.Helper()
 	info, err := os.Stat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return time.Time{}
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
