@@ -115,11 +115,11 @@ chosen view below at full width. "(n)" is the changes view's file count (FR-UX-0
 Hidden views stay mounted, so switching keeps the scroll position and the typed commit message. The
 arrow keys move between tabs and pick as they go.
 
-- **Toolbar**: every action is a button with one shared look, Pull a split button. Below wide the
-  buttons show their icon only, below medium they are the small size, and in narrow the three
-  pickers show only their icon too. A conflict in progress and a pull's stash waiting are states,
-  not results, so they show as banners below the toolbar (warn and info message boxes); every other
-  result is a notice.
+- **Toolbar**: every action is a button with one shared look, Pull a split button whose menu picks
+  the pull mode (Settings' default pull mode) without pulling. Below wide the buttons show their
+  icon only, below medium they are the small size, and in narrow the three pickers show only their
+  icon too. A conflict in progress and a pull's stash waiting are states, not results, so they show
+  as banners below the toolbar (warn and info message boxes); every other result is a notice.
 - **Jobs menu** (FR-UX-12): a fixed-size toolbar button, a clock when idle, spinning with a count
   badge while jobs run, so the toolbar never resizes. Its popover lists each running job with git's
   progress message, a progress bar and an abort button.
