@@ -22,9 +22,13 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
 // A reactive stand-in for the settings store: settingsStore.settings can be
 // reassigned mid-test to prove the button follows a live change, the way a
-// save in another window reaches this one (stores/settings.ts).
+// save in another window reaches this one (stores/settings.ts). save mimics
+// the real store's: it applies the next value, so a menu choice shows.
 import type { Preferences } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
-const settingsStore = reactive<{ settings: Preferences | null }>({ settings: null })
+const settingsStore = reactive<{ settings: Preferences | null; save: ReturnType<typeof vi.fn> }>({
+  settings: null,
+  save: vi.fn(),
+})
 
 vi.mock('@/stores/settings', () => ({
   useSettingsStore: () => settingsStore,
@@ -33,7 +37,7 @@ vi.mock('@/stores/settings', () => ({
 import { createI18n } from 'vue-i18n'
 import en from '@/locales/en.json'
 import { mountInBody } from '@/testing/mountInBody'
-import { clickMenuItem } from '@/testing/contextMenu'
+import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 import SyncControls from '../SyncControls.vue'
 import NoticeArea from '../NoticeArea.vue'
 import { useJobsStore } from '@/stores/jobs'
@@ -94,6 +98,9 @@ describe('SyncControls', () => {
     confirmRequire.mockReset()
     setRefs()
     settingsStore.settings = defaultSettingsFixture()
+    settingsStore.save.mockReset().mockImplementation((next: Preferences) => {
+      settingsStore.settings = next
+    })
   })
 
   it('FR-UX-11 the Fetch button reads toolbar.fetch from the active locale, not a literal', async () => {
@@ -319,7 +326,59 @@ describe('SyncControls', () => {
     expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
   })
 
-  it('FR-SYNC-02 choosing "Pull with merge" from the SplitButton menu runs it once without changing the button', async () => {
+  it('FR-SYNC-02 choosing "Pull (rebase)" in the menu saves it as the default pull mode; it does not pull', async () => {
+    setRefs({ upstream: 'origin/main' })
+    const { body } = await mountControls()
+    await flushPromises()
+
+    await openPullMenu(body)
+    await flushPromises()
+    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
+    await flushPromises()
+
+    expect(Facade.Pull).not.toHaveBeenCalled()
+    expect(settingsStore.save).toHaveBeenCalledTimes(1)
+    expect(settingsStore.save).toHaveBeenCalledWith(
+      defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase }),
+    )
+    const pullButton = findButton(body, 'Pull (rebase)')!
+    expect(pullButton).toBeTruthy()
+    expect(pullButton.attributes('title')).toBe('Pull (rebase) · Ctrl+T')
+  })
+
+  it('FR-SYNC-02 clicking the main button pulls with the mode chosen in the menu', async () => {
+    setRefs({ upstream: 'origin/main' })
+    const { body } = await mountControls()
+    await flushPromises()
+    await openPullMenu(body)
+    await flushPromises()
+    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
+    await flushPromises()
+
+    await body.get('.p-splitbutton-button').trigger('click')
+    await flushPromises()
+
+    expect(Facade.Pull).toHaveBeenCalledTimes(1)
+    expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
+  })
+
+  it('FR-UX-05 Ctrl+T pulls with the mode chosen in the menu', async () => {
+    setRefs({ upstream: 'origin/main' })
+    const { body } = await mountControls()
+    await flushPromises()
+    await openPullMenu(body)
+    await flushPromises()
+    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
+    await flushPromises()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true }))
+    await flushPromises()
+
+    expect(Facade.Pull).toHaveBeenCalledTimes(1)
+    expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
+  })
+
+  it('FR-SYNC-02 the menu lists "Pull (merge)" and "Pull (rebase)"; only the current mode has an icon', async () => {
     setRefs({ upstream: 'origin/main' })
     settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
     const { body } = await mountControls()
@@ -327,26 +386,36 @@ describe('SyncControls', () => {
 
     await openPullMenu(body)
     await flushPromises()
-    await clickMenuItem(body, 'Pull with merge', 'tieredmenu')
-    await flushPromises()
 
-    expect(Facade.Pull).toHaveBeenCalledTimes(1)
-    expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullMerge)
-    expect(findButton(body, 'Pull (rebase)')).toBeTruthy()
+    expect(menuLabels(body, 'tieredmenu')).toEqual(['Pull (merge)', 'Pull (rebase)'])
+    const items = body.findAll('.p-tieredmenu-item-content')
+    expect(items[0]!.find('.p-tieredmenu-item-icon').exists()).toBe(false)
+    expect(items[1]!.get('.p-tieredmenu-item-icon').classes()).toContain('oi-check')
   })
 
-  it('FR-SYNC-02 a menu choice is not remembered: a reload shows Settings’ default again', async () => {
+  it('FR-SYNC-02 the dropdown button has title and aria-label "Choose pull mode"', async () => {
     setRefs({ upstream: 'origin/main' })
-    const first = await mountControls()
-    await flushPromises()
-    await openPullMenu(first.body)
-    await clickMenuItem(first.body, 'Pull with rebase', 'tieredmenu')
-    first.wrapper.unmount()
+    const { body } = await mountControls()
 
-    const second = await mountControls()
+    const dropdown = body.get('.p-splitbutton-dropdown')
+    expect(dropdown.attributes('title')).toBe('Choose pull mode')
+    expect(dropdown.attributes('aria-label')).toBe('Choose pull mode')
+  })
+
+  it('FR-SYNC-02 a failed save shows in the error banner; Facade.Pull is not called and the button keeps its mode', async () => {
+    setRefs({ upstream: 'origin/main' })
+    settingsStore.save.mockRejectedValueOnce(new Error('boom', { cause: { message: 'disk full' } }))
+    const { body } = await mountControls()
     await flushPromises()
 
-    expect(findButton(second.body, 'Pull (merge)')).toBeTruthy()
+    await openPullMenu(body)
+    await flushPromises()
+    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
+    await flushPromises()
+
+    expect(body.get('.error-banner').text()).toContain('disk full')
+    expect(Facade.Pull).not.toHaveBeenCalled()
+    expect(findButton(body, 'Pull (merge)')).toBeTruthy()
   })
 
   it('FR-SYNC-02 a Settings default saved in another window updates the button without a remount', async () => {

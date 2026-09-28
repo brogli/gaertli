@@ -69,19 +69,32 @@ const pullTooltip = computed(() =>
 const pushTooltip = computed(() =>
   t('shortcuts.withShortcut', { action: t('toolbar.push'), shortcut: t('shortcuts.push') }),
 )
+const pullMenuTooltip = t('toolbar.pullModeMenu')
 const pullMenuItems = computed<MenuItem[]>(() => [
-  { label: t('toolbar.pullWithMerge'), command: () => runPull(PullMode.PullMerge) },
-  { label: t('toolbar.pullWithRebase'), command: () => runPull(PullMode.PullRebase) },
+  {
+    label: t('toolbar.pullMerge'),
+    icon: pullMode.value === PullMode.PullMerge ? iconClass('current') : undefined,
+    command: () => choosePullMode(PullMode.PullMerge),
+  },
+  {
+    label: t('toolbar.pullRebase'),
+    icon: pullMode.value === PullMode.PullRebase ? iconClass('current') : undefined,
+    command: () => choosePullMode(PullMode.PullRebase),
+  },
 ])
 
 function onFetch(): void {
   void run(() => Facade.Fetch(props.wt, ''))
 }
-function runPull(mode: PullMode): void {
-  void run(() => Facade.Pull(props.wt, mode))
+// choosePullMode only saves the chosen mode as Settings' default pull mode;
+// it never pulls. settings:changed then updates every window's button.
+function choosePullMode(mode: PullMode): void {
+  if (!settings.settings) return
+  const next = { ...settings.settings, defaultPullMode: mode }
+  void run(() => settings.save(next))
 }
 function onPull(): void {
-  runPull(pullMode.value)
+  void run(() => Facade.Pull(props.wt, pullMode.value))
 }
 function onForcePush(): void {
   const branchName = refs.current?.name ?? ''
@@ -166,6 +179,7 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
         v-bind="toolbarButton"
         :label="compact ? '' : pullLabel"
         :button-props="{ title: pullTooltip, 'aria-label': pullLabel }"
+        :menu-button-props="{ title: pullMenuTooltip, 'aria-label': pullMenuTooltip }"
         :model="pullMenuItems"
         @click="onPull"
       >
