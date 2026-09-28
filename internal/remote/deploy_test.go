@@ -26,7 +26,7 @@ func localRunner(ctx context.Context, distro string, args ...string) (*exec.Cmd,
 // newDeployer is Ubuntu-22.04's DistroCore for version 1.0.0, deploying
 // through localRunner.
 func newDeployer(consent Consent) *DistroCore {
-	return NewDistroCore("Ubuntu-22.04", "1.0.0", `C:\nebegit.exe`, localRunner, consent, nil, slog.Default())
+	return NewDistroCore("Ubuntu-22.04", "1.0.0", localRunner, consent, nil, slog.Default())
 }
 
 type fakeConsent struct {

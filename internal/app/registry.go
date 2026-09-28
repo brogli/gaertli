@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"maps"
-	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -110,9 +109,8 @@ func NewRegistry() *Registry {
 		pages:       make(map[shellWindow]*windowEntry),
 		distros:     make(map[string]distroCorer),
 	}
-	guiExe, _ := os.Executable() // "" leaves a distro's nebegit command unset, and the log says so
 	r.newDistroCore = func(distro string, sink core.EventSink) distroCorer {
-		return remote.NewDistroCore(distro, buildinfo.App, guiExe, remote.WslRun, r.consent, sink, r.log)
+		return remote.NewDistroCore(distro, buildinfo.App, remote.WslRun, r.consent, sink, r.log)
 	}
 	return r
 }

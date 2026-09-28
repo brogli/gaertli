@@ -43,19 +43,3 @@ func trimWSLPrefix(path string) (string, bool) {
 	}
 	return "", false
 }
-
-// windowsPathToMount converts an absolute Windows path (os.Executable()'s
-// own form) to its default WSL DrvFs mount form: Windows drives mount under
-// /mnt/<lowercase-letter>/ unless wsl.conf's [automount] root is
-// customised. ok=false for anything not of the form "<letter>:\...".
-func windowsPathToMount(winPath string) (mountPath string, ok bool) {
-	if len(winPath) < 3 || winPath[1] != ':' || winPath[2] != '\\' {
-		return "", false
-	}
-	letter := winPath[0]
-	if (letter < 'a' || letter > 'z') && (letter < 'A' || letter > 'Z') {
-		return "", false
-	}
-	rest := strings.ReplaceAll(winPath[3:], `\`, "/")
-	return "/mnt/" + strings.ToLower(string(letter)) + "/" + rest, true
-}

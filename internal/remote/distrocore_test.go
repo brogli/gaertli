@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -68,29 +67,18 @@ type acceptConsent struct{}
 
 func (acceptConsent) Ask(string) bool { return true }
 
-// failConsent fails the test if asked.
-type failConsent struct{ t *testing.T }
-
-func (c failConsent) Ask(string) bool {
-	c.t.Error("consent asked, want none")
-	return false
-}
-
 // toggleConsent answers accept, changeable between calls: it tests that a
 // declined consent is not remembered and the next open asks again.
 type toggleConsent struct{ accept bool }
 
 func (c *toggleConsent) Ask(string) bool { return c.accept }
 
-// guiExe is the Windows app the test distro cores set the command up for.
-const guiExe = `C:\nebegit\nebegit.exe`
-
 // fakeWSL intercepts the "sh -c '<target> --stdio'" spawn call to run bin
 // locally instead of a real wsl.exe child; every other call (deploy's
-// stat/cat dance, the command setup) runs the given shell command for real
-// against a test-sandboxed $HOME. It counts every call, records each
-// script, and keeps each spawn cmd so a test can kill the live process
-// without DistroCore exposing it.
+// stat/cat dance) runs the given shell command for real against a
+// test-sandboxed $HOME. It counts every call, records each script, and
+// keeps each spawn cmd so a test can kill the live process without
+// DistroCore exposing it.
 type fakeWSL struct {
 	bin     string
 	calls   int
@@ -119,80 +107,16 @@ func newDistroCore(t *testing.T, bin string, log *slog.Logger) (*remote.DistroCo
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 	wsl := &fakeWSL{bin: bin}
-	return remote.NewDistroCore("Ubuntu-22.04", "1.0.0", guiExe, wsl.run, acceptConsent{}, nil, log), wsl
-}
-
-// commandSetUp reads what the command setup left in $HOME: the link's
-// target and the recorded app path.
-func commandSetUp(t *testing.T) (link, gui string) {
-	t.Helper()
-	home := os.Getenv("HOME")
-	link, err := os.Readlink(filepath.Join(home, ".local/bin/nebegit"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(filepath.Join(home, ".cache/nebegit/1.0.0/gui-path"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return link, string(data)
-}
-
-func TestFR_REPO_06_EveryFreshConnectSetsUpTheCommandInOneWSLStart(t *testing.T) {
-	dc, wsl := newDistroCore(t, coreBin, slog.Default())
-	if _, _, err := dc.Ensure(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-
-	link, gui := commandSetUp(t)
-	if want := filepath.Join(os.Getenv("HOME"), ".cache/nebegit/1.0.0/nebegit-core"); link != want {
-		t.Errorf("~/.local/bin/nebegit -> %q, want %q", link, want)
-	}
-	if want := "/mnt/c/nebegit/nebegit.exe"; gui != want {
-		t.Errorf("gui-path = %q, want %q", gui, want)
-	}
-	setups := slices.DeleteFunc(slices.Clone(wsl.scripts), func(s string) bool { return !strings.Contains(s, "gui-path") })
-	if len(setups) != 1 || !strings.Contains(setups[0], "ln -sf") {
-		t.Errorf("setup scripts = %q, want one that links and records", setups)
-	}
-
-	if err := os.Remove(filepath.Join(os.Getenv("HOME"), ".cache/nebegit/1.0.0/gui-path")); err != nil {
-		t.Fatal(err)
-	}
-	if err := wsl.spawns[len(wsl.spawns)-1].Process.Kill(); err != nil {
-		t.Fatal(err)
-	}
-	waitForRespawn(t, dc)
-
-	if _, gui := commandSetUp(t); gui != "/mnt/c/nebegit/nebegit.exe" {
-		t.Errorf("gui-path after a respawn = %q, want it written again", gui)
-	}
-}
-
-func TestFR_REPO_06_AMovedAppTakesOverTheCommandOnItsConnect(t *testing.T) {
-	dc, wsl := newDistroCore(t, coreBin, slog.Default())
-	if _, _, err := dc.Ensure(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-
-	moved := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", `D:\tools\nebegit.exe`, wsl.run, failConsent{t}, nil, slog.Default())
-	if _, _, err := moved.Ensure(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, gui := commandSetUp(t); gui != "/mnt/d/tools/nebegit.exe" {
-		t.Errorf("gui-path = %q, want the moved app's", gui)
-	}
+	return remote.NewDistroCore("Ubuntu-22.04", "1.0.0", wsl.run, acceptConsent{}, nil, log), wsl
 }
 
 // A declined consent is not remembered: the next open asks again, and
-// accepting then deploys, spawns and sets up the command as any other
-// first open would.
+// accepting then deploys and spawns as any other first open would.
 func TestQA_PORT_02_ADeclinedConsentAsksAgainOnTheNextOpen(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	wsl := &fakeWSL{bin: coreBin}
 	consent := &toggleConsent{accept: false}
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", guiExe, wsl.run, consent, nil, slog.Default())
+	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", wsl.run, consent, nil, slog.Default())
 
 	_, _, err := dc.Ensure(t.Context())
 	coretest.AssertCode(t, err, core.DeployRefused)
@@ -204,9 +128,6 @@ func TestQA_PORT_02_ADeclinedConsentAsksAgainOnTheNextOpen(t *testing.T) {
 	}
 	if !respawned || client == nil {
 		t.Errorf("Ensure after accepting = (%v, %v), want a freshly spawned live client", client, respawned)
-	}
-	if _, gui := commandSetUp(t); gui == "" {
-		t.Error("command not set up after accepting on the second open")
 	}
 }
 
@@ -538,7 +459,7 @@ func exitingCore(t *testing.T, sink core.EventSink, log *slog.Logger) {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 	wsl := &fakeWSL{bin: exitBin}
-	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", guiExe, wsl.run, acceptConsent{}, sink, log)
+	dc := remote.NewDistroCore("Ubuntu-22.04", "1.0.0", wsl.run, acceptConsent{}, sink, log)
 	client, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)

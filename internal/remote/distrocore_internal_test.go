@@ -23,7 +23,7 @@ func ubuntuOnly(context.Context) ([]Distro, error) {
 }
 
 func TestFR_REPO_07_ADistroThatIsNotInstalledIsDistroNotFound(t *testing.T) {
-	dc := NewDistroCore("Gone", "1.0.0", `C:\nebegit.exe`, exitingRunner, &fakeConsent{accept: true}, nil, slog.Default())
+	dc := NewDistroCore("Gone", "1.0.0", exitingRunner, &fakeConsent{accept: true}, nil, slog.Default())
 	dc.listDistros = ubuntuOnly
 
 	_, _, err := dc.Ensure(t.Context())
@@ -41,7 +41,7 @@ func TestQA_PORT_02_ADistroOnWSL1IsRefusedBeforeAnyStart(t *testing.T) {
 		t.Errorf("wsl.exe started with %v, want no start in a WSL 1 distro", args)
 		return exitingRunner(ctx, distro, args...)
 	}
-	dc := NewDistroCore("old", "1.0.0", `C:\nebegit.exe`, started, &fakeConsent{accept: true}, nil, slog.Default())
+	dc := NewDistroCore("old", "1.0.0", started, &fakeConsent{accept: true}, nil, slog.Default())
 	dc.listDistros = func(context.Context) ([]Distro, error) {
 		return []Distro{{Name: "Old", Version: 1}}, nil
 	}
@@ -58,7 +58,7 @@ func TestQA_PORT_02_ADistroOnWSL1IsRefusedBeforeAnyStart(t *testing.T) {
 // installed: its failed start keeps its own error. One start lists the
 // distros once, for the WSL 1 check and the failure alike.
 func TestFR_REPO_07_AFailureInADistroWithAnUnreadableRowKeepsItsError(t *testing.T) {
-	dc := NewDistroCore("Odd", "1.0.0", `C:\nebegit.exe`, exitingRunner, &fakeConsent{accept: true}, nil, slog.Default())
+	dc := NewDistroCore("Odd", "1.0.0", exitingRunner, &fakeConsent{accept: true}, nil, slog.Default())
 	listings := 0
 	dc.listDistros = func(context.Context) ([]Distro, error) {
 		listings++
@@ -80,7 +80,7 @@ func TestFR_REPO_07_AFailureInADistroWithAnUnreadableRowKeepsItsError(t *testing
 // wsl.exe matches distro names regardless of case, so a listed name in
 // another case is installed.
 func TestFR_REPO_07_AFailureInAnInstalledDistroKeepsItsError(t *testing.T) {
-	dc := NewDistroCore("ubuntu", "1.0.0", `C:\nebegit.exe`, exitingRunner, &fakeConsent{accept: true}, nil, slog.Default())
+	dc := NewDistroCore("ubuntu", "1.0.0", exitingRunner, &fakeConsent{accept: true}, nil, slog.Default())
 	dc.listDistros = ubuntuOnly
 
 	_, _, err := dc.Ensure(t.Context())

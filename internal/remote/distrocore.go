@@ -21,7 +21,6 @@ import (
 // the process dies.
 type DistroCore struct {
 	distro, version string
-	guiExe          string // the Windows app the nebegit command opens
 	run             wslRunner
 	listDistros     func(context.Context) ([]Distro, error)
 	consent         Consent
@@ -34,12 +33,11 @@ type DistroCore struct {
 	onConnect func(context.Context, *Client)
 }
 
-// NewDistroCore builds a DistroCore for distro, not yet spawned. guiExe is
-// the Windows app's own path, for the nebegit command. log is where a
-// failed start, a reconnect, and the core process's own stderr are
+// NewDistroCore builds a DistroCore for distro, not yet spawned. log is
+// where a failed start, a reconnect, and the core process's own stderr are
 // reported.
-func NewDistroCore(distro, version, guiExe string, run wslRunner, consent Consent, sink core.EventSink, log *slog.Logger) *DistroCore {
-	return &DistroCore{distro: distro, version: version, guiExe: guiExe, run: run, listDistros: ListDistros, consent: consent, sink: sink, log: log}
+func NewDistroCore(distro, version string, run wslRunner, consent Consent, sink core.EventSink, log *slog.Logger) *DistroCore {
+	return &DistroCore{distro: distro, version: version, run: run, listDistros: ListDistros, consent: consent, sink: sink, log: log}
 }
 
 // OnConnect registers fn to run once per fresh connect, after the version
@@ -60,10 +58,9 @@ func (d *DistroCore) LiveClient() (*Client, bool) {
 
 // Ensure returns a live client, spawning the core process if none runs.
 // respawned is true only when a spawn just happened: a fresh core has no
-// sessions, so the caller re-opens its worktrees. A spawn also sets up the
-// nebegit command. Concurrent callers during a spawn share the one attempt.
-// A failed start is logged; a distro not installed is core.DistroNotFound,
-// one on WSL 1 core.WslUnsupported.
+// sessions, so the caller re-opens its worktrees. Concurrent callers during a
+// spawn share the one attempt. A failed start is logged; a distro not
+// installed is core.DistroNotFound, one on WSL 1 core.WslUnsupported.
 func (d *DistroCore) Ensure(ctx context.Context) (*Client, bool, error) {
 	// One start lists the distros at most once, for the WSL 1 check and a
 	// failure alike.
@@ -74,13 +71,10 @@ func (d *DistroCore) Ensure(ctx context.Context) (*Client, bool, error) {
 		d.log.Warn("WSL core failed to start", "distro", d.distro, "err", err)
 		return nil, false, err
 	}
-	if respawned {
-		// outside the lock: a wsl.exe start or an RPC round trip must not
-		// serialise other callers
-		d.setUpCommand(ctx)
-		if onConnect != nil {
-			onConnect(ctx, client)
-		}
+	if respawned && onConnect != nil {
+		// outside the lock: an RPC round trip must not serialise other
+		// callers
+		onConnect(ctx, client)
 	}
 	return client, respawned, nil
 }
