@@ -76,10 +76,9 @@ Install). On Windows it has no `nebegit` command; the installer and the zip brin
 
 ## First start
 
-nebegit checks both prerequisites at launch. Missing git: a message names it and asks you to install
-it and make sure it's on `PATH`. Missing web view on Windows: a native message box names WebView2.
-On Linux, a missing WebKitGTK fails before nebegit's own code can show a message, so check the
-terminal output instead.
+nebegit checks both prerequisites at launch and says which one is missing or too old: on Windows in
+a message box, on Linux only in the terminal output. If it doesn't open on Linux, start it from a
+terminal.
 
 ## Start from a terminal
 
@@ -104,14 +103,15 @@ set a different editor per distro, since the command has to run where the repo a
 
 ## Logs
 
-nebegit writes every git command and its own errors to a log file; Settings names its path. Set
-`NEBEGIT_LOG=debug` before starting it to also log automatic background reads (refresh, polling).
+nebegit logs its own errors and every failed git or editor command to a file; Settings names its
+path. Debug mode in Settings, or `NEBEGIT_LOG=debug` set before starting it, logs every git and
+editor command it runs.
 
 ## Known limits
 
 - **WSL**: open a WSL repo with "Open folder…" through the Linux entry (`\\wsl.localhost\<distro>`).
-  Only WSL 2 distros are supported. Before nebegit places its headless core inside a distro the
-  first time, it asks for consent, naming the distro; declining leaves nothing behind.
+  Only WSL 2 distros are supported. Before nebegit places its helper inside a distro, the first time
+  and after each update, it asks for consent, naming the distro; declining leaves nothing behind.
 - **SSH passphrase**: nebegit runs git with interactive prompting disabled, so a
   passphrase-protected SSH key needs a running `ssh-agent` with the key already added — otherwise
   the git call fails instead of prompting for the passphrase.
