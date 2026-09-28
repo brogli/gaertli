@@ -25,9 +25,9 @@ import (
 
 const singleInstanceID = "nebegit" // stable per machine; no reverse-domain owner to use
 
-// Run starts the shell. args is os.Args (argv[0] included, see pathArg).
+// Run starts the shell. args is os.Args (argv[0] included, see launchPath).
 func Run(assets fs.FS, args []string) error {
-	if action := pathActionArg(args); action != noPathAction {
+	if action := pathActionFor(args); action != nil {
 		return runPathAction(action)
 	}
 
@@ -37,7 +37,7 @@ func Run(assets fs.FS, args []string) error {
 	}
 
 	wd, _ := os.Getwd()
-	path, ok := firstLaunchPath(args, wd)
+	path, ok := launchPath(args, wd)
 	if !ok {
 		showFatal(text(appName, nil), text(usage, nil))
 		return errors.New("bad arguments")
@@ -130,32 +130,33 @@ func options(assets fs.FS, reg *Registry, onSecondInstance func(path string), lo
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: singleInstanceID,
 			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
-				if path, ok := pathArg(data.Args); ok {
-					onSecondInstance(resolveFrom(data.WorkingDir, path))
+				if path, ok := launchPath(data.Args, data.WorkingDir); ok {
+					onSecondInstance(path)
 				}
 			},
 		},
 	}
 }
 
-// pathArg reads the optional repo path from an argv (os.Args and
-// SecondInstanceData.Args both start with the program name): none opens
-// the placeholder window, one is the path to open or focus, more is a
-// usage error.
-func pathArg(args []string) (path string, ok bool) {
+// launchPath reads the optional repo path from an argv (os.Args and
+// SecondInstanceData.Args both start with the program name) and resolves
+// it against wd, the launching process's working directory: a relayed "."
+// means the second instance's directory, not this process's. None opens
+// the placeholder window (path "", ok true); one argument is the path to
+// open or focus; more is a usage error (ok false).
+func launchPath(args []string, wd string) (path string, ok bool) {
 	switch len(args) {
 	case 1:
 		return "", true
 	case 2:
-		return args[1], true
+		return resolveFrom(wd, args[1]), true
 	default:
 		return "", false
 	}
 }
 
 // resolveFrom makes a relative path argument absolute against dir, the
-// launching process's working directory: a relayed "." means the second
-// instance's directory, not this process's. "" (no path) stays "".
+// launching process's working directory. "" (no path) stays "".
 func resolveFrom(dir, path string) string {
 	if path == "" || filepath.IsAbs(path) {
 		return path
@@ -163,55 +164,32 @@ func resolveFrom(dir, path string) string {
 	return filepath.Join(dir, path)
 }
 
-// firstLaunchPath is pathArg resolved against wd (os.Getwd() at the call
-// site), the same way the second-instance relay resolves a relayed path
-// against its own working directory.
-func firstLaunchPath(args []string, wd string) (path string, ok bool) {
-	path, ok = pathArg(args)
-	if !ok {
-		return "", false
-	}
-	return resolveFrom(wd, path), true
+// pathActions maps each installer flag argv[1] can be to the action it
+// runs on the exe's bin folder.
+var pathActions = map[string]func(dir string) error{
+	"--add-to-path":      userpath.Add,
+	"--remove-from-path": userpath.Remove,
 }
 
-// pathAction is the PATH action argv selects, if any.
-type pathAction string
-
-const (
-	noPathAction   pathAction = ""
-	addToPath      pathAction = "--add-to-path"
-	removeFromPath pathAction = "--remove-from-path"
-)
-
-// pathActionArg reads exactly argv[0] plus one of the two installer flags;
-// any other argv, including a repo path, selects no action.
-func pathActionArg(args []string) pathAction {
+// pathActionFor is the action argv selects, nil for none: argv[0] plus one
+// of the two installer flags selects it; any other argv, including a repo
+// path, selects none.
+func pathActionFor(args []string) func(string) error {
 	if len(args) != 2 {
-		return noPathAction
+		return nil
 	}
-	switch action := pathAction(args[1]); action {
-	case addToPath, removeFromPath:
-		return action
-	default:
-		return noPathAction
-	}
+	return pathActions[args[1]]
 }
 
-// runPathAction adds or removes the exe's own bin folder in the user PATH.
-// It reports the outcome for main to turn into an exit code (nil: 0, an
-// error: 1); a failure's reason also goes to the app log.
-func runPathAction(action pathAction) error {
+// runPathAction adds or removes the exe's own bin folder in the user PATH;
+// a failure's reason also goes to the app log.
+func runPathAction(action func(string) error) error {
 	dir, err := exeBinDir()
 	if err == nil {
-		switch action {
-		case addToPath:
-			err = userpath.Add(dir)
-		case removeFromPath:
-			err = userpath.Remove(dir)
-		}
+		err = action(dir)
 	}
 	if err != nil {
-		logPathActionFailure(action, err)
+		logPathActionFailure(err)
 	}
 	return err
 }
@@ -226,14 +204,14 @@ func exeBinDir() (string, error) {
 	return filepath.Join(filepath.Dir(exe), "bin"), nil
 }
 
-// logPathActionFailure writes why action failed to the app log; the
+// logPathActionFailure writes why the PATH edit failed to the app log; the
 // settings-driven debug level is not available yet this early in Run.
-func logPathActionFailure(action pathAction, err error) {
+func logPathActionFailure(err error) {
 	logger, _, closer, _, _ := applog.Open(false)
 	if closer != nil {
 		defer func() { _ = closer.Close() }()
 	}
-	logger.Error("could not update the user PATH", "action", string(action), "error", err)
+	logger.Error("could not update the user PATH", "error", err)
 }
 
 // errorNotifier shows a message outside any specific window.

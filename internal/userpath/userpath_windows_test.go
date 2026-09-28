@@ -11,31 +11,33 @@ import (
 func TestDIST_04_AddAndRemoveEditPathUnderAGivenKeyAndKeepItsType(t *testing.T) {
 	key := scratchKey(t)
 	dir := `C:\Apps\nebegit\bin`
+	add := func(path string) string { return withEntry(path, dir) }
+	remove := func(path string) string { return withoutEntry(path, dir) }
 
 	if err := key.SetExpandStringValue(pathValueName, `%USERPROFILE%\x`); err != nil {
 		t.Fatalf("seeding Path: %v", err)
 	}
 
-	if err := addTo(key, dir); err != nil {
-		t.Fatalf("first addTo: %v", err)
+	if err := updateKey(key, add); err != nil {
+		t.Fatalf("first add: %v", err)
 	}
 	assertPath(t, key, `%USERPROFILE%\x;C:\Apps\nebegit\bin`)
 
-	if err := addTo(key, dir); err != nil {
-		t.Fatalf("second addTo: %v", err)
+	if err := updateKey(key, add); err != nil {
+		t.Fatalf("second add: %v", err)
 	}
 	assertPath(t, key, `%USERPROFILE%\x;C:\Apps\nebegit\bin`)
 
-	if err := removeFrom(key, dir); err != nil {
-		t.Fatalf("removeFrom: %v", err)
+	if err := updateKey(key, remove); err != nil {
+		t.Fatalf("remove: %v", err)
 	}
 	assertPath(t, key, `%USERPROFILE%\x`)
 
 	if err := key.DeleteValue(pathValueName); err != nil {
 		t.Fatalf("clearing Path: %v", err)
 	}
-	if err := addTo(key, dir); err != nil {
-		t.Fatalf("addTo on a missing value: %v", err)
+	if err := updateKey(key, add); err != nil {
+		t.Fatalf("add on a missing value: %v", err)
 	}
 	assertPath(t, key, dir)
 }

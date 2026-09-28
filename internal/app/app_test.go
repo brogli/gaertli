@@ -12,6 +12,7 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/settings"
+	"github.com/brogli/nebegit/internal/userpath"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -119,7 +120,7 @@ func newTestStore(t *testing.T) *settings.Store {
 	return st
 }
 
-func TestFR_REPO_06_PathArg(t *testing.T) {
+func TestFR_REPO_06_LaunchPath(t *testing.T) {
 	cases := []struct {
 		args     []string
 		wantPath string
@@ -130,19 +131,19 @@ func TestFR_REPO_06_PathArg(t *testing.T) {
 		{[]string{"nebegit", "/a", "/b"}, "", false},
 	}
 	for _, c := range cases {
-		path, ok := pathArg(c.args)
+		path, ok := launchPath(c.args, "/wd")
 		if path != c.wantPath || ok != c.wantOK {
-			t.Errorf("pathArg(%v) = (%q, %v), want (%q, %v)", c.args, path, ok, c.wantPath, c.wantOK)
+			t.Errorf("launchPath(%v, ...) = (%q, %v), want (%q, %v)", c.args, path, ok, c.wantPath, c.wantOK)
 		}
 	}
 }
 
-func TestFR_REPO_06_PathArgThenOpenOrFocusOpensAWindow(t *testing.T) {
+func TestFR_REPO_06_LaunchPathThenOpenOrFocusOpensAWindow(t *testing.T) {
 	r, opener := newTestRegistry()
 
-	path, ok := pathArg([]string{"nebegit", "/a"})
+	path, ok := launchPath([]string{"nebegit", "/a"}, "/wd")
 	if !ok {
-		t.Fatal("pathArg ok = false")
+		t.Fatal("launchPath ok = false")
 	}
 	r.OpenOrFocus(core.WorktreeID(path), path, "")
 
@@ -153,8 +154,8 @@ func TestFR_REPO_06_PathArgThenOpenOrFocusOpensAWindow(t *testing.T) {
 
 // The first launch resolves its path argument the same way the
 // second-instance relay resolves a relayed one: against the launching
-// working directory, with resolveFrom.
-func TestFR_REPO_06_FirstLaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
+// working directory.
+func TestFR_REPO_06_LaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
 	wslDir := `\\wsl.localhost\Ubuntu\home\u\repo`
 	abs := t.TempDir()
 	cases := []struct {
@@ -166,13 +167,13 @@ func TestFR_REPO_06_FirstLaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
 		{[]string{"nebegit"}, ""},
 	}
 	for _, c := range cases {
-		path, ok := firstLaunchPath(c.args, wslDir)
+		path, ok := launchPath(c.args, wslDir)
 		if !ok || path != c.wantPath {
-			t.Errorf("firstLaunchPath(%v, %q) = (%q, %v), want (%q, true)", c.args, wslDir, path, ok, c.wantPath)
+			t.Errorf("launchPath(%v, %q) = (%q, %v), want (%q, true)", c.args, wslDir, path, ok, c.wantPath)
 		}
 	}
 
-	resolved, _ := firstLaunchPath([]string{"nebegit", "."}, wslDir)
+	resolved, _ := launchPath([]string{"nebegit", "."}, wslDir)
 	distro, linuxPath, ok := remote.ClassifyWSLPath(resolved)
 	if !ok || distro != "Ubuntu" || linuxPath != "/home/u/repo" {
 		t.Errorf("ClassifyWSLPath(%q) = (%q, %q, %v), want (Ubuntu, /home/u/repo, true)", resolved, distro, linuxPath, ok)
@@ -419,20 +420,20 @@ func TestFR_REPO_02_SelectionURLCarriesTheDistro(t *testing.T) {
 	}
 }
 
-func TestDIST_04_PathActionArgDispatchesTheInstallerFlagsOnly(t *testing.T) {
+func TestDIST_04_PathActionForDispatchesTheInstallerFlagsOnly(t *testing.T) {
 	cases := []struct {
 		args []string
-		want pathAction
+		want func(string) error
 	}{
-		{[]string{"nebegit", "--add-to-path"}, addToPath},
-		{[]string{"nebegit", "--remove-from-path"}, removeFromPath},
-		{[]string{"nebegit"}, noPathAction},
-		{[]string{"nebegit", `C:\repo`}, noPathAction},
-		{[]string{"nebegit", "--add-to-path", "extra"}, noPathAction},
+		{[]string{"nebegit", "--add-to-path"}, userpath.Add},
+		{[]string{"nebegit", "--remove-from-path"}, userpath.Remove},
+		{[]string{"nebegit"}, nil},
+		{[]string{"nebegit", `C:\repo`}, nil},
+		{[]string{"nebegit", "--add-to-path", "extra"}, nil},
 	}
 	for _, c := range cases {
-		if got := pathActionArg(c.args); got != c.want {
-			t.Errorf("pathActionArg(%v) = %q, want %q", c.args, got, c.want)
+		if got := pathActionFor(c.args); fmt.Sprintf("%p", got) != fmt.Sprintf("%p", c.want) {
+			t.Errorf("pathActionFor(%v) = %p, want %p", c.args, got, c.want)
 		}
 	}
 }

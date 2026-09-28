@@ -3,7 +3,10 @@
 // %VAR% text exactly.
 package userpath
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // withEntry appends dir to path unless an entry equal to it (case-insensitive,
 // a trailing backslash ignored) is already there.
@@ -21,22 +24,12 @@ func withEntry(path, dir string) string {
 // trailing backslash ignored), keeping every other entry, its order and its
 // text.
 func withoutEntry(path, dir string) string {
-	kept := make([]string, 0, strings.Count(path, ";")+1)
-	for entry := range strings.SplitSeq(path, ";") {
-		if !sameEntry(entry, dir) {
-			kept = append(kept, entry)
-		}
-	}
-	return strings.Join(kept, ";")
+	entries := slices.DeleteFunc(strings.Split(path, ";"), func(entry string) bool { return sameEntry(entry, dir) })
+	return strings.Join(entries, ";")
 }
 
 func hasEntry(path, dir string) bool {
-	for entry := range strings.SplitSeq(path, ";") {
-		if sameEntry(entry, dir) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(strings.Split(path, ";"), func(entry string) bool { return sameEntry(entry, dir) })
 }
 
 func sameEntry(entry, dir string) bool {

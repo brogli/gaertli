@@ -76,19 +76,16 @@ func (c *toggleConsent) Ask(string) bool { return c.accept }
 // fakeWSL intercepts the "sh -c '<target> --stdio'" spawn call to run bin
 // locally instead of a real wsl.exe child; every other call (deploy's
 // stat/cat dance) runs the given shell command for real against a
-// test-sandboxed $HOME. It counts every call, records each script, and
-// keeps each spawn cmd so a test can kill the live process without
-// DistroCore exposing it.
+// test-sandboxed $HOME. It counts every call and keeps each spawn cmd so a
+// test can kill the live process without DistroCore exposing it.
 type fakeWSL struct {
-	bin     string
-	calls   int
-	scripts []string
-	spawns  []*exec.Cmd
+	bin    string
+	calls  int
+	spawns []*exec.Cmd
 }
 
 func (f *fakeWSL) run(ctx context.Context, distro string, args ...string) (*exec.Cmd, error) {
 	f.calls++
-	f.scripts = append(f.scripts, strings.Join(args, " "))
 	if len(args) == 3 && strings.HasSuffix(args[2], "--stdio") {
 		cmd := exec.CommandContext(ctx, f.bin, "--stdio")
 		// Puts the core's own current directory on $HOME's drive, the same

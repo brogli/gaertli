@@ -10,50 +10,35 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// pathValueName is the environment variable this package edits.
 const pathValueName = "Path"
 
 // Add puts dir at the end of the user PATH, once, and tells running
 // processes about the change.
 func Add(dir string) error {
-	key, err := openPathKey()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = key.Close() }()
-	return addTo(key, dir)
+	return editUserPath(func(path string) string { return withEntry(path, dir) })
 }
 
 // Remove drops dir from the user PATH and tells running processes about the
 // change.
 func Remove(dir string) error {
-	key, err := openPathKey()
+	return editUserPath(func(path string) string { return withoutEntry(path, dir) })
+}
+
+// editUserPath opens HKCU\Environment and applies update to it.
+func editUserPath(update func(string) string) error {
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE|registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = key.Close() }()
-	return removeFrom(key, dir)
+	return updateKey(key, update)
 }
 
-func openPathKey() (registry.Key, error) {
-	return registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE|registry.SET_VALUE)
-}
-
-// addTo and removeFrom take key as a parameter so tests can use a scratch
-// key instead of the real HKCU\Environment.
-
-func addTo(key registry.Key, dir string) error {
-	return update(key, func(path string) string { return withEntry(path, dir) })
-}
-
-func removeFrom(key registry.Key, dir string) error {
-	return update(key, func(path string) string { return withoutEntry(path, dir) })
-}
-
-// update reads Path from key, applies edit, and writes the result back as
-// REG_EXPAND_SZ only when it changed, then broadcasts the change so
-// terminals started from Explorer see it.
-func update(key registry.Key, edit func(string) string) error {
+// updateKey reads Path from key, applies edit, and writes the result back
+// as REG_EXPAND_SZ only when it changed, then broadcasts the change so
+// terminals started from Explorer see it. It takes key as a parameter so
+// tests can use a scratch key instead of the real HKCU\Environment.
+func updateKey(key registry.Key, edit func(string) string) error {
 	current, _, err := key.GetStringValue(pathValueName)
 	if err != nil && !errors.Is(err, registry.ErrNotExist) {
 		return err
@@ -89,7 +74,6 @@ func broadcastEnvironmentChange() {
 	if err != nil {
 		return
 	}
-	var result uintptr
 	_, _, _ = procSendMessageTimeout.Call(
 		hwndBroadcast,
 		wmSettingChange,
@@ -97,6 +81,6 @@ func broadcastEnvironmentChange() {
 		uintptr(unsafe.Pointer(param)),
 		smtoAbortIfHung,
 		broadcastTimeoutMs,
-		uintptr(unsafe.Pointer(&result)),
+		0,
 	)
 }
