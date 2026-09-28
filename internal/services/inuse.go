@@ -66,10 +66,10 @@ func sameWorktree(dirInfo os.FileInfo, path string) bool {
 }
 
 // worktreeGitDir resolves a worktree's own git dir from its top-level
-// folder's .git: a directory (or a symlink to one) for the main worktree, a
-// "gitdir: <path>" file for a linked one, the path possibly relative to the
-// worktree's own folder (worktree.useRelativePaths). ok is false if .git
-// cannot be read.
+// folder's .git: a directory for the main worktree; for a linked one a
+// "gitdir: <path>" file, the path possibly relative to the worktree's own
+// folder (worktree.useRelativePaths), or a symlink to its admin dir. ok is
+// false if .git cannot be read.
 func worktreeGitDir(worktreePath string) (dir string, ok bool) {
 	dotGit := filepath.Join(worktreePath, ".git")
 	info, err := os.Stat(dotGit)
