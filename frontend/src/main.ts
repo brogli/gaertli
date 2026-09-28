@@ -12,6 +12,7 @@ import { NebegitPreset } from '@/theme/preset'
 import { installErrorLogging } from '@/lib/errorLogging'
 import { i18n } from './i18n'
 import { openvueLocale } from '@/lib/openvueLocale'
+import { openvuePassThrough } from '@/lib/openvuePassThrough'
 
 const app = createApp(App)
 installErrorLogging(app)
@@ -21,7 +22,8 @@ installErrorLogging(app)
 // $primevue.config. darkModeSelector is the class the settings store
 // toggles on <html>. OpenVue's styles go into their own CSS layer, between
 // Tailwind's base and its utilities.
-// locale gives its components' own texts from the catalogue.
+// locale gives its components' own texts from the catalogue. pt is the
+// shared pass-through (openvuePassThrough.ts), also used by Vitest's setup.
 // ConfirmationService backs useConfirm() and App.vue's <ConfirmDialog>.
 // ToastService backs useToast() and App.vue's <NoticeArea>.
 app
@@ -36,6 +38,7 @@ app
       },
     },
     locale: openvueLocale(i18n.global.t),
+    pt: openvuePassThrough,
   })
   .use(ConfirmationService)
   .use(ToastService)

@@ -5,6 +5,7 @@ import ConfirmationService from 'openvue/confirmationservice'
 import ToastService from 'openvue/toastservice'
 import { i18n } from '@/i18n'
 import { openvueLocale } from '@/lib/openvueLocale'
+import { openvuePassThrough } from '@/lib/openvuePassThrough'
 
 // Components with a window-level listener (onKeyStroke's shortcuts) would
 // otherwise keep firing into later tests in the same file: every mount
@@ -18,7 +19,7 @@ enableAutoUnmount(afterEach)
 // i18n instance keeps every mount asserting English text; a test proving
 // text comes from the catalogue installs its own instance on that mount.
 config.global.plugins = [
-  [PrimeVueConfig, { theme: 'none', locale: openvueLocale(i18n.global.t) }],
+  [PrimeVueConfig, { theme: 'none', locale: openvueLocale(i18n.global.t), pt: openvuePassThrough }],
   ConfirmationService,
   ToastService,
   i18n,
