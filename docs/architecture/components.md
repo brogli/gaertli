@@ -2,30 +2,30 @@
 
 ## Backend (Go)
 
-| Package              | Responsibility                                                                                                                                                                                |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `internal/core`      | The core contract: the `API` interface, its DTOs, the error type and the events (ADR-3, TR-28).                                                                                               |
-| `internal/services`  | Implements `core.API`, one feature area at a time: validates input, calls git, returns DTOs.                                                                                                  |
-| `internal/session`   | Repo and worktree sessions (ADR-9): caches, write locks, watchers, the commit message draft.                                                                                                  |
-| `internal/git`       | The git runner (environment, timeout, cancel, stderr capture, each command's record for the app log) and the parsers for git's machine-readable output.                                       |
-| `internal/graph`     | Commit graph lane layout, a pure function over the commit stream (ADR-5).                                                                                                                     |
-| `internal/watch`     | Debounced change signals: a git-dir watcher (fsnotify with a poll fallback) and a worktree status poller.                                                                                     |
-| `internal/jobs`      | Long-running tasks: id, state, progress, cancel.                                                                                                                                              |
-| `internal/editor`    | Editor profiles and starting the editor command.                                                                                                                                              |
-| `internal/proc`      | Child-process attributes (TR-12): no console on Windows, a process group of its own for git so a cancel can interrupt it, a detached editor that outlives nebegit.                            |
-| `internal/remote`    | The WSL side of ADR-3: the generated JSON-RPC client and dispatcher, WSL detection, deploying and starting a core in a distro, the version handshake, reconnect, and the launcher inside WSL. |
-| `internal/app`       | The shell: Wails setup, the generated facade, the window registry, single-instance hand-over, event routing, settings. The only package that imports Wails.                                   |
-| `internal/settings`  | Loading and saving the settings file (TR-13).                                                                                                                                                 |
-| `internal/buildinfo` | The version string, stamped at release build time.                                                                                                                                            |
-| `internal/applog`    | The app log file: its location, rotation at open, and its level, which debug mode switches (FR-UX-02, FR-UX-19).                                                                              |
+| Package              | Responsibility                                                                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal/core`      | The core contract: the `API` interface, its DTOs, the error type and the events (ADR-3, TR-28).                                                                                         |
+| `internal/services`  | Implements `core.API`, one feature area at a time: validates input, calls git, returns DTOs.                                                                                            |
+| `internal/session`   | Repo and worktree sessions (ADR-9): caches, write locks, watchers, the commit message draft.                                                                                            |
+| `internal/git`       | The git runner (environment, timeout, cancel, stderr capture, each command's record for the app log) and the parsers for git's machine-readable output.                                 |
+| `internal/graph`     | Commit graph lane layout, a pure function over the commit stream (ADR-5).                                                                                                               |
+| `internal/watch`     | Debounced change signals: a git-dir watcher (fsnotify with a poll fallback) and a worktree status poller.                                                                               |
+| `internal/jobs`      | Long-running tasks: id, state, progress, cancel.                                                                                                                                        |
+| `internal/editor`    | Editor profiles and starting the editor command.                                                                                                                                        |
+| `internal/proc`      | Child-process attributes (TR-12): no console on Windows, a process group of its own for git so a cancel can interrupt it, a detached editor that outlives nebegit.                      |
+| `internal/remote`    | The WSL side of ADR-3: the generated JSON-RPC client and dispatcher, WSL detection, deploying and starting a core in a distro, the version handshake, reconnect.                        |
+| `internal/app`       | The shell: Wails setup, the generated facade, the window registry, single-instance hand-over, event routing, settings. The only package that imports Wails.                             |
+| `internal/userpath`  | Adds or removes one directory in the Windows user PATH, keeping every other entry, its order and its `%VAR%` text; the installer and its uninstaller call it through the app's own exe. |
+| `internal/settings`  | Loading and saving the settings file (TR-13).                                                                                                                                           |
+| `internal/buildinfo` | The version string, stamped at release build time.                                                                                                                                      |
+| `internal/applog`    | The app log file: its location, rotation at open, and its level, which debug mode switches (FR-UX-02, FR-UX-19).                                                                        |
 
 Test helpers: `internal/core/coretest` (core errors, events), `internal/git/gittest` (temp repos),
 `internal/testbin` (helper binaries), `internal/remote/remotetest` (a core served over an in-memory
 pipe).
 
 Binaries: `cmd/nebegit` is the GUI with an in-process core. `cmd/nebegit-core` is the headless core
-for WSL: it serves JSON-RPC on stdio, and acts as the launcher when given a path. It builds without
-cgo.
+for WSL: it serves JSON-RPC on stdio. It builds without cgo.
 
 Dependencies point one way: `app` → `services` and `remote` → `core`. `services` uses `session`,
 `git`, `graph`, `watch`, `jobs` and `editor`. `remote` uses `git` too, so one rule masks credentials

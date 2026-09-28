@@ -15,13 +15,22 @@ Windows window.
 
 ## Install
 
-Download from the project's GitHub Releases page: `nebegit-windows-amd64.zip` for Windows; for
-Linux, a `.deb` or `.rpm` for the common package managers (`nebegit-linux-amd64.deb`,
-`nebegit-linux-amd64.rpm`) or `nebegit-linux-amd64.tar.gz` for other distributions; or (best-effort,
-unsigned, untested) `nebegit-darwin-arm64.zip`. `SHA256SUMS` on the same page lets you verify the
-download.
+Download from the project's GitHub Releases page: for Windows, `nebegit-windows-amd64-setup.exe`
+(installer) or `nebegit-windows-amd64.zip` (portable); for Linux, a `.deb` or `.rpm` for the common
+package managers (`nebegit-linux-amd64.deb`, `nebegit-linux-amd64.rpm`) or
+`nebegit-linux-amd64.tar.gz` for other distributions; or (best-effort, unsigned, untested)
+`nebegit-darwin-arm64.zip`. `SHA256SUMS` on the same page lets you verify the download.
 
-- **Windows**: unzip and run `nebegit.exe` — no installer, no auto-update.
+- **Windows, installer** (recommended): run `nebegit-windows-amd64-setup.exe` — no administrator
+  rights needed. It installs under your user profile, adds a Start menu entry, and puts the
+  `nebegit` command on `PATH` for Windows and WSL terminals opened afterwards. No auto-update;
+  installing a newer version over the old one keeps your settings. Uninstall from Windows'
+  "Installed apps" removes the app and that command.
+- **Windows, zip**: unzip and run `nebegit.exe` — nothing is installed and `PATH` is left alone. To
+  use the `nebegit` command, add the unzipped `bin` folder to your user `PATH` by hand (Windows'
+  "Edit environment variables for your account").
+- **Windows, winget** (once published): `winget install brogli.nebegit`; `winget upgrade` and
+  `winget uninstall` give the same result as the installer.
 - **Linux, deb/rpm**: install with your package manager (e.g.
   `sudo apt install ./nebegit-linux-amd64.deb`, `sudo dnf install ./nebegit-linux-amd64.rpm`); it
   also installs the web view. No auto-update — upgrade by installing a newer package.
@@ -44,17 +53,18 @@ terminal output instead.
 
 ## Start from a terminal
 
-`nebegit <path>` opens the window for that repo, or brings it to the front. For the command to
-exist:
+`nebegit [path]` opens or focuses the window for that repo (`.` for the current folder); without a
+path it reopens the windows that were open at last quit. This needs the `nebegit` command on `PATH`
+(see Install):
 
-- **WSL**: nebegit sets up `~/.local/bin/nebegit` in a distro when it first opens a repo there (the
-  consent it asks names it). `nebegit` in that distro's terminal then opens the Windows app on the
-  WSL repo; without a path it uses the current folder. If `~/.local/bin` was new, open a new
-  terminal first.
+- **Windows, cmd or PowerShell**: `nebegit`, `nebegit .` and `nebegit <path>` work from any folder;
+  the command returns at once and leaves the app running.
+- **WSL**: the same command, once a new terminal has picked up the PATH change (only needed the
+  first time). `nebegit .` opens the app in a native Windows window on the WSL repo; nothing is
+  installed inside the distro for the command itself.
 - **Linux, deb/rpm**: the package already put `nebegit` on `PATH`.
 - **Linux, tar.gz**: put the extracted `nebegit` binary in `~/.local/bin` (or any folder on your
   `PATH`).
-- **Windows**: add the folder that holds `nebegit.exe` to your user `PATH`.
 
 ## Editor setup
 
@@ -70,8 +80,8 @@ nebegit writes every git command and its own errors to a log file; Settings name
 ## Known limits
 
 - **WSL**: open a WSL repo with "Open folder…" through the Linux entry (`\\wsl.localhost\<distro>`).
-  Only WSL 2 distros are supported. Before nebegit places its headless core and the `nebegit`
-  command inside a distro the first time, it asks for consent; declining leaves nothing behind.
+  Only WSL 2 distros are supported. Before nebegit places its headless core inside a distro the
+  first time, it asks for consent, naming the distro; declining leaves nothing behind.
 - **SSH passphrase**: nebegit runs git with interactive prompting disabled, so a
   passphrase-protected SSH key needs a running `ssh-agent` with the key already added — otherwise
   the git call fails instead of prompting for the passphrase.

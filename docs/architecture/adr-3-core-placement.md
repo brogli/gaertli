@@ -43,13 +43,16 @@ The id or path alone decides, not the window making the call:
   reopens the sessions of that distro's windows, and each window reloads everything it shows.
   Nothing is lost: the core holds no repo state of its own (ADR-4), and a window hands the new core
   the commit message being typed before it reloads.
-- Launcher (FR-REPO-06): on Windows and Linux, `nebegit [path]` is the GUI binary. Inside WSL,
-  `~/.local/bin/nebegit` is a link to the deployed core; given a path instead of `--stdio`, it
-  starts the Windows app through interop, at the app's path recorded next to the core. The first-use
-  consent names the command. Every connect refreshes the link and the recorded path, so a new
-  version or a moved app takes over. The recorded path is the distro's own view of the app: through
-  the Windows drive mount, or its POSIX path when the app lives in that distro's file system. An app
-  inside a different distro is unsupported.
+- Launcher (FR-REPO-06): on Windows and Linux, `nebegit [path]` is the GUI binary. Inside WSL, the
+  command is a script beside the Windows install (`build-and-release.md`), reached through the
+  Windows user PATH that WSL appends to its own; it converts its argument to a Windows path and
+  starts the Windows app through interop, then returns at once. Nothing of the command is placed in
+  a distro: the helper core (above) is the only thing the app deploys there, and the consent that
+  first-use asks for names only the helper. That consent, and the deploy it guards, come up whenever
+  a distro's core is needed: at start for a restored window or a path on that distro, not only from
+  "Open folder…". The shell routes a `\\wsl$\<distro>\…` or `\\wsl.localhost\<distro>\…` argument,
+  and a UNC working directory from a WSL terminal, to that distro's core the same way it routes a
+  path chosen in the folder dialog.
 - The editor command runs in the core, so for a WSL repo the editor starts inside WSL.
 
 Alternatives considered:
