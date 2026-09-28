@@ -124,6 +124,99 @@ func TestFR_BR_06_RenameBranchRejectsADuplicateNewNameAsGitFailed(t *testing.T) 
 	}
 }
 
+// TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree passes
+// on the old code too, by design: git's own rename of a branch checked out
+// elsewhere, moving that worktree's HEAD along, is kept (owner, 2026-09-28);
+// only the rebase/bisect cases below are refused up front.
+func TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
+	gittest.Run(t, repo.Dir, "branch", "other")
+	linked := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "other")
+
+	c, wt := openWorktree(t, repo.Dir)
+
+	if err := c.RenameBranch(t.Context(), wt, "other", "renamed"); err != nil {
+		t.Fatal(err)
+	}
+
+	if !branchExists(t, repo.Dir, "renamed") {
+		t.Error("renamed missing, want it created")
+	}
+	if branchExists(t, repo.Dir, "other") {
+		t.Error("other still exists, want renamed away")
+	}
+	if got := currentBranch(t, linked); got != "renamed" {
+		t.Errorf("linked worktree's branch = %s, want renamed (git moves its HEAD)", got)
+	}
+}
+
+func TestFR_BR_10_RenameBranchRefusesABranchBeingRebasedElsewhere(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	wtPath := gitPath(t, wtDir)
+
+	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
+
+	err := c.RenameBranch(t.Context(), wt, "B", "B2")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchRebasingElsewhere" {
+		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
+	}
+	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.HasPrefix(e.Command, "git branch ") {
+			t.Errorf("recorded %q, want no branch call before the refusal", e.Command)
+		}
+	}
+	if !branchExists(t, repo.Dir, "B") {
+		t.Error("B gone, want still present")
+	}
+	if branchExists(t, repo.Dir, "B2") {
+		t.Error("B2 exists, want the rename refused")
+	}
+}
+
+// TestFR_BR_10_RenameBranchRefusesABranchBeingBisectedInThisWorktree covers
+// this window's own worktree bisecting the branch: refuseBranchInUse finds
+// a branch in use in any worktree, this one included, the way UpdateBranch
+// already does.
+func TestFR_BR_10_RenameBranchRefusesABranchBeingBisectedInThisWorktree(t *testing.T) {
+	t.Parallel()
+	_, _, wtDir := bisectInProgressFixture(t)
+	wtPath := gitPath(t, wtDir)
+
+	c, wt := openWorktree(t, wtDir)
+	rec := recordCommands(t, c, wt)
+
+	err := c.RenameBranch(t.Context(), wt, "B", "B2")
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchBisectingElsewhere" {
+		t.Errorf("Key = %q, want branchBisectingElsewhere", ce.Key)
+	}
+	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.HasPrefix(e.Command, "git branch ") {
+			t.Errorf("recorded %q, want no branch call before the refusal", e.Command)
+		}
+	}
+	if !branchExists(t, wtDir, "B") {
+		t.Error("B gone, want still present")
+	}
+	if branchExists(t, wtDir, "B2") {
+		t.Error("B2 exists, want the rename refused")
+	}
+}
+
 func TestFR_BR_06_DeleteBranchDeletesAFullyMergedBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

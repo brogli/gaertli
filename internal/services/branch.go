@@ -156,6 +156,9 @@ func (c *Core) RenameBranch(ctx context.Context, id core.WorktreeID, name, newNa
 	if err := validateBranchName(ctx, wt.Runner, wt.Path, newName); err != nil {
 		return err
 	}
+	if err := refuseBranchRebasingOrBisecting(ctx, wt.Runner, wt.Path, name); err != nil {
+		return err // a read-only check: not worth holding a write lock for
+	}
 
 	wt.Repo.Lock() // branch rename is a repo-wide one-off
 	defer wt.Repo.Unlock()
