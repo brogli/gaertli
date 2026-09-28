@@ -47,6 +47,9 @@ func Main(m *testing.M, bins ...testbin.Bin) {
 	for _, args := range [][]string{
 		{"config", "--global", "user.name", "nebegit test"},
 		{"config", "--global", "user.email", "test@nebegit.invalid"},
+		// git commit and others start a detached maintenance run that may
+		// still write the repo while t.TempDir removes it.
+		{"config", "--global", "maintenance.auto", "false"},
 	} {
 		if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: home, Args: args}); err != nil {
 			panic(err)
