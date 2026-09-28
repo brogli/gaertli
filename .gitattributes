@@ -1,2 +1,5 @@
 # LF everywhere: gofmt and prettier check formatting on Windows runners too.
 * text=auto eol=lf
+
+# cmd.exe requires CRLF line endings to run a batch file reliably.
+*.cmd text eol=crlf

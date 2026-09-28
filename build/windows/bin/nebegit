@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+# Starts the Windows app beside this script. In WSL, converts every
+# non-flag argument to a Windows path first.
+
+app="$(dirname "$(dirname "$(realpath "$0")")")/nebegit.exe"
+
+if [ -n "$WSL_DISTRO_NAME" ]; then
+	n=$#
+	i=0
+	while [ "$i" -lt "$n" ]; do
+		arg="$1"
+		shift
+		case "$arg" in
+		-*) ;;
+		*) arg="$(wslpath -w "$arg")" || exit "$?" ;;
+		esac
+		set -- "$@" "$arg"
+		i=$((i + 1))
+	done
+fi
+
+"$app" "$@" </dev/null >/dev/null 2>&1 &
+exit 0

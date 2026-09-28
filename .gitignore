@@ -1,7 +1,7 @@
 CLAUDE.local.md
 .direnv/
 .task/
-bin/
+/bin/
 .bench/
 frontend/dist/
 frontend/bindings/
