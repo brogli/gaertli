@@ -37,9 +37,15 @@
   - Installing over an existing installation replaces the files and keeps the settings, which live
     outside the install folder (DIST-03); a package manager upgrade and replacing the archive's
     files do the same.
+  - A running nebegit locks its exe. The installer and the uninstaller check for that first, before
+    they change anything: interactively they ask the user to close it and retry; a silent run exits
+    with 32 (Windows' sharing-violation code) instead of skipping the locked file and reporting
+    success, which is what NSIS does by default. The check catches the exe in the install folder
+    only, the one file that would be skipped.
   - winget: `brogli.nebegit`, `InstallerType: nullsoft`, `Scope: user`, installed from the prod
     release asset with its `SHA256SUMS` hash, using NSIS's own silent switches for install and
-    uninstall (DIST-06). No manifest lives in this repo: it would only restate each release's
+    uninstall (DIST-06); its `ExpectedReturnCodes` map 32 to `packageInUse`, so winget tells the
+    user to close the app. No manifest lives in this repo: it would only restate each release's
     version and hash, and cannot be validated on Linux. The owner submits it to
     `microsoft/winget-pkgs` by hand, for prod releases only.
 - Linux: a `.deb` and an `.rpm` (nfpm, via `wails3 tool package`), installing to `/usr/bin` and

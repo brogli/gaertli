@@ -45,6 +45,25 @@ Unicode true
     ${EndIf}
 !macroend
 
+# A running exe cannot be opened for writing. Exit code 32 is Windows'
+# ERROR_SHARING_VIOLATION; a silent run takes Cancel.
+!macro waitForClosedApp
+    ${If} ${FileExists} "$INSTDIR\${PRODUCT_EXECUTABLE}"
+        ${Do}
+            ClearErrors
+            FileOpen $0 "$INSTDIR\${PRODUCT_EXECUTABLE}" a
+            ${IfNot} ${Errors}
+                FileClose $0
+                ${Break}
+            ${EndIf}
+            ${If} ${Cmd} `MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "nebegit is running. Close it, then click Retry." /SD IDCANCEL IDCANCEL`
+                SetErrorLevel 32
+                Abort
+            ${EndIf}
+        ${Loop}
+    ${EndIf}
+!macroend
+
 # The version information for this two must consist of 4 parts
 VIProductVersion "${INFO_PRODUCTVERSION}.0"
 VIFileVersion    "${INFO_PRODUCTVERSION}.0"
@@ -95,6 +114,7 @@ Function .onInit
 FunctionEnd
 
 Section
+    !insertmacro waitForClosedApp
     !insertmacro wails.setShellContext
 
     SetOutPath $INSTDIR
@@ -120,6 +140,7 @@ Section
 SectionEnd
 
 Section "uninstall" 
+    !insertmacro waitForClosedApp
     !insertmacro wails.setShellContext
 
     ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --remove-from-path' $0
