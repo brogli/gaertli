@@ -200,7 +200,9 @@ arrow keys move between tabs and pick as they go.
   side-by-side/unified and whitespace toggles (FR-DIFF-01, FR-DIFF-06), stays in view while the diff
   scrolls. Side by side, the two editors sit in a splitter's panels and scroll sideways together.
   Added and removed lines take their colours from the theme, mixed strong enough to meet FR-DIFF-11
-  in every theme; an e2e check measures each theme.
+  in every theme, measured as: each changed line's background differs from the diff's background,
+  and added from removed, by at least 0.08 ΔE in OKLab; text on them keeps 4.5:1 contrast; the
+  change marker keeps 3:1 against the diff's background. An e2e check measures each theme.
 
 ## Communication
 
