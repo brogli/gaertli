@@ -14,6 +14,7 @@ var ErrorKeys = map[string][]string{
 	"branchCheckedOutElsewhere":   {"branch", "path"},
 	"branchRebasingElsewhere":     {"branch", "path"},
 	"branchBisectingElsewhere":    {"branch", "path"},
+	"branchCheckedOutSwitchFirst": {"branch", "path"},
 	"worktreeExists":              {"path"},
 	"mergeCommitNotPickable":      {"sha", "verb"},
 	"gitTooOld":                   {"version", "minVersion"},

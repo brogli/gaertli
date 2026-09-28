@@ -170,6 +170,10 @@ func (c *Core) DeleteBranch(ctx context.Context, id core.WorktreeID, name string
 	if err != nil {
 		return err
 	}
+	if err := refuseBranchInUse(ctx, wt.Runner, wt.Path, name); err != nil {
+		return err // a read-only check: not worth holding a write lock for
+	}
+
 	flag := "-d"
 	if force {
 		flag = "-D"

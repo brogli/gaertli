@@ -180,27 +180,94 @@ func TestFR_BR_06_DeleteBranchForcedDeletesAnUnmergedBranch(t *testing.T) {
 	}
 }
 
-func TestFR_BR_06_DeleteBranchRefusesABranchCheckedOutInAnotherWorktreeAsGitFailedNotUnmerged(t *testing.T) {
+func TestFR_BR_10_DeleteBranchRefusesABranchCheckedOutInAnotherWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "other")
 	linked := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linked, "other")
+	linkedPath := gitPath(t, linked)
 
 	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
 
-	err := c.DeleteBranch(t.Context(), wt, "other", false)
-	coretest.AssertCode(t, err, core.GitFailed)
+	for _, force := range []bool{false, true} {
+		err := c.DeleteBranch(t.Context(), wt, "other", force)
 
-	err = c.DeleteBranch(t.Context(), wt, "other", true)
-	coretest.AssertCode(t, err, core.GitFailed)
-
+		ce := coretest.AsError(t, err, core.GitFailed)
+		if ce.Key != "branchCheckedOutSwitchFirst" {
+			t.Errorf("force=%v: Key = %q, want branchCheckedOutSwitchFirst", force, ce.Key)
+		}
+		if ce.Args["branch"] != "other" || ce.Args["path"] != linkedPath {
+			t.Errorf("force=%v: Args = %+v, want branch=other path=%s", force, ce.Args, linkedPath)
+		}
+	}
+	for _, e := range rec.snapshot() {
+		if strings.Contains(e.Command, "branch ") {
+			t.Errorf("recorded %q, want no branch call before the refusal", e.Command)
+		}
+	}
 	if !branchExists(t, repo.Dir, "other") {
 		t.Error("other gone, want still present")
 	}
 	if got := currentBranch(t, linked); got != "other" {
 		t.Errorf("linked worktree's branch = %s, want still other", got)
+	}
+}
+
+func TestFR_BR_10_DeleteBranchRefusesABranchBeingRebasedElsewhere(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	wtPath := gitPath(t, wtDir)
+	beforeSHA := branchTip(t, repo.Dir, "B")
+
+	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
+
+	err := c.DeleteBranch(t.Context(), wt, "B", true)
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchRebasingElsewhere" {
+		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
+	}
+	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.Contains(e.Command, "branch ") {
+			t.Errorf("recorded %q, want no branch call before the refusal", e.Command)
+		}
+	}
+	if got := branchTip(t, repo.Dir, "B"); got != beforeSHA {
+		t.Errorf("B = %s, want unchanged %s", got, beforeSHA)
+	}
+}
+
+func TestFR_BR_10_DeleteBranchRefusesABranchBeingBisectedElsewhere(t *testing.T) {
+	t.Parallel()
+	repo, _, wtDir := bisectInProgressFixture(t)
+	wtPath := gitPath(t, wtDir)
+
+	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
+
+	err := c.DeleteBranch(t.Context(), wt, "B", true)
+
+	ce := coretest.AsError(t, err, core.GitFailed)
+	if ce.Key != "branchBisectingElsewhere" {
+		t.Errorf("Key = %q, want branchBisectingElsewhere", ce.Key)
+	}
+	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
+		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
+	}
+	for _, e := range rec.snapshot() {
+		if strings.Contains(e.Command, "branch ") {
+			t.Errorf("recorded %q, want no branch call before the refusal", e.Command)
+		}
+	}
+	if !branchExists(t, repo.Dir, "B") {
+		t.Error("B gone, want still present")
 	}
 }
 

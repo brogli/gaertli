@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git"
 )
 
@@ -54,6 +55,56 @@ func branchesInUse(ctx context.Context, r git.Runner, dir string, background boo
 		}
 	}
 	return uses, nil
+}
+
+// inUseRefusal is the GitFailed refusal for branch, a worktree at use.path
+// rebasing or bisecting it.
+func inUseRefusal(branch string, use branchInUse) error {
+	args := map[string]string{"branch": branch, "path": use.path}
+	if use.kind == "bisect" {
+		return core.ErrorfArgs(core.GitFailed, "branchBisectingElsewhere", args, "%q is being bisected in %s. End the bisect there first.", branch, use.path)
+	}
+	return core.ErrorfArgs(core.GitFailed, "branchRebasingElsewhere", args, "%q is being rebased in %s. Finish or abort the rebase there first.", branch, use.path)
+}
+
+// refuseBranchRebasingOrBisecting refuses branch, before any mutating git
+// call, when a worktree (this window's own included) is rebasing or
+// bisecting it. Delete and Rename both call it; Rename calls it alone
+// (below), Delete through refuseBranchInUse.
+func refuseBranchRebasingOrBisecting(ctx context.Context, r git.Runner, dir, branch string) error {
+	uses, err := branchesInUse(ctx, r, dir, false)
+	if err != nil {
+		return err
+	}
+	if use, found := uses[branch]; found {
+		return inUseRefusal(branch, use)
+	}
+	return nil
+}
+
+// refuseBranchInUse is Delete's up-front refusal (FR-BR-10): a branch
+// checked out in another worktree, read from %(worktreepath) (empty for a
+// missing branch, so git's own delete call refuses it with its own text),
+// or a worktree rebasing or bisecting it. Rename keeps git's own behaviour
+// for a branch checked out elsewhere instead (it renames it there too and
+// moves that worktree's HEAD along), so it calls
+// refuseBranchRebasingOrBisecting alone, not this.
+func refuseBranchInUse(ctx context.Context, r git.Runner, dir, branch string) error {
+	result, err := r.Run(ctx, git.Call{
+		Dir: dir, ReadOnly: true,
+		Args: []string{"for-each-ref", "--format=%(worktreepath)", "refs/heads/" + branch},
+	})
+	if err != nil {
+		return err
+	}
+	if path := strings.TrimSpace(string(result.Stdout)); path != "" {
+		dirInfo, _ := os.Stat(dir)
+		if !sameWorktree(dirInfo, path) {
+			args := map[string]string{"branch": branch, "path": path}
+			return core.ErrorfArgs(core.GitFailed, "branchCheckedOutSwitchFirst", args, "%q is checked out in %s. Check out another branch there first.", branch, path)
+		}
+	}
+	return refuseBranchRebasingOrBisecting(ctx, r, dir, branch)
 }
 
 // sameWorktree reports whether path is the worktree dirInfo was Stat'd
