@@ -179,13 +179,14 @@ arrow keys move between tabs and pick as they go.
   like the view widths (FR-LOG-15). In its place, the comparison (FR-CMP), whose header shows from →
   to and a Swap button, or the working-tree comparison, or, with three or more selected, their
   count.
-- **Changed files** (FR-LOG-16): a flat list, the same one the changes view and the diff window use,
-  or a folder tree built from the paths, switched by a toggle above the files, beside their count.
-  The choice lives in local storage (ADR-4), shared by every window.
-- **Changes view** (FR-CHG-11, FR-CHG-12): Stage all and Unstage all above the change list's groups,
-  then the commit box. A file's row starts with its stage or unstage button, before its name; its
-  other actions sit at the row's end (FR-CHG-02). The commit message field spans the commit box's
-  full width.
+- **Changed files** (FR-LOG-16): a flat list, or a folder tree built from the paths, switched by a
+  toggle above the files, beside their count. The choice lives in local storage (ADR-4), shared by
+  the commit detail view, the diff window and the changes view (FR-CHG-13).
+- **Changes view** (FR-CHG-11, FR-CHG-12, FR-CHG-13): Stage all, Unstage all and the list/tree
+  toggle above the change list's groups, then the commit box. Each group shows as a list or a tree,
+  the shared choice; a file's row starts with its stage, unstage or mark-resolved button, before its
+  name, in both, and its other actions sit at the row's end (FR-CHG-02); a folder in the tree has no
+  buttons. The commit message field spans the commit box's full width.
 - **Diff window** (FR-DIFF-07): a separate OS window; the main window stays usable behind it. The
   target's files on the left, a working tree's in their groups, and the diff view on the right. A
   target is a commit, a range, a commit against the working tree, or a working-tree side. In every
