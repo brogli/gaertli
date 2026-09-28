@@ -103,6 +103,10 @@ func (f *fakeWSL) run(ctx context.Context, distro string, args ...string) (*exec
 	f.scripts = append(f.scripts, strings.Join(args, " "))
 	if len(args) == 3 && strings.HasSuffix(args[2], "--stdio") {
 		cmd := exec.CommandContext(ctx, f.bin, "--stdio")
+		// Puts the core's own current directory on $HOME's drive, the same
+		// one gittest.New's repos live on: a path with no drive letter
+		// resolves against the current drive on Windows.
+		cmd.Dir = os.Getenv("HOME")
 		f.spawns = append(f.spawns, cmd)
 		return cmd, nil
 	}
@@ -241,24 +245,41 @@ func TestADR_3_EnsureForcesARedeployOnAProtocolMismatch(t *testing.T) {
 	coretest.AssertCode(t, err, core.Internal)
 }
 
+// gitPath returns dir's path the way git reports it: what OpenWorktree's
+// own toplevel is built from, so a comparison against it holds regardless
+// of the platform's own path form (short names, backslashes).
+func gitPath(t *testing.T, dir string) string {
+	t.Helper()
+	return gittest.Out(t, dir, "rev-parse", "--show-toplevel")
+}
+
+// distroPath renders repo, an absolute path in git's own form, as the
+// distro side of fakeWSL sees it: its volume name (empty outside Windows)
+// dropped, so ClassifyWSLPath's decode, which always adds back a leading
+// slash, reconstructs it unchanged.
+func distroPath(repo string) string {
+	return strings.TrimPrefix(repo, filepath.VolumeName(repo))
+}
+
 func TestADR_3_OpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
-	repo := gittest.New(t).Dir
+	const distro = "Ubuntu-22.04"
+	repo := gitPath(t, gittest.New(t).Dir)
 	dc, _ := newDistroCore(t, coreBin, slog.Default())
 	client, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	uncPath := remote.BuildWSLPath("Ubuntu-22.04", repo)
-	info, err := remote.NewDistroPathClient(client, "Ubuntu-22.04").OpenWorktree(t.Context(), core.RepoPath(uncPath))
+	uncPath := remote.BuildWSLPath(distro, distroPath(repo))
+	info, err := remote.NewDistroPathClient(client, distro).OpenWorktree(t.Context(), core.RepoPath(uncPath))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Path != repo {
 		t.Errorf("OpenWorktree translated path = %q, want %q (not the UNC string)", info.Path, repo)
 	}
-	if info.ID != core.WorktreeID(uncPath) {
-		t.Errorf("ID = %q, want the UNC form %q", info.ID, uncPath)
+	if want := core.WorktreeID(remote.BuildWSLPath(distro, repo)); info.ID != want {
+		t.Errorf("ID = %q, want the UNC form %q", info.ID, want)
 	}
 	if want := repo + "/.git"; info.RepoKey != want {
 		t.Errorf("RepoKey = %q, want the POSIX %q", info.RepoKey, want)
@@ -266,15 +287,16 @@ func TestADR_3_OpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
 }
 
 func TestADR_4_EnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
-	repo := gittest.New(t).Dir
+	const distro = "Ubuntu-22.04"
+	repo := gitPath(t, gittest.New(t).Dir)
 	dc, wsl := newDistroCore(t, coreBin, slog.Default())
 
 	client1, _, err := dc.Ensure(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	uncPath := remote.BuildWSLPath("Ubuntu-22.04", repo)
-	info, err := remote.NewDistroPathClient(client1, "Ubuntu-22.04").OpenWorktree(t.Context(), core.RepoPath(uncPath))
+	uncPath := remote.BuildWSLPath(distro, distroPath(repo))
+	info, err := remote.NewDistroPathClient(client1, distro).OpenWorktree(t.Context(), core.RepoPath(uncPath))
 	if err != nil {
 		t.Fatal(err)
 	}
