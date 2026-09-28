@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Button from 'openvue/button'
 import Tree, { type TreeExpandedKeys, type TreePassThroughMethodOptions } from 'openvue/tree'
 import type { TreeNode } from 'openvue/treenode'
-import { useI18n } from '@/i18n'
 import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { fileTree, folderKeys } from '@/lib/fileTree'
 import { iconClass } from '@/lib/icons'
-import { ICON_BUTTON } from '@/lib/layout'
+import ChangedFileButton from './ChangedFileButton.vue'
 import FileStatusIcon from './FileStatusIcon.vue'
 
 // ChangedFileTree shows changed files by folder in OpenVue's Tree, every
@@ -20,7 +18,6 @@ const emit = defineEmits<{
   open: [file: ChangedFile]
   'open-editor': [file: ChangedFile]
 }>()
-const { t } = useI18n()
 
 const nodes = computed(() => fileTree(props.files))
 const expandedKeys = ref<TreeExpandedKeys>({})
@@ -79,13 +76,10 @@ const pt = {
         <template v-if="node.data?.oldPath">{{ node.data.oldPath }} &rarr; </template
         >{{ node.label }}
       </span>
-      <Button
+      <ChangedFileButton
         v-if="node.data"
-        v-bind="ICON_BUTTON"
-        :icon="iconClass('openEditor')"
+        kind="openEditor"
         data-test="open-editor"
-        :title="t('common.openInEditor')"
-        :aria-label="t('common.openInEditor')"
         @click.stop="emit('open-editor', node.data)"
       />
     </template>
