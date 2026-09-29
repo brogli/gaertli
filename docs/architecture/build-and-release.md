@@ -6,7 +6,7 @@
 - The Windows build embeds the `linux/amd64` core for WSL (ADR-3), so the app stays one download.
   `task build` cross-compiles the core first, then the GUI.
 - A release build stamps its version and commit into the binary; Settings shows both, e.g.
-  `0.1.57 (abc1234)` (DIST-03). Local builds are `dev`.
+  `0.1.0 (abc1234)` (DIST-03). Local builds are `dev`.
 - `task build:server` builds the server-mode app the real-backend e2e suite runs (ADR-2).
 
 ## Packaging and releases
@@ -55,26 +55,28 @@
 - Run-time prerequisites are git and the platform's web view (DIST-01, TR-04 to TR-06); the tar.gz
   and the Windows zip bundle neither.
 - No auto-update, no code signing (DIST-03). Unsigned Windows binaries trigger SmartScreen.
-- Versions are `X.Y.RUN`: `X.Y` is set by hand in `build/config.yml`, `RUN` is the release candidate
-  workflow's run number. One string everywhere: the app, the exe's version resource, the installer's
-  `DisplayVersion` (its numeric version is `X.Y.RUN.0`), the deb and rpm, and winget's
-  `PackageVersion`. There is no pre-release marker: winget compares text after a number
-  alphabetically, so `0.1.0-100` would sort below `0.1.0-57`; and "release candidate" is the draft's
-  state, not part of the files.
+- Versions are plain semantic versions `X.Y.Z`, set by hand in `build/config.yml` and raised before
+  each release; tags are `vX.Y.Z`. One string everywhere: the app, the exe's version resource, the
+  installer's `DisplayVersion` (its numeric version is `X.Y.Z.0`), the deb and rpm, and winget's
+  `PackageVersion`. No pre-release suffix and no build number: "release candidate" is the draft's
+  state, not part of the files, and two candidates of one version never both ship, since only one
+  draft is ever published. The commit tells builds apart.
 - Releases (DIST-02) are started by hand; nothing starts on a merge.
   - Release candidate: a GitHub Actions workflow the maintainer starts on `main` (it refuses any
-    other branch). It runs the full CI workflow on the commit, then builds every artifact (the
-    Windows installer is cross-built on Linux, like the rest of the Windows build, TR-26), writes
-    `THIRD-PARTY-NOTICES.txt` and `SHA256SUMS`, attests each file's build provenance once the repo
-    is public, and creates a draft release `vX.Y.RUN` targeting the built commit's SHA, never a
-    branch, titled with the version and commit. A new draft replaces older drafts.
+    other branch, and a version whose tag exists, i.e. one already released). It runs the full CI
+    workflow on the commit, then builds every artifact (the Windows installer is cross-built on
+    Linux, like the rest of the Windows build, TR-26), writes `THIRD-PARTY-NOTICES.txt` and
+    `SHA256SUMS`, attests each file's build provenance once the repo is public, and creates a draft
+    release `vX.Y.Z` targeting the built commit's SHA, never a branch, titled with the version and
+    commit. It first deletes older drafts, so the next candidate of the same version replaces a
+    failed one.
   - Release notes are GitHub's generated list of the pull requests merged since the last release,
     bots excluded, edited by the maintainer in the draft. PR titles are therefore written for users.
   - Publish: the maintainer checks the draft's files and publishes that same draft. A draft has no
-    tag; publishing creates `vX.Y.RUN` on the built commit, so the published files are the checked
+    tag; publishing creates `vX.Y.Z` on the built commit, so the published files are the checked
     ones. With immutable releases enabled, tag and files stay fixed after that.
-  - A failed candidate's draft is deleted; the fix goes through a pull request into `main` and a new
-    run. A bad published release is marked pre-release with a warning and superseded, not deleted: a
-    deleted immutable release's tag can never be reused.
-  - `task release:dry-run RUN=<n>` builds this platform's artifacts the same way, locally.
+  - After a failed candidate the fix goes through a pull request into `main` and a new run, with the
+    same version. A bad published release is marked pre-release with a warning and superseded, not
+    deleted: a deleted immutable release's tag can never be reused.
+  - `task release:dry-run` builds this platform's artifacts the same way, locally.
 - A licence check runs in CI (OSS-01, TR-19).

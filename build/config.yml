@@ -9,7 +9,7 @@ info:
   description: 'The git tool that sits beside your editor'
   copyright: 'Copyright (c) 2026, brogli'
   comments: ''
-  # X.Y is set by hand; a release replaces the last part with its run number.
+  # The release version (semantic versioning), raised by hand before each release.
   version: '0.1.0'
 
 dev_mode:

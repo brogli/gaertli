@@ -10,8 +10,8 @@ vars:
   # miss pnpm, go and wails3 on PATH.
   GOOS: '{{.GOOS | default OS}}'
   # Stamped into internal/buildinfo via -ldflags -X: the release version
-  # X.Y.RUN (build/release-version.sh) and the short commit, set by the
-  # release workflow; "dev" and no commit for every local build.
+  # (build/release-version.sh) and the short commit, set by the release
+  # workflow; "dev" and no commit for every local build.
   VERSION: '{{.VERSION | default "dev"}}'
   COMMIT: '{{.COMMIT | default ""}}'
   # The numeric version installers and packages need: 0.0.0 outside releases.
@@ -125,7 +125,7 @@ tasks:
       without publishing
     vars:
       VERSION:
-        sh: build/release-version.sh {{.RUN | default 0}}
+        sh: build/release-version.sh
       COMMIT:
         sh: git rev-parse --short=7 HEAD
     cmds:

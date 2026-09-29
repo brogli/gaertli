@@ -30,11 +30,18 @@ jobs:
         with:
           persist-credentials: false
 
+      # Publishing a draft creates its tag: an existing tag is a released version.
       - id: version
         env:
-          RUN: ${{ github.run_number }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          echo "version=$(build/release-version.sh "$RUN")" >> "$GITHUB_OUTPUT"
+          version=$(build/release-version.sh)
+          if gh api "repos/$GH_REPO/git/ref/tags/v$version" --silent 2>/dev/null; then
+            echo "::error::v$version is already released: raise the version in build/config.yml."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
   ci:
@@ -267,16 +274,17 @@ jobs:
           subject-path: dist/*
 
       # A draft has no tag yet: publishing it creates the tag on this commit.
-      - name: Draft the release, then delete older drafts
+      - name: Replace older drafts with this one
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.version.outputs.version }}
           COMMIT: ${{ needs.version.outputs.commit }}
+        # Older drafts go first: a failed candidate's draft may carry the same
+        # version.
         run: |
-          older=$(gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft) | .id')
-          gh release create "v$VERSION" dist/* --draft --target "$GITHUB_SHA" \
-            --title "nebegit $VERSION ($COMMIT)" --generate-notes
-          for id in $older; do
+          for id in $(gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft) | .id'); do
             gh api --method DELETE "repos/$GH_REPO/releases/$id"
           done
+          gh release create "v$VERSION" dist/* --draft --target "$GITHUB_SHA" \
+            --title "nebegit $VERSION ($COMMIT)" --generate-notes
