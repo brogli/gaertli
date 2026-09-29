@@ -42,12 +42,12 @@
     with 32 (Windows' sharing-violation code) instead of skipping the locked file and reporting
     success, which is what NSIS does by default. The check catches the exe in the install folder
     only, the one file that would be skipped.
-  - winget: `brogli.nebegit`, `InstallerType: nullsoft`, `Scope: user`, installed from the prod
+  - winget: `brogli.nebegit`, `InstallerType: nullsoft`, `Scope: user`, installed from the published
     release asset with its `SHA256SUMS` hash, using NSIS's own silent switches for install and
     uninstall (DIST-06); its `ExpectedReturnCodes` map 32 to `packageInUse`, so winget tells the
     user to close the app. No manifest lives in this repo: it would only restate each release's
     version and hash, and cannot be validated on Linux. The owner submits it to
-    `microsoft/winget-pkgs` by hand, for prod releases only.
+    `microsoft/winget-pkgs` by hand, for published releases.
 - Linux: a `.deb` and an `.rpm` (nfpm, via `wails3 tool package`), installing to `/usr/bin` and
   declaring GTK4, WebKitGTK and git as package dependencies; a `.tar.gz` (binary, `LICENSE`,
   `THIRD-PARTY-NOTICES.txt`) for other distributions.
