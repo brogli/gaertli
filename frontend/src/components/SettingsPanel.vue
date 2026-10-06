@@ -26,12 +26,15 @@ import ErrorBanner from './ErrorBanner.vue'
 import FormField from './FormField.vue'
 
 // DEFAULT_PROFILE mirrors editor.Default(), so a newly added profile form
-// starts pre-filled.
+// starts pre-filled. On a Windows host Zed opens each file in a window of
+// its own: a lone file would join Zed's last active window, and a WSL
+// remote window shows a Windows path as an empty file.
+const zedFile = System.IsWindows() ? 'zed -n {path}' : 'zed {path}'
 const DEFAULT_PROFILE: EditorProfile = {
   name: 'Zed',
   folderCmd: 'zed {path}',
-  fileCmd: 'zed {path}',
-  fileAtLineCmd: 'zed {path}:{line}',
+  fileCmd: zedFile,
+  fileAtLineCmd: `${zedFile}:{line}`,
 }
 
 // EDITOR_PRESETS fill a profile's fields in one click. IntelliJ has no

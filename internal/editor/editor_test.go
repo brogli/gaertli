@@ -3,6 +3,7 @@ package editor
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -25,6 +26,18 @@ func TestFR_ED_05_Default(t *testing.T) {
 	want := core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"}
 	if got := Default(); got != want {
 		t.Errorf("Default() = %+v, want %+v", got, want)
+	}
+}
+
+func TestFR_ED_13_DefaultOnWindowsOpensFilesInAWindowOfTheirOwn(t *testing.T) {
+	t.Parallel()
+	got := defaultFor("windows")
+	want := core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor -n {path}", FileAtLineCmd: "editor -n {path}:{line}"}
+	if got != want {
+		t.Errorf("defaultFor(windows) = %+v, want %+v", got, want)
+	}
+	if got := defaultFor("linux"); got != Default() && runtime.GOOS != "windows" {
+		t.Errorf("defaultFor(linux) = %+v, want Default()", got)
 	}
 }
 

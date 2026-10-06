@@ -24,6 +24,7 @@ import { branchFixture } from '@/testing/fixtures/branch'
 import { Theme } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
 import { field } from '@/testing/dialog'
 import { useRefsStore } from '@/stores/refs'
+import { System } from '@/testing/runtime'
 import { darkThemes } from '@/theme/themes'
 
 const filled = defaultSettingsFixture({ protectedBranches: ['main'] })
@@ -49,6 +50,7 @@ describe('SettingsPanel', () => {
     SettingsService.Get.mockReset().mockResolvedValue(filled)
     SettingsService.Set.mockReset().mockResolvedValue(undefined)
     AppService.ListWSLDistros.mockReset().mockResolvedValue([])
+    System.IsWindows.mockReset().mockReturnValue(false)
     AppService.LogPath.mockReset().mockResolvedValue({
       path: '/home/user/.local/state/nebegit/nebegit.log',
       error: '',
@@ -179,6 +181,53 @@ describe('SettingsPanel', () => {
       folderCmd: 'code {path}',
     })
     expect(sent.editorProfiles['']).toMatchObject({ name: 'Zed', folderCmd: 'zed {path}' })
+  })
+
+  it('FR-ED-13 on a Windows host the Zed preset and a new distro form open files in a window of their own', async () => {
+    System.IsWindows.mockReturnValue(true)
+    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
+    SettingsService.Get.mockResolvedValue(
+      defaultSettingsFixture({
+        editorProfiles: {
+          '': { name: 'VS Code', folderCmd: 'code {path}', fileCmd: 'code {path}' },
+        },
+      }),
+    )
+
+    const wrapper = await mountPanel()
+
+    const fieldsets = wrapper.findAll('fieldset')
+    await fieldsets[0]!
+      .findAll('[data-test="editor-preset"]')
+      .find((b) => b.text() === 'Zed')!
+      .trigger('click')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const sent = SettingsService.Set.mock.calls[0]?.[0]
+    const windowsZed = {
+      folderCmd: 'zed {path}',
+      fileCmd: 'zed -n {path}',
+      fileAtLineCmd: 'zed -n {path}:{line}',
+    }
+    expect(sent.editorProfiles['']).toMatchObject(windowsZed)
+    expect(sent.editorProfiles['Ubuntu-22.04']).toMatchObject(windowsZed)
+  })
+
+  it('FR-ED-13 on a Linux host the Zed preset opens files in the last used window', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper
+      .findAll('[data-test="editor-preset"]')
+      .find((b) => b.text() === 'Zed')!
+      .trigger('click')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(SettingsService.Set.mock.calls[0]?.[0].editorProfiles['']).toMatchObject({
+      fileCmd: 'zed {path}',
+      fileAtLineCmd: 'zed {path}:{line}',
+    })
   })
 
   it('FR-ED-03 a stored profile for a distro no longer installed still gets a form, kept on save', async () => {

@@ -11,9 +11,22 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-// Default is the built-in editor profile.
+// Default is the built-in editor profile for this host. The shell pushes it
+// to every core, the WSL ones included, so the host's rule reaches them.
 func Default() core.EditorProfile {
-	return core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"}
+	return defaultFor(runtime.GOOS)
+}
+
+// defaultFor is the editor. On a Windows host each file opens in a window of its
+// own (-n): the editor hands a lone file to its last active window, and a WSL
+// remote window resolves a Windows path on the Linux side, so the file
+// shows empty; the reverse holds for a WSL file and a Windows window.
+func defaultFor(goos string) core.EditorProfile {
+	file := "editor {path}"
+	if goos == "windows" {
+		file = "editor -n {path}"
+	}
+	return core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: file, FileAtLineCmd: file + ":{line}"}
 }
 
 // OrDefault returns profile if it names a folder command, else Default().

@@ -201,4 +201,6 @@ The app's own writes also trigger the watcher. Debounce plus reload-after-write 
 - The template is split into arguments first, then the placeholders are filled in. No shell (TR-10).
 - The editor starts detached (TR-12); only start errors are reported, as `EDITOR_NOT_FOUND` naming
   the command.
-- Presets (FR-ED-07) are data in Settings.
+- Presets (FR-ED-07) are data in Settings. On a Windows host the editor default and preset open each
+  file in a window of its own (`-n`): a lone file would join the editor's last active window, and a WSL
+  remote window shows a Windows path as an empty file (FR-ED-13).
