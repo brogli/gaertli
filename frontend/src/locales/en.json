@@ -450,7 +450,6 @@
   "branchPicker": {
     "searchPlaceholder": "Search branches and tags",
     "newBranch": "New branch…",
-    "updateChecked": "Update {n} branches",
     "checkOut": "Check out",
     "newBranchFromHere": "New branch from here…",
     "newWorktreeFromHere": "New worktree from here…",
@@ -471,7 +470,6 @@
     },
     "showInLog": "Show in log",
     "showHistory": "Show history",
-    "selectToUpdate": "Select {name} to update",
     "currentBranch": "Current branch",
     "deleteUnmergedTitle": "Delete unmerged branch",
     "deleteUnmergedConfirm": "{reason} Delete anyway? Its commits will become unreachable.",

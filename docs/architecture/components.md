@@ -139,13 +139,11 @@ arrow keys move between tabs and pick as they go.
     repo's main worktree. Each recent entry but the window's own has a menu (Open in new window,
     Remove from recents) with a "…" button. Open in new window resolves the entry as choosing it
     does, falling back to the repo's main worktree, then opens or focuses that worktree's window.
-  - The branch picker lists "New branch…" first, then local branches, remote branches and tags. Each
-    local branch has a checkbox; checked branches update together (FR-UPD-06), and entry names line
-    up whether or not an entry has a checkbox. A menu action's refusal shows as a notice; a row
-    click's refusal stays in the list. A tag's Show history sets the log's filter and brings the log
-    view forward. Merge and rebase leave a conflict to the conflict banner, and a refusal over local
-    changes offers the stash-and-retry as its notice's action. Every entry action is menu-only, so
-    each entry has a "…" button.
+  - The branch picker lists "New branch…" first, then local branches, remote branches and tags. A
+    menu action's refusal shows as a notice; a row click's refusal stays in the list. A tag's Show
+    history sets the log's filter and brings the log view forward. Merge and rebase leave a conflict
+    to the conflict banner, and a refusal over local changes offers the stash-and-retry as its
+    notice's action. Every entry action is menu-only, so each entry has a "…" button.
 - **Settings** (FR-UX-04): a dialog over the window, opened from the toolbar's gear button, laid out
   like every dialog, with a group per editor environment and a base-folder field per environment
   found (local and each WSL distro).

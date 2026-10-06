@@ -657,37 +657,4 @@ describe('BranchPicker', () => {
     expect(wrapper.emitted('show-log')).toHaveLength(1)
     expect(body.find('.branch-list').exists()).toBe(false)
   })
-
-  it('FR-UPD-06 checking two eligible branches offers "Update 2 branches" at the top, which updates both', async () => {
-    const other = branchFixture({
-      name: 'other',
-      sha: 'sha-other',
-      current: false,
-      upstream: 'origin/other',
-    })
-    const { body } = await openPicker(refsWith([main, feat, other]))
-
-    const boxes = body.findAll('[data-test="update-select"]')
-    expect(boxes).toHaveLength(2)
-    await boxes[0]!.get('input').setValue(true)
-    await boxes[1]!.get('input').setValue(true)
-    const update = body.findAll('.picker-rows li')[1]!
-    expect(update.text()).toBe('Update 2 branches')
-    await update.get('[data-test="picker-action"]').trigger('click')
-    await flushPromises()
-
-    expect(Facade.UpdateBranch).toHaveBeenCalledWith('/repo', 'feat')
-    expect(Facade.UpdateBranch).toHaveBeenCalledWith('/repo', 'other')
-    expect(Facade.Checkout).not.toHaveBeenCalled()
-  })
-
-  it('FR-UPD-06 the current branch and one without an upstream have no checkbox; a checkbox names its branch', async () => {
-    const noUpstream = branchFixture({ name: 'local', current: false })
-    const { body } = await openPicker(refsWith([main, feat, noUpstream]))
-
-    const boxes = body.findAll('[data-test="update-select"]')
-    expect(boxes).toHaveLength(1)
-    expect(boxes[0]!.attributes('title')).toBe('Select feat to update')
-    expect(boxes[0]!.get('input').attributes('aria-label')).toBe('Select feat to update')
-  })
 })

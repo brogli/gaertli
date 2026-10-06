@@ -9,12 +9,9 @@ import {
   jobsMenuButton,
   logRow,
   notice,
-  openBranchPicker,
   openJobsMenu,
-  pickerAction,
   pickRefAction,
   pushFromClone,
-  refLi,
   rev,
 } from './helpers'
 
@@ -108,23 +105,4 @@ test('FR-UPD-03 a diverged branch is left as it is and the result says it diverg
 
   await expect(notice(app)).toContainText(/diverged/i)
   expect(rev(git, repos.work, 'B')).toBe(local)
-})
-
-test('FR-UPD-06 Update 2 branches fast-forwards each selected branch', async ({
-  openApp,
-  repos,
-  git,
-}) => {
-  pushFromClone(git, repos.other, 'B', { 'b.txt': 'b\n' }, 'remote b')
-  pushFromClone(git, repos.other, 'topic/x', { 't.txt': 't\n' }, 'remote t')
-  const app = await openApp(repos.work)
-
-  await openBranchPicker(app)
-  await refLi(app, 'B').locator('[data-test=update-select] input').check()
-  await refLi(app, 'topic/x').locator('[data-test=update-select] input').check()
-  await pickerAction(app, 'Update 2 branches').click()
-
-  await expect.poll(() => rev(git, repos.work, 'B')).toBe(rev(git, repos.remote, 'B'))
-  await expect.poll(() => rev(git, repos.work, 'topic/x')).toBe(rev(git, repos.remote, 'topic/x'))
-  expect(rev(git, repos.work, 'HEAD')).toBe(rev(git, repos.work, 'main'))
 })

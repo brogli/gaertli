@@ -3,7 +3,6 @@ import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
-import Checkbox from 'openvue/checkbox'
 import type { MenuItem } from 'openvue/menuitem'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
@@ -136,33 +135,12 @@ const sections = computed<{ label: string; rows: RefRow[] }[]>(() => [
   },
 ])
 
-// Local branches with an upstream, other than the current one, can be
-// checked to update several at once.
-function updatable(row: Row): boolean {
-  return row.kind === 'local' && !row.branch.current && !!row.branch.upstream
-}
-const checked = ref(new Set<string>())
-
-function setChecked(name: string, on: boolean): void {
-  if (on) checked.value.add(name)
-  else checked.value.delete(name)
-}
-
 const query = ref('')
 const rows = computed<Row[]>(() => {
   const actions = [
     actionRow('new-branch', t('branchPicker.newBranch'), () =>
       closeAnd(() => emit('create-branch', currentStart())),
     ),
-    ...(checked.value.size >= 2
-      ? [
-          actionRow(
-            'update-checked',
-            t('branchPicker.updateChecked', { n: checked.value.size }),
-            () => void updateChecked(),
-          ),
-        ]
-      : []),
   ]
   return [
     ...filterRows(actions, query.value, (a) => a.label),
@@ -348,14 +326,6 @@ function deleteBranch(name: string): void {
     },
   )
 }
-
-async function updateChecked(): Promise<void> {
-  await Promise.all(
-    [...checked.value].map((name) => run(() => Facade.UpdateBranch(props.wt, name))),
-  )
-  checked.value.clear()
-  if (!error.value) hide()
-}
 </script>
 
 <template>
@@ -389,19 +359,6 @@ async function updateChecked(): Promise<void> {
         menu-button
         @activate="activate"
       >
-        <template #lead="{ row }">
-          <span v-if="isRef(row)" class="flex w-(--p-checkbox-width) flex-none">
-            <Checkbox
-              v-if="updatable(row)"
-              binary
-              data-test="update-select"
-              :model-value="checked.has(row.name)"
-              :title="t('branchPicker.selectToUpdate', { name: row.name })"
-              :aria-label="t('branchPicker.selectToUpdate', { name: row.name })"
-              @update:model-value="setChecked(row.name, $event)"
-            />
-          </span>
-        </template>
         <template #row="{ row }">
           <h3 v-if="row.kind === 'section'">{{ row.label }}</h3>
           <template v-else-if="row.kind === 'action'">{{ row.label }}</template>

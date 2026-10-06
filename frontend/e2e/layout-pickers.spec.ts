@@ -31,32 +31,22 @@ test('FR-UX-09 no picker list scrolls sideways; every row fits the list', async 
   await expectRowsFit(page, '.branch-list')
 })
 
-test('FR-UX-09 a long branch name ends in an ellipsis beside its checkbox and shows whole on hover', async ({
+test('FR-UX-09 a long branch name ends in an ellipsis and shows whole on hover', async ({
   page,
 }) => {
   await openMockRepo(page)
   const long = 'feature/a-rather-long-branch-name-that-does-not-fit'
 
   await openBranchPicker(page)
-  const li = refLi(page, long)
-  const checkbox = li.locator('[data-test=update-select]')
-  const name = li.locator('.ref-name')
-  await expect(checkbox).toBeVisible()
+  const name = refLi(page, long).locator('.ref-name')
   await expect(name).toHaveAttribute('title', long)
-  const [c, n] = [await checkbox.boundingBox(), await name.boundingBox()]
-  expect(Math.abs(c!.y + c!.height / 2 - (n!.y + n!.height / 2))).toBeLessThan(4)
   expect(await overflows(name)).toBe(true)
 })
 
-test('FR-BR-09 every ref name in the branch picker starts at the same x, with an update checkbox or without', async ({
-  page,
-}) => {
+test('FR-BR-09 every ref name in the branch picker starts at the same x', async ({ page }) => {
   await openMockRepo(page, '&crowdedRefs=1')
 
   await openBranchPicker(page)
-  await expect(refLi(page, 'B').locator('[data-test=update-select]')).toBeVisible()
-  await expect(refLi(page, 'side').locator('[data-test=update-select]')).toHaveCount(0)
-
   const names = ['main', 'B', 'side', 'origin/B', 'v1']
   const lefts = await Promise.all(
     names.map(async (name) => (await refLi(page, name).locator('.ref-name').boundingBox())!.x),
