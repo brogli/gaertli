@@ -8,13 +8,13 @@
 Swiss German _näbe_ ("beside") + git: a desktop git GUI that sits beside your editor.
 
 For developers whose editor lacks strong git tooling. Log viewer with graph, commit compare,
-worktree handling, safe sync actions. Go core, Wails v3 shell, Vue 3 frontend; every git operation
-runs the system `git`.
+worktree handling, safe sync actions, merge, rebase, cherry-pick and a three-pane merge editor. Go
+core, Wails v3 shell, Vue 3 frontend; every git operation runs the system `git`.
 
 Status: pre-alpha. Windows and Linux are the targets, including repos inside WSL from a native
 Windows window.
 
-- What it will do: [docs/requirements.md](docs/requirements.md)
+- What it does: [docs/requirements.md](docs/requirements.md)
 - How it is built: [docs/architecture.md](docs/architecture.md)
 - Developing nebegit: [CONTRIBUTING.md](CONTRIBUTING.md)
 
