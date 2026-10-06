@@ -1,0 +1,340 @@
+import { flushPromises, type VueWrapper } from '@vue/test-utils'
+import { undo } from '@codemirror/commands'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mountInBody } from '@/testing/mountInBody'
+
+const { Facade } = vi.hoisted(() => ({
+  Facade: {
+    Conflict: vi.fn(),
+    SaveConflict: vi.fn(),
+    ResolveConflict: vi.fn(),
+    StageFile: vi.fn(),
+    OpenFile: vi.fn(),
+  },
+}))
+
+vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
+import ConflictView from '../ConflictView.vue'
+import MergeEditor from '../MergeEditor.vue'
+import { confirmOptions, confirmRequire } from '@/testing/confirm'
+import { useMergeDrafts } from '@/composables/useMergeDrafts'
+import { emit } from '@/testing/runtime'
+import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { findButton } from '@/testing/findButton'
+import { editorViews } from '@/testing/editorView'
+import { conflictFileFixture } from '@/testing/fixtures/conflicts'
+import {
+  ConflictChoice,
+  ConflictKind,
+  Operation,
+  type ConflictFile,
+} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+
+async function mountView(file: Partial<ConflictFile>) {
+  Facade.Conflict.mockResolvedValue(conflictFileFixture(file))
+  const { wrapper } = await mountInBody(ConflictView, { props: { wt: '/repo', path: 'a.txt' } })
+  return wrapper
+}
+
+describe('ConflictView', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    for (const fn of Object.values(Facade)) fn.mockReset().mockResolvedValue(undefined)
+    confirmRequire.mockReset()
+    useMergeDrafts().clearAll()
+    document.body.innerHTML = ''
+  })
+
+  it('FR-CONF-05 a text conflict shows the merge editor', async () => {
+    const wrapper = await mountView({})
+
+    const editor = wrapper.getComponent(MergeEditor)
+    expect(editor.props('wt')).toBe('/repo')
+    expect(editor.props('file').path).toBe('a.txt')
+  })
+
+  it('FR-CONF-07 a file the current side deleted offers the incoming version and deletion', async () => {
+    const wrapper = await mountView({
+      kind: ConflictKind.ConflictDeleted,
+      current: { ...conflictFileFixture().current, present: false },
+    })
+
+    expect(wrapper.text()).toContain('main deleted the file; side changed it.')
+    expect(findButton(wrapper, `Keep the version of main`)).toBeUndefined()
+    await findButton(wrapper, `Take the version of side`)!.trigger('click')
+    expect(Facade.ResolveConflict).toHaveBeenCalledWith(
+      '/repo',
+      'a.txt',
+      ConflictChoice.ChooseIncoming,
+    )
+    expect(findButton(wrapper, 'Delete file…')).toBeDefined()
+  })
+
+  it('FR-CONF-07 a file the incoming side deleted offers the current version', async () => {
+    const wrapper = await mountView({
+      kind: ConflictKind.ConflictDeleted,
+      incoming: { ...conflictFileFixture().incoming, present: false },
+    })
+
+    expect(wrapper.text()).toContain('side deleted the file; main changed it.')
+    expect(findButton(wrapper, `Take the version of side`)).toBeUndefined()
+    await findButton(wrapper, `Keep the version of main`)!.trigger('click')
+    expect(Facade.ResolveConflict).toHaveBeenCalledWith(
+      '/repo',
+      'a.txt',
+      ConflictChoice.ChooseCurrent,
+    )
+  })
+
+  it.each([
+    [ConflictKind.ConflictBinary, 'Both sides changed this binary file.'],
+    [ConflictKind.ConflictSymlink, 'Both sides changed this symbolic link.'],
+  ])(
+    'FR-CONF-07 a %s conflict offers both versions; Delete file confirms first',
+    async (kind, sentence) => {
+      const wrapper = await mountView({ kind })
+
+      expect(wrapper.text()).toContain(sentence)
+      await findButton(wrapper, `Keep the version of main`)!.trigger('click')
+      await findButton(wrapper, `Take the version of side`)!.trigger('click')
+      expect(Facade.ResolveConflict.mock.calls.map((c) => c[2])).toEqual([
+        ConflictChoice.ChooseCurrent,
+        ConflictChoice.ChooseIncoming,
+      ])
+
+      Facade.ResolveConflict.mockClear()
+      await findButton(wrapper, 'Delete file…')!.trigger('click')
+      expect(confirmOptions().message).toBe(
+        'Delete a.txt? The file is removed from the working tree and the index.',
+      )
+      expect(Facade.ResolveConflict).not.toHaveBeenCalled()
+      confirmOptions().accept()
+      expect(Facade.ResolveConflict).toHaveBeenCalledWith(
+        '/repo',
+        'a.txt',
+        ConflictChoice.ChooseDelete,
+      )
+    },
+  )
+
+  it('FR-CONF-05 a revert names its incoming side as the state before the commit', async () => {
+    const wrapper = await mountView({
+      kind: ConflictKind.ConflictBinary,
+      operation: Operation.RevertOperation,
+    })
+
+    expect(findButton(wrapper, 'Take the version before abcdef0 on side')).toBeDefined()
+  })
+
+  it('FR-CONF-05 sides without a commit are the current and incoming side', async () => {
+    const { current, incoming } = conflictFileFixture()
+    const wrapper = await mountView({
+      kind: ConflictKind.ConflictBinary,
+      operation: Operation.$zero,
+      current: { ...current, sha: '', ref: '' },
+      incoming: { ...incoming, sha: '', ref: '' },
+    })
+
+    expect(findButton(wrapper, 'Keep the version of Current side')).toBeDefined()
+    expect(findButton(wrapper, 'Take the version of Incoming side')).toBeDefined()
+  })
+
+  it.each([
+    [ConflictKind.ConflictNotUTF8, 'This file is not UTF-8 text.'],
+    [ConflictKind.ConflictRename, 'The two sides renamed this file differently.'],
+    [ConflictKind.ConflictSubmodule, 'This is a submodule.'],
+  ])(
+    'FR-CONF-02 a %s conflict says why, offers the editor and Mark resolved',
+    async (kind, reason) => {
+      const wrapper = await mountView({ kind })
+
+      expect(wrapper.text()).toContain(reason)
+      await findButton(wrapper, 'Open in editor')!.trigger('click')
+      expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
+      await findButton(wrapper, 'Mark resolved')!.trigger('click')
+      expect(Facade.StageFile).toHaveBeenCalledWith('/repo', 'a.txt')
+    },
+  )
+
+  it.each([ConflictKind.ConflictBinary, ConflictKind.ConflictText])(
+    'FR-CONF-02 previous and next file ask the parent on a %s conflict',
+    async (kind) => {
+      const wrapper = await mountView({ kind })
+
+      await findButton(wrapper, 'Previous file')!.trigger('click')
+      await findButton(wrapper, 'Next file')!.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.emitted('step-file')).toEqual([[-1], [1]])
+    },
+  )
+
+  it('FR-CONF-06 reloading after a refused save shows the file as it is on disk, without the edits', async () => {
+    Facade.SaveConflict.mockRejectedValue(
+      Object.assign(new Error('rejected'), {
+        cause: { message: 'changed', key: 'fileChangedSinceOpened', args: { path: 'a.txt' } },
+      }),
+    )
+    const wrapper = await mountView({})
+    const resultView = () => editorViews(wrapper)[2]!
+    resultView().dispatch({ changes: { from: 0, insert: 'typed ' } })
+    await findButton(wrapper, 'Save')!.trigger('click')
+    Facade.Conflict.mockResolvedValue(
+      conflictFileFixture({ result: 'on disk', fingerprint: 'fp2' }),
+    )
+
+    await findButton(wrapper, 'Reload')!.trigger('click')
+    await flushPromises()
+
+    expect(resultView().state.doc.toString()).toBe('on disk')
+    expect(findButton(wrapper, 'Reload')).toBeUndefined()
+  })
+
+  describe('reading the conflict again', () => {
+    const resultView = (wrapper: VueWrapper) => editorViews(wrapper)[2]!
+
+    async function reread(file: Partial<ConflictFile>): Promise<void> {
+      Facade.Conflict.mockResolvedValue(conflictFileFixture(file))
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+    }
+
+    it('FR-CONF-06 the same fingerprint keeps the editor as it is', async () => {
+      const wrapper = await mountView({})
+      const before = resultView(wrapper)
+
+      await reread({})
+
+      expect(resultView(wrapper)).toBe(before)
+    })
+
+    it('FR-CONF-06 a save keeps the editor, its edits and undo through the reload it causes', async () => {
+      Facade.SaveConflict.mockResolvedValue('fpSaved')
+      const wrapper = await mountView({})
+      const before = resultView(wrapper)
+      before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
+      await findButton(wrapper, 'Save')!.trigger('click')
+      await flushPromises()
+
+      await reread({ fingerprint: 'fpSaved', result: 'typed a' })
+
+      expect(resultView(wrapper)).toBe(before)
+      expect(before.state.doc.toString()).toMatch(/^typed a\n/)
+      expect(undo(before)).toBe(true)
+      expect(before.state.doc.toString()).toMatch(/^a\n/)
+    })
+
+    it('FR-CONF-06 a read that started before a save does not undo the save', async () => {
+      Facade.SaveConflict.mockResolvedValue('fpSaved')
+      const wrapper = await mountView({})
+      const before = resultView(wrapper)
+      before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
+      let answerStaleRead: (file: ConflictFile) => void = () => undefined
+      Facade.Conflict.mockReturnValueOnce(
+        new Promise<ConflictFile>((resolve) => (answerStaleRead = resolve)),
+      )
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await findButton(wrapper, 'Save')!.trigger('click')
+      await flushPromises()
+      answerStaleRead(conflictFileFixture({}))
+      await flushPromises()
+
+      await reread({ fingerprint: 'fpSaved', result: 'typed a' })
+
+      expect(resultView(wrapper)).toBe(before)
+    })
+
+    it('FR-CONF-06 a read that fails after a newer read started shows no error', async () => {
+      const wrapper = await mountView({})
+      let failStaleRead: (e: Error) => void = () => undefined
+      Facade.Conflict.mockReturnValueOnce(
+        new Promise<ConflictFile>((_, reject) => (failStaleRead = reject)),
+      )
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+      Facade.Conflict.mockResolvedValue(conflictFileFixture({}))
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+      failStaleRead(Object.assign(new Error('boom'), { cause: { message: 'boom' } }))
+      await flushPromises()
+
+      expect(wrapper.find('.error-banner').exists()).toBe(false)
+    })
+
+    it('FR-CONF-06 a read of a file that is no longer conflicted shows no error', async () => {
+      const wrapper = await mountView({})
+      Facade.Conflict.mockRejectedValue(
+        Object.assign(new Error('rejected'), {
+          cause: { message: 'not conflicted', key: 'notConflicted', args: { path: 'a.txt' } },
+        }),
+      )
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+
+      expect(wrapper.find('.error-banner').exists()).toBe(false)
+    })
+
+    it('FR-CONF-06 a save that ends after a switch to another file leaves that file shown', async () => {
+      let finishSave: (fingerprint: string) => void = () => undefined
+      Facade.SaveConflict.mockReturnValueOnce(
+        new Promise<string>((resolve) => (finishSave = resolve)),
+      )
+      const wrapper = await mountView({})
+      resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
+      await findButton(wrapper, 'Save')!.trigger('click')
+      let answerRead: (file: ConflictFile) => void = () => undefined
+      Facade.Conflict.mockReturnValueOnce(
+        new Promise<ConflictFile>((resolve) => (answerRead = resolve)),
+      )
+      await wrapper.setProps({ path: 'b.txt' })
+
+      finishSave('fpA2')
+      await flushPromises()
+      answerRead(conflictFileFixture({ path: 'b.txt', result: 'other' }))
+      await flushPromises()
+
+      expect(resultView(wrapper).state.doc.toString()).toBe('other')
+    })
+
+    it('FR-CONF-06 a changed file without unsaved edits shows as it is now', async () => {
+      const wrapper = await mountView({})
+
+      await reread({ result: 'on disk', fingerprint: 'fp2' })
+
+      expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
+    })
+
+    it('FR-CONF-06 a changed file keeps unsaved edits and says so; Reload drops them', async () => {
+      const wrapper = await mountView({})
+      resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
+
+      await reread({ result: 'on disk', fingerprint: 'fp2' })
+      expect(resultView(wrapper).state.doc.toString()).toMatch(/^typed /)
+      expect(wrapper.text()).toContain('a.txt changed on disk.')
+
+      await findButton(wrapper, 'Reload')!.trigger('click')
+      await flushPromises()
+      expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
+      expect(useMergeDrafts().hasUnsaved.value).toBe(false)
+    })
+
+    it('FR-CONF-06 unsaved edits survive a visit to another file', async () => {
+      const wrapper = await mountView({})
+      resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
+
+      Facade.Conflict.mockResolvedValue(conflictFileFixture({ path: 'b.txt', result: 'other' }))
+      await wrapper.setProps({ path: 'b.txt' })
+      await flushPromises()
+      expect(resultView(wrapper).state.doc.toString()).toBe('other')
+      Facade.Conflict.mockResolvedValue(conflictFileFixture())
+      await wrapper.setProps({ path: 'a.txt' })
+      await flushPromises()
+
+      expect(resultView(wrapper).state.doc.toString()).toMatch(/^typed a\n/)
+    })
+  })
+})

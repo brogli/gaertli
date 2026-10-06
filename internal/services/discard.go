@@ -18,9 +18,10 @@ func (c *Core) DiscardFile(ctx context.Context, id core.WorktreeID, path string,
 	wt.Lock() // discard writes this worktree's files
 	defer wt.Unlock()
 
-	args := []string{"restore", "--worktree", "--", path}
+	literal := literalPath(path)
+	args := []string{"restore", "--worktree", "--", literal}
 	if untracked {
-		args = []string{"clean", "-f", "--", path}
+		args = []string{"clean", "-f", "--", literal}
 	}
 	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
 	return err

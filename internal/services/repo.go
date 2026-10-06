@@ -35,13 +35,13 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 	if err != nil {
 		return core.Summary{}, err
 	}
-	stash, err := pullStash(ctx, wt.Runner, wt.Path)
+	stash, err := waitingStash(ctx, wt.Runner, wt.Path)
 	if err != nil {
 		return core.Summary{}, err
 	}
 	return core.Summary{
 		Branch: branch, Detached: detached, Operation: core.Operation(operation(wt.GitDir)), SHA: sha,
-		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(), PullStash: stash,
+		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(), WaitingStash: stash,
 	}, nil
 }
 
@@ -58,6 +58,9 @@ func headBranch(ctx context.Context, r git.Runner, dir string) (branch string, d
 	}
 	return strings.TrimPrefix(strings.TrimSpace(string(result.Stdout)), "refs/heads/"), false, err
 }
+
+// literalPath is a pathspec that matches path only, never as a pattern.
+func literalPath(path string) string { return ":(literal)" + path }
 
 // verifyRev resolves rev to its object name, "" if rev does not exist (an
 // unborn HEAD, no stash).

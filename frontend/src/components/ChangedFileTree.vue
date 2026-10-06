@@ -14,14 +14,15 @@ import FileStatusIcon from './FileStatusIcon.vue'
 // double-click or Enter opens it; a click or Enter on a folder folds or
 // unfolds it. action, when set, adds a per-file button before the status
 // icon (the changes view's stage/unstage); secondAction adds one after Open
-// in editor (discard). A folder node gets no buttons.
+// in editor (discard, reopen conflict) for each file it names an action for.
+// A folder node gets no buttons.
 const props = defineProps<{
   files: ChangedFile[]
   selected?: ChangedFile | null
   action?: ChangedFileAction
   // | undefined, not just optional: ChangesView binds a per-group value that
   // may be undefined, which exactOptionalPropertyTypes tells from absent.
-  secondAction?: ChangedFileAction | undefined
+  secondAction?: ((file: ChangedFile) => ChangedFileAction | undefined) | undefined
 }>()
 const emit = defineEmits<{
   select: [file: ChangedFile]
@@ -32,6 +33,10 @@ const emit = defineEmits<{
 }>()
 
 const nodes = computed(() => fileTree(props.files))
+// Resolved once per file, keyed by path, rather than on every render of a row.
+const secondActions = computed(
+  () => new Map(props.files.map((file) => [file.path, props.secondAction?.(file)])),
+)
 const expandedKeys = ref<TreeExpandedKeys>({})
 watch(nodes, (n) => (expandedKeys.value = folderKeys(n)), { immediate: true })
 
@@ -101,8 +106,8 @@ const pt = {
           @click.stop="emit('open-editor', node.data)"
         />
         <ChangedFileButton
-          v-if="secondAction"
-          :kind="secondAction"
+          v-if="secondActions.get(node.data.path)"
+          :kind="secondActions.get(node.data.path)!"
           data-test="second-action"
           @click.stop="emit('second-action', node.data)"
         />

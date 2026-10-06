@@ -6,6 +6,7 @@ import { useCompareStore } from '@/stores/compare'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useShortcut } from '@/composables/useShortcut'
+import { useWithShortcut } from '@/composables/useWithShortcut'
 import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { DiffKind, fileTarget } from '@/lib/diffTarget'
 import { iconClass } from '@/lib/icons'
@@ -23,6 +24,7 @@ const compare = useCompareStore()
 const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(() => props.wt, run)
 const { t } = useI18n()
+const withShortcut = useWithShortcut()
 
 function openDiff(f: ChangedFile): void {
   if (!compare.from || !compare.to) return
@@ -71,12 +73,7 @@ useShortcut('Escape', () => compare.exit(), { inTextField: false })
         v-bind="ICON_BUTTON"
         :icon="iconClass('close')"
         data-test="exit"
-        :title="
-          t('shortcuts.withShortcut', {
-            action: t('compareView.stopComparing'),
-            shortcut: t('shortcuts.stopComparing'),
-          })
-        "
+        :title="withShortcut('compareView.stopComparing', 'shortcuts.stopComparing')"
         :aria-label="t('compareView.stopComparing')"
         @click="compare.exit"
       />

@@ -15,7 +15,7 @@ import (
 // display reads it: its one hunk carries every line of both sides with its
 // number, so a selection can be checked against the file as it is now.
 func diffArgsFor(path string, staged bool) []string {
-	args := []string{fullContext, "--", path}
+	args := []string{fullContext, "--", literalPath(path)}
 	if staged {
 		args = append([]string{"--cached"}, args...)
 	}

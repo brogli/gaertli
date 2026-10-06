@@ -96,11 +96,15 @@ func (w *fakeWindow) fire(eventType events.WindowEventType) {
 	}
 }
 
-// close simulates the OS destroying the window: its hooks run first, then
-// its listeners.
+// close simulates the OS destroying the window: its hooks run first, and a
+// hook that cancels the event keeps the window open; then its listeners.
 func (w *fakeWindow) close() {
+	event := &application.WindowEvent{}
 	if hook := w.hooks[events.Common.WindowClosing]; hook != nil {
-		hook(&application.WindowEvent{})
+		hook(event)
+	}
+	if event.IsCancelled() {
+		return
 	}
 	w.fire(events.Common.WindowClosing)
 }
@@ -1023,5 +1027,57 @@ func TestFR_ED_11_PushEditorProfilesOnlyPushesToAlreadyConnectedDistros(t *testi
 	}
 	if notConnected.calls != 0 {
 		t.Errorf("NotConnected.calls = %d, want 0 (PushEditorProfiles must not trigger Ensure/deploy)", notConnected.calls)
+	}
+}
+
+func TestFR_CONF_06_ClosingADiffWindowWithUnsavedWorkIsCancelledAndAsksThePage(t *testing.T) {
+	r, opener := newTestRegistry()
+	key := diffWindowKey{wt: "wt"}
+	r.OpenOrFocusDiff(key, "wt", DiffTarget{Kind: WorkingDiff, Path: "f"})
+	window := opener.windows[0]
+	r.SetUnsavedWork(window.ID(), true)
+	emitted := window.emitCount()
+
+	window.close()
+
+	if _, open := r.diffWindows[key]; !open {
+		t.Error("diff window dropped from the registry, want it kept open")
+	}
+	if window.emitCount() != emitted+1 || window.emitted[emitted].name != "diff:closeRequested" {
+		t.Errorf("emitted = %+v, want one more diff:closeRequested", window.emitted)
+	}
+}
+
+func TestFR_CONF_06_ClosingADiffWindowProceedsOnceTheUnsavedWorkIsCleared(t *testing.T) {
+	r, opener := newTestRegistry()
+	key := diffWindowKey{wt: "wt"}
+	r.OpenOrFocusDiff(key, "wt", DiffTarget{Kind: WorkingDiff, Path: "f"})
+	window := opener.windows[0]
+	r.SetUnsavedWork(window.ID(), true)
+	r.SetUnsavedWork(window.ID(), false)
+	emitted := window.emitCount()
+
+	window.close()
+
+	if _, open := r.diffWindows[key]; open {
+		t.Error("diff window still registered, want it closed")
+	}
+	if window.emitCount() != emitted {
+		t.Errorf("emitted = %+v, want no close request", window.emitted)
+	}
+}
+
+func TestFR_CONF_06_QuittingTheAppClosesADiffWindowWithUnsavedWork(t *testing.T) {
+	r, opener := newTestRegistry()
+	key := diffWindowKey{wt: "wt"}
+	r.OpenOrFocusDiff(key, "wt", DiffTarget{Kind: WorkingDiff, Path: "f"})
+	window := opener.windows[0]
+	r.SetUnsavedWork(window.ID(), true)
+
+	r.Quitting()
+	window.close()
+
+	if _, open := r.diffWindows[key]; open {
+		t.Error("diff window still registered, want it closed on quit")
 	}
 }

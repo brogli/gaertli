@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { EditorState, type Extension, Text } from '@codemirror/state'
+import { EditorState, Text } from '@codemirror/state'
 import { type Command, EditorView } from '@codemirror/view'
 import {
   type Chunk,
@@ -11,9 +11,6 @@ import {
   MergeView,
   unifiedMergeView,
 } from '@codemirror/merge'
-import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
-import { languages } from '@codemirror/language-data'
-import { classHighlighter } from '@lezer/highlight'
 import Button from 'openvue/button'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
@@ -28,7 +25,7 @@ import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { diffColours } from '@/lib/diffColours'
 import { syncScrollX } from '@/lib/syncScrollX'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
-import { basename } from '@/lib/path'
+import { codeEditorExtensions } from '@/lib/codeEditor'
 import { iconClass, type IconName } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { useRepoChanged } from '@/lib/windowEvents'
@@ -36,6 +33,7 @@ import { DiffKind, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { DiffMode } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 import ErrorBanner from './ErrorBanner.vue'
+import FileStepButtons from './FileStepButtons.vue'
 import {
   ChangeScope,
   type DiffHunk,
@@ -46,8 +44,6 @@ import {
 // between two commits, a commit against the working tree, or an
 // uncommitted change. status is a working-tree file's status: line actions
 // need it. git computes the diff; CodeMirror draws its hunks.
-// Previous/next file ask the parent, which holds the file list, with
-// step-file.
 const props = defineProps<{ wt: string; target: DiffTarget; status?: string }>()
 const emit = defineEmits<{ 'step-file': [step: 1 | -1] }>()
 
@@ -105,7 +101,7 @@ useRepoChanged([ChangeScope.IndexChanged], () => {
 function openEditor(): void {
   const cm = changeTarget()
   const line = cm ? cm.state.doc.lineAt(cm.state.selection.main.head).number : 0
-  openInEditor({ path: props.target.path, status: props.status ?? '' }, line)
+  openInEditor({ path: props.target.path }, line)
 }
 
 // A binary or too-large file shows only its placeholder.
@@ -141,24 +137,6 @@ function updateSelectedLinesEnabled(): void {
   selectedLinesEnabled.value = selectedLines() !== null
 }
 
-// classHighlighter emits plain "tok-*" classes; they take the app's own
-// tokens rather than CodeMirror's default colours.
-const CODE_COLOURS = EditorView.theme({
-  '.tok-keyword, .tok-operator': { color: 'var(--p-primary-color)' },
-  '.tok-comment': { color: 'var(--p-text-muted-color)', fontStyle: 'italic' },
-})
-
-// languageExtensionFor is the syntax highlighting for path's filename, or
-// null (plain text) when @codemirror/language-data knows none.
-async function languageExtensionFor(path: string): Promise<Extension | null> {
-  const lang = LanguageDescription.matchFilename(languages, basename(path))
-  return lang ? await lang.load() : null
-}
-
-// FIXED_WIDTH_FONT sets the diff text in the app's fixed-width font, in
-// place of CodeMirror's default system monospace.
-const FIXED_WIDTH_FONT = EditorView.theme({ '.cm-scroller': { fontFamily: 'var(--nb-font-mono)' } })
-
 // loadSeq drops a language load that resolves after a newer file started.
 let loadSeq = 0
 
@@ -173,19 +151,10 @@ async function mountView(): Promise<void> {
   if (!file || file.binary || file.tooLarge) return
   if (sideBySide ? !a || !b : !el) return
 
-  const language = await languageExtensionFor(props.target.path)
+  const shared = await codeEditorExtensions(props.target.path)
   if (seq !== loadSeq) return
 
-  const lang = language ? [language, syntaxHighlighting(classHighlighter), CODE_COLOURS] : []
-  // Lines split at "\n" only, as git splits them: a lone "\r" stays in its
-  // line, so git's hunks sit on git's lines.
-  const docExtensions = [
-    EditorState.readOnly.of(true),
-    EditorState.lineSeparator.of('\n'),
-    FIXED_WIDTH_FONT,
-    diffColours,
-    ...lang,
-  ]
+  const docExtensions = [EditorState.readOnly.of(true), diffColours, ...shared]
   // git's diff is line-based, so changed lines are marked whole.
   const gitDiff = {
     diffConfig: { override: hunkChanges(file.hunks ?? []) },
@@ -388,26 +357,6 @@ const toolbar = computed<ToolbarButton[]>(() => {
       },
     )
   }
-  buttons.push(
-    {
-      test: 'prev-file',
-      label: t('diffWindow.previousFile'),
-      icon: 'prevFile',
-      action: () => emit('step-file', -1),
-    },
-    {
-      test: 'next-file',
-      label: t('diffWindow.nextFile'),
-      icon: 'nextFile',
-      action: () => emit('step-file', 1),
-    },
-    {
-      test: 'open-editor',
-      label: t('common.openInEditor'),
-      icon: 'openEditor',
-      action: openEditor,
-    },
-  )
   return buttons
 })
 </script>
@@ -445,6 +394,15 @@ const toolbar = computed<ToolbarButton[]>(() => {
           :aria-label="b.label"
           :aria-pressed="b.pressed"
           @click="b.action"
+        />
+        <FileStepButtons @step="emit('step-file', $event)" />
+        <Button
+          v-bind="ICON_BUTTON"
+          :icon="iconClass('openEditor')"
+          data-test="open-editor"
+          :title="t('common.openInEditor')"
+          :aria-label="t('common.openInEditor')"
+          @click="openEditor"
         />
       </div>
       <p v-if="diff.file.binary">{{ t('diffWindow.binaryFile') }}</p>

@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
-const { Facade, SettingsService } = vi.hoisted(() => ({
+const { Facade, SettingsService, AppService } = vi.hoisted(() => ({
   Facade: {
     CommitDetails: vi.fn(),
     CompareCommits: vi.fn(),
@@ -15,20 +15,28 @@ const { Facade, SettingsService } = vi.hoisted(() => ({
     DiffWorking: vi.fn(),
     StageLines: vi.fn(),
     OpenFile: vi.fn(),
+    Conflict: vi.fn(),
+    StageFile: vi.fn(),
   },
   SettingsService: { Get: vi.fn(), Set: vi.fn() },
+  AppService: { SetUnsavedWork: vi.fn() },
 }))
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade,
   SettingsService,
+  AppService,
 }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { Events, Window, emit } from '@/testing/runtime'
 
+import { confirmOptions, confirmRequire } from '@/testing/confirm'
+import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import DiffWindowView from '../DiffWindowView.vue'
 import DiffView from '@/components/DiffView.vue'
+import ConflictView from '@/components/ConflictView.vue'
 import { DiffKind, type DiffTarget } from '@/lib/diffTarget'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
@@ -63,6 +71,7 @@ const selectedRow = (wrapper: VueWrapper) => wrapper.get('.files li.selected .pa
 describe('DiffWindowView', () => {
   beforeEach(() => {
     localStorage.clear()
+    useMergeDrafts().clearAll()
     setActivePinia(createPinia())
     for (const fn of Object.values(Facade)) fn.mockReset()
     Facade.CommitDetails.mockResolvedValue({ sha: 'abc', files })
@@ -86,7 +95,10 @@ describe('DiffWindowView', () => {
     Facade.DiffWorking.mockImplementation((_wt, path: string) => Promise.resolve(diffOf(path)))
     Facade.StageLines.mockResolvedValue(undefined)
     Facade.OpenFile.mockResolvedValue(undefined)
+    Facade.Conflict.mockResolvedValue({})
+    Facade.StageFile.mockResolvedValue(undefined)
     SettingsService.Get.mockResolvedValue(defaultSettingsFixture())
+    AppService.SetUnsavedWork.mockReset().mockResolvedValue(undefined)
     Events.On.mockClear()
     Window.Close.mockReset()
   })
@@ -132,7 +144,7 @@ describe('DiffWindowView', () => {
     expect(Facade.DiffAgainstWorking).toHaveBeenCalledWith('/repo', 'abc', 'c.txt', '', opts)
   })
 
-  it("FR-DIFF-07 the working tree's window lists the changes in their groups; a conflicted file opens in the editor", async () => {
+  it("FR-DIFF-07 the working tree's window lists the changes in their groups; a conflicted file shows its conflict", async () => {
     const wrapper = await mountWindow({
       kind: DiffKind.WorkingDiff,
       staged: false,
@@ -155,8 +167,120 @@ describe('DiffWindowView', () => {
     expect(selectedRow(wrapper)).toBe('b.txt')
     expect(Facade.DiffWorking).toHaveBeenCalledWith('/repo', 'b.txt', '', false, opts)
 
-    await rows(wrapper)[3]!.trigger('dblclick')
+    await rows(wrapper)[3]!.get('[data-test="open-editor"]').trigger('click')
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'both.txt', 0)
+  })
+
+  it('FR-CONF-02 selecting a conflicted file shows its conflict, not a diff', async () => {
+    const wrapper = await mountWindow({
+      kind: DiffKind.WorkingDiff,
+      staged: false,
+      path: 'b.txt',
+      oldPath: '',
+    })
+
+    await rows(wrapper)[3]!.trigger('click')
+    await flushPromises()
+
+    expect(selectedRow(wrapper)).toBe('both.txt')
+    expect(wrapper.findComponent(DiffView).exists()).toBe(false)
+    expect(wrapper.getComponent(ConflictView).props()).toEqual({ wt: '/repo', path: 'both.txt' })
+    expect(Facade.Conflict).toHaveBeenCalledWith('/repo', 'both.txt')
+  })
+
+  it("FR-CONF-02 next file goes on from the working tree's last group to the conflicted files", async () => {
+    const wrapper = await mountWindow({
+      kind: DiffKind.WorkingDiff,
+      staged: false,
+      path: 'new.txt',
+      oldPath: '',
+    })
+
+    await wrapper.get('[data-test="next-file"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.getComponent(ConflictView).props('path')).toBe('both.txt')
+  })
+
+  it("FR-CONF-02 the conflict view's next and previous file step through the conflicted files", async () => {
+    Facade.Status.mockResolvedValue(
+      changedFilesFixture({
+        conflicted: [
+          { path: 'one.txt', status: 'UU' },
+          { path: 'two.txt', status: 'UU' },
+        ],
+      }),
+    )
+    const wrapper = await mountWindow({
+      kind: DiffKind.WorkingDiff,
+      conflicted: true,
+      path: 'one.txt',
+      oldPath: '',
+    })
+
+    await wrapper.get('[data-test="next-file"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.getComponent(ConflictView).props('path')).toBe('two.txt')
+
+    await wrapper.get('[data-test="prev-file"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.getComponent(ConflictView).props('path')).toBe('one.txt')
+  })
+
+  describe('a conflicted target', () => {
+    const oneOfTwo = { kind: DiffKind.WorkingDiff, conflicted: true, path: 'one.txt', oldPath: '' }
+
+    beforeEach(() => {
+      Facade.Status.mockResolvedValue(
+        changedFilesFixture({
+          conflicted: [
+            { path: 'one.txt', status: 'UU' },
+            { path: 'two.txt', status: 'UU' },
+          ],
+        }),
+      )
+    })
+
+    async function indexChanges(status: ReturnType<typeof changedFilesFixture>): Promise<void> {
+      Facade.Status.mockResolvedValue(status)
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+    }
+
+    it('FR-CONF-02 shows its conflict', async () => {
+      const wrapper = await mountWindow(oneOfTwo)
+      expect(wrapper.getComponent(ConflictView).props('path')).toBe('one.txt')
+    })
+
+    it('FR-CONF-02 gives way to the next conflicted file once it leaves the list', async () => {
+      const wrapper = await mountWindow(oneOfTwo)
+      await indexChanges(
+        changedFilesFixture({
+          staged: [{ path: 'one.txt', status: 'M' }],
+          conflicted: [{ path: 'two.txt', status: 'UU' }],
+        }),
+      )
+      expect(wrapper.getComponent(ConflictView).props('path')).toBe('two.txt')
+      expect(selectedRow(wrapper)).toBe('two.txt')
+    })
+
+    it('FR-CONF-02 gives way to the conflicted file before it when the last one leaves the list', async () => {
+      const wrapper = await mountWindow({ ...oneOfTwo, path: 'two.txt' })
+      await indexChanges(
+        changedFilesFixture({
+          staged: [{ path: 'two.txt', status: 'M' }],
+          conflicted: [{ path: 'one.txt', status: 'UU' }],
+        }),
+      )
+      expect(wrapper.getComponent(ConflictView).props('path')).toBe('one.txt')
+    })
+
+    it('FR-CONF-02 shows a hint once no conflicted file is left', async () => {
+      const wrapper = await mountWindow(oneOfTwo)
+      await indexChanges(changedFilesFixture({ staged: [{ path: 'two.txt', status: 'M' }] }))
+      expect(wrapper.findComponent(ConflictView).exists()).toBe(false)
+      expect(wrapper.text()).toContain('No conflicts left.')
+    })
   })
 
   it("FR-DIFF-07 the diff gets the window's target, with the chosen working-tree file's side and status", async () => {
@@ -295,6 +419,35 @@ describe('DiffWindowView', () => {
     expect(Facade.DiffWorking.mock.calls.length).toBeGreaterThan(diffCalls)
   })
 
+  it('FR-CONF-06 a draft of a file that is no longer conflicted is dropped', async () => {
+    Facade.Status.mockResolvedValue(
+      changedFilesFixture({
+        conflicted: [
+          { path: 'one.txt', status: 'UU' },
+          { path: 'two.txt', status: 'UU' },
+        ],
+      }),
+    )
+    await mountWindow({
+      kind: DiffKind.WorkingDiff,
+      conflicted: true,
+      path: 'one.txt',
+      oldPath: '',
+    })
+    const drafts = useMergeDrafts()
+    drafts.set('/repo', 'one.txt', { text: 'x', fingerprint: 'fp', regions: [] })
+    drafts.set('/repo', 'two.txt', { text: 'y', fingerprint: 'fp', regions: [] })
+
+    Facade.Status.mockResolvedValue(
+      changedFilesFixture({ conflicted: [{ path: 'one.txt', status: 'UU' }] }),
+    )
+    emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+    await flushPromises()
+
+    expect(drafts.get('/repo', 'one.txt')).toBeDefined()
+    expect(drafts.get('/repo', 'two.txt')).toBeUndefined()
+  })
+
   it('FR-DIFF-07 Escape closes the window, unless it closes an open dialog first', async () => {
     await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
     const dialog = document.createElement('div')
@@ -306,7 +459,72 @@ describe('DiffWindowView', () => {
 
     dialog.remove()
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
     expect(Window.Close).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-CONF-06 closing with nothing unsaved clears the shell flag first, whatever it held', async () => {
+    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+    AppService.SetUnsavedWork.mockClear()
+
+    emit('diff:closeRequested')
+    await flushPromises()
+
+    expect(AppService.SetUnsavedWork).toHaveBeenCalledWith(false)
+    expect(Window.Close).toHaveBeenCalledTimes(1)
+    expect(AppService.SetUnsavedWork.mock.invocationCallOrder[0]).toBeLessThan(
+      Window.Close.mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('FR-CONF-06 Escape with an unsaved merge result asks before closing the window', async () => {
+    confirmRequire.mockReset()
+    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+    useMergeDrafts().set('/repo', 'a.txt', { text: 'x', fingerprint: 'fp', regions: [] })
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+    expect(Window.Close).not.toHaveBeenCalled()
+    const { header, message, accept } = confirmOptions()
+    expect([header, message]).toEqual(['Close the diff window?', 'Unsaved merge results are lost.'])
+    accept()
+    await flushPromises()
+    expect(Window.Close).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-CONF-06 the shell is told whenever the window gains or loses unsaved merge results', async () => {
+    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+    expect(AppService.SetUnsavedWork).toHaveBeenLastCalledWith(false)
+    AppService.SetUnsavedWork.mockClear()
+
+    useMergeDrafts().set('/repo', 'a.txt', { text: 'x', fingerprint: 'fp', regions: [] })
+    await flushPromises()
+    expect(AppService.SetUnsavedWork).toHaveBeenLastCalledWith(true)
+
+    useMergeDrafts().discard('/repo', 'a.txt')
+    await flushPromises()
+    expect(AppService.SetUnsavedWork).toHaveBeenLastCalledWith(false)
+  })
+
+  it('FR-CONF-06 the close button of the window asks first, and confirming clears the flag before closing', async () => {
+    confirmRequire.mockReset()
+    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+    useMergeDrafts().set('/repo', 'a.txt', { text: 'x', fingerprint: 'fp', regions: [] })
+    await flushPromises()
+    AppService.SetUnsavedWork.mockClear()
+
+    emit('diff:closeRequested')
+    await flushPromises()
+
+    expect(Window.Close).not.toHaveBeenCalled()
+    expect(confirmOptions().header).toBe('Close the diff window?')
+    confirmOptions().accept()
+    await flushPromises()
+    expect(AppService.SetUnsavedWork).toHaveBeenCalledWith(false)
+    expect(Window.Close).toHaveBeenCalledTimes(1)
+    expect(AppService.SetUnsavedWork.mock.invocationCallOrder[0]).toBeLessThan(
+      Window.Close.mock.invocationCallOrder[0]!,
+    )
   })
 
   it('FR-ED-02 a file of the list opens in the editor', async () => {

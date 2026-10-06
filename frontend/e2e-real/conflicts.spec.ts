@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import type { Git, Repos } from './repos'
 import {
+  boundCallEndingWith,
   clickConfirm,
   commitFiles,
   commitSha,
@@ -17,6 +18,8 @@ import {
   pull,
   pushFromClone,
   rev,
+  shortRev,
+  stagedText,
 } from './helpers'
 
 // Operations stopped on conflicts: started outside the app or from it,
@@ -26,6 +29,13 @@ import {
 // git reports with a non-zero exit.
 function stopOnConflicts(git: Git, repo: string, ...args: string[]): void {
   expect(() => git(repo, ...args)).toThrow()
+}
+
+type OpenDiff = (worktree: string, target: Record<string, string>) => Promise<Page>
+
+// openConflict opens the diff window on file's conflict.
+function openConflict(openDiff: OpenDiff, repo: string, file: string): Promise<Page> {
+  return openDiff(repo, { kind: 'working', conflicted: 'true', file })
 }
 
 async function abort(page: Page): Promise<void> {
@@ -65,7 +75,7 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
     ])
   })
 
-  test('FR-CONF-02 double-click or "Open in editor" opens a conflicted file in the editor', async ({
+  test('FR-CONF-02 double-click opens a conflicted file in the diff window; "Open in editor" opens the editor', async ({
     app,
     repos,
     git,
@@ -73,17 +83,18 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
   }) => {
     stopOnConflicts(git, repos.work, 'merge', 'feature')
 
+    const openDiffWindow = boundCallEndingWith(app, [
+      { kind: 'working', conflicted: true, path: 'conflict.txt', oldPath: '' },
+    ])
     await fileRow(app, 'Conflicted', 'conflict.txt').dblclick()
+    await openDiffWindow
     await fileRow(app, 'Conflicted', 'hunks.txt')
       .getByRole('button', { name: 'Open in editor' })
       .click()
 
     await expect
       .poll(editorCalls)
-      .toEqual([
-        `stand-in-editor ${path.join(repos.work, 'conflict.txt')}`,
-        `stand-in-editor ${path.join(repos.work, 'hunks.txt')}`,
-      ])
+      .toEqual([`stand-in-editor ${path.join(repos.work, 'hunks.txt')}`])
   })
 
   test('FR-CONF-03 a file marked resolved leaves Conflicted; Continue waits for the other', async ({
@@ -133,6 +144,28 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
     expect(rev(git, repos.work, 'HEAD')).toBe(head)
     expect(git(repos.work, 'status', '--porcelain')).toBe('')
   })
+})
+
+test("FR-CONF-07 a modify/delete conflict shows its panel in the diff window; taking the current side's version stages it and enables Continue", async ({
+  app,
+  openDiff,
+  repos,
+  git,
+}) => {
+  git(repos.work, 'checkout', '-q', '-b', 'deleter', 'v1')
+  git(repos.work, 'rm', '-q', 'docs/readme.md')
+  git(repos.work, 'commit', '-q', '-m', 'deleter: remove readme')
+  git(repos.work, 'checkout', '-q', 'main')
+  commitFiles(git, repos.work, 'main: edit readme', { 'docs/readme.md': 'edited on main\n' })
+  stopOnConflicts(git, repos.work, 'merge', 'deleter')
+  await expect(conflictBanner(app).getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+  const diff = await openConflict(openDiff, repos.work, 'docs/readme.md')
+  await expect(diff.getByText('deleter deleted the file;')).toBeVisible()
+  await diff.getByRole('button', { name: 'Keep the version of main' }).click()
+
+  await expect.poll(() => stagedText(git, repos.work, 'docs/readme.md')).toBe('edited on main\n')
+  await expect(conflictBanner(app).getByRole('button', { name: 'Continue' })).toBeEnabled()
 })
 
 test('FR-CONF-01 a rebase stopped on conflicts is named in the banner and can be aborted', async ({
@@ -212,4 +245,65 @@ test('FR-CP-03 a cherry-pick from the menu that stops on conflicts is handed to 
 
   await expect(conflictBanner(app)).toBeHidden()
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
+})
+
+test.describe('the merge editor', () => {
+  function pane(page: Page, name: string) {
+    return page.locator(`[data-test=pane-header-${name}]`)
+  }
+
+  test('FR-CONF-06 a merge conflict with two regions resolves in the merge editor: a side taken, one region edited by hand, saved and staged', async ({
+    app,
+    openDiff,
+    repos,
+    git,
+  }) => {
+    git(repos.work, 'checkout', '-q', 'feature')
+    commitFiles(git, repos.work, 'feature: hunks lines 1 and 20', {
+      'hunks.txt': hunksText({ 1: 'feature 1', 20: 'feature 20' }),
+    })
+    git(repos.work, 'checkout', '-q', 'main')
+    commitFiles(git, repos.work, 'main: hunks lines 1 and 20', {
+      'hunks.txt': hunksText({ 1: 'main 1', 20: 'main 20' }),
+    })
+    stopOnConflicts(git, repos.work, 'merge', 'feature')
+
+    const diff = await openConflict(openDiff, repos.work, 'hunks.txt')
+    await expect(pane(diff, 'current')).toHaveText('main · current branch')
+    await expect(pane(diff, 'result')).toHaveText('Result')
+    await expect(pane(diff, 'incoming')).toHaveText('feature · merged branch')
+    const position = diff.locator('[data-test=conflict-position]')
+    await expect(position).toHaveText('Conflict 1 of 2 · 2 left')
+
+    await diff.getByRole('button', { name: 'Take incoming' }).click()
+    await diff.locator('[data-test=next-conflict]').click()
+    await expect(position).toHaveText('Conflict 2 of 2 · 1 left')
+    await diff.getByRole('button', { name: 'Both, current first' }).click()
+    await expect(position).toHaveText('No conflicts left')
+    await diff.locator('[data-test=pane-header-result] ~ div .cm-content').click()
+    await diff.keyboard.press('Control+End')
+    await diff.keyboard.type('typed by hand\n')
+    await diff.getByRole('button', { name: 'Save and mark resolved' }).click()
+
+    const expected = hunksText({ 1: 'feature 1', 20: 'main 20\nfeature 20' }) + 'typed by hand\n'
+    await expect.poll(() => stagedText(git, repos.work, 'hunks.txt')).toBe(expected)
+    await expect(fileGroup(app, 'Conflicted').locator('.path')).toHaveText(['conflict.txt'])
+  })
+
+  test('FR-CONF-05 a rebase conflict names the sides: the branch rebased onto and the commit being replayed', async ({
+    openDiff,
+    repos,
+    git,
+  }) => {
+    git(repos.work, 'checkout', '-q', 'feature')
+    stopOnConflicts(git, repos.work, 'rebase', 'main')
+
+    const diff = await openConflict(openDiff, repos.work, 'conflict.txt')
+
+    await expect(pane(diff, 'current')).toHaveText('main · rebased onto')
+    const sha = shortRev(git, repos.work, 'REBASE_HEAD')
+    await expect(pane(diff, 'incoming')).toHaveText(
+      `${sha} feature: change conflict.txt · commit being replayed`,
+    )
+  })
 })

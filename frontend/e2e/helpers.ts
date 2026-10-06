@@ -11,6 +11,11 @@ export async function openMockRepo(page: Page, query = ''): Promise<void> {
 export const mockDiffUrl =
   '/?view=diff&wt=/mock/repo&kind=range&from=aaa&to=bbb&file=src/components/staged-one.ts'
 
+// mockConflictUrl shows the mock working tree's conflicted file in the diff
+// window.
+export const mockConflictUrl =
+  '/?view=diff&wt=/mock/repo&kind=working&conflicted=true&file=scroll.txt'
+
 // expectNoOverlap: sorted left to right, each box's x-range ends at or
 // before the next one's begins.
 export function expectNoOverlap(boxes: { x: number; width: number }[]): void {

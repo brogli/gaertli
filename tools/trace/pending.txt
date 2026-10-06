@@ -1,7 +1,2 @@
 # IDs whose tests are still owed. The change that adds an ID's test removes
 # its line in the same commit; task trace fails otherwise.
-FR-BR-11
-FR-BR-12
-FR-CONF-05
-FR-CONF-06
-FR-CONF-07

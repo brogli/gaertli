@@ -45,3 +45,7 @@ Alternatives considered:
 - The pins rely on the presentation rules of `@codemirror/merge`; a test runs git's hunks through
   the library itself, so an upgrade that changes those rules fails a test.
 - The staging logic is tested against real git; its patch builder is adapted from lazygit (ADR-8).
+- The merge editor (FR-CONF-05) draws git's conflict regions in plain CodeMirror editors and
+  computes no diff of its own: the regions are the markers git wrote, and their places in each side
+  come from git's diff. `@codemirror/merge` is not used there, since it pairs exactly two documents
+  and its pinned hunks do not survive editing.

@@ -258,3 +258,61 @@ func TestFR_CHG_10_DiscardLinesRevertsOnlyTheSelectedHunk(t *testing.T) {
 		}
 	})
 }
+
+func TestFR_CHG_10_DiscardFileTakesAGlobLikeNameLiterally(t *testing.T) {
+	t.Parallel()
+	dir := globRepo(t)
+	writeFile(t, dir, "a.txt", "changed\n")
+	writeFile(t, dir, "[ab].txt", "changed\n")
+	c, id := openWorktree(t, dir)
+
+	if err := c.DiscardFile(t.Context(), id, "[ab].txt", false); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := readFile(t, dir, "a.txt"); got != "changed\n" {
+		t.Errorf("a.txt = %q, want the change kept", got)
+	}
+	if got := readFile(t, dir, "[ab].txt"); got != "ab\n" {
+		t.Errorf("[ab].txt = %q, want restored", got)
+	}
+}
+
+func TestFR_CHG_10_DiscardUntrackedFileTakesAGlobLikeNameLiterally(t *testing.T) {
+	t.Parallel()
+	dir := gittest.New(t).Dir
+	gittest.Commit(t, dir, "seed.txt", "x", "seed")
+	writeFile(t, dir, "a.txt", "a")
+	writeFile(t, dir, "[ab].txt", "ab")
+	c, id := openWorktree(t, dir)
+
+	if err := c.DiscardFile(t.Context(), id, "[ab].txt", true); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "a.txt")); err != nil {
+		t.Errorf("a.txt = %v, want kept", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "[ab].txt")); !os.IsNotExist(err) {
+		t.Errorf("[ab].txt still exists (err = %v)", err)
+	}
+}
+
+func TestFR_CHG_10_DiscardLinesOfAPatternNamedFileChangesOnlyThatFile(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	patternTwins(t, repo.Dir)
+	c, id := openWorktree(t, repo.Dir)
+
+	sel := shown(t, c, id, "f?.txt", false, []int{2}, []int{2})
+	if err := c.DiscardLines(t.Context(), id, "f?.txt", sel); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := readFile(t, repo.Dir, "f?.txt"); got != "a\nb\nc\n" {
+		t.Errorf("f?.txt = %q, want the change discarded", got)
+	}
+	if got := readFile(t, repo.Dir, "f1.txt"); got != "a\nX\nc\n" {
+		t.Errorf("f1.txt = %q, want it untouched", got)
+	}
+}

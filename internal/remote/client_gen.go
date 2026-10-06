@@ -121,6 +121,17 @@ func (c *Client) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha
 	return result, err
 }
 
+type conflictParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Path string          `json:"path"`
+}
+
+func (c *Client) Conflict(ctx context.Context, wt core.WorktreeID, path string) (core.ConflictFile, error) {
+	var result core.ConflictFile
+	err := c.call(ctx, "Conflict", conflictParams{Wt: wt, Path: path}, &result)
+	return result, err
+}
+
 type continueOperationParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -329,6 +340,18 @@ func (c *Client) MainWorktree(ctx context.Context, gitDir core.RepoPath) (core.W
 	return result, err
 }
 
+type mergeParams struct {
+	Wt    core.WorktreeID `json:"wt"`
+	Ref   string          `json:"ref"`
+	Stash bool            `json:"stash"`
+}
+
+func (c *Client) Merge(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+	var result core.IntegrateResult
+	err := c.call(ctx, "Merge", mergeParams{Wt: wt, Ref: ref, Stash: stash}, &result)
+	return result, err
+}
+
 type openFileParams struct {
 	Wt   core.WorktreeID `json:"wt"`
 	Path string          `json:"path"`
@@ -426,6 +449,18 @@ func (c *Client) PushTarget(ctx context.Context, wt core.WorktreeID) (core.PushT
 	return result, err
 }
 
+type rebaseParams struct {
+	Wt    core.WorktreeID `json:"wt"`
+	Ref   string          `json:"ref"`
+	Stash bool            `json:"stash"`
+}
+
+func (c *Client) Rebase(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+	var result core.IntegrateResult
+	err := c.call(ctx, "Rebase", rebaseParams{Wt: wt, Ref: ref, Stash: stash}, &result)
+	return result, err
+}
+
 type refreshParams struct {
 	Wt core.WorktreeID `json:"wt"`
 }
@@ -472,6 +507,15 @@ func (c *Client) RenameBranch(ctx context.Context, wt core.WorktreeID, name stri
 	return c.call(ctx, "RenameBranch", renameBranchParams{Wt: wt, Name: name, NewName: newName}, nil)
 }
 
+type reopenConflictParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Path string          `json:"path"`
+}
+
+func (c *Client) ReopenConflict(ctx context.Context, wt core.WorktreeID, path string) error {
+	return c.call(ctx, "ReopenConflict", reopenConflictParams{Wt: wt, Path: path}, nil)
+}
+
 type resetParams struct {
 	Wt   core.WorktreeID `json:"wt"`
 	Sha  string          `json:"sha"`
@@ -484,6 +528,16 @@ func (c *Client) Reset(ctx context.Context, wt core.WorktreeID, sha string, mode
 	return result, err
 }
 
+type resolveConflictParams struct {
+	Wt     core.WorktreeID     `json:"wt"`
+	Path   string              `json:"path"`
+	Choice core.ConflictChoice `json:"choice"`
+}
+
+func (c *Client) ResolveConflict(ctx context.Context, wt core.WorktreeID, path string, choice core.ConflictChoice) error {
+	return c.call(ctx, "ResolveConflict", resolveConflictParams{Wt: wt, Path: path, Choice: choice}, nil)
+}
+
 type revertParams struct {
 	Wt   core.WorktreeID  `json:"wt"`
 	Shas []string         `json:"shas"`
@@ -492,6 +546,20 @@ type revertParams struct {
 
 func (c *Client) Revert(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
 	return c.call(ctx, "Revert", revertParams{Wt: wt, Shas: shas, Opts: opts}, nil)
+}
+
+type saveConflictParams struct {
+	Wt           core.WorktreeID `json:"wt"`
+	Path         string          `json:"path"`
+	Text         string          `json:"text"`
+	Fingerprint  string          `json:"fingerprint"`
+	MarkResolved bool            `json:"markResolved"`
+}
+
+func (c *Client) SaveConflict(ctx context.Context, wt core.WorktreeID, path string, text string, fingerprint string, markResolved bool) (string, error) {
+	var result string
+	err := c.call(ctx, "SaveConflict", saveConflictParams{Wt: wt, Path: path, Text: text, Fingerprint: fingerprint, MarkResolved: markResolved}, &result)
+	return result, err
 }
 
 type searchLogParams struct {

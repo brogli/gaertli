@@ -77,7 +77,7 @@ describe('ChangedFileList', () => {
 
   it("FR-CHG-10 clicking a row's second action button emits second-action with that file, not select or action", async () => {
     const wrapper = mount(ChangedFileList, {
-      props: { files, action: 'stage', secondAction: 'discard' },
+      props: { files, action: 'stage', secondAction: () => 'discard' },
     })
 
     const button = wrapper.findAll('[data-test="second-action"]')[1]!
@@ -91,7 +91,7 @@ describe('ChangedFileList', () => {
 
   it("FR-UX-09 every action button has a title and aria-label naming it, and the name's title is the full path", () => {
     const wrapper = mount(ChangedFileList, {
-      props: { files, action: 'stage', secondAction: 'discard' },
+      props: { files, action: 'stage', secondAction: () => 'discard' },
     })
 
     const row = wrapper.findAll('li')[1]!
@@ -109,7 +109,7 @@ describe('ChangedFileList', () => {
 
   it("FR-CHG-02 the action button is the row's first element, before the status icon", () => {
     const wrapper = mount(ChangedFileList, {
-      props: { files, action: 'stage', secondAction: 'discard' },
+      props: { files, action: 'stage', secondAction: () => 'discard' },
     })
 
     const row = wrapper.findAll('li')[1]!
@@ -122,7 +122,7 @@ describe('ChangedFileList', () => {
 
   it("FR-CHG-02 open-in-editor and the second action stay at the row's end", () => {
     const wrapper = mount(ChangedFileList, {
-      props: { files, action: 'unstage', secondAction: 'discard' },
+      props: { files, action: 'unstage', secondAction: () => 'discard' },
     })
 
     const row = wrapper.findAll('li')[1]!

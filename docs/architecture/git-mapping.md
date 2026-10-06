@@ -42,10 +42,51 @@ output only, a fixed environment, arguments as a list. Failures are classified a
 | Worktrees                 | `worktree list --porcelain`, `worktree add/remove/prune`; `add -b --no-track` from a remote-tracking ref, for the same reason as Create branch                                                                                                                                                                                                                                                                                          |
 | Fetch                     | `fetch --prune`                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Pull                      | `fetch`, then the merge or rebase onto `@{upstream}` that `git pull --no-rebase`/`--rebase` would run, in the worktree queue (ADR-6)                                                                                                                                                                                                                                                                                                    |
-| Stash and pull            | `stash push`, pull, `stash pop` of exactly that entry, only after a clean integrate                                                                                                                                                                                                                                                                                                                                                     |
+| Merge a branch            | `merge --no-edit --ff --commit --no-squash --no-autostash` of the picked ref, in the worktree queue; explicit flags, so `merge.ff`, `merge.autoStash` and a branch's `mergeOptions` cannot change the result (below)                                                                                                                                                                                                                    |
+| Rebase onto a branch      | `rebase --merge --no-rebase-merges --no-update-refs --no-autostash` onto the picked ref, in the worktree queue; merges are flattened and no other branch moves, whatever the `rebase.*` settings say                                                                                                                                                                                                                                    |
+| Stash and integrate       | `stash push`, then the pull, merge or rebase, then `stash pop` of exactly that entry, only after a clean integrate                                                                                                                                                                                                                                                                                                                      |
 | Push                      | `push --porcelain`; its summary classifies rejections. A branch without an upstream (`for-each-ref %(upstream)` of HEAD's ref is empty): `push --porcelain --set-upstream <remote> refs/heads/<branch>`, naming the branch so a HEAD that moved meanwhile is not pushed; the remote from `for-each-ref %(push:remotename)`, else the only remote, else `origin`; `config --type=bool push.autoSetupRemote` decides whether to ask first |
 | Force push                | `push --force-with-lease --force-if-includes`, never plain `--force`                                                                                                                                                                                                                                                                                                                                                                    |
 | Commit-graph              | `commit-graph write --reachable` once, on first open of a large repo (ADR-4)                                                                                                                                                                                                                                                                                                                                                            |
+
+## Merge and rebase from the branch picker (FR-BR-11, FR-BR-12)
+
+1. Refused before any git call while an operation is in progress or HEAD is detached.
+2. The picked ref reaches git by its short name when that name resolves to exactly that ref
+   (`rev-parse --verify --symbolic-full-name`), so the merge commit's default message reads as on
+   the command line ("Merge branch 'x'"); when a tag shares the name, by its full ref.
+3. A failure is classified by the state git leaves, not by its exit code, which is 1 for a conflict,
+   a refused fast-forward and a failed hook alike: an operation still in progress is a stop
+   (`CONFLICTS` while files conflict, else `STOPPED`), left for continue or abort; a refusal over
+   local changes offers the stash-and-retry Pull has (FR-SYNC-09).
+4. The result compares HEAD before and after: up to date, fast-forwarded, merged or rebased.
+
+## Resolving a conflict (FR-CONF)
+
+A conflicted file is read from what git left, never merged a second time:
+
+1. `ls-files -u` gives its stages. Stage 2 is always the side checked out and stage 3 the side
+   brought in, in a rebase too, where the checked-out side is the branch rebased onto. So the
+   current side is stage 2 (`--ours`) for every operation; only its name changes with the operation,
+   read from the operation's state files (`MERGE_HEAD`, `rebase-merge/onto`, `REBASE_HEAD`,
+   `CHERRY_PICK_HEAD`, `REVERT_HEAD`) and the refs pointing there.
+2. The stages decide the kind: a submodule, a rename (one stage only), a deletion on one side, a
+   symlink; otherwise the contents do. A NUL in the first 8000 bytes or a `merge` attribute of
+   `binary` makes it binary, as for git; text that is not UTF-8 goes to the external editor.
+3. For text, the result is the working file as git wrote it, in the user's conflict style, with any
+   edits made since; the sides are their blobs in working-tree form (`cat-file --filters`). The
+   conflict regions are its marker blocks (marker size from the `conflict-marker-size` attribute).
+   Where each region sits in each side comes from git: the result with every block filled from one
+   side is diffed against that side (`diff --no-index -U0`).
+4. All text reaches the UI with LF line breaks. Saving writes the working file's own convention
+   back, refuses when the file changed since it was read, and stages it (`add`) only when no marker
+   line is left.
+5. Choosing a side is `checkout --ours`/`--theirs` and `add`; deleting is `rm`.
+6. Reopening a resolved file uses the resolve-undo record `add` leaves: `update-index --unresolve`,
+   then `checkout -m` for a file with both sides, which writes the merge with its markers again. The
+   record outlives the commit that concludes the operation, and `checkout -m` would then re-create a
+   conflict on a clean tree, so reopening is offered and run only while the operation is still
+   stopped (`ls-files --resolve-undo`).
 
 ## Update another branch in the background (FR-UPD)
 

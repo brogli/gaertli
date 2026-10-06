@@ -65,6 +65,7 @@ const ICON = {
   unstage: 'minus',
   discard: 'undo',
   markResolved: 'check',
+  reopenConflict: 'replay',
   close: 'times',
   clear: 'times',
   settings: 'cog',

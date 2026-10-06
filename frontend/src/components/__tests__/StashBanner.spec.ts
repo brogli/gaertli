@@ -19,10 +19,10 @@ import { findButton } from '@/testing/findButton'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import type { ChangedFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
-// mountWithStash mounts StashBanner with pullStash set and conflicted
+// mountWithStash mounts StashBanner with waitingStash set and conflicted
 // files remaining.
-function mountWithStash(pullStash: string, conflicted: ChangedFile[] = []) {
-  useRepoStore().summary = summaryFixture({ pullStash })
+function mountWithStash(waitingStash: string, conflicted: ChangedFile[] = []) {
+  useRepoStore().summary = summaryFixture({ waitingStash })
   useChangesStore().files = changedFilesFixture({ conflicted })
   return mount(StashBanner, { props: { wt: '/repo' } })
 }
@@ -35,16 +35,18 @@ describe('StashBanner', () => {
     confirmRequire.mockReset()
   })
 
-  it('FR-SYNC-09 does not render with no pull stash', () => {
+  it('FR-SYNC-09 does not render with no waiting stash', () => {
     const wrapper = mountWithStash('')
 
     expect(wrapper.find('[data-test="stash-banner"]').exists()).toBe(false)
   })
 
-  it('FR-SYNC-09 renders while a pull stash is set and nothing is conflicted', () => {
+  it('FR-SYNC-09 renders while a waiting stash is set and nothing is conflicted', () => {
     const wrapper = mountWithStash('stash@{0}')
 
-    expect(wrapper.get('[data-test="stash-banner"]').text()).toContain('stashed')
+    expect(wrapper.get('[data-test="stash-banner"]').text()).toContain(
+      'Local changes from before a pull, merge or rebase are stashed.',
+    )
   })
 
   it('FR-SYNC-09 is hidden while a conflicted file remains', () => {

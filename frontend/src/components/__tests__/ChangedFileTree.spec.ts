@@ -81,7 +81,7 @@ describe('ChangedFileTree', () => {
 
   it("FR-CHG-13 a file node's label holds, in order, the action button, the status icon, the name, open in editor and the second action; a folder node has no button", () => {
     const wrapper = mount(ChangedFileTree, {
-      props: { files, action: 'stage', secondAction: 'discard' },
+      props: { files, action: 'stage', secondAction: () => 'discard' },
     })
 
     const label = node(wrapper, 'b.ts').get('[data-pc-section="nodelabel"]')
@@ -101,7 +101,7 @@ describe('ChangedFileTree', () => {
 
   it("FR-CHG-13 clicking a file's action button, then its second action, emits action and second-action with that file, not select or open", async () => {
     const wrapper = mount(ChangedFileTree, {
-      props: { files, action: 'stage', secondAction: 'discard' },
+      props: { files, action: 'stage', secondAction: () => 'discard' },
     })
 
     await row(wrapper, 'b.ts').get('[data-test="action"]').trigger('click')
@@ -115,7 +115,7 @@ describe('ChangedFileTree', () => {
 
   it("FR-CHG-13 Enter on a file's action button does not select or open the file, or fold the tree", async () => {
     const wrapper = mount(ChangedFileTree, {
-      props: { files, action: 'stage', secondAction: 'discard' },
+      props: { files, action: 'stage', secondAction: () => 'discard' },
     })
     const before = labels(wrapper)
 

@@ -10,6 +10,7 @@ import {
   Code,
   type Branch,
   type BranchInUse,
+  type IntegrateResult,
 } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { useRefsStore } from '@/stores/refs'
 import { useRepoStore } from '@/stores/repo'
@@ -50,17 +51,21 @@ const { t } = useI18n()
 const layout = useLayout()
 const toolbarButton = useToolbarButton()
 
-// The button's text: the branch, or the short hash while detached, and any
-// operation in progress.
-const headLabel = computed(() => {
+// The current branch, or the short hash while detached.
+const headName = computed(() => {
   const summary = repo.summary
   if (!summary) return ''
-  const head = summary.detached
+  return summary.detached
     ? t('branchPicker.detachedLabel', { sha: shortSha(summary.sha ?? '') })
     : summary.branch
-  return summary.operation
-    ? t('branchPicker.operationLabel', { head, operation: summary.operation })
-    : head
+})
+
+// The button's text: the head and any operation in progress.
+const headLabel = computed(() => {
+  const operation = repo.summary?.operation
+  return operation
+    ? t('branchPicker.operationLabel', { head: headName.value, operation })
+    : headName.value
 })
 
 // The current branch, if it tracks an upstream that still exists.
@@ -236,6 +241,34 @@ function worktreeStart(row: RefRow): WorktreeStart {
     : { newBranch: true, start: { ref: row.ref } }
 }
 
+type Integrate = 'merge' | 'rebase'
+
+// integrate merges row's ref into the current branch or rebases the current
+// branch onto it. A stop on conflicts waits in the conflict banner; local
+// changes in the way offer to stash them and run again.
+async function integrate(verb: Integrate, row: RefRow, stash = false): Promise<void> {
+  const head = headName.value
+  const call = verb === 'merge' ? Facade.Merge : Facade.Rebase
+  const result = await run<IntegrateResult>(
+    () => call(props.wt, row.ref, stash),
+    (refusal) => {
+      if (refusal.code === Code.Conflicts) return true
+      if (refusal.code !== Code.DirtyWorktree) return showRefusal(refusal)
+      const retry = {
+        label: t(`branchPicker.stashAnd.${verb}`),
+        run: () => void integrate(verb, row, true),
+      }
+      notices.show('branch-picker', errorNotice(refusal, [retry]))
+      return true
+    },
+  )
+  if (!result) return
+  notices.show('branch-picker', {
+    severity: 'success',
+    summary: t(`branchPicker.outcome.${result.outcome}`, { current: head, name: row.name }),
+  })
+}
+
 function menuItems(row: RefRow): MenuItem[] {
   const local = row.kind === 'local' ? row.branch : undefined
   const other = !local?.current
@@ -263,6 +296,18 @@ function menuItems(row: RefRow): MenuItem[] {
       ? [
           { label: t('branchPicker.rename'), command: () => (renameTarget.value = row.name) },
           { label: t('branchPicker.delete'), command: () => deleteBranch(row.name) },
+        ]
+      : []),
+    ...(other
+      ? [
+          {
+            label: t('branchPicker.mergeInto', { current: headName.value }),
+            command: () => void integrate('merge', row),
+          },
+          {
+            label: t('branchPicker.rebaseOnto', { current: headName.value }),
+            command: () => void integrate('rebase', row),
+          },
         ]
       : []),
     {

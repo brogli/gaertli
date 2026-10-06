@@ -39,7 +39,7 @@ func (c *Core) DiffRange(ctx context.Context, id core.WorktreeID, a, b, path, ol
 	old := cmp.Or(oldPath, path)
 	d := fileDiff{
 		path: path, oldPath: oldPath, oldRev: a + ":" + old, newRev: b + ":" + path,
-		cmd: "diff", args: []string{"-M", "--end-of-options", a, b, "--", old, path},
+		cmd: "diff", args: []string{"-M", "--end-of-options", a, b, "--", literalPath(old), literalPath(path)},
 	}
 	return c.diff(ctx, id, d, opts)
 }

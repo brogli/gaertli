@@ -503,3 +503,100 @@ func TestFR_CHG_04_DiffWorkingShowsAFileWhoseNameHoldsANewline(t *testing.T) {
 		}
 	}
 }
+
+// globRepo commits a.txt and [ab].txt; the second's name matches the first
+// as a glob.
+func globRepo(t *testing.T) string {
+	t.Helper()
+	dir := gittest.New(t).Dir
+	writeFile(t, dir, "a.txt", "a\n")
+	writeFile(t, dir, "[ab].txt", "ab\n")
+	gittest.Run(t, dir, "add", "--", ":(literal)a.txt", ":(literal)[ab].txt")
+	gittest.CommitAll(t, dir, "base")
+	return dir
+}
+
+func commitAll(t *testing.T, dir, msg string) {
+	t.Helper()
+	gittest.Run(t, dir, "add", "-A")
+	gittest.CommitAll(t, dir, msg)
+}
+
+func TestFR_CONF_03_StageFileTakesAGlobLikeNameLiterally(t *testing.T) {
+	t.Parallel()
+	dir := globRepo(t)
+	gittest.Run(t, dir, "checkout", "-q", "-b", "side")
+	writeFile(t, dir, "a.txt", "side\n")
+	writeFile(t, dir, "[ab].txt", "side\n")
+	commitAll(t, dir, "side")
+	gittest.Run(t, dir, "checkout", "-q", "master")
+	writeFile(t, dir, "a.txt", "cur\n")
+	writeFile(t, dir, "[ab].txt", "cur\n")
+	commitAll(t, dir, "cur")
+	tryGit(t, dir, "merge", "side")
+	c, id := openWorktree(t, dir)
+
+	if err := c.StageFile(t.Context(), id, "[ab].txt"); err != nil {
+		t.Fatal(err)
+	}
+
+	got := statusOf(t, c, id)
+	if len(got.Conflicted) != 1 || got.Conflicted[0].Path != "a.txt" {
+		t.Errorf("Conflicted = %+v, want only a.txt", got.Conflicted)
+	}
+}
+
+func TestFR_CHG_02_UnstageFileTakesAGlobLikeNameLiterally(t *testing.T) {
+	t.Parallel()
+	dir := globRepo(t)
+	writeFile(t, dir, "a.txt", "changed\n")
+	writeFile(t, dir, "[ab].txt", "changed\n")
+	gittest.Run(t, dir, "add", "-A")
+	c, id := openWorktree(t, dir)
+
+	if err := c.UnstageFile(t.Context(), id, "[ab].txt"); err != nil {
+		t.Fatal(err)
+	}
+
+	got := statusOf(t, c, id)
+	if len(got.Staged) != 1 || got.Staged[0].Path != "a.txt" {
+		t.Errorf("Staged = %+v, want only a.txt", got.Staged)
+	}
+}
+
+func TestFR_CHG_04_DiffWorkingOfAPatternNamedFileShowsItsOwnContent(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "f1.txt", "one\n", "add f1.txt")
+	gittest.Commit(t, repo.Dir, "f?.txt", "other\n", "add f?.txt")
+	writeFile(t, repo.Dir, "f1.txt", "one changed\n")
+	writeFile(t, repo.Dir, "f?.txt", "other changed\n")
+	c, id := openWorktree(t, repo.Dir)
+
+	diff, err := c.DiffWorking(t.Context(), id, "f?.txt", "", false, core.DiffOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff.OldContent != "other\n" || diff.NewContent != "other changed\n" {
+		t.Errorf("DiffWorking = %+v, want only f?.txt's contents", diff)
+	}
+}
+
+func TestFR_CHG_04_DiffWorkingOfAPathLikeAStageNumberShowsItsOwnContent(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "x", "plain x\n", "add x")
+	gittest.Commit(t, repo.Dir, "1:x", "one colon x\n", "add 1:x")
+	writeFile(t, repo.Dir, "1:x", "one colon x changed\n")
+	c, id := openWorktree(t, repo.Dir)
+
+	diff, err := c.DiffWorking(t.Context(), id, "1:x", "", false, core.DiffOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff.OldContent != "one colon x\n" || diff.NewContent != "one colon x changed\n" {
+		t.Errorf("DiffWorking = %+v, want only 1:x's contents", diff)
+	}
+}

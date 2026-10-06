@@ -11,6 +11,7 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { useJobNotices } from '@/composables/useJobNotices'
 import { usePush } from '@/composables/usePush'
 import { useShortcut } from '@/composables/useShortcut'
+import { useWithShortcut } from '@/composables/useWithShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   JobKind,
@@ -32,6 +33,7 @@ const { confirmAction } = useConfirmAction()
 const { error, run } = useCoreCall()
 const { push, upstreamQuestion } = usePush(() => props.wt, run)
 const { t } = useI18n()
+const withShortcut = useWithShortcut()
 const layout = useLayout()
 const toolbarButton = useToolbarButton()
 
@@ -60,15 +62,12 @@ const pullMode = computed<PullMode>(() =>
     ? PullMode.PullRebase
     : PullMode.PullMerge,
 )
-const pullLabel = computed(() =>
-  pullMode.value === PullMode.PullRebase ? t('toolbar.pullRebase') : t('toolbar.pullMerge'),
+const pullLabelKey = computed(() =>
+  pullMode.value === PullMode.PullRebase ? 'toolbar.pullRebase' : 'toolbar.pullMerge',
 )
-const pullTooltip = computed(() =>
-  t('shortcuts.withShortcut', { action: pullLabel.value, shortcut: t('shortcuts.pull') }),
-)
-const pushTooltip = computed(() =>
-  t('shortcuts.withShortcut', { action: t('toolbar.push'), shortcut: t('shortcuts.push') }),
-)
+const pullLabel = computed(() => t(pullLabelKey.value))
+const pullTooltip = computed(() => withShortcut(pullLabelKey.value, 'shortcuts.pull'))
+const pushTooltip = computed(() => withShortcut('toolbar.push', 'shortcuts.push'))
 const pullMenuTooltip = t('toolbar.pullModeMenu')
 const pullMenuItems = computed<MenuItem[]>(() => [
   {

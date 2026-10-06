@@ -208,7 +208,7 @@ func TestFR_SYNC_09_ClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals(t *
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := &core.Error{Code: core.GitFailed}
-			coretest.AssertCode(t, classifyDirtyIntegrate(err, git.Result{Stderr: []byte(tt.stderr)}), tt.want)
+			coretest.AssertCode(t, classifyDirtyIntegrate(err, git.Result{Stderr: []byte(tt.stderr)}, "pull"), tt.want)
 		})
 	}
 }
@@ -322,17 +322,17 @@ func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) 
 		t.Fatal("refs/stash missing, want the kept marker entry")
 	}
 
-	// Summary.PullStash names the kept entry, by its stable commit SHA.
+	// Summary.WaitingStash names the kept entry, by its stable commit SHA.
 	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.PullStash != stashSHA {
-		t.Errorf("Summary.PullStash = %q, want %q", summary.PullStash, stashSHA)
+	if summary.WaitingStash != stashSHA {
+		t.Errorf("Summary.WaitingStash = %q, want %q", summary.WaitingStash, stashSHA)
 	}
 
 	// Resolving the conflict and committing, then PopStash brings the
-	// unrelated local change back and clears PullStash.
+	// unrelated local change back and clears WaitingStash.
 	if err := c.StageFile(t.Context(), wt, "seed.txt"); err != nil {
 		t.Fatal(err)
 	}
@@ -351,8 +351,8 @@ func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.PullStash != "" {
-		t.Errorf("Summary.PullStash = %q, want \"\" after popping", summary.PullStash)
+	if summary.WaitingStash != "" {
+		t.Errorf("Summary.WaitingStash = %q, want \"\" after popping", summary.WaitingStash)
 	}
 }
 
@@ -362,7 +362,7 @@ func TestFR_SYNC_09_PopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "stashed change\n")
-	stashSHA := stashPush(t, repo.Dir, stashMarker)
+	stashSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
 	gittest.Commit(t, repo.Dir, "f.txt", "conflicting head change\n", "head change")
 
 	c, wt := openWorktree(t, repo.Dir)
@@ -384,7 +384,7 @@ func TestFR_SYNC_09_DropStashDeletesTheEntry(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "changed\n")
-	stashSHA := stashPush(t, repo.Dir, stashMarker)
+	stashSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
 
 	c, wt := openWorktree(t, repo.Dir)
 
@@ -403,7 +403,7 @@ func TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *tes
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "marker change\n")
-	markerSHA := stashPush(t, repo.Dir, stashMarker)
+	markerSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
 
 	writeFile(t, repo.Dir, "f.txt", "user change\n")
 	userSHA := stashPush(t, repo.Dir, "user's own work")
@@ -428,7 +428,7 @@ func TestFR_SYNC_09_PopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *t
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	gittest.Commit(t, repo.Dir, "g.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "marker change\n")
-	markerSHA := stashPush(t, repo.Dir, stashMarker)
+	markerSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
 
 	writeFile(t, repo.Dir, "g.txt", "user change\n")
 	userSHA := stashPush(t, repo.Dir, "user's own work")
@@ -1620,5 +1620,28 @@ func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithGitDirSymlinkRefuses(t *test
 	}
 	if ce.Args["path"] != wtPath {
 		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
+	}
+}
+
+func TestFR_SYNC_09_PullWithStashGivesTheEntryBackWhenTheMergeNeverStarted(t *testing.T) {
+	t.Parallel()
+	repo, origin := pullMergeFixture(t)
+	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")
+	gittest.Run(t, repo.Dir, "push", "origin", "master")
+	remoteAppendCommit(t, origin, "u", "upstream\n", "upstream adds u")
+	writeFile(t, repo.Dir, "other.txt", "local uncommitted change\n")
+	writeFile(t, repo.Dir, "u", "untracked\n")
+
+	c, wt := openWorktree(t, repo.Dir)
+	job := waitForJobState(t, c, wt, jobID(t)(c.PullWithStash(t.Context(), wt, core.PullMerge)), "failed")
+
+	if job.Error == nil {
+		t.Fatal("job.Error is nil, want the untracked file to stop the pull")
+	}
+	if list := gittest.Out(t, repo.Dir, "stash", "list"); list != "" {
+		t.Errorf("stash list = %q, want empty", list)
+	}
+	if content := readFile(t, repo.Dir, "other.txt"); content != "local uncommitted change\n" {
+		t.Errorf("other.txt = %q, want the local change back", content)
 	}
 }

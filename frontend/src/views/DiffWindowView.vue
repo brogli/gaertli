@@ -5,7 +5,7 @@ import { useEventListener } from '@vueuse/core'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   ChangeScope,
   type ChangedFile,
@@ -14,6 +14,8 @@ import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '@/lib/d
 import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
 import { useChangesStore } from '@/stores/changes'
 import { useDiffStore } from '@/stores/diff'
+import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useFileTreeChoice } from '@/composables/useFileTreeChoice'
@@ -22,6 +24,7 @@ import ChangedFileList from '@/components/ChangedFileList.vue'
 import ChangedFileTree from '@/components/ChangedFileTree.vue'
 import FileTreeToggle from '@/components/FileTreeToggle.vue'
 import DiffView from '@/components/DiffView.vue'
+import ConflictView from '@/components/ConflictView.vue'
 
 // DiffWindowView is the diff window's root view: the files of its target
 // on the left, one file's diff on the right. The window is its own JS
@@ -38,6 +41,8 @@ const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(wt, run)
 const asTree = useFileTreeChoice()
 const { t } = useI18n()
+const { confirmAction } = useConfirmAction()
+const { hasUnsaved, keepOnly } = useMergeDrafts()
 
 const isWorking = computed(() => target.value.kind === DiffKind.WorkingDiff)
 
@@ -45,40 +50,69 @@ interface Group {
   title: string
   files: ChangedFile[]
   staged: boolean
+  conflicted: boolean
 }
 
-// groups are the files the diff can show, in list order. A conflicted file
-// has no diff here: it opens in the editor.
+// An entry is a file of the list in the group it is shown in.
+type Entry = Pick<Group, 'staged' | 'conflicted'> & { file: ChangedFile }
+
+// groups are the files the window can show, in list order: the working
+// tree's conflicted files last, each shown as a conflict, not a diff.
 const groups = computed<Group[]>(() => {
-  if (!isWorking.value) return [{ title: '', files: files.value, staged: false }]
+  if (!isWorking.value) return [{ title: '', files: files.value, staged: false, conflicted: false }]
   const f = changes.files
   return [
-    { title: t('changesView.stagedTitle'), files: f?.staged ?? [], staged: true },
-    { title: t('changesView.unstagedTitle'), files: f?.unstaged ?? [], staged: false },
-    { title: t('changesView.untrackedTitle'), files: f?.untracked ?? [], staged: false },
+    {
+      title: t('changesView.stagedTitle'),
+      files: f?.staged ?? [],
+      staged: true,
+      conflicted: false,
+    },
+    {
+      title: t('changesView.unstagedTitle'),
+      files: f?.unstaged ?? [],
+      staged: false,
+      conflicted: false,
+    },
+    {
+      title: t('changesView.untrackedTitle'),
+      files: f?.untracked ?? [],
+      staged: false,
+      conflicted: false,
+    },
+    {
+      title: t('changesView.conflictedTitle'),
+      files: f?.conflicted ?? [],
+      staged: false,
+      conflicted: true,
+    },
   ]
 })
-const conflicted = computed(() => (isWorking.value ? (changes.files?.conflicted ?? []) : []))
 
-const entries = computed(() =>
-  groups.value.flatMap((g) => g.files.map((file) => ({ file, staged: g.staged }))),
+const entries = computed<Entry[]>(() =>
+  groups.value.flatMap(({ files, staged, conflicted }) =>
+    files.map((file) => ({ file, staged, conflicted })),
+  ),
 )
 const currentIndex = computed(() =>
   entries.value.findIndex(
-    (e) => e.file.path === target.value.path && e.staged === !!target.value.staged,
+    (e) =>
+      e.file.path === target.value.path &&
+      e.staged === !!target.value.staged &&
+      e.conflicted === !!target.value.conflicted,
   ),
 )
 const current = computed(() => entries.value[currentIndex.value])
 
-function show(file: ChangedFile, staged: boolean): void {
-  target.value = fileTarget(file, { ...target.value, staged })
+function show({ file, staged, conflicted }: Entry): void {
+  target.value = fileTarget(file, { ...target.value, staged, conflicted })
 }
 
 // stepFile shows the next or previous file of the list; a no-op past
 // either end.
 function stepFile(step: 1 | -1): void {
   const next = entries.value[currentIndex.value + step]
-  if (currentIndex.value >= 0 && next) show(next.file, next.staged)
+  if (currentIndex.value >= 0 && next) show(next)
 }
 
 async function loadFiles(): Promise<void> {
@@ -106,6 +140,30 @@ const listSource = computed(() => {
 })
 watch(listSource, () => void run(loadFiles), { immediate: true })
 
+// A conflicted file that leaves the list (resolved) loses its unsaved merge
+// result and gives way to the conflicted file now at its place, if any.
+watch(
+  () => changes.files?.conflicted ?? [],
+  (now, before) => {
+    keepOnly(
+      wt.value,
+      now.map((f) => f.path),
+    )
+    if (!target.value.conflicted || now.some((f) => f.path === target.value.path)) return
+    const next = at(
+      now,
+      before.findIndex((f) => f.path === target.value.path),
+    )
+    if (next) show({ file: next, staged: false, conflicted: true })
+  },
+)
+
+// at is the file of files at index, clamped into the list; undefined for an
+// empty list.
+function at(files: ChangedFile[], index: number): ChangedFile | undefined {
+  return files[Math.min(Math.max(index, 0), files.length - 1)]
+}
+
 // repo:changed{scope:"index"} covers staging and outside edits, which
 // change the working tree's lists.
 useRepoChanged([ChangeScope.IndexChanged], () => {
@@ -126,6 +184,28 @@ useWindowEvent('diff:show', (ev) => {
   target.value = ev.data.target
 })
 
+// The shell cancels a close of the window while it holds unsaved merge
+// results, and asks the page to confirm.
+watch(hasUnsaved, (unsaved) => void AppService.SetUnsavedWork(unsaved), { immediate: true })
+
+// closeWindow closes the window, after the user confirms losing unsaved
+// merge results if there are any.
+function closeWindow(): void {
+  if (!hasUnsaved.value) return void closeNow()
+  confirmAction(t('diffWindow.closeUnsavedHeader'), t('diffWindow.closeUnsavedMessage'), () => {
+    void closeNow()
+  })
+}
+
+// closeNow stops the shell holding the close back, whatever flag it still
+// holds, then closes.
+async function closeNow(): Promise<void> {
+  await AppService.SetUnsavedWork(false)
+  void Window.Close()
+}
+
+useWindowEvent('diff:closeRequested', closeWindow)
+
 // Escape closes the window, unless a dialog (a discard's confirmation) is
 // open: that Escape is the dialog's. Capturing runs this before the dialog
 // closes itself.
@@ -134,7 +214,7 @@ useEventListener(
   'keydown',
   (e: KeyboardEvent) => {
     if (e.key === 'Escape' && !document.querySelector('[role=dialog], [role=alertdialog]'))
-      void Window.Close()
+      closeWindow()
   },
   { capture: true },
 )
@@ -159,25 +239,25 @@ useEventListener(
             <component
               :is="asTree ? ChangedFileTree : ChangedFileList"
               :files="g.files"
-              :selected="current?.staged === g.staged ? current.file : null"
-              @select="(f) => show(f, g.staged)"
+              :selected="
+                current?.staged === g.staged && current.conflicted === g.conflicted
+                  ? current.file
+                  : null
+              "
+              @select="(file) => show({ file, staged: g.staged, conflicted: g.conflicted })"
               @open-editor="openEditor"
             />
           </template>
         </template>
-        <template v-if="conflicted.length">
-          <h3 class="mt-2 mb-1 text-sm">{{ t('changesView.conflictedTitle') }}</h3>
-          <component
-            :is="asTree ? ChangedFileTree : ChangedFileList"
-            :files="conflicted"
-            @open="openEditor"
-            @open-editor="openEditor"
-          />
-        </template>
       </aside>
     </SplitterPanel>
     <SplitterPanel :size="75" :min-size="30">
+      <template v-if="target.conflicted">
+        <ConflictView v-if="current" :wt="wt" :path="target.path" @step-file="stepFile" />
+        <p v-else-if="changes.files" class="p-2.5">{{ t('diffWindow.noConflictsLeft') }}</p>
+      </template>
       <DiffView
+        v-else
         class="h-full overflow-auto"
         :wt="wt"
         :target="target"

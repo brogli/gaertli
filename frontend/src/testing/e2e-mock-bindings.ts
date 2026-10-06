@@ -5,11 +5,14 @@
 
 import { objectNames, setTransport, type Events } from '@wailsio/runtime'
 import {
+  IntegrateOutcome,
   JobState,
   type ChangedFile,
   type ChangedFiles,
   type CommitDetails,
+  type ConflictFile,
   type DiffFile,
+  type IntegrateResult,
   type LogIndexResult,
   type LogRowsResult,
   type LogSearchResult,
@@ -29,6 +32,7 @@ import type { LogPathInfo } from '../../bindings/github.com/brogli/nebegit/inter
 import { branchFixture } from '@/testing/fixtures/branch'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
+import { scrollConflictFixture } from '@/testing/fixtures/conflicts'
 import { jobFixture } from '@/testing/fixtures/job'
 import { LOG_ROWS_FIXTURE } from '@/testing/fixtures/log-rows'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
@@ -62,6 +66,12 @@ const STATUS_FIXTURE = changedFilesFixture({
 // the changes view's scrolling case, which needs a change
 // list taller than the window.
 function statusFixture(): ChangedFiles {
+  // The diff window's ?conflicted=true target lists the conflicted file.
+  if (query.get('conflicted') === 'true') {
+    return changedFilesFixture({
+      conflicted: [{ path: scrollConflictFixture().path, status: 'UU' }],
+    })
+  }
   const count = Number(query.get('changedFiles') ?? '0')
   if (!count) return STATUS_FIXTURE
   return changedFilesFixture({
@@ -300,6 +310,14 @@ function runFetchJob(): string {
 }
 
 export const Facade = {
+  Merge(): Promise<IntegrateResult> {
+    return delay({ outcome: IntegrateOutcome.IntegrateMerged })
+  },
+
+  Rebase(): Promise<IntegrateResult> {
+    return delay({ outcome: IntegrateOutcome.IntegrateRebased })
+  },
+
   LoadLog(): Promise<void> {
     void streamLogProgress()
     return Promise.resolve()
@@ -372,6 +390,10 @@ export const Facade = {
     return delay(DIFF_FILE_FIXTURE)
   },
 
+  Conflict(): Promise<ConflictFile> {
+    return delay(scrollConflictFixture())
+  },
+
   ListWorktrees(): Promise<Worktree[]> {
     return delay(worktreesFixture())
   },
@@ -392,6 +414,9 @@ export const AppService = {
   },
   LogPath(): Promise<LogPathInfo> {
     return Promise.resolve({ path: '/mock/nebegit.log', error: '' })
+  },
+  SetUnsavedWork(): Promise<void> {
+    return Promise.resolve(undefined)
   },
   OpenRecentRepo(): Promise<void> {
     return Promise.resolve(undefined)

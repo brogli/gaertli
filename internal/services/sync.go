@@ -91,7 +91,7 @@ func (c *Core) startPull(ctx context.Context, id core.WorktreeID, mode core.Pull
 // integrateStep runs Pull's merge/rebase step. Caller holds wt's write lock.
 func integrateStep(ctx context.Context, wt *session.Worktree, integrateArgs []string) error {
 	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: integrateArgs})
-	return classifyDirtyIntegrate(remapOperationConflict(err, wt.GitDir), result)
+	return classifyDirtyIntegrate(remapOperationConflict(err, wt.GitDir), result, "pull")
 }
 
 // dirtyIntegrateReasons are the integrate step's refusals to start because
@@ -105,10 +105,18 @@ var dirtyIntegrateReasons = []string{
 }
 
 // classifyDirtyIntegrate reclassifies an integrate refusal matching
-// dirtyIntegrateReasons as Code DirtyWorktree.
-func classifyDirtyIntegrate(err error, result git.Result) error {
+// dirtyIntegrateReasons as Code DirtyWorktree, keyed by verb ("pull",
+// "merge" or "rebase").
+func classifyDirtyIntegrate(err error, result git.Result, verb string) error {
 	if ce := gitFailure(err); ce != nil && containsAny(string(result.Stderr), dirtyIntegrateReasons) {
-		ce.Retag(core.DirtyWorktree, "pullBlockedByChanges", nil, "Local changes are in the way of the pull.")
+		switch verb {
+		case "merge":
+			ce.Retag(core.DirtyWorktree, "mergeBlockedByChanges", nil, "Local changes are in the way of the merge.")
+		case "rebase":
+			ce.Retag(core.DirtyWorktree, "rebaseBlockedByChanges", nil, "Local changes are in the way of the rebase.")
+		default:
+			ce.Retag(core.DirtyWorktree, "pullBlockedByChanges", nil, "Local changes are in the way of the pull.")
+		}
 	}
 	return err
 }
@@ -117,22 +125,27 @@ func containsAny(s string, subs []string) bool {
 	return slices.ContainsFunc(subs, func(sub string) bool { return strings.Contains(s, sub) })
 }
 
-// stashMarker tags the subject of a stash entry PullWithStash made, so
-// Summary's pullStash tells it apart from a stash made outside the app.
-const stashMarker = "nebegit: local changes before pull"
+// stashSubjectPrefix starts the subject of every stash entry the app makes around an integrate,
+// so Summary's WaitingStash tells it apart from a stash made outside the app. git prefixes the
+// branch ("On main: "); the verb (pull, merge or rebase) follows.
+const stashSubjectPrefix = "nebegit: local changes before "
 
-// integrateWithStash is integrateStep with local changes stashed around
-// it. git stash push exits 0 without an entry when there is nothing to
-// save, so refs/stash is compared before and after the push. The new entry
-// is popped by its commit, never by a bare "stash pop" that could take
-// someone else's. A failed integrate keeps the stash. Caller holds wt's
-// write lock.
+// integrateWithStash is integrateStep with local changes stashed around it.
 func integrateWithStash(ctx context.Context, wt *session.Worktree, integrateArgs []string) error {
+	return withStash(ctx, wt, "pull", func() error { return integrateStep(ctx, wt, integrateArgs) })
+}
+
+// withStash runs integrate with local changes stashed around it, the entry's subject naming verb.
+// git stash push exits 0 without an entry when there is nothing to save, so refs/stash is compared
+// before and after the push. The new entry is popped by its commit, never by a bare "stash pop"
+// that could take someone else's. A failed integrate that left the worktree untouched gives the
+// entry back; any other failure keeps it. Caller holds wt's write lock.
+func withStash(ctx context.Context, wt *session.Worktree, verb string, integrate func() error) error {
 	before, err := verifyRev(ctx, wt.Runner, wt.Path, "refs/stash")
 	if err != nil {
 		return err
 	}
-	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"stash", "push", "-m", stashMarker}}); err != nil {
+	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"stash", "push", "-m", stashSubjectPrefix + verb}}); err != nil {
 		return err
 	}
 	after, err := verifyRev(ctx, wt.Runner, wt.Path, "refs/stash")
@@ -140,10 +153,47 @@ func integrateWithStash(ctx context.Context, wt *session.Worktree, integrateArgs
 		return err
 	}
 
-	if err := integrateStep(ctx, wt, integrateArgs); err != nil || after == before {
+	stashed := after != before
+	var head string
+	if stashed {
+		if head, err = revParse(ctx, wt.Runner, wt.Path, "HEAD"); err != nil {
+			return err
+		}
+	}
+	if err := integrate(); err != nil {
+		if stashed && untouched(ctx, wt, head) {
+			_ = popStash(ctx, wt, after) // on failure the entry stays for the user
+		}
 		return err
 	}
-	ref, err := resolveStashRef(ctx, wt.Runner, wt.Path, after)
+	if !stashed {
+		return nil
+	}
+	return popStash(ctx, wt, after)
+}
+
+// untouched reports whether wt has no operation in progress, HEAD at head, and the index and
+// tracked files as HEAD has them.
+func untouched(ctx context.Context, wt *session.Worktree, head string) bool {
+	if operation(wt.GitDir) != "" {
+		return false
+	}
+	now, err := revParse(ctx, wt.Runner, wt.Path, "HEAD")
+	return err == nil && now == head && matchesHead(ctx, wt)
+}
+
+// matchesHead reports whether the index and the tracked files equal HEAD.
+// The refresh drops files whose stat alone changed; a submodule's checkout,
+// which stash push never moves, does not count.
+func matchesHead(ctx context.Context, wt *session.Worktree) bool {
+	_, _ = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"update-index", "-q", "--refresh"}})
+	_, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, ReadOnly: true, Args: []string{"diff-index", "--quiet", "--ignore-submodules", "HEAD", "--"}})
+	return err == nil
+}
+
+// popStash pops the stash entry whose commit is sha.
+func popStash(ctx context.Context, wt *session.Worktree, sha string) error {
+	ref, err := resolveStashRef(ctx, wt.Runner, wt.Path, sha)
 	if err != nil {
 		return err
 	}
@@ -202,9 +252,9 @@ func resolveStashRef(ctx context.Context, r git.Runner, dir, sha string) (string
 	return "", core.Errorf(core.Internal, "stash %s is no longer in the stash list", sha)
 }
 
-// pullStash returns the commit of the newest stash entry stashMarker tags,
-// "" if none. git stash list is newest-first.
-func pullStash(ctx context.Context, r git.Runner, dir string) (string, error) {
+// waitingStash returns the commit of the newest stash entry the app made around an integrate, ""
+// if none. git stash list is newest-first.
+func waitingStash(ctx context.Context, r git.Runner, dir string) (string, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
 		Args: []string{"stash", "list", "--format=%H%x1f%gs", "-z"},
@@ -214,7 +264,7 @@ func pullStash(ctx context.Context, r git.Runner, dir string) (string, error) {
 	}
 	for _, rec := range nulRecords(result.Stdout) {
 		sha, subject, ok := strings.Cut(rec, "\x1f")
-		if ok && strings.Contains(subject, stashMarker) {
+		if ok && strings.Contains(subject, stashSubjectPrefix) {
 			return sha, nil
 		}
 	}

@@ -143,7 +143,9 @@ arrow keys move between tabs and pick as they go.
     local branch has a checkbox; checked branches update together (FR-UPD-06), and entry names line
     up whether or not an entry has a checkbox. A menu action's refusal shows as a notice; a row
     click's refusal stays in the list. A tag's Show history sets the log's filter and brings the log
-    view forward. Every entry action is menu-only, so each entry has a "…" button.
+    view forward. Merge and rebase leave a conflict to the conflict banner, and a refusal over local
+    changes offers the stash-and-retry as its notice's action. Every entry action is menu-only, so
+    each entry has a "…" button.
 - **Settings** (FR-UX-04): a dialog over the window, opened from the toolbar's gear button, laid out
   like every dialog, with a group per editor environment and a base-folder field per environment
   found (local and each WSL distro).
@@ -188,12 +190,18 @@ arrow keys move between tabs and pick as they go.
   toggle above the change list's groups, then the commit box. Each group shows as a list or a tree,
   the shared choice; a file's row starts with its stage, unstage or mark-resolved button, before its
   name, in both, and its other actions sit at the row's end (FR-CHG-02); a folder in the tree has no
-  buttons. The commit message field spans the commit box's full width.
+  buttons. The commit message field spans the commit box's full width. A conflicted file opens in
+  the diff window; a staged file resolved during the stopped operation can be reopened from its row,
+  after a confirmation. A resolved file with no change left (resolved to the current side's version)
+  is in no other group, so the conflicted list shows it for the same reopen.
 - **Diff window** (FR-DIFF-07): a separate OS window; the main window stays usable behind it. The
   target's files on the left, a working tree's in their groups, and the diff view on the right. A
-  target is a commit, a range, a commit against the working tree, or a working-tree side. In every
-  file list of the main window a click selects a row and a double-click or Enter opens it; opening
-  another file retargets the open diff window (`diff:show`). A working-tree list and diff reload on
+  target is a commit, a range, a commit against the working tree, a working-tree side, or a
+  conflicted file, which shows the merge editor for text and otherwise a panel that says why and
+  offers what fits: a side's version or deletion, or the external editor and mark resolved. When the
+  shown file is resolved, the window moves to the next conflicted one. In every file list of the
+  main window a click selects a row and a double-click or Enter opens it; opening another file
+  retargets the open diff window (`diff:show`). A working-tree list and diff reload on
   `repo:changed` with scope `index`. Splitters between the file list and the diff, and between the
   diff's two sides, are remembered like the main window's view widths. The list's flat/tree toggle
   and its remembered choice are the commit detail view's. The window's size is kept in the settings
@@ -213,6 +221,23 @@ arrow keys move between tabs and pick as they go.
   the diff's background, and added from removed, by at least 0.08 ΔE in OKLab; text on them keeps
   4.5:1 contrast; the change marker keeps 3:1 against the diff's background. An e2e check measures
   each theme.
+- **Merge editor** (FR-CONF-05, FR-CONF-06, ADR-7): three CodeMirror editors in a splitter, the
+  current side and the incoming side read-only around the editable result, and the base in a pane
+  above them while shown. Each pane names its side and that side's role in the operation.
+  - Conflict regions are tracked by their markers: each region git reported keeps its range in the
+    result through every edit (CodeMirror's position mapping), and it counts as resolved once that
+    range holds no marker line. A take or a hand edit of any shape is therefore handled the same
+    way, and "Save and mark resolved" waits until no marker line is left anywhere in the result.
+  - The toolbar's actions act on the selected region: the one last clicked in any pane, or holding
+    the result's cursor; previous and next move between unresolved regions. A take is one undoable
+    change.
+  - The panes stay aligned by region: each region's first and last line in every pane are anchor
+    points, lines between anchors map linearly, and scrolling any pane moves the others through the
+    scroll event, as the diff view's sideways scrolling does.
+  - Unsaved results live per file for as long as the diff window does; closing the window over one
+    asks first, by Escape and by the window's own close button, which the shell holds back while the
+    page reports unsaved work. A result whose file changed on disk meanwhile stays, with a reload
+    that discards it.
 
 ## Communication
 

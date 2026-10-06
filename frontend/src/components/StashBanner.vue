@@ -10,8 +10,8 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
-// StashBanner offers to restore or drop the stash PullWithStash made
-// (Summary.PullStash) once no conflicted file remains.
+// StashBanner offers to restore or drop the stash a pull, merge or rebase with stash made
+// (Summary.WaitingStash) once no conflicted file remains.
 const props = defineProps<{ wt: string }>()
 const repo = useRepoStore()
 const changes = useChangesStore()
@@ -19,7 +19,7 @@ const { error, run } = useCoreCall()
 const { confirmAction } = useConfirmAction()
 const { t } = useI18n()
 
-const stashRef = computed(() => repo.summary?.pullStash ?? '')
+const stashRef = computed(() => repo.summary?.waitingStash ?? '')
 const visible = computed(() => !!stashRef.value && !changes.files?.conflicted?.length)
 
 function onRestore(): void {

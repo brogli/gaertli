@@ -20,6 +20,7 @@ const (
 	diffRangeTitle     textID = "diffRangeTitle"
 	diffAgainstWorking textID = "diffAgainstWorkingTitle"
 	diffWorkingTitle   textID = "diffWorkingTitle"
+	diffConflictTitle  textID = "diffConflictTitle"
 )
 
 // texts holds the shell's own text, in English.
@@ -37,6 +38,7 @@ var texts = map[textID]string{
 	diffRangeTitle:     "{name}: compare {from}..{to}",
 	diffAgainstWorking: "{name}: compare {sha}..working tree",
 	diffWorkingTitle:   "{name}: changes",
+	diffConflictTitle:  "{name}: conflict in {file}",
 }
 
 // text renders id's English text, replacing each {key} placeholder with

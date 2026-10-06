@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, type Locator, type Page, type Request } from '@playwright/test'
 import { openBranchPicker, openWorktreePicker, refLi } from '../e2e/helpers'
 import type { Git } from './repos'
 
@@ -8,6 +8,16 @@ export { openBranchPicker, openWorktreePicker, refLi }
 
 // Locators and actions the area specs share; an area-only helper stays in
 // its spec file.
+
+// boundCallEndingWith resolves on the page's next bound-method call whose
+// arguments end with args.
+export function boundCallEndingWith(page: Page, args: unknown[]): Promise<Request> {
+  return page.waitForRequest((req) => {
+    if (!req.url().endsWith('/wails/runtime')) return false
+    const sent: unknown[] = JSON.parse(req.postData() ?? '{}').args?.args ?? []
+    return JSON.stringify(sent.slice(-args.length)) === JSON.stringify(args)
+  })
+}
 
 // logRow is the log row whose subject contains subject.
 export function logRow(page: Page, subject: string): Locator {
@@ -193,6 +203,17 @@ export function parents(git: Git, repo: string): number {
 // hunksText is hunks.txt (line 1 … line 30) with the given lines replaced.
 export function hunksText(replaced: Record<number, string> = {}): string {
   return Array.from({ length: 30 }, (_, i) => `${replaced[i + 1] ?? `line ${i + 1}`}\n`).join('')
+}
+
+// stagedText is file's content in the index, or null while it has no stage 0
+// entry (unmerged or missing). Polls read the index through it: git show
+// exits non-zero then, and expect.poll fails at once when its callback throws.
+export function stagedText(git: Git, repo: string, file: string): string | null {
+  try {
+    return git(repo, 'show', `:${file}`)
+  } catch {
+    return null
+  }
 }
 
 // fileText is file's content, or null while it is missing. Polls read files

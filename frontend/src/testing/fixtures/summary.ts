@@ -8,7 +8,7 @@ export function summaryFixture(overrides: Partial<Summary> = {}): Summary {
     operation: Operation.$zero,
     editorName: 'editor',
     messageDraft: '',
-    pullStash: '',
+    waitingStash: '',
     ...overrides,
   }
 }

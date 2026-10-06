@@ -26,20 +26,22 @@ func init() {
 	application.RegisterEvent[application.Void]("core:reconnected")
 	application.RegisterEvent[DiffShow]("diff:show")
 	application.RegisterEvent[application.Void]("settings:changed")
+	application.RegisterEvent[application.Void]("diff:closeRequested")
 }
 
 // eventPayloads decodes a core.Event's JSON payload into the type it is
 // registered with, or, for a logged event ("command", "editor"), its record
 // type.
 var eventPayloads = map[string]func(json.RawMessage) (any, error){
-	"repo:changed":     decodePayload[core.RepoChanged],
-	"log:progress":     decodePayload[core.LogProgress],
-	"job:update":       decodePayload[core.JobInfo],
-	"command":          decodePayload[core.CommandRecord],
-	"editor":           decodePayload[core.EditorRecord],
-	"core:reconnected": noPayload,
-	"diff:show":        decodePayload[DiffShow],
-	"settings:changed": noPayload,
+	"repo:changed":        decodePayload[core.RepoChanged],
+	"log:progress":        decodePayload[core.LogProgress],
+	"job:update":          decodePayload[core.JobInfo],
+	"command":             decodePayload[core.CommandRecord],
+	"editor":              decodePayload[core.EditorRecord],
+	"core:reconnected":    noPayload,
+	"diff:show":           decodePayload[DiffShow],
+	"settings:changed":    noPayload,
+	"diff:closeRequested": noPayload,
 }
 
 // decodeEvent returns ev's payload as its registered data type.

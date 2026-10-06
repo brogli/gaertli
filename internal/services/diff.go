@@ -34,7 +34,7 @@ func (c *Core) DiffFile(ctx context.Context, id core.WorktreeID, sha, path, oldP
 	old := cmp.Or(oldPath, path)
 	d := fileDiff{
 		path: path, oldPath: oldPath, oldRev: sha + "^:" + old, newRev: sha + ":" + path,
-		cmd: "show", args: []string{"--root", "--format=", "--first-parent", "-M", "--end-of-options", sha, "--", old, path},
+		cmd: "show", args: []string{"--root", "--format=", "--first-parent", "-M", "--end-of-options", sha, "--", literalPath(old), literalPath(path)},
 	}
 	return c.diff(ctx, id, d, opts)
 }
@@ -44,7 +44,7 @@ func (c *Core) DiffAgainstWorking(ctx context.Context, id core.WorktreeID, sha, 
 	old := cmp.Or(oldPath, path)
 	d := fileDiff{
 		path: path, oldPath: oldPath, oldRev: sha + ":" + old,
-		cmd: "diff", args: []string{"-M", "--end-of-options", sha, "--", old, path},
+		cmd: "diff", args: []string{"-M", "--end-of-options", sha, "--", literalPath(old), literalPath(path)},
 	}
 	return c.diff(ctx, id, d, opts)
 }
@@ -125,7 +125,7 @@ func (d fileDiff) check(ctx context.Context, r git.Runner, dir string) (tooLarge
 		}
 		return max(sizes[0].size, sizes[1].size) > maxDiffFileSize, false, nil
 	}
-	sizes, err := objectSizes(ctx, r, dir, d.oldRev, ":"+d.path)
+	sizes, err := objectSizes(ctx, r, dir, d.oldRev, ":0:"+d.path)
 	if err != nil {
 		return false, false, err
 	}

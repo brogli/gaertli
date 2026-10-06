@@ -20,18 +20,22 @@ func (c *Core) Status(ctx context.Context, id core.WorktreeID) (core.ChangedFile
 	if err != nil {
 		return core.ChangedFiles{}, err
 	}
-	return parseStatus(result.Stdout), nil
+	status := parseStatus(result.Stdout)
+	if operation(wt.GitDir) != "" {
+		status.Resolved, err = resolvedPaths(ctx, wt, status.Conflicted)
+	}
+	return status, err
 }
 
 // StageFile implements core.API.
 func (c *Core) StageFile(ctx context.Context, id core.WorktreeID, path string) error {
-	_, err := c.runLocked(ctx, id, "add", "--", path)
+	_, err := c.runLocked(ctx, id, "add", "--", literalPath(path))
 	return err
 }
 
 // UnstageFile implements core.API.
 func (c *Core) UnstageFile(ctx context.Context, id core.WorktreeID, path string) error {
-	_, err := c.runLocked(ctx, id, "restore", "--staged", "--", path)
+	_, err := c.runLocked(ctx, id, "restore", "--staged", "--", literalPath(path))
 	return err
 }
 
@@ -149,12 +153,12 @@ func appendUnmerged(out *core.ChangedFiles, rec string) {
 // DiffWorking implements core.API.
 func (c *Core) DiffWorking(ctx context.Context, id core.WorktreeID, path, oldPath string, staged bool, opts core.DiffOptions) (core.DiffFile, error) {
 	// the index against the working tree, or HEAD against the index
-	d := fileDiff{path: path, oldRev: ":" + path, cmd: "diff", args: []string{"--", path}}
+	d := fileDiff{path: path, oldRev: ":0:" + path, cmd: "diff", args: []string{"--", literalPath(path)}}
 	if staged {
 		old := cmp.Or(oldPath, path)
 		d = fileDiff{
-			path: path, oldPath: oldPath, oldRev: "HEAD:" + old, newRev: ":" + path,
-			cmd: "diff", args: []string{"--cached", "-M", "--", old, path},
+			path: path, oldPath: oldPath, oldRev: "HEAD:" + old, newRev: ":0:" + path,
+			cmd: "diff", args: []string{"--cached", "-M", "--", literalPath(old), literalPath(path)},
 		}
 	}
 	return c.diff(ctx, id, d, opts)

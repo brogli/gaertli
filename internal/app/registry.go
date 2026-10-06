@@ -57,6 +57,7 @@ type windowEntry struct {
 	repo     string          // common git dir, set by SetRepo
 	distro   string          // "" = local; else the WSL distro this window's core runs in
 	focused  bool            // has OS focus
+	unsaved  bool            // the page holds work a close would lose
 }
 
 // distroCorer is what Registry needs from a WSL distro's live core
@@ -490,11 +491,42 @@ func (r *Registry) openOrRetargetDiff(key diffWindowKey, wt core.WorktreeID, tar
 		r.Release(r.closeDiffWindow(key))
 	})
 	if window, ok := entry.window.(resizableWindow); ok {
-		window.RegisterHook(events.Common.WindowClosing, func(*application.WindowEvent) { r.rememberDiffWindowSize(window) })
+		window.RegisterHook(events.Common.WindowClosing, func(ev *application.WindowEvent) {
+			if r.askBeforeClosing(entry, ev) {
+				return
+			}
+			r.rememberDiffWindowSize(window)
+		})
 	}
 	r.wireFocus(entry)
 	r.diffWindows[key] = entry
 	return nil, ""
+}
+
+// askBeforeClosing cancels ev, a diff window's close, and asks its page to
+// confirm, if the page holds unsaved work and the app is not quitting. It
+// reports whether it did.
+func (r *Registry) askBeforeClosing(e *windowEntry, ev *application.WindowEvent) bool {
+	r.mu.Lock()
+	ask := e.unsaved && !r.quitting.Load()
+	r.mu.Unlock()
+	if ask {
+		ev.Cancel()
+		e.window.EmitEvent("diff:closeRequested")
+	}
+	return ask
+}
+
+// SetUnsavedWork records whether the page of the diff window windowID holds
+// work a close would lose.
+func (r *Registry) SetUnsavedWork(windowID uint, unsaved bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, e := range r.diffWindows {
+		if e.window.ID() == windowID {
+			e.unsaved = unsaved
+		}
+	}
 }
 
 // showLocked makes e, a diff window or a page, show wt, with the path, repo

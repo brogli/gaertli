@@ -21,8 +21,10 @@ import type { ChangedFileAction } from './changedFileAction'
 // ChangesView is the changes view: the change list, which scrolls on its
 // own, above the commit box, which never does. A click selects a row, a
 // double-click opens its side of the change in the diff window. A
-// conflicted file has no working-tree diff: it opens in the editor, and
-// "Mark resolved" stages it (git add). Each group shows as a flat list or a
+// conflicted file opens in the diff window on its conflict, and "Mark
+// resolved" stages it (git add); a staged file resolved since the operation
+// started offers "Reopen conflict", and so does a resolved file without changes,
+// listed under Conflicted. Each group shows as a flat list or a
 // folder tree, the same remembered choice (useFileTreeChoice) as the commit
 // detail view and the diff window.
 const props = defineProps<{ wt: string }>()
@@ -39,6 +41,22 @@ const selected = ref<{ file: ChangedFile; staged: boolean } | null>(null)
 
 function openDiff(file: ChangedFile, staged: boolean): void {
   void AppService.OpenDiff(props.wt, fileTarget(file, { kind: DiffKind.WorkingDiff, staged }))
+}
+
+function openConflict(file: ChangedFile): void {
+  void AppService.OpenDiff(
+    props.wt,
+    fileTarget(file, { kind: DiffKind.WorkingDiff, conflicted: true }),
+  )
+}
+
+// reopenConflict confirms first: the resolution is replaced.
+function reopenConflict(file: ChangedFile): void {
+  confirmAction(
+    t('changesView.reopenConflict'),
+    t('changesView.reopenConflictConfirm', { path: file.path }),
+    () => void run(() => Facade.ReopenConflict(props.wt, file.path)),
+  )
 }
 
 // The index-scope repo:changed event after each write reloads the list.
@@ -78,7 +96,7 @@ interface Group {
   staged: boolean
   action: ChangedFileAction
   onAction: (file: ChangedFile) => void
-  secondAction?: ChangedFileAction
+  secondAction?: (file: ChangedFile) => ChangedFileAction | undefined
   onSecondAction?: (file: ChangedFile) => void
 }
 
@@ -86,6 +104,7 @@ interface Group {
 // the diff shows. Conflicted (below, in the template) is not one of them.
 // Only Unstaged and Untracked offer Discard — staged content is unstaged
 // first, same boundary DiffView's hunk discard draws.
+const resolved = computed(() => new Set(changes.files?.resolved ?? []))
 const groups = computed<Group[]>(() => {
   const f = changes.files
   return [
@@ -96,6 +115,8 @@ const groups = computed<Group[]>(() => {
       staged: true,
       action: 'unstage',
       onAction: unstageFile,
+      secondAction: (file) => (resolved.value.has(file.path) ? 'reopenConflict' : undefined),
+      onSecondAction: reopenConflict,
     },
     {
       title: t('changesView.unstagedTitle'),
@@ -104,7 +125,7 @@ const groups = computed<Group[]>(() => {
       staged: false,
       action: 'stage',
       onAction: stageFile,
-      secondAction: 'discard',
+      secondAction: () => 'discard',
       onSecondAction: (file) => discardFile(file, false),
     },
     {
@@ -114,12 +135,25 @@ const groups = computed<Group[]>(() => {
       staged: false,
       action: 'stage',
       onAction: stageFile,
-      secondAction: 'discard',
+      secondAction: () => 'discard',
       onSecondAction: (file) => discardFile(file, true),
     },
   ]
 })
 const conflicted = computed(() => changes.files?.conflicted ?? [])
+// A file resolved to the current side's version has no change and is in no
+// other group; it stays listed so it can be reopened.
+const resolvedUnchanged = computed<ChangedFile[]>(() => {
+  const listed = new Set(
+    groups.value
+      .flatMap((g) => g.files)
+      .concat(conflicted.value)
+      .map((file) => file.path),
+  )
+  return [...resolved.value]
+    .filter((path) => !listed.has(path))
+    .map((path) => ({ path, status: 'M' }))
+})
 </script>
 
 <template>
@@ -160,14 +194,24 @@ const conflicted = computed(() => changes.files?.conflicted ?? [])
 
       <section class="flex flex-col gap-1">
         <h3>{{ t('changesView.conflictedTitle') }}</h3>
-        <p v-if="!conflicted.length">{{ t('changesView.conflictedEmpty') }}</p>
+        <p v-if="!conflicted.length && !resolvedUnchanged.length">
+          {{ t('changesView.conflictedEmpty') }}
+        </p>
         <component
           :is="asTree ? ChangedFileTree : ChangedFileList"
           :files="conflicted"
           action="markResolved"
-          @open="openEditor"
+          @open="openConflict"
           @open-editor="openEditor"
           @action="stageFile"
+        />
+        <component
+          :is="asTree ? ChangedFileTree : ChangedFileList"
+          v-if="resolvedUnchanged.length"
+          :files="resolvedUnchanged"
+          :second-action="() => 'reopenConflict'"
+          @open-editor="openEditor"
+          @second-action="reopenConflict"
         />
       </section>
     </section>

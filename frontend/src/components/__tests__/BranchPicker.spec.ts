@@ -11,6 +11,8 @@ const { AppService, Facade } = vi.hoisted(() => ({
     UpdateBranch: vi.fn(),
     RenameBranch: vi.fn(),
     DeleteBranch: vi.fn(),
+    Merge: vi.fn(),
+    Rebase: vi.fn(),
   },
 }))
 
@@ -36,6 +38,7 @@ import {
 import { branchFixture } from '@/testing/fixtures/branch'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
+import { findButton } from '@/testing/findButton'
 
 const main = branchFixture()
 const feat = branchFixture({
@@ -119,6 +122,8 @@ describe('BranchPicker', () => {
     Facade.UpdateBranch.mockReset().mockResolvedValue('job-1')
     Facade.RenameBranch.mockReset().mockResolvedValue(undefined)
     Facade.DeleteBranch.mockReset().mockResolvedValue(undefined)
+    Facade.Merge.mockReset().mockResolvedValue({ outcome: 'merged' })
+    Facade.Rebase.mockReset().mockResolvedValue({ outcome: 'rebased' })
     confirmRequire.mockReset()
   })
 
@@ -334,6 +339,8 @@ describe('BranchPicker', () => {
       'Update from upstream',
       'Rename…',
       'Delete',
+      'Merge into main',
+      'Rebase main onto this',
       'Show in log',
     ])
 
@@ -351,6 +358,8 @@ describe('BranchPicker', () => {
       'Check out',
       'New branch from here…',
       'New worktree from here…',
+      'Merge into main',
+      'Rebase main onto this',
       'Show in log',
     ]
 
@@ -358,6 +367,105 @@ describe('BranchPicker', () => {
     expect(menuLabels(body)).toEqual(expected)
     await openActions(body, 'v1')
     expect(menuLabels(body)).toEqual([...expected, 'Show history'])
+  })
+
+  it('FR-BR-11 a detached HEAD names itself in the merge and rebase actions', async () => {
+    const { body } = await mountPicker(
+      refsWith([branchFixture({ current: false }), feat]),
+      summaryFixture({ detached: true, sha: 'abcdef1234567' }),
+    )
+    await body.get('[data-test="branch-picker"]').trigger('click')
+    await flushPromises()
+
+    await openActions(body, 'feat')
+
+    expect(menuLabels(body)).toContain('Merge into abcdef1 (detached)')
+    expect(menuLabels(body)).toContain('Rebase abcdef1 (detached) onto this')
+  })
+
+  it.each([
+    ['fastForward', 'Fast-forwarded main to feat'],
+    ['merged', 'Merged feat into main'],
+    ['upToDate', 'main is already up to date with feat'],
+  ])(
+    'FR-BR-11 "Merge into main" merges the full ref; outcome %s shows a success notice',
+    async (outcome, text) => {
+      Facade.Merge.mockResolvedValueOnce({ outcome })
+      const { body: notice } = await mountInBody(NoticeArea)
+      const { body } = await openPicker()
+
+      await pickAction(body, 'feat', 'Merge into main')
+
+      expect(Facade.Merge).toHaveBeenCalledWith('/repo', 'refs/heads/feat', false)
+      expect(notice.get('.p-toast').text()).toContain(text)
+    },
+  )
+
+  it('FR-BR-11 a merge refused for local changes offers "Stash and merge", which merges with stash', async () => {
+    Facade.Merge.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'DIRTY_WORKTREE', message: 'local changes in the way' } }),
+    )
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker()
+
+    await pickAction(body, 'feat', 'Merge into main')
+    await findButton(notice, 'Stash and merge')!.trigger('click')
+
+    expect(Facade.Merge).toHaveBeenLastCalledWith('/repo', 'refs/heads/feat', true)
+  })
+
+  it('FR-BR-11 a merge that stops on conflicts shows no notice', async () => {
+    Facade.Merge.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
+    )
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker()
+
+    await pickAction(body, 'feat', 'Merge into main')
+
+    expect(notice.find('.p-toast-message').exists()).toBe(false)
+  })
+
+  it('FR-BR-11 a merge that stops for another reason shows the reason as a notice', async () => {
+    Facade.Merge.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'STOPPED', message: 'hook failed' } }),
+    )
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker()
+
+    await pickAction(body, 'feat', 'Merge into main')
+
+    expect(notice.get('.p-toast').text()).toContain('hook failed')
+  })
+
+  it.each([
+    ['rebased', 'Rebased main onto feat'],
+    ['upToDate', 'main is already up to date with feat'],
+  ])(
+    'FR-BR-12 "Rebase main onto this" rebases onto the full ref; outcome %s shows a success notice',
+    async (outcome, text) => {
+      Facade.Rebase.mockResolvedValueOnce({ outcome })
+      const { body: notice } = await mountInBody(NoticeArea)
+      const { body } = await openPicker()
+
+      await pickAction(body, 'feat', 'Rebase main onto this')
+
+      expect(Facade.Rebase).toHaveBeenCalledWith('/repo', 'refs/heads/feat', false)
+      expect(notice.get('.p-toast').text()).toContain(text)
+    },
+  )
+
+  it('FR-BR-12 a rebase refused for local changes offers "Stash and rebase", which rebases with stash', async () => {
+    Facade.Rebase.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'DIRTY_WORKTREE', message: 'local changes in the way' } }),
+    )
+    const { body: notice } = await mountInBody(NoticeArea)
+    const { body } = await openPicker()
+
+    await pickAction(body, 'feat', 'Rebase main onto this')
+    await findButton(notice, 'Stash and rebase')!.trigger('click')
+
+    expect(Facade.Rebase).toHaveBeenLastCalledWith('/repo', 'refs/heads/feat', true)
   })
 
   it('FR-BR-09 clicking a row\'s "…" opens the same menu as its right-click', async () => {

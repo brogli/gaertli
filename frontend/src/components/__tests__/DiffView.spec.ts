@@ -39,6 +39,7 @@ import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { DiffMode } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
+import { editorViews } from '@/testing/editorView'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import {
   ChangeScope,
@@ -50,7 +51,7 @@ const settings = defaultSettingsFixture()
 
 // editorOf is the mounted unified view.
 function editorOf(wrapper: VueWrapper): EditorView {
-  const view = EditorView.findFromDOM(wrapper.get<HTMLElement>('.cm-editor').element)
+  const [view] = editorViews(wrapper)
   if (!view) throw new Error('no EditorView mounted')
   return view
 }
@@ -248,10 +249,9 @@ describe('DiffView', () => {
 
     const wrapper = await mountCommit()
 
-    for (const editor of wrapper.findAll<HTMLElement>('.cm-editor')) {
-      const doc = EditorView.findFromDOM(editor.element)?.state.doc
-      expect(doc?.line(3).text).toBe('th\rree')
-      expect(doc?.lines).toBe(7)
+    for (const { state } of editorViews(wrapper)) {
+      expect(state.doc.line(3).text).toBe('th\rree')
+      expect(state.doc.lines).toBe(7)
     }
   })
 
@@ -532,10 +532,9 @@ describe('DiffView', () => {
     await wrapper.get('[data-test="mode-toggle"]').trigger('click')
     await flushPromises()
 
-    const editors = wrapper.findAll<HTMLElement>('.cm-editor')
-    expect(editors).toHaveLength(2)
-    const newView = EditorView.findFromDOM(editors[1]!.element)
-    if (!newView) throw new Error('no new-side EditorView mounted')
+    const views = editorViews(wrapper)
+    expect(views).toHaveLength(2)
+    const newView = views[1]!
     newView.dispatch({ selection: EditorSelection.cursor(newView.state.doc.line(4).from) })
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')

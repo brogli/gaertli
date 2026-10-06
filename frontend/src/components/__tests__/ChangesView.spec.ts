@@ -13,6 +13,7 @@ const { Facade, AppService } = vi.hoisted(() => ({
     StageAll: vi.fn(),
     UnstageAll: vi.fn(),
     DiscardFile: vi.fn(),
+    ReopenConflict: vi.fn(),
     Status: vi.fn(),
     OpenFile: vi.fn(),
     Commit: vi.fn(),
@@ -179,11 +180,71 @@ describe('ChangesView', () => {
     expect(Facade.Status).not.toHaveBeenCalled()
   })
 
-  it('FR-CONF-02 double-clicking a conflicted row calls Facade.OpenFile with its path', async () => {
+  it('FR-CONF-02 double-clicking a conflicted row opens the diff window on it as a conflict', async () => {
     const wrapper = mountWith({ conflicted: [{ path: 'c.txt', status: 'UU' }] })
     await wrapper.get('li').trigger('dblclick')
 
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: 'working',
+      conflicted: true,
+      path: 'c.txt',
+      oldPath: '',
+    })
+    expect(Facade.OpenFile).not.toHaveBeenCalled()
+  })
+
+  it('FR-CONF-02 a conflicted row\'s "Open in editor" button opens the editor', async () => {
+    const wrapper = mountWith({ conflicted: [{ path: 'c.txt', status: 'UU' }] })
+    await wrapper.get('[data-test="open-editor"]').trigger('click')
+
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'c.txt', 0)
+    expect(AppService.OpenDiff).not.toHaveBeenCalled()
+  })
+
+  it('FR-CONF-08 only a staged row of a resolved file has "Reopen conflict"; it confirms, then reopens', async () => {
+    const wrapper = mountWith({
+      staged: [
+        { path: 'r.txt', status: 'M' },
+        { path: 's.txt', status: 'M' },
+      ],
+      resolved: ['r.txt'],
+    })
+    const rows = wrapper.findAll('li')
+    const reopen = (i: number) => rows[i]!.find('[data-test="second-action"]')
+
+    expect(reopen(0).attributes('aria-label')).toBe('Reopen conflict')
+    expect(reopen(1).exists()).toBe(false)
+
+    await reopen(0).trigger('click')
+    const options = confirmOptions()
+    expect(options.header).toBe('Reopen conflict')
+    expect(options.message).toBe('Reopen the conflict in r.txt? Its resolution is lost.')
+    expect(Facade.ReopenConflict).not.toHaveBeenCalled()
+
+    options.accept()
+    expect(Facade.ReopenConflict).toHaveBeenCalledWith('/repo', 'r.txt')
+  })
+
+  it('FR-CONF-08 a resolved file without changes is listed under Conflicted and can be reopened', async () => {
+    const wrapper = mountWith({ resolved: ['f.txt'] })
+    const sections = wrapper.findAll('section section')
+    const conflicted = sections[sections.length - 1]!
+    const rows = conflicted.findAll('li')
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.text()).toContain('f.txt')
+    expect(rows[0]!.find('[data-test="action"]').exists()).toBe(false)
+    await rows[0]!.get('[data-test="second-action"]').trigger('click')
+    const options = confirmOptions()
+    expect(options.message).toBe('Reopen the conflict in f.txt? Its resolution is lost.')
+    options.accept()
+    expect(Facade.ReopenConflict).toHaveBeenCalledWith('/repo', 'f.txt')
+  })
+
+  it('FR-CONF-08 a resolved file with a staged change is listed only under Staged', () => {
+    const wrapper = mountWith({ staged: [{ path: 'f.txt', status: 'M' }], resolved: ['f.txt'] })
+
+    expect(wrapper.findAll('li')).toHaveLength(1)
   })
 
   it('FR-CONF-03 clicking a conflicted row\'s "Mark resolved" button calls Facade.StageFile with its path', async () => {
@@ -194,13 +255,11 @@ describe('ChangesView', () => {
     expect(Facade.StageFile).toHaveBeenCalledWith('/repo', 'c.txt')
   })
 
-  it('FR-CONF-02 a conflicted row is not selectable and opens no diff window', async () => {
+  it('FR-CONF-02 a conflicted row is not selectable in the changes view', async () => {
     const wrapper = mountWith({ conflicted: [{ path: 'c.txt', status: 'UU' }] })
     await wrapper.get('li').trigger('click')
-    await wrapper.get('li').trigger('dblclick')
 
     expect(wrapper.get('li').classes()).not.toContain('selected')
-    expect(AppService.OpenDiff).not.toHaveBeenCalled()
   })
 
   it('FR-CHG-10, FR-UX-03, QA-SAFE-01 an unstaged row\'s "Discard" confirms naming the path, then calls Facade.DiscardFile untracked=false', async () => {
@@ -345,14 +404,19 @@ describe('ChangesView', () => {
     await row(conflicted!, 'c.txt').trigger('dblclick')
     await row(conflicted!, 'c.txt').trigger('click')
 
-    expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
     expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
       kind: 'working',
       staged: false,
       path: 'a.txt',
       oldPath: '',
     })
-    expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'c.txt', 0)
+    expect(AppService.OpenDiff).toHaveBeenCalledTimes(2)
+    expect(AppService.OpenDiff).toHaveBeenLastCalledWith('/repo', {
+      kind: 'working',
+      conflicted: true,
+      path: 'c.txt',
+      oldPath: '',
+    })
     expect(row(conflicted!, 'c.txt').attributes('data-p-selected')).toBe('false')
   })
 })

@@ -248,11 +248,28 @@ type WindowAPI interface {
 	Pull(ctx context.Context, wt WorktreeID, mode PullMode) (string, error)
 
 	// PullWithStash is Pull with local changes in the way: after fetching,
-	// it stashes them (tagged, so Summary.PullStash finds the entry),
+	// it stashes them (tagged, so Summary.WaitingStash finds the entry),
 	// integrates, and pops that exact entry only if the integrate step ends
 	// cleanly. An integrate failure keeps the stash and is returned as-is;
 	// a conflicting pop is GitFailed.
 	PullWithStash(ctx context.Context, wt WorktreeID, mode PullMode) (string, error)
+
+	// Merge merges ref (a full ref name: refs/heads/x, refs/remotes/o/x,
+	// refs/tags/x) into wt's current branch: a fast-forward when possible,
+	// else a merge commit with git's default message; hooks run. Refused
+	// before git runs: an operation in progress (GitFailed, key
+	// operationInProgress), a detached HEAD (GitFailed, key detachedHead).
+	// Local changes in the way are DirtyWorktree (key mergeBlockedByChanges)
+	// unless stash: then they are stashed first and restored after a clean
+	// merge, as PullWithStash does. A stop is left for the conflict flow:
+	// Code Conflicts while files conflict, else Code Stopped with git's
+	// reason.
+	Merge(ctx context.Context, wt WorktreeID, ref string, stash bool) (IntegrateResult, error)
+
+	// Rebase rebases wt's current branch onto ref, flattening merge commits
+	// and moving no other branch. Same refusals, stash and stops as Merge
+	// (DirtyWorktree key rebaseBlockedByChanges).
+	Rebase(ctx context.Context, wt WorktreeID, ref string, stash bool) (IntegrateResult, error)
 
 	// PopStash applies the stash entry whose commit is sha and drops it on
 	// success; sha is resolved to its current stash@{n} at call time. A
@@ -314,6 +331,35 @@ type WindowAPI interface {
 	// operationNotSkippable): merge has no --skip, and rebase is not
 	// supported.
 	SkipOperation(ctx context.Context, wt WorktreeID) error
+
+	// Conflict reads path's conflict for the merge editor or the choice panel:
+	// its kind, the operation and sides' labels, and for Kind text the three
+	// sides, the working file as the result, its regions, its line ending and a
+	// fingerprint. All text has LF line breaks. A path with no unmerged entry is
+	// GitFailed (key notConflicted); a text conflict whose working file is gone
+	// is FileNotFound.
+	Conflict(ctx context.Context, wt WorktreeID, path string) (ConflictFile, error)
+
+	// SaveConflict writes text (LF line breaks) to path's working file in its
+	// line-ending convention and, if markResolved, stages it (git add). The
+	// file must still match fingerprint (GitFailed, key fileChangedSinceOpened,
+	// nothing written); markResolved with a conflict marker line left is
+	// GitFailed (key conflictMarkersLeft), nothing written. Returns the new
+	// fingerprint.
+	SaveConflict(ctx context.Context, wt WorktreeID, path, text, fingerprint string, markResolved bool) (string, error)
+
+	// ResolveConflict resolves path to one side or deletes it: current
+	// (checkout --ours + add), incoming (checkout --theirs + add), or delete
+	// (git rm). Current is always the side checked out (stage 2), also in a
+	// rebase. Git's refusals (a side without a version) are GitFailed.
+	ResolveConflict(ctx context.Context, wt WorktreeID, path string, choice ConflictChoice) error
+
+	// ReopenConflict turns path, resolved while the operation is still
+	// stopped, back into a conflict: its stages from git's resolve-undo record,
+	// and for a file with both sides the working file as git merged it (its
+	// markers). No operation in progress is GitFailed (key noOperation); no
+	// record is GitFailed (key notReopenable).
+	ReopenConflict(ctx context.Context, wt WorktreeID, path string) error
 
 	// RenameBranch renames name to newName, validated first (Code
 	// InvalidName).
@@ -378,7 +424,7 @@ type Version struct {
 }
 
 // Protocol is bumped whenever the wire format of API changes.
-const Protocol = 4
+const Protocol = 5
 
 // WorktreeID names a worktree session. Issued by the core that owns the
 // repo; opaque to the UI. The shell and the UI name a WSL distro's
@@ -406,10 +452,10 @@ type Summary struct {
 	EditorName   string    `json:"editorName"`    // the effective editor profile's Name
 	MessageDraft string    `json:"messageDraft"`  // "" if none
 
-	// PullStash is the commit of the newest stash entry PullWithStash made
-	// that is still in the stash list, "" if none. A commit, not a
-	// stash@{n} index, which shifts whenever anything else stashes.
-	PullStash string `json:"pullStash"`
+	// WaitingStash is the commit of the newest stash entry a pull, merge or rebase with stash made
+	// that is still in the stash list, "" if none. A commit, not a stash@{n} index, which shifts
+	// whenever anything else stashes.
+	WaitingStash string `json:"waitingStash"`
 }
 
 // Operation is a merge, rebase, cherry-pick or revert in progress.

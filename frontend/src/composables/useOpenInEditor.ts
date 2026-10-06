@@ -11,7 +11,7 @@ export function useOpenInEditor(
   wt: MaybeRefOrGetter<string>,
   run: ReturnType<typeof useCoreCall>['run'],
 ): {
-  openEditor: (f: ChangedFile, line?: number) => void
+  openEditor: (f: Pick<ChangedFile, 'path'>, line?: number) => void
   openFolder: () => void
   openFolderAt: (path: string) => void
 } {
@@ -28,7 +28,7 @@ export function useOpenInEditor(
   }
 
   return {
-    openEditor: (f: ChangedFile, line = 0) =>
+    openEditor: (f: Pick<ChangedFile, 'path'>, line = 0) =>
       open(() => Facade.OpenFile(toValue(wt), f.path, line)),
     openFolder: () => open(() => Facade.OpenFolder(toValue(wt))),
     openFolderAt: (path: string) => open(() => Facade.OpenFolderAt(path)),

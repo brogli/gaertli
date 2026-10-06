@@ -2,12 +2,14 @@ package core
 
 // ChangedFiles groups a worktree's current changes. A file changed both
 // ways (git's "MM"-shaped status line) appears once in Staged and once in
-// Unstaged.
+// Unstaged. Resolved lists, while an operation is in progress, the paths
+// resolved since it started that ReopenConflict can turn back into conflicts.
 type ChangedFiles struct {
 	Staged     []ChangedFile `json:"staged"`
 	Unstaged   []ChangedFile `json:"unstaged"`
 	Untracked  []ChangedFile `json:"untracked"`
 	Conflicted []ChangedFile `json:"conflicted"`
+	Resolved   []string      `json:"resolved"`
 }
 
 // LineSelection names the changed lines of one path's diff to stage,

@@ -37,6 +37,7 @@ export function diffWindowQuery(query: URLSearchParams): { wt: string; target: D
       from: query.get('from') ?? '',
       to: query.get('to') ?? '',
       staged: query.get('staged') === 'true',
+      conflicted: query.get('conflicted') === 'true',
       path: query.get('file') ?? '',
       oldPath: query.get('oldFile') ?? '',
     },

@@ -7,6 +7,7 @@ const { AppService, Facade, SettingsService } = vi.hoisted(() => ({
     PickAndOpen: vi.fn(),
     RecentRepos: vi.fn().mockResolvedValue([]),
     OpenPath: vi.fn(),
+    SetUnsavedWork: vi.fn().mockResolvedValue(undefined),
   },
   Facade: {
     CompareCommits: vi.fn().mockResolvedValue([]),
@@ -66,6 +67,7 @@ describe('App', () => {
         from: 'sha-a',
         to: 'sha-b',
         staged: false,
+        conflicted: false,
         path: 'a.txt',
         oldPath: 'old.txt',
       },

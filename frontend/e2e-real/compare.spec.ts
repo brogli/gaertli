@@ -1,8 +1,16 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Locator, Page, Request } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import { diffText, hunksText, logRow, pickFromContextMenu, rev, shortRev } from './helpers'
+import {
+  boundCallEndingWith,
+  diffText,
+  hunksText,
+  logRow,
+  pickFromContextMenu,
+  rev,
+  shortRev,
+} from './helpers'
 
 // Comparing two commits, or a commit with the working tree, in the main
 // window's side column. A double-click's diff window is a native window:
@@ -21,16 +29,6 @@ async function listedFiles(view: Locator): Promise<string[]> {
       ),
     )
   return rows.map((row) => row.replace(/\s+/g, ' ').trim()).sort()
-}
-
-// boundCallEndingWith resolves on the page's next bound-method call whose
-// arguments end with args.
-function boundCallEndingWith(page: Page, args: unknown[]): Promise<Request> {
-  return page.waitForRequest((req) => {
-    if (!req.url().endsWith('/wails/runtime')) return false
-    const sent: unknown[] = JSON.parse(req.postData() ?? '{}').args?.args ?? []
-    return JSON.stringify(sent.slice(-args.length)) === JSON.stringify(args)
-  })
 }
 
 async function ctrlClickCompare(page: Page, from: string, to: string): Promise<void> {

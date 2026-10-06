@@ -18,6 +18,7 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useAutoFetch } from '@/composables/useAutoFetch'
 import { useShortcut } from '@/composables/useShortcut'
+import { useWithShortcut } from '@/composables/useWithShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { BranchInUse, ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from '@/components/ErrorBanner.vue'
@@ -45,6 +46,7 @@ import { useLayout, useToolbarButton } from '@/lib/layout'
 const props = defineProps<{ path: string; distro?: string | undefined }>()
 const emit = defineEmits<{ 'open-settings': [] }>()
 const { t } = useI18n()
+const withShortcut = useWithShortcut()
 // The id every core call and child takes: path for a local worktree, its
 // UNC form for a WSL one. path stays what the window shows.
 const wt = repoPath(props.path, props.distro)
@@ -206,12 +208,7 @@ const sideView = computed<'details' | 'changes'>(() =>
         v-bind="toolbarButton"
         :icon="iconClass('refresh')"
         :label="compact ? '' : t('toolbar.refresh')"
-        :title="
-          t('shortcuts.withShortcut', {
-            action: t('toolbar.refresh'),
-            shortcut: t('shortcuts.refresh'),
-          })
-        "
+        :title="withShortcut('toolbar.refresh', 'shortcuts.refresh')"
         :aria-label="t('toolbar.refresh')"
         @click="refresh"
       />

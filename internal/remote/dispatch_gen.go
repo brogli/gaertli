@@ -44,6 +44,9 @@ func handlers(api core.API) handler.Map {
 		"CompareWithWorking": handler.New(func(ctx context.Context, p compareWithWorkingParams) ([]core.ChangedFile, error) {
 			return api.CompareWithWorking(ctx, p.Wt, p.Sha)
 		}),
+		"Conflict": handler.New(func(ctx context.Context, p conflictParams) (core.ConflictFile, error) {
+			return api.Conflict(ctx, p.Wt, p.Path)
+		}),
 		"ContinueOperation": handler.New(func(ctx context.Context, p continueOperationParams) error {
 			return api.ContinueOperation(ctx, p.Wt)
 		}),
@@ -101,6 +104,9 @@ func handlers(api core.API) handler.Map {
 		"MainWorktree": handler.New(func(ctx context.Context, p mainWorktreeParams) (core.Worktree, error) {
 			return api.MainWorktree(ctx, p.GitDir)
 		}),
+		"Merge": handler.New(func(ctx context.Context, p mergeParams) (core.IntegrateResult, error) {
+			return api.Merge(ctx, p.Wt, p.Ref, p.Stash)
+		}),
 		"OpenFile": handler.New(func(ctx context.Context, p openFileParams) error {
 			return api.OpenFile(ctx, p.Wt, p.Path, p.Line)
 		}),
@@ -131,6 +137,9 @@ func handlers(api core.API) handler.Map {
 		"PushTarget": handler.New(func(ctx context.Context, p pushTargetParams) (core.PushTarget, error) {
 			return api.PushTarget(ctx, p.Wt)
 		}),
+		"Rebase": handler.New(func(ctx context.Context, p rebaseParams) (core.IntegrateResult, error) {
+			return api.Rebase(ctx, p.Wt, p.Ref, p.Stash)
+		}),
 		"Refresh": handler.New(func(ctx context.Context, p refreshParams) error {
 			return api.Refresh(ctx, p.Wt)
 		}),
@@ -146,11 +155,20 @@ func handlers(api core.API) handler.Map {
 		"RenameBranch": handler.New(func(ctx context.Context, p renameBranchParams) error {
 			return api.RenameBranch(ctx, p.Wt, p.Name, p.NewName)
 		}),
+		"ReopenConflict": handler.New(func(ctx context.Context, p reopenConflictParams) error {
+			return api.ReopenConflict(ctx, p.Wt, p.Path)
+		}),
 		"Reset": handler.New(func(ctx context.Context, p resetParams) (core.ResetResult, error) {
 			return api.Reset(ctx, p.Wt, p.Sha, p.Mode)
 		}),
+		"ResolveConflict": handler.New(func(ctx context.Context, p resolveConflictParams) error {
+			return api.ResolveConflict(ctx, p.Wt, p.Path, p.Choice)
+		}),
 		"Revert": handler.New(func(ctx context.Context, p revertParams) error {
 			return api.Revert(ctx, p.Wt, p.Shas, p.Opts)
+		}),
+		"SaveConflict": handler.New(func(ctx context.Context, p saveConflictParams) (string, error) {
+			return api.SaveConflict(ctx, p.Wt, p.Path, p.Text, p.Fingerprint, p.MarkResolved)
 		}),
 		"SearchLog": handler.New(func(ctx context.Context, p searchLogParams) (core.LogSearchResult, error) {
 			return api.SearchLog(ctx, p.Wt, p.Query)

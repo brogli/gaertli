@@ -20,6 +20,7 @@ func TestFR_DIFF_07_DiffWindowTitleNamesTheWorktreeAndWhatItShows(t *testing.T) 
 		{DiffTarget{Kind: RangeDiff, From: a, To: b}, "project: compare 1111111..2222222"},
 		{DiffTarget{Kind: AgainstWorkingDiff, Sha: a}, "project: compare 1111111..working tree"},
 		{DiffTarget{Kind: WorkingDiff}, "project: changes"},
+		{DiffTarget{Kind: WorkingDiff, Path: "a/b.txt", Conflicted: true}, "project: conflict in a/b.txt"},
 	}
 	for _, wt := range []core.WorktreeID{"/x/project", `\\wsl.localhost\Ubuntu\home\u\project`} {
 		for _, c := range cases {
@@ -52,6 +53,10 @@ func TestFR_DIFF_07_DiffURLCarriesTheWorktreeAndTheTarget(t *testing.T) {
 		{
 			DiffTarget{Kind: AgainstWorkingDiff, Sha: "s", Path: "f"},
 			with(url.Values{"kind": {"againstWorking"}, "sha": {"s"}, "file": {"f"}}),
+		},
+		{
+			DiffTarget{Kind: WorkingDiff, Path: "f", Conflicted: true},
+			with(url.Values{"kind": {"working"}, "conflicted": {"true"}, "file": {"f"}}),
 		},
 		{
 			DiffTarget{Kind: WorkingDiff, Path: "f", Staged: true},

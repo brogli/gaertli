@@ -19,13 +19,16 @@ const (
 // DiffTarget is what a diff window shows: its kind's files, starting at
 // Path (OldPath for a rename).
 type DiffTarget struct {
-	Kind    DiffKind `json:"kind"`
-	Sha     string   `json:"sha,omitempty"`
-	From    string   `json:"from,omitempty"`
-	To      string   `json:"to,omitempty"`
-	Staged  bool     `json:"staged,omitempty"`
-	Path    string   `json:"path"`
-	OldPath string   `json:"oldPath,omitempty"`
+	Kind   DiffKind `json:"kind"`
+	Sha    string   `json:"sha,omitempty"`
+	From   string   `json:"from,omitempty"`
+	To     string   `json:"to,omitempty"`
+	Staged bool     `json:"staged,omitempty"`
+	// Conflicted marks a conflicted file of the working tree: the window
+	// shows its conflict, not a diff.
+	Conflicted bool   `json:"conflicted,omitempty"`
+	Path       string `json:"path"`
+	OldPath    string `json:"oldPath,omitempty"`
 }
 
 // diffWindowKey names a diff window by its main window's id, or, for a
@@ -46,6 +49,9 @@ func diffWindowTitle(wt core.WorktreeID, t DiffTarget) string {
 	case AgainstWorkingDiff:
 		return text(diffAgainstWorking, map[string]string{"name": name, "sha": shortSHA(t.Sha)})
 	default:
+		if t.Conflicted {
+			return text(diffConflictTitle, map[string]string{"name": name, "file": t.Path})
+		}
 		return text(diffWorkingTitle, map[string]string{"name": name})
 	}
 }
@@ -60,6 +66,9 @@ func diffURL(wt core.WorktreeID, t DiffTarget) string {
 	}
 	if t.Staged {
 		q.Set("staged", "true")
+	}
+	if t.Conflicted {
+		q.Set("conflicted", "true")
 	}
 	return "/?" + q.Encode()
 }

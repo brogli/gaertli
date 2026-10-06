@@ -32,3 +32,18 @@ const (
 	BranchUpdated  UpdateOutcome = "updated"
 	BranchUpToDate UpdateOutcome = "upToDate"
 )
+
+// IntegrateResult is Merge's and Rebase's result.
+type IntegrateResult struct {
+	Outcome IntegrateOutcome `json:"outcome"`
+}
+
+// IntegrateOutcome is what Merge or Rebase did to the current branch.
+type IntegrateOutcome string
+
+const (
+	IntegrateUpToDate    IntegrateOutcome = "upToDate"    // HEAD did not move
+	IntegrateFastForward IntegrateOutcome = "fastForward" // Merge moved HEAD to the merged ref
+	IntegrateMerged      IntegrateOutcome = "merged"      // Merge made a merge commit
+	IntegrateRebased     IntegrateOutcome = "rebased"
+)

@@ -100,6 +100,15 @@ func (f *Forwarder) CompareWithWorking(ctx context.Context, wt core.WorktreeID, 
 	return c.CompareWithWorking(ctx, coreID, sha)
 }
 
+func (f *Forwarder) Conflict(ctx context.Context, wt core.WorktreeID, path string) (core.ConflictFile, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.ConflictFile
+		return zero, err
+	}
+	return c.Conflict(ctx, coreID, path)
+}
+
 func (f *Forwarder) ContinueOperation(ctx context.Context, wt core.WorktreeID) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
@@ -264,6 +273,15 @@ func (f *Forwarder) MainWorktree(ctx context.Context, gitDir core.RepoPath) (cor
 	return c.MainWorktree(ctx, gitDir)
 }
 
+func (f *Forwarder) Merge(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.IntegrateResult
+		return zero, err
+	}
+	return c.Merge(ctx, coreID, ref, stash)
+}
+
 func (f *Forwarder) OpenFile(ctx context.Context, wt core.WorktreeID, path string, line int) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
@@ -349,6 +367,15 @@ func (f *Forwarder) PushTarget(ctx context.Context, wt core.WorktreeID) (core.Pu
 	return c.PushTarget(ctx, coreID)
 }
 
+func (f *Forwarder) Rebase(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero core.IntegrateResult
+		return zero, err
+	}
+	return c.Rebase(ctx, coreID, ref, stash)
+}
+
 func (f *Forwarder) Refresh(ctx context.Context, wt core.WorktreeID) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
@@ -390,6 +417,14 @@ func (f *Forwarder) RenameBranch(ctx context.Context, wt core.WorktreeID, name s
 	return c.RenameBranch(ctx, coreID, name, newName)
 }
 
+func (f *Forwarder) ReopenConflict(ctx context.Context, wt core.WorktreeID, path string) error {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		return err
+	}
+	return c.ReopenConflict(ctx, coreID, path)
+}
+
 func (f *Forwarder) Reset(ctx context.Context, wt core.WorktreeID, sha string, mode core.ResetMode) (core.ResetResult, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
@@ -399,12 +434,29 @@ func (f *Forwarder) Reset(ctx context.Context, wt core.WorktreeID, sha string, m
 	return c.Reset(ctx, coreID, sha, mode)
 }
 
+func (f *Forwarder) ResolveConflict(ctx context.Context, wt core.WorktreeID, path string, choice core.ConflictChoice) error {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		return err
+	}
+	return c.ResolveConflict(ctx, coreID, path, choice)
+}
+
 func (f *Forwarder) Revert(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
 	}
 	return c.Revert(ctx, coreID, shas, opts)
+}
+
+func (f *Forwarder) SaveConflict(ctx context.Context, wt core.WorktreeID, path string, text string, fingerprint string, markResolved bool) (string, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero string
+		return zero, err
+	}
+	return c.SaveConflict(ctx, coreID, path, text, fingerprint, markResolved)
 }
 
 func (f *Forwarder) SearchLog(ctx context.Context, wt core.WorktreeID, query string) (core.LogSearchResult, error) {
