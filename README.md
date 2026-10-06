@@ -32,6 +32,8 @@ no auto-update: installing a newer version over the old one keeps your settings.
   "Edit environment variables for your account").
 - **Windows, winget** (once published): `winget install brogli.nebegit`; `winget upgrade` and
   `winget uninstall` give the same result as the installer.
+- **WSL**: install the Windows app (any of the above); nothing is installed inside the distro by
+  hand. The Linux packages below are for native Linux desktops, not for WSL. See Known limits.
 - **Linux, deb/rpm**: install with your package manager, e.g.
   `sudo apt install ./nebegit-linux-amd64.deb` or `sudo dnf install ./nebegit-linux-amd64.rpm`.
 - **Linux, other distributions**: unpack `nebegit-linux-amd64.tar.gz` and run the `nebegit` binary
@@ -95,9 +97,13 @@ editor command it runs.
 
 ## Known limits
 
-- **WSL**: open a WSL repo with "Open folder…" through the Linux entry (`\\wsl.localhost\<distro>`).
-  Only WSL 2 distros are supported. Before nebegit places its helper inside a distro, the first time
-  and after each update, it asks for consent, naming the distro; declining leaves nothing behind.
+- **WSL**: open a WSL repo with "Open folder…" through the Linux entry (`\\wsl.localhost\<distro>`)
+  or with `nebegit .` from a WSL terminal; the window is a native Windows window. Only WSL 2 distros
+  are supported. Git, hooks and the editor command run inside the distro through a helper that
+  nebegit copies to `~/.cache/nebegit/<version>/` there; that helper is the only thing it places in
+  a distro. The first time, and after each update, it asks for consent, naming the distro; declining
+  leaves nothing behind. `wsl --shutdown` is harmless: the next action starts the helper again and
+  the window reloads.
 - **SSH passphrase**: nebegit runs git with interactive prompting disabled, so a
   passphrase-protected SSH key needs a running `ssh-agent` with the key already added; otherwise the
   git call fails.
