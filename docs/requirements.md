@@ -68,6 +68,6 @@ comparison, worktree handling, and safe sync actions.
 
 ## Out of scope for v1
 
-Clone · built-in merge editor · interactive rebase (beyond squash and fixup, FR-LOG-14) · stash
-management (beyond FR-SYNC-09) · tag management · blame · file history view · submodules ·
-LFS-specific features · auto-update · code signing.
+Clone · interactive rebase (beyond squash and fixup, FR-LOG-14) · stash management (beyond
+FR-SYNC-09) · tag management · blame · file history view · submodules · LFS-specific features ·
+auto-update · code signing.
