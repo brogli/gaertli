@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [dev, main]
   workflow_call:
+  # By hand (gh workflow run ci --ref dev): the full set, Windows and macOS included.
+  workflow_dispatch:
 
 permissions:
   contents: read

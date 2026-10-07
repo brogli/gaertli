@@ -71,6 +71,6 @@ Linux jobs side by side: lint (treefmt, type check, traceability, licence check)
 frontend tests with the Linux build and the Windows cross-build (TR-26), the mock and the
 real-backend e2e suites, and the Go tests with the race detector against the oldest supported git,
 built from source (QA-COMP-03). The Windows job (the Go tests on Windows, where every git process is
-slow) and the macOS build are billed at a multiple, so they run for pull requests into `main` and in
-the release workflow. A newer push cancels the run in progress. The performance checks run on demand
-(`task bench`).
+slow) and the macOS build are billed at a multiple, so they run for pull requests into `main`, in
+the release workflow and when started by hand. A newer push cancels the run in progress. The
+performance checks run on demand (`task bench`).
