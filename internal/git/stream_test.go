@@ -30,8 +30,8 @@ func TestADR_5_StreamCallsOnRecordAsRecordsArrive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if firstAt > 100*time.Millisecond {
-		t.Errorf("first record arrived after %s, want well under 100ms (proves streaming, not buffer-then-split)", firstAt)
+	if firstAt > 75*time.Millisecond {
+		t.Errorf("first record arrived after %s, want well under the 150ms record delay (proves streaming, not buffer-then-split)", firstAt)
 	}
 	if want := []string{"A", "B", "C"}; !slices.Equal(records, want) {
 		t.Errorf("records = %q, want %q", records, want)
@@ -72,7 +72,7 @@ func TestADR_5_StreamCapturesStderrAndExitCode(t *testing.T) {
 }
 
 // streamSlowly makes fakegit's log call print the NUL-terminated records
-// 500ms apart.
+// 150ms apart.
 func streamSlowly(t *testing.T, records string) {
 	t.Helper()
 	file := filepath.Join(t.TempDir(), "records")
@@ -80,5 +80,5 @@ func streamSlowly(t *testing.T, records string) {
 		t.Fatal(err)
 	}
 	t.Setenv("FAKEGIT_STREAM_FILE", file)
-	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "500")
+	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "150")
 }
