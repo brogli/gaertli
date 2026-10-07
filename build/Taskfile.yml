@@ -42,6 +42,7 @@ tasks:
     sources:
       - '**/*'
       - exclude: node_modules/**/*
+      - exclude: dist-e2e/**/*
     generates:
       - dist/**/*
     deps:
