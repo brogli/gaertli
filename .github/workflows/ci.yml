@@ -10,14 +10,21 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch or pull request cancels the run in
+# progress. A release's call (workflow_dispatch) is never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
 jobs:
   linux:
     # The Nix shell supplies GTK4, WebKitGTK, golangci-lint, treefmt, the
-    # task and wails3 shims and Playwright's browsers.
+    # task and wails3 shims and Playwright's browsers. One job per Task
+    # aggregate, so the slow parts run side by side.
     strategy:
       fail-fast: false
       matrix:
-        task: [ci, e2e, e2e:real]
+        task: ['ci:lint', 'ci:go', 'ci:frontend', e2e, 'e2e:real']
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
@@ -30,18 +37,35 @@ jobs:
 
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
 
-      # Go is not part of the Nix shell. Caches the module and build caches.
+      # Go is not part of the Nix shell. Its caches are keyed by job and
+      # commit, with the previous commit's as the fallback, so each run
+      # compiles only what changed (setup-go's own cache saves once per
+      # go.sum).
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: false
 
-      - name: pnpm store path
-        id: pnpm-store
-        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Cache paths
+        id: paths
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "pnpm=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ steps.pnpm-store.outputs.path }}
+          path: |
+            ${{ steps.paths.outputs.gomod }}
+            ${{ steps.paths.outputs.gobuild }}
+          key: go-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            go-${{ matrix.task }}-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.pnpm }}
           key: pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-
 
@@ -57,7 +81,7 @@ jobs:
         run: task ${{ matrix.task }}
 
       - name: Upload Playwright report
-        if: failure() && matrix.task != 'ci'
+        if: failure() && startsWith(matrix.task, 'e2e')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report-${{ strategy.job-index }}
@@ -67,7 +91,12 @@ jobs:
   windows:
     # Only Windows can run the Go tests' Windows paths (processes, paths,
     # the WSL core). The Windows binary itself is cross-compiled on Linux,
-    # in the linux job's `task ci`.
+    # in the linux job's `task ci:frontend`. Billed at twice the Linux rate
+    # and slow (git starts slowly there), so it runs for pull requests into
+    # main and for releases, not for every push.
+    if:
+      github.event_name != 'push' && (github.event_name != 'pull_request' || github.base_ref ==
+      'main')
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -78,18 +107,43 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Cache paths
+        id: paths
+        shell: bash
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.paths.outputs.gomod }}
+            ${{ steps.paths.outputs.gobuild }}
+          key: go-windows-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-windows-${{ hashFiles('go.sum') }}-
+            go-windows-
 
       - name: Setup (online)
         run: go mod download
 
+      # -count=1: Go's test cache travels in the build cache, and a cached
+      # pass does not see a changed git on the runner image.
       - name: Go tests (offline)
         env:
           GOPROXY: off
           GOTOOLCHAIN: local
-          GOFLAGS: -mod=readonly
+          GOFLAGS: -mod=readonly -count=1
         run: go tool task test:go:core
 
   macos:
+    # A build only (QA-PORT-04), billed at ten times the Linux rate: pull
+    # requests into main and releases.
+    if:
+      github.event_name != 'push' && (github.event_name != 'pull_request' || github.base_ref ==
+      'main')
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -100,6 +154,23 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Cache paths
+        id: paths
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.paths.outputs.gomod }}
+            ${{ steps.paths.outputs.gobuild }}
+          key: go-macos-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-macos-${{ hashFiles('go.sum') }}-
+            go-macos-
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -140,6 +211,23 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Cache paths
+        id: paths
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.paths.outputs.gomod }}
+            ${{ steps.paths.outputs.gobuild }}
+          key: go-git-2-42-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-git-2-42-${{ hashFiles('go.sum') }}-
+            go-git-2-42-
 
       - name: Cache git 2.42 build
         id: git-2-42-cache

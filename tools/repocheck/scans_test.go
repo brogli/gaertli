@@ -1,7 +1,6 @@
-// Package repocheck holds the tests that scan the working tree (this file)
-// and those that run the repo's tools on planted faults (repocheck_test.go,
-// build tag repocheck). Tests that plant files live here only, so they never
-// run in parallel with each other.
+// Package repocheck holds the tests that scan the working tree for what no
+// linter checks: foreign lockfiles, owner-specific defaults, test-file
+// placement, glossary use, the release version script.
 package repocheck_test
 
 import (

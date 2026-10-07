@@ -73,16 +73,14 @@ tasks:
     cmds:
       - go test {{.FLAGS}} ./internal/... ./cmd/nebegit-core/... ./build/windows/bin/...
 
-  test:repocheck:
-    summary:
-      Runs the repo checks that run the tools on planted faults; behind a build tag because they take
-      minutes and change only with the tooling config (the working-tree scans run with `go test`)
-    env:
-      GOPROXY: off
-      GOFLAGS: -mod=readonly
-      GOTOOLCHAIN: local
+  test:frontend:
+    summary: Runs the Vitest component tests offline
+    deps:
+      - task: common:install:frontend:deps
+      - task: common:generate:bindings
     cmds:
-      - go test -tags repocheck ./tools/repocheck
+      - task: common:frontend:run
+        vars: { SCRIPT: test:unit }
 
   test:
     summary: Runs Go and frontend tests offline
@@ -90,8 +88,7 @@ tasks:
       - task: common:build:frontend
     cmds:
       - task: test:go
-      - task: common:frontend:run
-        vars: { SCRIPT: test:unit }
+      - task: test:frontend
 
   fmt:
     summary: Lint with fixes, then format the whole repo (treefmt.toml)
@@ -199,14 +196,32 @@ tasks:
     cmds:
       - go build -trimpath -o internal/remote/nebegit-core-linux ./cmd/nebegit-core
 
-  ci:
-    summary: What CI runs offline after `task setup`
+  ci:lint:
+    summary: CI's lint job (treefmt, type check, traceability, licence check)
     cmds:
       - task: lint
       - task: trace
       - task: licence-check
-      - task: test
+
+  ci:go:
+    summary: CI's Go job (the Go tests embed the built frontend)
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - task: test:go
+
+  ci:frontend:
+    summary:
+      CI's frontend job (component tests, the Linux build, the Windows cross-build and installer)
+    cmds:
+      - task: test:frontend
       - task: build
       - task: build:core
       - task: windows:package:dryrun
-      - task: test:repocheck
+
+  ci:
+    summary: Everything CI runs offline after `task setup`, as its Linux jobs split it
+    cmds:
+      - task: ci:lint
+      - task: ci:go
+      - task: ci:frontend

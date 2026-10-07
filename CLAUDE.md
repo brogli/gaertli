@@ -50,10 +50,10 @@ needs.
   Go `TestFR_LOG_01_...`, Vitest `it('FR-LOG-01 ...')`.
 - Frontend tests: Vitest component tests first; Playwright only where a component test cannot cover
   it, and the task plan says why.
-- Tests prove behaviour, never restate configuration (a flag, a version, an include list). Tooling
-  is accepted by running it on a planted fault, e.g. `treefmt --ci` on an unformatted file and a
-  lint error. Tests that plant files in the working tree live in `tools/repocheck`, so they never
-  run in parallel with each other.
+- Tests prove behaviour, never restate configuration (a flag, a version, an include list). A tooling
+  change is checked once by hand on a planted fault (e.g. `treefmt --ci` on an unformatted file and
+  a lint error), recorded in its task plan; no permanent test of the tool config. `tools/repocheck`
+  holds working-tree scans only.
 - Comments state facts only: no task plan numbers, no requirement, ADR or TR IDs as labels, no
   research or review narration.
 - Anything found done ugly gets fixed, also outside the current task, in a separate `simplify:`
@@ -80,9 +80,6 @@ needs.
   status (`task ci && git commit …`), never on an echo.
 - Run `task ci` before committing CI or Taskfile changes: CI runs the same tasks, and no test
   restates the workflows.
-- `task test:repocheck` runs the tool-on-planted-fault tests of `tools/repocheck` (build tag
-  `repocheck`, so `go test ./...` skips them); CI runs it only when tooling config changes. The
-  package's working-tree scans stay untagged.
 - Regenerate the core's generated code with `cd internal/core && go run ../../tools/gencore` (from
   the repo root it fails).
 - Windows build: `nix develop --command task windows:build` (an exported `GOOS=windows` breaks
