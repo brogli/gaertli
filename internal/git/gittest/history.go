@@ -97,3 +97,14 @@ func shasFromMarks(t *testing.T, path string, n int) []string {
 	}
 	return shas
 }
+
+// Copy duplicates the repo in src, working tree and .git, into a new temp
+// dir. The copy holds no reference to src unless src has linked worktrees.
+func Copy(t *testing.T, src string) *Repo {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS(src)); err != nil {
+		t.Fatal(err)
+	}
+	return &Repo{Dir: dir}
+}

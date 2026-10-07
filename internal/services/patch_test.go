@@ -69,10 +69,11 @@ func TestQA_COMP_01_DiffWorkingAndStageLinesIgnoreConfigThatChangesThePatchFrami
 		{"diff.suppressBlankEmpty", "true"},
 		{"diff.interHunkContext", "3"},
 	}
+	original := gittest.New(t)
+	framingFixture(t, original.Dir)
 	for _, kv := range configs {
 		t.Run(kv[0], func(t *testing.T) {
-			repo := gittest.New(t)
-			framingFixture(t, repo.Dir)
+			repo := gittest.Copy(t, original.Dir)
 			gittest.Run(t, repo.Dir, "config", kv[0], kv[1])
 
 			got, err := diffWorking(t, repo.Dir, "f.txt", core.DiffOptions{})

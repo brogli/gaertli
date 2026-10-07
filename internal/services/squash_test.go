@@ -156,11 +156,12 @@ const uncleanMessage = "amend! Subject\n\n# hash line\n; semicolon line\n\n\n\nt
 
 func TestFR_LOG_14_TheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T) {
 	t.Parallel()
+	original := gittest.New(t)
+	l := lineFixture(t, original.Dir)
 	for _, cleanup := range []string{"strip", "whitespace", "scissors", "verbatim"} {
 		for _, commentChar := range []string{"#", ";"} {
 			t.Run(cleanup+" "+commentChar, func(t *testing.T) {
-				repo := gittest.New(t)
-				l := lineFixture(t, repo.Dir)
+				repo := gittest.Copy(t, original.Dir)
 				gittest.Run(t, repo.Dir, "config", "commit.cleanup", cleanup)
 				gittest.Run(t, repo.Dir, "config", "core.commentChar", commentChar)
 				c, wt := openWorktree(t, repo.Dir)

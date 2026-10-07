@@ -1,6 +1,31 @@
 package gittest
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestTR_14_CopyIsAnIndependentRepoWithTheSameState(t *testing.T) {
+	original := New(t)
+	shas := History(t, original.Dir, Step{Message: "base", Files: map[string]string{"a.txt": "a\n"}})
+	if err := os.WriteFile(filepath.Join(original.Dir, "a.txt"), []byte("edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cp := Copy(t, original.Dir)
+	Commit(t, cp.Dir, "b.txt", "b\n", "only in the copy")
+
+	if got := Out(t, cp.Dir, "log", "--format=%s", "-2"); got != "only in the copy\nbase" {
+		t.Errorf("copy log = %q", got)
+	}
+	if got := Out(t, cp.Dir, "status", "--porcelain"); got != "M a.txt" {
+		t.Errorf("copy status = %q, want the edit carried over", got)
+	}
+	if got := HeadSHA(t, original.Dir); got != shas[0] {
+		t.Errorf("original HEAD = %s, want unchanged %s", got, shas[0])
+	}
+}
 
 func TestTR_14_HistoryWritesBranchesAndMergeInOneRun(t *testing.T) {
 	repo := New(t)

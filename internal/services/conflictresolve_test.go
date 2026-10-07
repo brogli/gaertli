@@ -120,14 +120,21 @@ var stoppedOperations = []string{"merge", "rebase"}
 
 func stoppedOn(t *testing.T, op, path string, base, current, incoming version) (*Core, core.WorktreeID, string) {
 	t.Helper()
+	dir := stoppedDir(t, op, path, base, current, incoming)
+	c, id := openWorktree(t, dir)
+	return c, id, dir
+}
+
+// stoppedDir is a repo stopped by op on the diverged path.
+func stoppedDir(t *testing.T, op, path string, base, current, incoming version) string {
+	t.Helper()
 	dir := divergedRepo(t, path, base, current, incoming)
 	if op == "merge" {
 		tryGit(t, dir, "merge", "side")
 	} else {
 		tryGit(t, dir, "rebase", "side")
 	}
-	c, id := openWorktree(t, dir)
-	return c, id, dir
+	return dir
 }
 
 func TestFR_CONF_07_ResolveConflictTakesASideOrDeletes(t *testing.T) {
@@ -139,10 +146,12 @@ func TestFR_CONF_07_ResolveConflictTakesASideOrDeletes(t *testing.T) {
 	}
 	for shape, v := range shapes {
 		for _, op := range stoppedOperations {
+			stopped := stoppedDir(t, op, "f.bin", v[0], v[1], v[2])
 			for _, choice := range []core.ConflictChoice{core.ChooseCurrent, core.ChooseIncoming, core.ChooseDelete} {
 				t.Run(shape+"/"+op+"/"+string(choice), func(t *testing.T) {
 					t.Parallel()
-					c, wt, dir := stoppedOn(t, op, "f.bin", v[0], v[1], v[2])
+					dir := gittest.Copy(t, stopped).Dir
+					c, wt := openWorktree(t, dir)
 					stages := map[int][]byte{2: stageBytes(t, dir, 2, "f.bin"), 3: stageBytes(t, dir, 3, "f.bin")}
 					want := map[core.ConflictChoice][]byte{core.ChooseCurrent: stages[2], core.ChooseIncoming: stages[3]}[choice]
 
