@@ -41,17 +41,17 @@ includes = [
 ]
 priority = 3
 
-# The standalone binaries: `golangci-lint fmt` does the same work in ~40 s
-# instead of under a second.
+# The standalone tools from go.mod's tool directives: `golangci-lint fmt`
+# does the same work in ~40 s instead of under a second.
 [formatter.goimports]
-command = "goimports"
-options = ["-w"]
+command = "go"
+options = ["tool", "goimports", "-w"]
 includes = ["*.go"]
 priority = 3
 
 [formatter.gofumpt]
-command = "gofumpt"
-options = ["-w"]
+command = "go"
+options = ["tool", "gofumpt", "-w"]
 includes = ["*.go"]
 priority = 4
 

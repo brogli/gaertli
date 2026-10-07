@@ -8,6 +8,8 @@ tool (
 	github.com/go-task/task/v3/cmd/task
 	github.com/google/go-licenses/v2
 	github.com/wailsapp/wails/v3/cmd/wails3
+	golang.org/x/tools/cmd/goimports
+	mvdan.cc/gofumpt
 )
 
 require (
@@ -231,6 +233,7 @@ require (
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
@@ -245,6 +248,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
+	mvdan.cc/gofumpt v0.12.0 // indirect
 	mvdan.cc/sh/moreinterp v0.0.0-20260817215856-d6550df7ed8d // indirect
 	mvdan.cc/sh/v3 v3.13.2-0.20260817215856-d6550df7ed8d // indirect
 )

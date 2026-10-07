@@ -24,8 +24,6 @@
               nodejs_24
               pnpm_11
               golangci-lint
-              gofumpt
-              gotools # goimports
               treefmt
               nixfmt
               (goTool "task")
