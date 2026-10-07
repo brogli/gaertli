@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/brogli/nebegit/internal/core"
 )
@@ -25,10 +26,29 @@ func (v Version) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
+// versions holds the version of every git executable that passed
+// CheckVersion, by Runner.Git: git does not change while the app runs, and
+// every worktree open asks.
+var versions sync.Map
+
 // CheckVersion runs "git --version" and returns *core.Error{Code: GitTooOld}
 // if git cannot be started, its output cannot be parsed, or it is older
-// than MinVersion.
+// than MinVersion. A passed check is remembered for the process; a failed
+// one is repeated, so an installed or upgraded git is seen on the next
+// call.
 func (r Runner) CheckVersion(ctx context.Context) (Version, error) {
+	if v, ok := versions.Load(r.Git); ok {
+		return v.(Version), nil
+	}
+	v, err := r.checkVersion(ctx)
+	if err != nil {
+		return Version{}, err
+	}
+	versions.Store(r.Git, v)
+	return v, nil
+}
+
+func (r Runner) checkVersion(ctx context.Context) (Version, error) {
 	result, err := r.Run(ctx, Call{Args: []string{"--version"}, ReadOnly: true})
 	if err != nil {
 		return Version{}, core.Errorf(core.GitTooOld, "git --version: %v", err)
