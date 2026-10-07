@@ -7,6 +7,7 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ App
 
 import BranchInWorktreeDialog from '../BranchInWorktreeDialog.vue'
 import { BranchInUse } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { footerButtons } from '@/testing/dialog'
 
@@ -86,9 +87,7 @@ describe('BranchInWorktreeDialog', () => {
   })
 
   it('FR-BR-05 a rejection shows in the banner and keeps the dialog open', async () => {
-    AppService.SelectWorktree.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'worktree is gone' } }),
-    )
+    AppService.SelectWorktree.mockRejectedValueOnce(wailsError('worktree is gone'))
     const { wrapper, body } = await mountInBody(BranchInWorktreeDialog, {
       props: { branch: 'side', path: '/home/u/r-side' },
     })

@@ -13,6 +13,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import CompareWorkingView from '../CompareWorkingView.vue'
 import { useCompareStore } from '@/stores/compare'
+import { pressKey } from '@/testing/pressKey'
 import { commitRow } from '@/testing/fixtures/log-rows'
 import type { ChangedFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
@@ -109,7 +110,7 @@ describe('CompareWorkingView', () => {
   it('FR-UX-05 FR-CMP-04 pressing Escape leaves the working-tree compare', async () => {
     const { compare } = await mountAgainstWorking()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    pressKey('Escape')
 
     expect(compare.workingCommit).toBeNull()
   })

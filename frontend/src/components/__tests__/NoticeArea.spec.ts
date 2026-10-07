@@ -1,8 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick } from 'vue'
-import NoticeArea from '../NoticeArea.vue'
-import { mountInBody } from '@/testing/mountInBody'
+import { mountNotices } from '@/testing/mountNotices'
 import { findButton } from '@/testing/findButton'
 import { errorNotice, useNotices, type AppNotice } from '@/lib/notice'
 import { Code } from '../../../bindings/github.com/brogli/nebegit/internal/core'
@@ -22,7 +21,7 @@ function mountShow(message: AppNotice): void {
 
 // showNotice mounts the notice area and shows message under kind.
 async function showNotice(message: AppNotice) {
-  const { body } = await mountInBody(NoticeArea)
+  const body = await mountNotices()
   mountShow(message)
   await flushPromises()
   return body
@@ -90,7 +89,7 @@ describe('NoticeArea', () => {
     // switches to fake timers before showing message: its close timeout,
     // set as the message mounts, is one the test can advance.
     async function showThenFakeTimers(message: AppNotice) {
-      const { body } = await mountInBody(NoticeArea)
+      const body = await mountNotices()
       vi.useFakeTimers()
       mountShow(message)
       await nextTick()

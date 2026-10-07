@@ -7,6 +7,10 @@ vi.mock(
   '../../../bindings/github.com/brogli/nebegit/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
+import { expectIconOnly } from '@/testing/expectIconOnly'
+import { pressKey } from '@/testing/pressKey'
+import { mountNotices } from '@/testing/mountNotices'
+import { wailsError } from '@/testing/errors'
 import { AppService, Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
@@ -33,7 +37,6 @@ import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 import SyncControls from '../SyncControls.vue'
-import NoticeArea from '../NoticeArea.vue'
 import { useJobsStore } from '@/stores/jobs'
 import { useRefsStore } from '@/stores/refs'
 import {
@@ -271,16 +274,12 @@ describe('SyncControls', () => {
     setRefs({ upstream: 'origin/main' })
     const withUpstream = await mountControls({ compact: true })
     const push = findButton(withUpstream.body, 'Push')!
-    expect(push.attributes('title')).toBe('Push · Ctrl+Shift+K')
-    expect(push.attributes('aria-label')).toBe('Push')
-    expect(push.find('.p-button-label').exists()).toBe(false)
+    expectIconOnly(push, 'Push', 'Push · Ctrl+Shift+K')
 
     setRefs({ upstream: '' }, ['origin', 'upstream'])
     const noUpstream = await mountControls({ compact: true })
     const pushNoUpstream = findButton(noUpstream.body, 'Push')!
-    expect(pushNoUpstream.attributes('title')).toBe('Push · Ctrl+Shift+K')
-    expect(pushNoUpstream.attributes('aria-label')).toBe('Push')
-    expect(pushNoUpstream.find('.p-button-label').exists()).toBe(false)
+    expectIconOnly(pushNoUpstream, 'Push', 'Push · Ctrl+Shift+K')
   })
 
   it('FR-UX-09 below wide, the disabled Pull and Push also show icon only, title unchanged', async () => {
@@ -328,7 +327,7 @@ describe('SyncControls', () => {
     })
     await mountControls()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'K', ctrlKey: true, shiftKey: true }))
+    pressKey('K', { ctrlKey: true, shiftKey: true })
     await flushPromises()
 
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'main')
@@ -337,7 +336,7 @@ describe('SyncControls', () => {
   it('FR-SYNC-06, FR-UX-03, QA-SAFE-01 force push on a protected branch confirms first, naming it protected', async () => {
     setRefs({ name: 'main', upstream: 'origin/main' })
     settingsStore.settings = defaultSettingsFixture({ protectedBranches: ['main'] })
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
     await mountControls()
 
     await rejectPush()
@@ -355,7 +354,7 @@ describe('SyncControls', () => {
 
   it('FR-SYNC-06 cancelling the force-push confirmation calls nothing; the notice still offers it', async () => {
     setRefs({ name: 'main', upstream: 'origin/main' })
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
     await mountControls()
 
     await rejectPush()
@@ -428,7 +427,7 @@ describe('SyncControls', () => {
     await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
     await flushPromises()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true }))
+    pressKey('t', { ctrlKey: true })
     await flushPromises()
 
     expect(Facade.Pull).toHaveBeenCalledTimes(1)
@@ -461,7 +460,7 @@ describe('SyncControls', () => {
 
   it('FR-SYNC-02 a failed save shows in the error banner; Facade.Pull is not called and the button keeps its mode', async () => {
     setRefs({ upstream: 'origin/main' })
-    settingsStore.save.mockRejectedValueOnce(new Error('boom', { cause: { message: 'disk full' } }))
+    settingsStore.save.mockRejectedValueOnce(wailsError('disk full'))
     const { body } = await mountControls()
     await flushPromises()
 
@@ -488,9 +487,7 @@ describe('SyncControls', () => {
   })
 
   it('FR-UX-01 a rejected Fetch renders ErrorBanner with the error', async () => {
-    Facade.Fetch.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'network unreachable' } }),
-    )
+    Facade.Fetch.mockRejectedValueOnce(wailsError('network unreachable'))
     const { body } = await mountControls()
 
     await findButton(body, 'Fetch')!.trigger('click')
@@ -503,7 +500,7 @@ describe('SyncControls', () => {
     setRefs({ upstream: 'origin/main' })
     await mountControls()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true }))
+    pressKey('t', { ctrlKey: true })
     await flushPromises()
 
     expect(Facade.Pull).toHaveBeenCalledTimes(1)
@@ -519,7 +516,7 @@ describe('SyncControls', () => {
     })
     await mountControls()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'K', ctrlKey: true, shiftKey: true }))
+    pressKey('K', { ctrlKey: true, shiftKey: true })
     await flushPromises()
 
     expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
@@ -539,7 +536,7 @@ describe('SyncControls', () => {
     setRefs({ upstream: '' })
     await mountControls()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true }))
+    pressKey('t', { ctrlKey: true })
     await flushPromises()
 
     expect(Facade.Pull).not.toHaveBeenCalled()
@@ -549,7 +546,7 @@ describe('SyncControls', () => {
     setRefs({ upstream: 'origin/main' }, [])
     await mountControls()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', ctrlKey: true }))
+    pressKey('t', { ctrlKey: true })
     await flushPromises()
 
     expect(Facade.Pull).not.toHaveBeenCalled()

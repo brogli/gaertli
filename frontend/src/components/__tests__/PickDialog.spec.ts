@@ -10,6 +10,7 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Fac
 
 import PickDialog from '../PickDialog.vue'
 import { DiffKind } from '@/lib/diffTarget'
+import { wailsError } from '@/testing/errors'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { footerButtons } from '@/testing/dialog'
@@ -65,7 +66,7 @@ describe('PickDialog', () => {
   })
 
   it("FR-CP-06 a rejection renders in this dialog's own ErrorBanner and keeps it open", async () => {
-    Facade.CherryPick.mockRejectedValueOnce(new Error('boom', { cause: { message: 'conflict' } }))
+    Facade.CherryPick.mockRejectedValueOnce(wailsError('conflict'))
     const { wrapper, body } = await mountDialog('cherry-pick', ['a1'])
 
     await body.get('[data-test="pick-submit"]').trigger('click')
@@ -76,9 +77,7 @@ describe('PickDialog', () => {
   })
 
   it('FR-CONF-09 a stop on conflicts opens the diff window and closes the dialog', async () => {
-    Facade.CherryPick.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
-    )
+    Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
     const { wrapper, body } = await mountDialog('cherry-pick', ['a1'])
 
     await body.get('[data-test="pick-submit"]').trigger('click')

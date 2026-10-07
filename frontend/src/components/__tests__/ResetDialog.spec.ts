@@ -8,10 +8,10 @@ const { Facade } = vi.hoisted(() => ({ Facade: { Reset: vi.fn(), UncommittedCoun
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
+import { mountNotices } from '@/testing/mountNotices'
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
 import ResetDialog from '../ResetDialog.vue'
-import NoticeArea from '../NoticeArea.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { footerButtons } from '@/testing/dialog'
 import { NOTICE_GROUP } from '@/lib/notice'
@@ -59,7 +59,7 @@ describe('ResetDialog', () => {
   it('FR-BR-02 Reset fails: the dialog stays open with the error, no notice', async () => {
     Facade.Reset.mockRejectedValue(new Error('boom'))
     const { wrapper, body: dialog } = await mountDialog()
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
 
     await dialog.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
@@ -105,7 +105,7 @@ describe('ResetDialog', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     Facade.Reset.mockResolvedValue({ previousHead: 'deadbeefcafe' })
     const { wrapper, body: dialog } = await mountDialog()
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
 
     await dialog.get('[data-test="reset-submit"]').trigger('click')
     await flushPromises()
@@ -118,7 +118,7 @@ describe('ResetDialog', () => {
   })
 
   it('FR-BR-04 a second reset replaces the notice with its own', async () => {
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
 
     await resetTo('first0000000')
     expect(notice.findAll('.p-toast-message')).toHaveLength(1)
@@ -132,7 +132,7 @@ describe('ResetDialog', () => {
   })
 
   it("FR-UX-15 a reset's notice leaves another action's notice open", async () => {
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
     const OtherAction = defineComponent({
       setup() {
         useToast().add({ group: NOTICE_GROUP, summary: 'Push was rejected', closable: true })

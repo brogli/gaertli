@@ -6,6 +6,7 @@ vi.mock(
   '../../../bindings/github.com/brogli/nebegit/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
+import { wailsError } from '@/testing/errors'
 import { AppService, Facade, SettingsService, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
@@ -266,9 +267,7 @@ describe('SettingsPanel', () => {
   })
 
   it('FR-UX-01 a rejected save renders ErrorBanner with the error', async () => {
-    SettingsService.Set.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'settings write failed' } }),
-    )
+    SettingsService.Set.mockRejectedValueOnce(wailsError('settings write failed'))
     const wrapper = await mountPanel()
 
     await wrapper.find('form').trigger('submit')

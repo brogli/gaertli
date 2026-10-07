@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { pressKey } from '@/testing/pressKey'
 import { mountInBody } from '@/testing/mountInBody'
 
 vi.mock(
@@ -40,7 +41,7 @@ describe('MainView', () => {
     mount(MainView, { props: { path: '' } })
     await flushPromises()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'N', ctrlKey: true, shiftKey: true }))
+    pressKey('N', { ctrlKey: true, shiftKey: true })
 
     expect(AppService.NewWindow).toHaveBeenCalledTimes(1)
   })

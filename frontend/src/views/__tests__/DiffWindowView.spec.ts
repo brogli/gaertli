@@ -7,6 +7,7 @@ vi.mock(
   '../../../bindings/github.com/brogli/nebegit/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
+import { pressKey } from '@/testing/pressKey'
 import { Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
@@ -429,11 +430,11 @@ describe('DiffWindowView', () => {
     dialog.setAttribute('role', 'alertdialog')
     document.body.append(dialog)
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    pressKey('Escape')
     expect(Window.Close).not.toHaveBeenCalled()
 
     dialog.remove()
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    pressKey('Escape')
     await flushPromises()
     expect(Window.Close).toHaveBeenCalledTimes(1)
   })
@@ -447,7 +448,7 @@ describe('DiffWindowView', () => {
       regions: [],
     }))
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    pressKey('Escape')
     await flushPromises()
 
     expect(confirmRequire).not.toHaveBeenCalled()

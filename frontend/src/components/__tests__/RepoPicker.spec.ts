@@ -1,6 +1,9 @@
 import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { expectIconOnly } from '@/testing/expectIconOnly'
+import { mountNotices } from '@/testing/mountNotices'
+import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 
@@ -21,7 +24,6 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ App
 
 import RepoPicker from '../RepoPicker.vue'
 import ErrorBanner from '../ErrorBanner.vue'
-import NoticeArea from '../NoticeArea.vue'
 import { worktreeFixture } from '@/testing/fixtures/worktree'
 
 const alpha = {
@@ -130,9 +132,7 @@ describe('RepoPicker', () => {
   })
 
   it('FR-WT-13 a failure the core could not recover from shows in the list', async () => {
-    AppService.SelectRecentRepo.mockRejectedValue(
-      new Error('boom', { cause: { code: 'NOT_A_REPO', message: 'still gone' } }),
-    )
+    AppService.SelectRecentRepo.mockRejectedValue(wailsError('still gone', 'NOT_A_REPO'))
     const { wrapper, body } = await openPicker({ path: '/repos/alpha' })
 
     await repoRow(body, beta.path).trigger('click')
@@ -200,9 +200,7 @@ describe('RepoPicker', () => {
     const { wrapper } = await mountInBody(RepoPicker, { props: { path: '/repos/alpha' } })
 
     const button = wrapper.get('[data-test="repo-picker"]')
-    expect(button.text()).toBe('')
-    expect(button.attributes('title')).toBe('/repos/alpha')
-    expect(button.attributes('aria-label')).toBe('/repos/alpha')
+    expectIconOnly(button, '/repos/alpha')
   })
 
   it('FR-REPO-08 a recent repo other than the window\'s own gets a "…" button; the current row and the actions get none', async () => {
@@ -252,10 +250,8 @@ describe('RepoPicker', () => {
   })
 
   it("FR-REPO-08 Open in new window failing shows the refusal as a notice, not the list's banner", async () => {
-    AppService.OpenRecentRepo.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'boom' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    AppService.OpenRecentRepo.mockRejectedValueOnce(wailsError('boom'))
+    const notice = await mountNotices()
     const { body } = await openPicker({ path: '/repos/alpha' })
 
     await pickRepoMenuAction(body, beta.path, 'Open in new window')
@@ -280,10 +276,8 @@ describe('RepoPicker', () => {
   })
 
   it('FR-REPO-08 Remove from recents failing shows the refusal as a notice', async () => {
-    AppService.RemoveRecentRepo.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'boom' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    AppService.RemoveRecentRepo.mockRejectedValueOnce(wailsError('boom'))
+    const notice = await mountNotices()
     const { body } = await openPicker({ path: '/repos/alpha' })
 
     await pickRepoMenuAction(body, beta.path, 'Remove from recents')

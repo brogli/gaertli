@@ -17,8 +17,8 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import SquashDialog from '../SquashDialog.vue'
-import NoticeArea from '../NoticeArea.vue'
 import { DiffKind } from '@/lib/diffTarget'
+import { mountNotices } from '@/testing/mountNotices'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { field, fieldLabels, footerButtons } from '@/testing/dialog'
@@ -111,7 +111,7 @@ describe('SquashDialog', () => {
   })
 
   it('FR-LOG-14 success leaves a notice naming the branch and the previous commit', async () => {
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
     const { body } = await mountDialog()
 
     await body.get('[data-test="squash-submit"]').trigger('click')
@@ -126,7 +126,7 @@ describe('SquashDialog', () => {
       message: 'untracked working tree files would be overwritten by merge',
     }
     Facade.Squash.mockRejectedValueOnce(new Error('x', { cause: stop }))
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
     const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="squash-submit"]').trigger('click')

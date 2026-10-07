@@ -2,8 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mountInBody } from '@/testing/mountInBody'
-import NoticeArea from '../NoticeArea.vue'
+import { mountNotices } from '@/testing/mountNotices'
+import { editorNotFound } from '@/testing/errors'
 
 vi.mock(
   '../../../bindings/github.com/brogli/nebegit/internal/app',
@@ -125,11 +125,9 @@ describe('ChangesView', () => {
   })
 
   it('FR-ED-06 OpenFile failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
-    Facade.OpenFile.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
-    )
+    Facade.OpenFile.mockRejectedValueOnce(editorNotFound('myed'))
     const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')
     await flushPromises()
@@ -139,13 +137,11 @@ describe('ChangesView', () => {
   })
 
   it("FR-UX-15 a second EDITOR_NOT_FOUND failure replaces the first one's notice", async () => {
-    const notFound = (editor: string) =>
-      new Error('boom', {
-        cause: { code: 'EDITOR_NOT_FOUND', message: `"${editor}" is not on PATH` },
-      })
-    Facade.OpenFile.mockRejectedValueOnce(notFound('alpha')).mockRejectedValueOnce(notFound('beta'))
+    Facade.OpenFile.mockRejectedValueOnce(editorNotFound('alpha')).mockRejectedValueOnce(
+      editorNotFound('beta'),
+    )
     const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')
     await flushPromises()

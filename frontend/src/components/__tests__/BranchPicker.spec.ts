@@ -1,8 +1,10 @@
 import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { expectIconOnly } from '@/testing/expectIconOnly'
+import { mountNotices } from '@/testing/mountNotices'
+import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
-import NoticeArea from '../NoticeArea.vue'
 
 const { AppService, Facade } = vi.hoisted(() => ({
   AppService: { SelectWorktree: vi.fn(), OpenDiff: vi.fn() },
@@ -185,9 +187,7 @@ describe('BranchPicker', () => {
     const { wrapper } = await mountPicker(refsWith([main]), summaryFixture())
 
     const button = wrapper.get('[data-test="branch-picker"]')
-    expect(button.text()).toBe('')
-    expect(button.attributes('title')).toBe('main')
-    expect(button.attributes('aria-label')).toBe('main')
+    expectIconOnly(button, 'main')
   })
 
   it('FR-BR-08 while detached the button shows the short hash and says so', async () => {
@@ -291,9 +291,7 @@ describe('BranchPicker', () => {
   })
 
   it("FR-BR-05 a checkout git refuses shows git's reason in the list", async () => {
-    Facade.Checkout.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'DIRTY_WORKTREE', message: 'would be overwritten' } }),
-    )
+    Facade.Checkout.mockRejectedValueOnce(wailsError('would be overwritten', 'DIRTY_WORKTREE'))
     const { body } = await openPicker()
 
     await checkoutRow(body, 'feat')
@@ -303,9 +301,7 @@ describe('BranchPicker', () => {
   })
 
   it('FR-BR-09 a refusal shown in the list is gone when the list opens again', async () => {
-    Facade.Checkout.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'DIRTY_WORKTREE', message: 'would be overwritten' } }),
-    )
+    Facade.Checkout.mockRejectedValueOnce(wailsError('would be overwritten', 'DIRTY_WORKTREE'))
     const { wrapper, body } = await openPicker()
     await checkoutRow(body, 'feat')
     await flushPromises()
@@ -415,7 +411,7 @@ describe('BranchPicker', () => {
     'FR-BR-11 "Merge into main" merges the full ref; outcome %s shows a success notice',
     async (outcome, text) => {
       Facade.Merge.mockResolvedValueOnce({ outcome })
-      const { body: notice } = await mountInBody(NoticeArea)
+      const notice = await mountNotices()
       const { body } = await openPicker()
 
       await pickAction(body, 'feat', 'Merge into main')
@@ -426,10 +422,8 @@ describe('BranchPicker', () => {
   )
 
   it('FR-BR-11 a merge refused for local changes offers "Stash and merge", which merges with stash', async () => {
-    Facade.Merge.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'DIRTY_WORKTREE', message: 'local changes in the way' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.Merge.mockRejectedValueOnce(wailsError('local changes in the way', 'DIRTY_WORKTREE'))
+    const notice = await mountNotices()
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Merge into main')
@@ -439,9 +433,7 @@ describe('BranchPicker', () => {
   })
 
   it('FR-CONF-09 a merge that stops on conflicts opens the diff window on the first conflicted file', async () => {
-    Facade.Merge.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
-    )
+    Facade.Merge.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Merge into main')
@@ -456,10 +448,8 @@ describe('BranchPicker', () => {
   })
 
   it('FR-BR-11 a merge that stops on conflicts shows no notice', async () => {
-    Facade.Merge.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.Merge.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
+    const notice = await mountNotices()
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Merge into main')
@@ -468,10 +458,8 @@ describe('BranchPicker', () => {
   })
 
   it('FR-BR-11 a merge that stops for another reason shows the reason as a notice', async () => {
-    Facade.Merge.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'STOPPED', message: 'hook failed' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.Merge.mockRejectedValueOnce(wailsError('hook failed', 'STOPPED'))
+    const notice = await mountNotices()
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Merge into main')
@@ -486,7 +474,7 @@ describe('BranchPicker', () => {
     'FR-BR-12 "Rebase main onto feat" rebases onto the full ref; outcome %s shows a success notice',
     async (outcome, text) => {
       Facade.Rebase.mockResolvedValueOnce({ outcome })
-      const { body: notice } = await mountInBody(NoticeArea)
+      const notice = await mountNotices()
       const { body } = await openPicker()
 
       await pickAction(body, 'feat', 'Rebase main onto feat')
@@ -497,10 +485,8 @@ describe('BranchPicker', () => {
   )
 
   it('FR-BR-12 a rebase refused for local changes offers "Stash and rebase", which rebases with stash', async () => {
-    Facade.Rebase.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'DIRTY_WORKTREE', message: 'local changes in the way' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.Rebase.mockRejectedValueOnce(wailsError('local changes in the way', 'DIRTY_WORKTREE'))
+    const notice = await mountNotices()
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Rebase main onto feat')
@@ -614,10 +600,8 @@ describe('BranchPicker', () => {
   })
 
   it("FR-UX-01 an action's refusal shows git's reason as a notice, the list being closed", async () => {
-    Facade.UpdateBranch.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'no upstream configured', code: 'NO_UPSTREAM' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.UpdateBranch.mockRejectedValueOnce(wailsError('no upstream configured', 'NO_UPSTREAM'))
+    const notice = await mountNotices()
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Update from upstream')
@@ -647,9 +631,7 @@ describe('BranchPicker', () => {
   })
 
   it("FR-UX-03 deleting an unmerged branch asks first, naming git's reason, then deletes forced", async () => {
-    Facade.DeleteBranch.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'UNMERGED_BRANCH', message: 'not fully merged' } }),
-    )
+    Facade.DeleteBranch.mockRejectedValueOnce(wailsError('not fully merged', 'UNMERGED_BRANCH'))
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Delete')
@@ -662,10 +644,8 @@ describe('BranchPicker', () => {
   })
 
   it('FR-BR-06 a delete refused for another reason shows the error as a notice, no confirmation', async () => {
-    Facade.DeleteBranch.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'GIT_FAILED', message: 'used by worktree' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.DeleteBranch.mockRejectedValueOnce(wailsError('used by worktree', 'GIT_FAILED'))
+    const notice = await mountNotices()
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Delete')

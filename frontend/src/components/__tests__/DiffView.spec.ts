@@ -25,14 +25,14 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 }))
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
+import { mountNotices } from '@/testing/mountNotices'
+import { editorNotFound } from '@/testing/errors'
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { Events, emit } from '@/testing/runtime'
 
 import DiffView from '../DiffView.vue'
-import NoticeArea from '../NoticeArea.vue'
-import { mountInBody } from '@/testing/mountInBody'
 import { DiffKind } from '@/lib/diffTarget'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
@@ -578,11 +578,9 @@ describe('DiffView', () => {
     Facade.DiffFile.mockResolvedValue(
       diffFileFixture({ oldContent: 'old\n', newContent: 'new\n', hunks: [hunk(1, 1, 1, 1)] }),
     )
-    Facade.OpenFile.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
-    )
+    Facade.OpenFile.mockRejectedValueOnce(editorNotFound('myed'))
     const wrapper = await mountCommit()
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')
     await flushPromises()

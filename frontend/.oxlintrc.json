@@ -10,6 +10,8 @@
   "rules": {
     // Would flag every untyped vi.fn() mock, the convention in this test
     // suite.
-    "vitest/require-mock-type-parameters": "off"
+    "vitest/require-mock-type-parameters": "off",
+    // Test helpers named expect* assert for the test that calls them.
+    "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expect*"] }]
   }
 }

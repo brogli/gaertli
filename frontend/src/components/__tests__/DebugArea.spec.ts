@@ -1,15 +1,14 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import DebugArea from '../DebugArea.vue'
-import NoticeArea from '../NoticeArea.vue'
-import { mountInBody } from '@/testing/mountInBody'
+import { mountNotices } from '@/testing/mountNotices'
 import { findButton } from '@/testing/findButton'
 
 // mountWithNotices mounts NoticeArea (where a shown notice renders) and
 // DebugArea separately, as real windows do: NoticeArea sits in App.vue,
 // DebugArea inside MainView.vue.
 async function mountWithNotices() {
-  const { body } = await mountInBody(NoticeArea)
+  const body = await mountNotices()
   const debug = mount(DebugArea)
   await flushPromises()
   return { debug, body }

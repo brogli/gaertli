@@ -14,6 +14,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import CompareView from '../CompareView.vue'
 import { useLogStore } from '@/stores/log'
 import { useCompareStore } from '@/stores/compare'
+import { pressKey } from '@/testing/pressKey'
 import { commitRow } from '@/testing/fixtures/log-rows'
 import type { ChangedFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
@@ -95,7 +96,7 @@ describe('CompareView', () => {
   it('FR-CMP-01 pressing Escape exits the comparison', async () => {
     const { log } = await mountComparing()
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    pressKey('Escape')
 
     expect(log.selection).toEqual([])
   })

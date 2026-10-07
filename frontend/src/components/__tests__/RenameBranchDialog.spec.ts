@@ -6,6 +6,7 @@ const { Facade } = vi.hoisted(() => ({ Facade: { RenameBranch: vi.fn() } }))
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
 import RenameBranchDialog from '../RenameBranchDialog.vue'
+import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { fieldLabels, footerButtons } from '@/testing/dialog'
 
@@ -32,9 +33,7 @@ describe('RenameBranchDialog', () => {
   })
 
   it('FR-BR-06 shows the rejection message and keeps the dialog open on failure', async () => {
-    Facade.RenameBranch.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: '"-bad" is not a valid branch name' } }),
-    )
+    Facade.RenameBranch.mockRejectedValueOnce(wailsError('"-bad" is not a valid branch name'))
     const { wrapper, body } = await mountInBody(RenameBranchDialog, {
       props: { wt: '/repo', name: 'feature' },
     })

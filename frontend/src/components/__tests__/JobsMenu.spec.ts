@@ -12,6 +12,7 @@ const { Facade } = vi.hoisted(() => ({
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+import { wailsError } from '@/testing/errors'
 import { Events, emit } from '@/testing/runtime'
 
 import JobsMenu from '../JobsMenu.vue'
@@ -112,9 +113,7 @@ describe('JobsMenu', () => {
 
   it('FR-UX-01 a rejected cancel renders ErrorBanner with the error, in the list', async () => {
     Facade.Jobs.mockResolvedValue([jobFixture()])
-    Facade.CancelJob.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'cancel failed' } }),
-    )
+    Facade.CancelJob.mockRejectedValueOnce(wailsError('cancel failed'))
     const { wrapper, body } = await mountMenu()
     await body.get('[data-test="jobs-menu"]').trigger('click')
 

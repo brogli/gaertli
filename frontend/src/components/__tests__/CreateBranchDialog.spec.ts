@@ -9,6 +9,7 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Fac
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import CreateBranchDialog from '../CreateBranchDialog.vue'
+import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { field, fieldLabels, footerButtons } from '@/testing/dialog'
 import { branchFixture } from '@/testing/fixtures/branch'
@@ -69,9 +70,7 @@ describe('CreateBranchDialog', () => {
   })
 
   it('FR-BR-01 shows the rejection message and keeps the dialog open on failure', async () => {
-    Facade.CreateBranch.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: '"-bad" is not a valid branch name' } }),
-    )
+    Facade.CreateBranch.mockRejectedValueOnce(wailsError('"-bad" is not a valid branch name'))
     const { wrapper, body } = await mountDialog({ ref: 'refs/heads/main' })
 
     await create(body, '-bad')

@@ -11,6 +11,7 @@ vi.mock(
   () => import('@/testing/mainWindowApp'),
 )
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+import { expectIconOnly } from '@/testing/expectIconOnly'
 import { Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 import WorktreeContent from '../WorktreeContent.vue'
@@ -210,9 +211,7 @@ describe('WorktreeContent layouts', () => {
       const button = findButton(wrapper, label)!
       expect(button.classes()).toContain('p-button')
       button.get('.p-button-icon') // throws if the icon is missing
-      expect(button.attributes('title')).toBe(label)
-      expect(button.attributes('aria-label')).toBe(label)
-      expect(button.find('.p-button-label').exists()).toBe(false)
+      expectIconOnly(button, label)
     }
   })
 
@@ -230,9 +229,7 @@ describe('WorktreeContent layouts', () => {
 
     const button = findButton(wrapper, 'Create branch here')!
     button.get('.p-button-icon') // throws if the icon is missing
-    expect(button.attributes('title')).toBe('Create branch here')
-    expect(button.attributes('aria-label')).toBe('Create branch here')
-    expect(button.find('.p-button-label').exists()).toBe(false)
+    expectIconOnly(button, 'Create branch here')
   })
 
   it('FR-UX-09 Fetch, Refresh, Open in editor and Settings are OpenVue Buttons, secondary and outlined', async () => {

@@ -2,6 +2,7 @@ import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DiffKind } from '@/lib/diffTarget'
+import { wailsError } from '@/testing/errors'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 
@@ -471,9 +472,7 @@ describe('LogList', () => {
   })
 
   it("FR-CP-04 a rejection renders in LogList's own ErrorBanner and keeps the multi-select", async () => {
-    Facade.CherryPick.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'would be overwritten by merge' } }),
-    )
+    Facade.CherryPick.mockRejectedValueOnce(wailsError('would be overwritten by merge'))
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
 
@@ -489,9 +488,7 @@ describe('LogList', () => {
   })
 
   it('FR-CONF-09 a cherry-pick that stops on conflicts opens the diff window and shows no error', async () => {
-    Facade.CherryPick.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
-    )
+    Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a'])
 
     await rowEls[0]!.trigger('click')

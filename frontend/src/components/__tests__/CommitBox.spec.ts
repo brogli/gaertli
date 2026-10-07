@@ -6,6 +6,7 @@ vi.mock(
   '../../../bindings/github.com/brogli/nebegit/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
+import { pressKey } from '@/testing/pressKey'
 import { Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
@@ -279,7 +280,7 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
+    pressKey('k', { ctrlKey: true })
     await flushPromises()
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
@@ -291,7 +292,7 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
 
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
+    pressKey('k', { ctrlKey: true })
     await flushPromises()
 
     expect(Facade.Commit).not.toHaveBeenCalled()

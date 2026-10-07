@@ -1,8 +1,10 @@
 import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { expectIconOnly } from '@/testing/expectIconOnly'
+import { mountNotices } from '@/testing/mountNotices'
+import { editorNotFound, wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
-import NoticeArea from '../NoticeArea.vue'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
 vi.mock(
@@ -206,8 +208,8 @@ describe('WorktreePicker', () => {
   })
 
   it("FR-WT-13 the menu's Open in new window failing shows the reason as a notice, not the list's banner", async () => {
-    AppService.OpenPath.mockRejectedValueOnce(new Error('boom', { cause: { message: 'boom' } }))
-    const { body: notice } = await mountInBody(NoticeArea)
+    AppService.OpenPath.mockRejectedValueOnce(wailsError('boom'))
+    const notice = await mountNotices()
     const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
 
     await pickWorktreeMenuAction(body, '/repos/alpha-feat', 'Open in new window')
@@ -217,10 +219,8 @@ describe('WorktreePicker', () => {
   })
 
   it('FR-WT-13 the Remove button closes the list before confirming; a refusal other than DIRTY_WORKTREE shows as a notice, no second confirmation', async () => {
-    Facade.RemoveWorktree.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'GIT_FAILED', message: 'is locked' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.RemoveWorktree.mockRejectedValueOnce(wailsError('is locked', 'GIT_FAILED'))
+    const notice = await mountNotices()
     const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
 
     await worktreeRow(body, '/repos/alpha-feat')
@@ -255,10 +255,8 @@ describe('WorktreePicker', () => {
   it('FR-ED-06 open in editor failing EDITOR_NOT_FOUND shows an error notice naming the command', async () => {
     const wip = worktreeFixture({ path: '/repos/alpha-wip', branch: 'wip' })
     Facade.ListWorktrees.mockResolvedValue([main, wip])
-    Facade.OpenFolderAt.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
-    )
-    const { body: notice } = await mountInBody(NoticeArea)
+    Facade.OpenFolderAt.mockRejectedValueOnce(editorNotFound('myed'))
+    const notice = await mountNotices()
     const { body } = await openPicker({ wt: '/repos/alpha', path: '/repos/alpha' })
 
     await worktreeRow(body, '/repos/alpha-wip').get('[data-test="open-in-editor"]').trigger('click')
@@ -415,8 +413,6 @@ describe('WorktreePicker', () => {
     })
 
     const button = wrapper.get('[data-test="worktree-picker"]')
-    expect(button.text()).toBe('')
-    expect(button.attributes('title')).toBe('/repos/alpha')
-    expect(button.attributes('aria-label')).toBe('/repos/alpha')
+    expectIconOnly(button, '/repos/alpha')
   })
 })

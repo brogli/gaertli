@@ -1,8 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mountNotices } from '@/testing/mountNotices'
+import { editorNotFound } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
-import NoticeArea from '@/components/NoticeArea.vue'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
 vi.mock(
@@ -107,11 +108,9 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-ED-06 Open in editor failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
-    Facade.OpenFolder.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
-    )
+    Facade.OpenFolder.mockRejectedValueOnce(editorNotFound('myed'))
     const wrapper = mountView({ path: '/repo' })
-    const { body: notice } = await mountInBody(NoticeArea)
+    const notice = await mountNotices()
     await flushPromises()
 
     await findButton(wrapper, 'Open in editor')?.trigger('click')

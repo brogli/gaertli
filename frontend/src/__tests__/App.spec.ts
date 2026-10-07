@@ -6,6 +6,7 @@ vi.mock(
   '../../bindings/github.com/brogli/nebegit/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
+import { editorNotFound } from '@/testing/errors'
 import { Facade, SettingsService, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
@@ -67,9 +68,7 @@ describe('App', () => {
       '?view=diff&wt=/repo&kind=range&from=sha-a&to=sha-b&file=a.txt&oldFile=',
     )
     Facade.CompareCommits.mockResolvedValueOnce([{ path: 'a.txt', status: 'M' }])
-    Facade.OpenFile.mockRejectedValueOnce(
-      new Error('boom', { cause: { code: 'EDITOR_NOT_FOUND', message: '"myed" is not on PATH' } }),
-    )
+    Facade.OpenFile.mockRejectedValueOnce(editorNotFound('myed'))
 
     const { body } = await mountInBody(App)
     await body.get('[data-test="open-editor"]').trigger('click')
