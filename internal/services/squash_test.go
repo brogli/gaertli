@@ -19,18 +19,15 @@ type line struct{ base, B, C, D, E string }
 
 func lineFixture(t *testing.T, dir string) line {
 	t.Helper()
-	commit := func(name, author string) string {
-		file, msg := strings.ToLower(name)+".txt", name+" subject\n\n"+name+" body"
-		commitAs(t, dir, file, name+"\n", msg, author, author+"@nebegit.invalid")
-		return gittest.HeadSHA(t, dir)
+	step := func(name, author string) gittest.Step {
+		return gittest.Step{
+			Message: name + " subject\n\n" + name + " body",
+			Author:  author,
+			Files:   map[string]string{strings.ToLower(name) + ".txt": name + "\n"},
+		}
 	}
-	return line{
-		base: commit("base", "Al"),
-		B:    commit("B", "Bea"),
-		C:    commit("C", "Al"),
-		D:    commit("D", "Al"),
-		E:    commit("E", "Al"),
-	}
+	shas := gittest.History(t, dir, step("base", "Al"), step("B", "Bea"), step("C", "Al"), step("D", "Al"), step("E", "Al"))
+	return line{base: shas[0], B: shas[1], C: shas[2], D: shas[3], E: shas[4]}
 }
 
 // history is dir's commits from HEAD down, one "subject: files" entry each.

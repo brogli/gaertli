@@ -47,11 +47,20 @@ func commitVersion(t *testing.T, dir, path string, v version, msg string) {
 func divergedRepo(t *testing.T, path string, base, current, incoming version) string {
 	t.Helper()
 	dir := gittest.New(t).Dir
-	commitVersion(t, dir, path, base, "base")
-	gittest.Run(t, dir, "checkout", "-q", "-b", "side")
-	commitVersion(t, dir, path, incoming, "incoming change")
-	gittest.Run(t, dir, "checkout", "-q", "master")
-	commitVersion(t, dir, path, current, "current change")
+	step := func(branch, from, msg string, v version) gittest.Step {
+		s := gittest.Step{Branch: branch, From: from, Message: msg}
+		if v == nil {
+			s.Delete = []string{path}
+		} else {
+			s.Files = map[string]string{path: string(v)}
+		}
+		return s
+	}
+	gittest.History(t, dir,
+		step("master", "", "base", base),
+		step("side", "master", "incoming change", incoming),
+		step("master", "", "current change", current),
+	)
 	return dir
 }
 

@@ -1170,10 +1170,8 @@ func updateBranchFixture(t *testing.T) (repo *gittest.Repo, origin string) {
 	repo = gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	origin = bareRemote(t, repo, "origin")
-	gittest.Run(t, repo.Dir, "push", "-u", "origin", "master")
-	gittest.Run(t, repo.Dir, "checkout", "-b", "B")
-	gittest.Run(t, repo.Dir, "push", "-u", "origin", "B")
-	gittest.Run(t, repo.Dir, "checkout", "master")
+	gittest.Run(t, repo.Dir, "branch", "B")
+	gittest.Run(t, repo.Dir, "push", "-u", "origin", "master", "B")
 	return repo, origin
 }
 

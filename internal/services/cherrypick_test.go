@@ -597,28 +597,27 @@ func realConflictFixture(t *testing.T, dir, verb string, files ...string) (sha s
 	if len(files) == 0 {
 		files = []string{"conflict.txt"}
 	}
-	commitAll := func(msg, content string) {
+	step := func(branch, from, msg, content string) gittest.Step {
+		changed := map[string]string{}
 		for _, f := range files {
-			writeFile(t, dir, f, content)
+			changed[f] = content
 		}
-		gittest.Run(t, dir, "add", "-A")
-		gittest.CommitAll(t, dir, msg)
+		return gittest.Step{Branch: branch, From: from, Message: msg, Files: changed}
 	}
 	if verb == "cherry-pick" {
-		commitAll("base", "orig\n")
-		gittest.Run(t, dir, "branch", "feature")
-		gittest.Run(t, dir, "checkout", "feature")
-		commitAll("feature change", "feature\n")
-		sha = gittest.HeadSHA(t, dir)
-		gittest.Run(t, dir, "checkout", "master")
-		commitAll("master change", "master\n")
-		return sha
+		shas := gittest.History(t, dir,
+			step("master", "", "base", "orig\n"),
+			step("feature", "master", "feature change", "feature\n"),
+			step("master", "", "master change", "master\n"),
+		)
+		return shas[1]
 	}
-	commitAll("base", "base\n")
-	commitAll("applies the change", "applied\n")
-	sha = gittest.HeadSHA(t, dir)
-	commitAll("further change", "applied2\n")
-	return sha
+	shas := gittest.History(t, dir,
+		step("master", "", "base", "base\n"),
+		step("master", "", "applies the change", "applied\n"),
+		step("master", "", "further change", "applied2\n"),
+	)
+	return shas[1]
 }
 
 // revertConflictFixture builds linear history where HEAD's commit changed
@@ -665,19 +664,15 @@ func commitExists(t *testing.T, dir, sha string) bool {
 // commit m, then a commit x2: a merge buried in a normal run of commits.
 func mergeCommitFixture(t *testing.T, dir string) (x1SHA, mSHA, x2SHA string) {
 	t.Helper()
-	gittest.Commit(t, dir, "base.txt", "base", "base")
-	gittest.Commit(t, dir, "x1.txt", "x1", "x1")
-	x1SHA = gittest.HeadSHA(t, dir)
-	gittest.Run(t, dir, "branch", "side")
-	gittest.Run(t, dir, "checkout", "side")
-	gittest.Commit(t, dir, "side.txt", "side", "side change")
-	gittest.Run(t, dir, "checkout", "master")
-	gittest.Commit(t, dir, "master2.txt", "master2", "diverging master commit")
-	gittest.Run(t, dir, "merge", "--no-ff", "--no-edit", "side")
-	mSHA = gittest.HeadSHA(t, dir)
-	gittest.Commit(t, dir, "x2.txt", "x2", "x2")
-	x2SHA = gittest.HeadSHA(t, dir)
-	return x1SHA, mSHA, x2SHA
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: map[string]string{"base.txt": "base"}},
+		gittest.Step{Message: "x1", Files: map[string]string{"x1.txt": "x1"}},
+		gittest.Step{Branch: "side", From: "master", Message: "side change", Files: map[string]string{"side.txt": "side"}},
+		gittest.Step{Message: "diverging master commit", Files: map[string]string{"master2.txt": "master2"}},
+		gittest.Step{Message: "Merge branch 'side'", Merge: "side", Files: map[string]string{"side.txt": "side"}},
+		gittest.Step{Message: "x2", Files: map[string]string{"x2.txt": "x2"}},
+	)
+	return shas[1], shas[4], shas[5]
 }
 
 // commitDated commits like gittest.Commit, but at an explicit date: git's

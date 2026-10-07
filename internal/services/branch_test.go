@@ -1092,10 +1092,12 @@ func mergeInProgress(dir string) bool {
 // seed.txt, which then gets a staged change and an unstaged one on top.
 func resetFixture(t *testing.T, dir string) (firstSHA string) {
 	t.Helper()
-	gittest.Commit(t, dir, "seed.txt", "a", "first")
-	firstSHA = gittest.HeadSHA(t, dir)
-	gittest.Commit(t, dir, "extra.txt", "x", "second")
-	gittest.Commit(t, dir, "seed.txt", "c", "third")
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "first", Files: map[string]string{"seed.txt": "a"}},
+		gittest.Step{Message: "second", Files: map[string]string{"extra.txt": "x"}},
+		gittest.Step{Message: "third", Files: map[string]string{"seed.txt": "c"}},
+	)
+	firstSHA = shas[0]
 
 	writeFile(t, dir, "seed.txt", "staged")
 	gittest.Run(t, dir, "add", "--", "seed.txt")
