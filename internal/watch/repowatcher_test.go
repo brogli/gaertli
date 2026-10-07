@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -24,44 +25,48 @@ func setInterval(t *testing.T, v *time.Duration, d time.Duration) {
 }
 
 func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
-	setInterval(t, &DebounceInterval, 20*time.Millisecond)
+	synctest.Test(t, func(t *testing.T) {
+		setInterval(t, &DebounceInterval, 20*time.Millisecond)
 
-	var mu sync.Mutex
-	var got []core.ChangeScope
-	w := &RepoWatcher{pending: map[core.ChangeScope]bool{}, onChange: func(s core.ChangeScope) {
+		var mu sync.Mutex
+		var got []core.ChangeScope
+		w := &RepoWatcher{pending: map[core.ChangeScope]bool{}, onChange: func(s core.ChangeScope) {
+			mu.Lock()
+			defer mu.Unlock()
+			got = append(got, s)
+		}}
+
+		for _, s := range []core.ChangeScope{core.RefsChanged, core.StateChanged, core.RefsChanged, core.StateChanged, core.RefsChanged} {
+			w.notify(s)
+		}
+		time.Sleep(10 * DebounceInterval)
+
 		mu.Lock()
 		defer mu.Unlock()
-		got = append(got, s)
-	}}
-
-	for _, s := range []core.ChangeScope{core.RefsChanged, core.StateChanged, core.RefsChanged, core.StateChanged, core.RefsChanged} {
-		w.notify(s)
-	}
-	time.Sleep(10 * DebounceInterval)
-
-	mu.Lock()
-	defer mu.Unlock()
-	if len(got) != 2 {
-		t.Fatalf("onChange calls = %d %v, want 2", len(got), got)
-	}
-	seen := map[core.ChangeScope]bool{got[0]: true, got[1]: true}
-	if !seen[core.RefsChanged] || !seen[core.StateChanged] {
-		t.Errorf("onChange scopes = %v, want one core.RefsChanged and one State", got)
-	}
+		if len(got) != 2 {
+			t.Fatalf("onChange calls = %d %v, want 2", len(got), got)
+		}
+		seen := map[core.ChangeScope]bool{got[0]: true, got[1]: true}
+		if !seen[core.RefsChanged] || !seen[core.StateChanged] {
+			t.Errorf("onChange scopes = %v, want one core.RefsChanged and one State", got)
+		}
+	})
 }
 
 func TestQA_PERF_06_FallbackTickerCallsCheckNowAtABoundedRate(t *testing.T) {
-	const interval = 20 * time.Millisecond
-	var count atomic.Int32
-	w := &RepoWatcher{done: make(chan struct{})}
-	go w.fallbackLoop(interval, func() { count.Add(1) })
-	defer func() { _ = w.Close() }()
+	synctest.Test(t, func(t *testing.T) {
+		const interval = 20 * time.Millisecond
+		var count atomic.Int32
+		w := &RepoWatcher{done: make(chan struct{})}
+		go w.fallbackLoop(interval, func() { count.Add(1) })
+		defer func() { _ = w.Close() }()
 
-	time.Sleep(4*interval + interval/2)
+		time.Sleep(4*interval + interval/2)
 
-	if got := count.Load(); got < 3 || got > 5 {
-		t.Errorf("CheckNow invocations = %d, want 4±1", got)
-	}
+		if got := count.Load(); got != 4 {
+			t.Errorf("CheckNow invocations = %d, want 4", got)
+		}
+	})
 }
 
 func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromOutside(t *testing.T) {

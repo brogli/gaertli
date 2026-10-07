@@ -58,6 +58,8 @@ func TestFR_SYNC_07_RepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 // A job whose fn takes the worktree lock is no bypass: a concurrent direct
 // Lock() waits for it.
 func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
+	// Real time: a goroutine blocked on the mutex keeps a synctest clock from advancing.
+	const hold = 60 * time.Millisecond
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
 
@@ -66,7 +68,7 @@ func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T
 		wt.Lock()
 		defer wt.Unlock()
 		close(locked)
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(hold)
 		return nil, nil
 	})
 	<-locked
@@ -77,8 +79,8 @@ func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T
 	held := time.Since(heldSince)
 	wt.Unlock()
 
-	if held < 140*time.Millisecond {
-		t.Errorf("direct Lock() returned %s after the job took the lock, want >= 140ms (should wait for the job's own hold)", held)
+	if held < hold-10*time.Millisecond {
+		t.Errorf("direct Lock() returned %s after the job took the lock, want >= %s (should wait for the job's own hold)", held, hold-10*time.Millisecond)
 	}
 }
 
@@ -88,31 +90,18 @@ func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing
 	m := jobs.NewManager(func(jobs.Job) {})
 
 	wt.Lock()
-	unlockedAt := make(chan time.Duration, 1)
-	start := time.Now()
-	go func() {
-		time.Sleep(150 * time.Millisecond)
-		wt.Unlock()
-		unlockedAt <- time.Since(start)
-	}()
+	defer wt.Unlock()
 
-	jobDone := make(chan time.Duration, 1)
+	jobDone := make(chan struct{})
 	m.Start(t.Context(), "test", func(ctx context.Context, progress jobs.Progress) (any, error) {
-		jobDone <- time.Since(start)
+		close(jobDone)
 		return nil, nil
 	})
 
 	select {
-	case elapsed := <-jobDone:
-		if elapsed > 50*time.Millisecond {
-			t.Errorf("job with no lock ran after %s, want well under the worktree lock's 150ms hold", elapsed)
-		}
+	case <-jobDone:
 	case <-time.After(time.Second):
-		t.Fatal("job with no lock never ran — blocked by an unrelated worktree lock?")
-	}
-
-	if elapsed := <-unlockedAt; elapsed < 140*time.Millisecond {
-		t.Errorf("the lock-held section finished after only %s, want ~150ms (not shortened by the job)", elapsed)
+		t.Fatal("job with no lock never ran while the worktree lock was held")
 	}
 }
 
