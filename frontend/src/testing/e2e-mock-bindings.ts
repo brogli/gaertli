@@ -350,7 +350,7 @@ export const Facade = {
   },
 
   Summary(): Promise<Summary> {
-    return Promise.resolve(summaryFixture({ editorName: 'the editor' }))
+    return Promise.resolve(summaryFixture({ editorName: 'Alpha' }))
   },
 
   Jobs(): Promise<[]> {

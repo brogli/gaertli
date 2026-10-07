@@ -316,11 +316,11 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-ED-01 "Open in {name}" is labelled with the editor name and calls OpenFolder with the path', async () => {
-    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'another editor' }))
+    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'Beta' }))
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
 
-    const button = findButton(wrapper, 'Open in another editor')
+    const button = findButton(wrapper, 'Open in Beta')
     expect(button).toBeTruthy()
 
     await button!.trigger('click')
@@ -330,16 +330,16 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-ED-05 a saved editor change relabels "Open in …" without a refresh', async () => {
-    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'the editor' }))
+    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'Alpha' }))
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()
-    expect(findButton(wrapper, 'Open in the editor')).toBeTruthy()
+    expect(findButton(wrapper, 'Open in Alpha')).toBeTruthy()
 
-    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'another editor' }))
+    Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'Beta' }))
     emit('settings:changed')
     await flushPromises()
 
-    expect(findButton(wrapper, 'Open in another editor')).toBeTruthy()
+    expect(findButton(wrapper, 'Open in Beta')).toBeTruthy()
   })
 
   it('FR-BR-01, FR-LOG-11 "New branch from here…" from the log opens the dialog fixed at that commit', async () => {

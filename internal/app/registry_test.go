@@ -971,13 +971,13 @@ func TestTR_13_PushEditorProfilesPushesTheLocalCoresProfile(t *testing.T) {
 	var pushed []core.EditorProfile
 	r.SetLocal(fakeAPI{editorProfiles: &pushed})
 	store := newTestStore(t)
-	setEditorProfiles(t, store, map[string]core.EditorProfile{"": {Name: "another editor", FolderCmd: "other {path}"}})
+	setEditorProfiles(t, store, map[string]core.EditorProfile{"": {Name: "Beta", FolderCmd: "beta {path}"}})
 	r.SetStore(store)
 
 	r.PushEditorProfiles(t.Context())
 
-	if len(pushed) != 1 || pushed[0].Name != "another editor" {
-		t.Errorf("local core received %+v, want exactly one push of another editor", pushed)
+	if len(pushed) != 1 || pushed[0].Name != "Beta" {
+		t.Errorf("local core received %+v, want exactly one push of Beta", pushed)
 	}
 }
 
@@ -987,8 +987,8 @@ func TestFR_ED_11_CoreForPushesTheDistrosOwnProfileOnFirstConnect(t *testing.T) 
 	serveDistroCores(t, r, fakeAPI{editorProfiles: &pushed})
 	store := newTestStore(t)
 	setEditorProfiles(t, store, map[string]core.EditorProfile{
-		"":             {Name: "the editor", FolderCmd: "editor {path}"},
-		"Ubuntu-22.04": {Name: "another editor", FolderCmd: "other {path}"},
+		"":             {Name: "Alpha", FolderCmd: "alpha {path}"},
+		"Ubuntu-22.04": {Name: "Beta", FolderCmd: "beta {path}"},
 	})
 	r.SetStore(store)
 
@@ -996,8 +996,8 @@ func TestFR_ED_11_CoreForPushesTheDistrosOwnProfileOnFirstConnect(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	if len(pushed) != 1 || pushed[0].Name != "another editor" {
-		t.Errorf("distro core received %+v, want exactly one push of another editor (its own profile, not local's)", pushed)
+	if len(pushed) != 1 || pushed[0].Name != "Beta" {
+		t.Errorf("distro core received %+v, want exactly one push of Beta (its own profile, not local's)", pushed)
 	}
 }
 
@@ -1015,15 +1015,15 @@ func TestFR_ED_11_PushEditorProfilesOnlyPushesToAlreadyConnectedDistros(t *testi
 
 	store := newTestStore(t)
 	setEditorProfiles(t, store, map[string]core.EditorProfile{
-		"Connected":    {Name: "another editor", FolderCmd: "other {path}"},
-		"NotConnected": {Name: "a third editor", FolderCmd: "myed {path}"},
+		"Connected":    {Name: "Beta", FolderCmd: "beta {path}"},
+		"NotConnected": {Name: "Gamma", FolderCmd: "gamma {path}"},
 	})
 	r.SetStore(store)
 
 	r.PushEditorProfiles(t.Context())
 
-	if len(pushedConnected) != 1 || pushedConnected[0].Name != "another editor" {
-		t.Errorf("connected distro received %+v, want exactly one push of another editor", pushedConnected)
+	if len(pushedConnected) != 1 || pushedConnected[0].Name != "Beta" {
+		t.Errorf("connected distro received %+v, want exactly one push of Beta", pushedConnected)
 	}
 	if notConnected.calls != 0 {
 		t.Errorf("NotConnected.calls = %d, want 0 (PushEditorProfiles must not trigger Ensure/deploy)", notConnected.calls)

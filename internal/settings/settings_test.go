@@ -66,7 +66,7 @@ func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
 		OpenWorktrees:  []string{"/a", "/b"},
 		DiffWindowSize: &settings.WindowSize{Width: 900, Height: 600},
 		Preferences: settings.Preferences{
-			EditorProfiles:           map[string]core.EditorProfile{"": {Name: "the editor", FolderCmd: "editor {path}"}},
+			EditorProfiles:           map[string]core.EditorProfile{"": {Name: "Alpha", FolderCmd: "alpha {path}"}},
 			ProtectedBranches:        []string{"main"},
 			DefaultPullMode:          core.PullRebase,
 			DiffMode:                 settings.SideBySideDiff,
@@ -327,8 +327,8 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
 	want := settings.Settings{Preferences: settings.Preferences{
 		EditorProfiles: map[string]core.EditorProfile{
-			"":             {Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"},
-			"Ubuntu-22.04": {Name: "another editor", FolderCmd: "other {path}", FileCmd: "other {path}"},
+			"":             {Name: "Alpha", FolderCmd: "alpha {path}", FileCmd: "alpha {path}", FileAtLineCmd: "alpha {path}:{line}"},
+			"Ubuntu-22.04": {Name: "Beta", FolderCmd: "beta {path}", FileCmd: "beta {path}"},
 		},
 	}}
 
@@ -339,7 +339,7 @@ func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
 
 // encoding/json ignores an older settings file's bare "editor" key.
 func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
-	if got := loadJSON(t, `{"editor": "editor"}`); len(got.EditorProfiles) != 0 {
+	if got := loadJSON(t, `{"editor": "alpha"}`); len(got.EditorProfiles) != 0 {
 		t.Errorf("EditorProfiles = %+v, want empty", got.EditorProfiles)
 	}
 }

@@ -172,11 +172,11 @@ func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if before.EditorName != "the editor" {
-		t.Errorf("EditorName before any push = %q, want %q (the core-side default)", before.EditorName, "the editor")
+	if before.EditorName != "" {
+		t.Errorf("EditorName before any push = %q, want empty: there is no built-in editor", before.EditorName)
 	}
 
-	if err := c.SetEditorProfile(t.Context(), core.EditorProfile{Name: "another editor", FolderCmd: "other {path}"}); err != nil {
+	if err := c.SetEditorProfile(t.Context(), core.EditorProfile{Name: "Beta", FolderCmd: "beta {path}"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -184,8 +184,8 @@ func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.EditorName != "another editor" {
-		t.Errorf("EditorName after push = %q, want %q", after.EditorName, "another editor")
+	if after.EditorName != "Beta" {
+		t.Errorf("EditorName after push = %q, want %q", after.EditorName, "Beta")
 	}
 }
 

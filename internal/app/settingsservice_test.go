@@ -30,7 +30,7 @@ func TestFR_UX_04_SettingsServiceSetThenGetRoundTrips(t *testing.T) {
 	reg, _ := newTestRegistry()
 	s := NewSettingsService(newTestStore(t), reg, &fakeEmitter{}, &slog.LevelVar{})
 	want := settings.Preferences{
-		EditorProfiles:  map[string]core.EditorProfile{"": {Name: "the editor", FolderCmd: "editor {path}"}},
+		EditorProfiles:  map[string]core.EditorProfile{"": {Name: "Alpha", FolderCmd: "alpha {path}"}},
 		DefaultPullMode: core.PullRebase,
 		DiffMode:        settings.UnifiedDiff,
 	}
@@ -137,13 +137,13 @@ func TestTR_13_SettingsServiceSetPushesTheNewProfileToTheLocalCore(t *testing.T)
 	reg.SetStore(store)
 	s := NewSettingsService(store, reg, &fakeEmitter{}, &slog.LevelVar{})
 
-	next := settings.Preferences{EditorProfiles: map[string]core.EditorProfile{"": {Name: "another editor", FolderCmd: "other {path}"}}}
+	next := settings.Preferences{EditorProfiles: map[string]core.EditorProfile{"": {Name: "Beta", FolderCmd: "beta {path}"}}}
 	if err := s.Set(t.Context(), next); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(pushed) != 1 || pushed[0].Name != "another editor" {
-		t.Errorf("pushed = %+v, want exactly one push of another editor", pushed)
+	if len(pushed) != 1 || pushed[0].Name != "Beta" {
+		t.Errorf("pushed = %+v, want exactly one push of Beta", pushed)
 	}
 }
 

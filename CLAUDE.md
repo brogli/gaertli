@@ -61,9 +61,9 @@ needs.
 - Rely on OpenVue's standard behaviour. When it misbehaves, remove what of ours defeats it (e.g.
   `@click.stop` inside a Popover); no workaround layers on top. A UI fix's task plan or prompt names
   the expected library behaviour and what of ours blocks it.
-- Other tools (an IDE, the editor) are inspiration only, never a template. Never read copyleft (GPL,
-  AGPL, LGPL) or source-available source; for the editor (GPL-3) only its user docs. Code adapted from a
-  permissive project ships its notice (OSS-05).
+- Other git tools are inspiration only, never a template. Never read copyleft (GPL, AGPL, LGPL) or
+  source-available source; for such tools only their user docs. Code adapted from a permissive
+  project ships its notice (OSS-05).
 - Destructive or history-writing paths (discard, reset, stash, squash, cherry-pick, revert, worktree
   remove) get a correctness review that reproduces with real git in a scratch repo before merging.
 - The machine's git may be older than CI's: test anything that rewrites history or parses git output

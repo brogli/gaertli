@@ -16,11 +16,12 @@ func (c *Core) SetEditorProfile(ctx context.Context, profile core.EditorProfile)
 	return nil
 }
 
-// currentProfile falls back to the default profile for a core used before
-// the shell's first SetEditorProfile push.
+// currentProfile is the profile the shell last pushed; empty before the
+// first push, so every open-in-editor action then reports that no editor is
+// configured.
 func (c *Core) currentProfile() core.EditorProfile {
 	p, _ := c.editorProfile.Load().(core.EditorProfile)
-	return editor.OrDefault(p)
+	return p
 }
 
 // OpenFolder implements core.API.

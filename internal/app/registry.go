@@ -10,7 +10,6 @@ import (
 
 	"github.com/brogli/nebegit/internal/buildinfo"
 	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/editor"
 	"github.com/brogli/nebegit/internal/remote"
 	"github.com/brogli/nebegit/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -153,7 +152,7 @@ func (r *Registry) pushEditorProfile(ctx context.Context, api core.API, env stri
 	if r.store == nil {
 		return
 	}
-	_ = api.SetEditorProfile(ctx, editor.OrDefault(r.store.Get().EditorProfiles[env]))
+	_ = api.SetEditorProfile(ctx, r.store.Get().EditorProfiles[env])
 }
 
 // PushEditorProfiles re-pushes every connected core's profile: the local

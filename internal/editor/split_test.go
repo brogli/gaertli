@@ -12,7 +12,7 @@ func TestFR_ED_04_SplitCommand(t *testing.T) {
 		want    []string
 		wantErr bool
 	}{
-		{"simple", "editor {path}", []string{"editor", "{path}"}, false},
+		{"simple", "myed {path}", []string{"myed", "{path}"}, false},
 		{"double-quoted token", `myed "{path}:{line}"`, []string{"myed", "{path}:{line}"}, false},
 		{"backslash-escaped space", `myed\ +{line}`, []string{"myed +{line}"}, false},
 		{"empty template", "", nil, true},
@@ -43,8 +43,8 @@ func TestFR_ED_12_SplitCommandWindowsRule(t *testing.T) {
 		in   string
 		want []string
 	}{
-		{"unquoted path with backslashes", `C:\tools\editor.exe {path}`, []string{`C:\tools\editor.exe`, "{path}"}},
-		{"quoted path with backslashes", `"C:\Program Files\the editor\editor.exe" {path}`, []string{`C:\Program Files\the editor\editor.exe`, "{path}"}},
+		{"unquoted path with backslashes", `C:\tools\ed.exe {path}`, []string{`C:\tools\ed.exe`, "{path}"}},
+		{"quoted path with backslashes", `"C:\Program Files\My Editor\ed.exe" {path}`, []string{`C:\Program Files\My Editor\ed.exe`, "{path}"}},
 		{"apostrophe in path", `C:\Users\O'Brien\ed.exe`, []string{`C:\Users\O'Brien\ed.exe`}},
 	}
 	for _, tt := range tests {

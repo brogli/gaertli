@@ -64,7 +64,7 @@
 
 | ID        | Requirement                                                                                                                                                                           |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| QA-USE-01 | Feels familiar to an an IDE git user: same terms, similar flows.                                                                                                                    |
+| QA-USE-01 | Feels familiar to a user of an IDE's git tooling: same terms, similar flows.                                                                                                          |
 | QA-USE-02 | The everyday actions (open a repo, switch worktree or branch, stage, commit, pull, push, fetch, compare two commits, open in editor) are at most two steps away from the main window. |
 | QA-USE-03 | Each domain thing has one name, the one in the glossary, used alike in requirements, architecture, code and UI.                                                                       |
 

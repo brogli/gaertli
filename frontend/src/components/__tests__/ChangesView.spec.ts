@@ -157,7 +157,7 @@ describe('ChangesView', () => {
       new Error('boom', {
         cause: { code: 'EDITOR_NOT_FOUND', message: `"${editor}" is not on PATH` },
       })
-    Facade.OpenFile.mockRejectedValueOnce(notFound('myed')).mockRejectedValueOnce(notFound('editor'))
+    Facade.OpenFile.mockRejectedValueOnce(notFound('alpha')).mockRejectedValueOnce(notFound('beta'))
     const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
     const { body: notice } = await mountInBody(NoticeArea)
 
@@ -167,7 +167,7 @@ describe('ChangesView', () => {
     await flushPromises()
 
     expect(notice.findAll('.p-toast-message')).toHaveLength(1)
-    expect(notice.text()).toContain('editor')
+    expect(notice.text()).toContain('beta')
   })
 
   it('FR-CHG-02 "Stage all" calls Facade.StageAll once; the index event reloads the list', async () => {

@@ -84,7 +84,7 @@ func TestFR_UX_02_AFailedCommandLogsWarnEvenAtInfoLevel(t *testing.T) {
 }
 
 func TestFR_UX_02_AnEditorStartIsLoggedAtDebugWithItsArgv(t *testing.T) {
-	out := dispatchLogged(t, slog.LevelDebug, "editor", "wt1", core.EditorRecord{Argv: []string{"editor", "/repo"}})
+	out := dispatchLogged(t, slog.LevelDebug, "editor", "wt1", core.EditorRecord{Argv: []string{"alpha", "/repo"}})
 
 	if strings.Contains(out, "level=INFO") || strings.Contains(out, "level=WARN") {
 		t.Errorf("log = %q, want no Info or Warn record for a started editor", out)
@@ -92,7 +92,7 @@ func TestFR_UX_02_AnEditorStartIsLoggedAtDebugWithItsArgv(t *testing.T) {
 	if !strings.Contains(out, "level=DEBUG") {
 		t.Errorf("log = %q, want level=DEBUG", out)
 	}
-	for _, want := range []string{`argv=`, `editor`, `/repo`, `worktree=wt1`} {
+	for _, want := range []string{`argv=`, `alpha`, `/repo`, `worktree=wt1`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("log = %q, want it to contain %q", out, want)
 		}
@@ -117,7 +117,7 @@ func TestFR_UX_02_AFailedEditorStartIsLoggedAtWarnWithItsArgvAndError(t *testing
 func TestFR_UX_02_CommandAndEditorEventsAreNeverEmittedToAWindow(t *testing.T) {
 	records := map[string]any{
 		"command": core.CommandRecord{Command: "git status"},
-		"editor":  core.EditorRecord{Argv: []string{"editor"}},
+		"editor":  core.EditorRecord{Argv: []string{"alpha"}},
 	}
 	for name, record := range records {
 		t.Run(name, func(t *testing.T) {

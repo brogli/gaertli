@@ -25,22 +25,22 @@ import { DiffMode, Theme } from '../../bindings/github.com/brogli/nebegit/intern
 import ErrorBanner from './ErrorBanner.vue'
 import FormField from './FormField.vue'
 
-// DEFAULT_PROFILE mirrors editor.Default(), so a newly added profile form
-// starts pre-filled. On a Windows host Zed opens each file in a window of
-// its own: a lone file would join Zed's last active window, and a WSL
-// remote window shows a Windows path as an empty file.
+const EMPTY_PROFILE: EditorProfile = { name: '', folderCmd: '', fileCmd: '', fileAtLineCmd: '' }
+
+// On a Windows host Zed opens each file in a window of its own: a lone file
+// would join Zed's last active window, and a WSL remote window shows a
+// Windows path as an empty file.
 const zedFile = System.IsWindows() ? 'zed -n {path}' : 'zed {path}'
-const DEFAULT_PROFILE: EditorProfile = {
-  name: 'Zed',
-  folderCmd: 'zed {path}',
-  fileCmd: zedFile,
-  fileAtLineCmd: `${zedFile}:{line}`,
-}
 
 // EDITOR_PRESETS fill a profile's fields in one click. IntelliJ has no
 // fileAtLineCmd: its line-jump flag isn't verified.
 const EDITOR_PRESETS: Record<string, EditorProfile> = {
-  Zed: DEFAULT_PROFILE,
+  Zed: {
+    name: 'Zed',
+    folderCmd: 'zed {path}',
+    fileCmd: zedFile,
+    fileAtLineCmd: `${zedFile}:{line}`,
+  },
   'VS Code': {
     name: 'VS Code',
     folderCmd: 'code {path}',
@@ -169,11 +169,11 @@ const editorEnvironments = computed(() => [
 ])
 
 // A newly listed environment (a distro just discovered, or the local one
-// before its stored settings load) starts from the built-in default.
+// before its stored settings load) starts with an empty form.
 watch(
   editorEnvironments,
   (envs) => {
-    for (const name of envs) editorProfiles[name] ??= { ...DEFAULT_PROFILE }
+    for (const name of envs) editorProfiles[name] ??= { ...EMPTY_PROFILE }
   },
   { immediate: true },
 )

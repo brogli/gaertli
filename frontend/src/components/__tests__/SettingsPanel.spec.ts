@@ -147,7 +147,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-ED-03 a WSL distro always has its own editor form, defaulted to Zed, with no control to add one', async () => {
+  it('FR-ED-03 a WSL distro always has its own editor form, starting empty, with no control to add one', async () => {
     AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
 
     const wrapper = await mountPanel()
@@ -155,9 +155,7 @@ describe('SettingsPanel', () => {
     const fieldsets = wrapper.findAll('fieldset')
     expect(fieldsets).toHaveLength(2)
     expect(fieldsets[1]!.text()).toContain('Ubuntu-22.04')
-    expect(fieldsets[1]!.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value).toBe(
-      'zed {path}',
-    )
+    expect(fieldsets[1]!.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value).toBe('')
     expect(wrapper.find('[data-test="add-distro-profile"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Add "Open in editor"')
   })
@@ -180,10 +178,10 @@ describe('SettingsPanel', () => {
       name: 'VS Code',
       folderCmd: 'code {path}',
     })
-    expect(sent.editorProfiles['']).toMatchObject({ name: 'Zed', folderCmd: 'zed {path}' })
+    expect(sent.editorProfiles['']).toMatchObject({ name: '', folderCmd: '' })
   })
 
-  it('FR-ED-13 on a Windows host the Zed preset and a new distro form open files in a window of their own', async () => {
+  it('FR-ED-13 on a Windows host the Zed preset opens files in a window of their own', async () => {
     System.IsWindows.mockReturnValue(true)
     AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
     SettingsService.Get.mockResolvedValue(
@@ -205,13 +203,12 @@ describe('SettingsPanel', () => {
     await flushPromises()
 
     const sent = SettingsService.Set.mock.calls[0]?.[0]
-    const windowsZed = {
+    expect(sent.editorProfiles['']).toMatchObject({
       folderCmd: 'zed {path}',
       fileCmd: 'zed -n {path}',
       fileAtLineCmd: 'zed -n {path}:{line}',
-    }
-    expect(sent.editorProfiles['']).toMatchObject(windowsZed)
-    expect(sent.editorProfiles['Ubuntu-22.04']).toMatchObject(windowsZed)
+    })
+    expect(sent.editorProfiles['Ubuntu-22.04']).toMatchObject({ name: '', folderCmd: '' })
   })
 
   it('FR-ED-13 on a Linux host the Zed preset opens files in the last used window', async () => {
@@ -256,7 +253,7 @@ describe('SettingsPanel', () => {
 
     const sent = SettingsService.Set.mock.calls[0]?.[0]
     expect(sent.editorProfiles.Ubuntu).toMatchObject({ name: 'VS Code' })
-    expect(sent.editorProfiles.Debian).toMatchObject({ name: 'Zed' })
+    expect(sent.editorProfiles.Debian).toMatchObject({ name: '', folderCmd: '' })
   })
 
   it('FR-ED-03 a Linux host with no WSL distros shows a single form naming the local system', async () => {
@@ -344,7 +341,7 @@ describe('SettingsPanel', () => {
     const fieldset = wrapper.get('.p-fieldset')
     const labels = fieldset.findAll('label[for]')
     expect(labels.map((l) => l.text())).toEqual([
-      'Name (shown as "Open in Zed")',
+      'Name (shown as "Open in editor")',
       'Folder command',
       'File command',
       'File-at-line command',

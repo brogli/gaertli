@@ -9,12 +9,12 @@ task plans and tests refer to these IDs.
 
 **nebegit** = Swiss German _näbe_ ("beside") + git: the git tool that sits beside your editor.
 
-A desktop GUI for daily git work, used next to a code editor that lacks strong git tooling (first
-case: the editor): a strong log view, commit comparison, worktree handling, and safe sync actions.
+A desktop GUI for daily git work, used next to a code editor that lacks strong git tooling: a strong
+log view, commit comparison, worktree handling, and safe sync actions.
 
 ## Goals
 
-- G1: Cover the daily git tasks that an IDE made easy and the editor lacks.
+- G1: Cover the daily git tasks an IDE makes easy and a lighter editor lacks.
 - G2: Make worktrees easy to see, create, and open in the editor.
 - G3: Be fast on large repos (about 100k commits).
 - G4: Be safe. No silent data loss.
@@ -32,8 +32,7 @@ case: the editor): a strong log view, commit comparison, worktree handling, and 
 
 ## Users and context
 
-- Users: developers who know git well. The first user is the owner, who uses the editor; others may use any
-  editor (FR-ED).
+- Users: developers who know git well, with any editor (FR-ED).
 - Single user, single machine.
 - Git is installed and on the path. The user is already logged in to their remotes through the git
   command line.

@@ -38,7 +38,7 @@ flowchart LR
   RUN -->|exec| GIT[(system git)]
   GIT --> REPO[(.git + worktrees)]
   WATCH -.->|fs events / poll| REPO
-  ED -->|exec| EXT[External editor<br/>configurable, default the editor]
+  ED -->|exec| EXT[External editor<br/>configurable]
 ```
 
 ## Documents

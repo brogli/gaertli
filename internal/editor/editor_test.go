@@ -3,7 +3,6 @@ package editor
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -21,26 +20,6 @@ func TestMain(m *testing.M) {
 	testbin.Main(m, testbin.Bin{Path: &argvWriterBin, Pkg: "./testdata/argvwriter"})
 }
 
-func TestFR_ED_05_Default(t *testing.T) {
-	t.Parallel()
-	want := defaultFor(runtime.GOOS)
-	if got := Default(); got != want {
-		t.Errorf("Default() = %+v, want %+v", got, want)
-	}
-}
-
-func TestFR_ED_13_DefaultOnWindowsOpensFilesInAWindowOfTheirOwn(t *testing.T) {
-	t.Parallel()
-	got := defaultFor("windows")
-	want := core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor -n {path}", FileAtLineCmd: "editor -n {path}:{line}"}
-	if got != want {
-		t.Errorf("defaultFor(windows) = %+v, want %+v", got, want)
-	}
-	if got := defaultFor("linux"); got != Default() && runtime.GOOS != "windows" {
-		t.Errorf("defaultFor(linux) = %+v, want Default()", got)
-	}
-}
-
 func TestFR_ED_04_FillPlaceholders(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -50,8 +29,8 @@ func TestFR_ED_04_FillPlaceholders(t *testing.T) {
 		line int
 		want []string
 	}{
-		{"path only, no line", []string{"editor", "{path}"}, "/a/b", 0, []string{"editor", "/a/b"}},
-		{"path and line", []string{"editor", "{path}:{line}"}, "/a/b", 42, []string{"editor", "/a/b:42"}},
+		{"path only, no line", []string{"myed", "{path}"}, "/a/b", 0, []string{"myed", "/a/b"}},
+		{"path and line", []string{"myed", "{path}:{line}"}, "/a/b", 42, []string{"myed", "/a/b:42"}},
 		{"line token left literal when line is 0", []string{"cmd", "{line}"}, "/a/b", 0, []string{"cmd", "{line}"}},
 	}
 	for _, tt := range tests {
@@ -74,21 +53,21 @@ func TestFR_ED_04_BuildCommandViaOpenFileSelectsTheRightTemplate(t *testing.T) {
 	}{
 		{
 			name:    "line 0 uses FileCmd",
-			profile: core.EditorProfile{FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"},
+			profile: core.EditorProfile{FileCmd: "myed {path}", FileAtLineCmd: "myed {path}:{line}"},
 			line:    0,
-			want:    []string{"editor", "/a/b"},
+			want:    []string{"myed", "/a/b"},
 		},
 		{
 			name:    "line > 0 uses FileAtLineCmd",
-			profile: core.EditorProfile{FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"},
+			profile: core.EditorProfile{FileCmd: "myed {path}", FileAtLineCmd: "myed {path}:{line}"},
 			line:    42,
-			want:    []string{"editor", "/a/b:42"},
+			want:    []string{"myed", "/a/b:42"},
 		},
 		{
 			name:    "no FileAtLineCmd falls back to FileCmd",
-			profile: core.EditorProfile{FileCmd: "editor {path}"},
+			profile: core.EditorProfile{FileCmd: "myed {path}"},
 			line:    42,
-			want:    []string{"editor", "/a/b"},
+			want:    []string{"myed", "/a/b"},
 		},
 	}
 	for _, tt := range tests {
