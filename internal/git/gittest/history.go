@@ -1,0 +1,99 @@
+package gittest
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/brogli/nebegit/internal/git"
+)
+
+// Step is one commit of History.
+type Step struct {
+	Branch  string // branch to commit on; "master" if empty
+	From    string // branch a new Branch forks from; empty for a root commit
+	Merge   string // branch whose tip becomes the second parent
+	Message string
+	Author  string            // author name; the test identity if empty. The email is the lowercased name at nebegit.invalid.
+	Files   map[string]string // path to content, set in this commit
+	Delete  []string          // paths removed in this commit
+}
+
+// History writes steps into dir, a repo without commits, in one git
+// fast-import run, then checks out master. It returns each commit's SHA in
+// order. A merge commit starts from its first parent's tree: Files must
+// bring in what the second parent added.
+func History(t *testing.T, dir string, steps ...Step) []string {
+	t.Helper()
+	marks := filepath.Join(t.TempDir(), "marks")
+	_, err := (git.Runner{}).Run(context.Background(), git.Call{
+		Dir:   dir,
+		Args:  []string{"fast-import", "--quiet", "--export-marks=" + marks},
+		Stdin: fastImportStream(steps, time.Now().Unix()-int64(len(steps))),
+	})
+	if err != nil {
+		t.Fatalf("git fast-import: %v", err)
+	}
+	Run(t, dir, "reset", "--hard", "--quiet")
+	return shasFromMarks(t, marks, len(steps))
+}
+
+func fastImportStream(steps []Step, start int64) []byte {
+	var s bytes.Buffer
+	for i, c := range steps {
+		branch := orDefault(c.Branch, "master")
+		when := start + int64(i)
+		author := "nebegit test <test@nebegit.invalid>"
+		if c.Author != "" {
+			author = fmt.Sprintf("%s <%s@nebegit.invalid>", c.Author, strings.ToLower(c.Author))
+		}
+		msg := strings.TrimRight(c.Message, "\n") + "\n"
+		fmt.Fprintf(&s, "commit refs/heads/%s\nmark :%d\nauthor %s %d +0000\ncommitter nebegit test <test@nebegit.invalid> %d +0000\ndata %d\n%s",
+			branch, i+1, author, when, when, len(msg), msg)
+		if c.From != "" {
+			fmt.Fprintf(&s, "from refs/heads/%s\n", c.From)
+		}
+		if c.Merge != "" {
+			fmt.Fprintf(&s, "merge refs/heads/%s\n", c.Merge)
+		}
+		for path, content := range c.Files {
+			fmt.Fprintf(&s, "M 100644 inline %s\ndata %d\n%s\n", path, len(content), content)
+		}
+		for _, path := range c.Delete {
+			fmt.Fprintf(&s, "D %s\n", path)
+		}
+		s.WriteString("\n")
+	}
+	return s.Bytes()
+}
+
+func orDefault(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+// shasFromMarks reads fast-import's exported marks (":N sha" lines).
+func shasFromMarks(t *testing.T, path string, n int) []string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shas := make([]string, n)
+	for line := range strings.Lines(string(data)) {
+		var mark int
+		var sha string
+		if _, err := fmt.Sscanf(line, ":%d %s", &mark, &sha); err != nil {
+			t.Fatalf("marks line %q: %v", line, err)
+		}
+		shas[mark-1] = sha
+	}
+	return shas
+}
