@@ -73,6 +73,17 @@ tasks:
     cmds:
       - go test {{.FLAGS}} ./internal/... ./cmd/nebegit-core/... ./build/windows/bin/...
 
+  test:repocheck:
+    summary:
+      Runs the repo checks that run the tools on planted faults; behind a build tag because they take
+      minutes and change only with the tooling config (the working-tree scans run with `go test`)
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      - go test -tags repocheck ./tools/repocheck
+
   test:
     summary: Runs Go and frontend tests offline
     deps:
@@ -198,3 +209,4 @@ tasks:
       - task: build
       - task: build:core
       - task: windows:package:dryrun
+      - task: test:repocheck

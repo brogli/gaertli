@@ -1,7 +1,7 @@
 version: '2'
 
 run:
-  build-tags: [bench]
+  build-tags: [bench, repocheck]
 
 linters:
   default: standard

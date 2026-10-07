@@ -80,6 +80,9 @@ needs.
   status (`task ci && git commit …`), never on an echo.
 - Run `task ci` before committing CI or Taskfile changes: CI runs the same tasks, and no test
   restates the workflows.
+- `task test:repocheck` runs the tool-on-planted-fault tests of `tools/repocheck` (build tag
+  `repocheck`, so `go test ./...` skips them); CI runs it only when tooling config changes. The
+  package's working-tree scans stay untagged.
 - Regenerate the core's generated code with `cd internal/core && go run ../../tools/gencore` (from
   the repo root it fails).
 - Windows build: `nix develop --command task windows:build` (an exported `GOOS=windows` breaks
