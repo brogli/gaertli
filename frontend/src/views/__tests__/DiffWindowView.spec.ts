@@ -3,30 +3,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
-const { Facade, SettingsService } = vi.hoisted(() => ({
-  Facade: {
-    CommitDetails: vi.fn(),
-    CompareCommits: vi.fn(),
-    CompareWithWorking: vi.fn(),
-    Status: vi.fn(),
-    DiffFile: vi.fn(),
-    DiffRange: vi.fn(),
-    DiffAgainstWorking: vi.fn(),
-    DiffWorking: vi.fn(),
-    StageLines: vi.fn(),
-    OpenFile: vi.fn(),
-    Conflict: vi.fn(),
-    MergeDraft: vi.fn(),
-    SetMergeDraft: vi.fn(),
-    StageFile: vi.fn(),
-  },
-  SettingsService: { Get: vi.fn(), Set: vi.fn() },
-}))
-
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  Facade,
-  SettingsService,
-}))
+vi.mock(
+  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('@/testing/mainWindowApp'),
+)
+import { Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
@@ -38,7 +19,6 @@ import DiffWindowView from '../DiffWindowView.vue'
 import DiffView from '@/components/DiffView.vue'
 import ConflictView from '@/components/ConflictView.vue'
 import { DiffKind, type DiffTarget } from '@/lib/diffTarget'
-import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 
@@ -73,7 +53,7 @@ describe('DiffWindowView', () => {
     localStorage.clear()
     useMergeDrafts().keepOnly('/repo', [])
     setActivePinia(createPinia())
-    for (const fn of Object.values(Facade)) fn.mockReset()
+    resetMainWindowApp()
     Facade.CommitDetails.mockResolvedValue({ sha: 'abc', files })
     Facade.CompareCommits.mockResolvedValue(files)
     Facade.CompareWithWorking.mockResolvedValue(files)
@@ -93,11 +73,7 @@ describe('DiffWindowView', () => {
       Promise.resolve(diffOf(path)),
     )
     Facade.DiffWorking.mockImplementation((_wt, path: string) => Promise.resolve(diffOf(path)))
-    Facade.StageLines.mockResolvedValue(undefined)
-    Facade.OpenFile.mockResolvedValue(undefined)
     Facade.Conflict.mockResolvedValue({})
-    Facade.StageFile.mockResolvedValue(undefined)
-    SettingsService.Get.mockResolvedValue(defaultSettingsFixture())
     Events.On.mockClear()
     Window.Close.mockReset()
   })

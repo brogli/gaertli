@@ -5,17 +5,11 @@ import { mountInBody } from '@/testing/mountInBody'
 import NoticeArea from '../NoticeArea.vue'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
-const { AppService, Facade } = vi.hoisted(() => ({
-  AppService: { OpenPath: vi.fn(), SelectWorktree: vi.fn() },
-  Facade: {
-    ListWorktrees: vi.fn(),
-    OpenFolderAt: vi.fn(),
-    RemoveWorktree: vi.fn(),
-    PruneWorktrees: vi.fn(),
-  },
-}))
-
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ AppService, Facade }))
+vi.mock(
+  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('@/testing/mainWindowApp'),
+)
+import { AppService, Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
@@ -81,12 +75,8 @@ async function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
 describe('WorktreePicker', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    AppService.OpenPath.mockReset().mockResolvedValue(undefined)
-    AppService.SelectWorktree.mockReset().mockResolvedValue(undefined)
-    Facade.ListWorktrees.mockReset().mockResolvedValue([main, feat])
-    Facade.OpenFolderAt.mockReset().mockResolvedValue(undefined)
-    Facade.RemoveWorktree.mockReset().mockResolvedValue(undefined)
-    Facade.PruneWorktrees.mockReset().mockResolvedValue(undefined)
+    resetMainWindowApp()
+    Facade.ListWorktrees.mockResolvedValue([main, feat])
     confirmRequire.mockReset()
     Events.On.mockReset()
   })

@@ -5,23 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '@/testing/mountInBody'
 import NoticeArea from '../NoticeArea.vue'
 
-const { Facade, AppService } = vi.hoisted(() => ({
-  AppService: { OpenDiff: vi.fn() },
-  Facade: {
-    StageFile: vi.fn(),
-    UnstageFile: vi.fn(),
-    StageAll: vi.fn(),
-    UnstageAll: vi.fn(),
-    DiscardFile: vi.fn(),
-    ReopenConflict: vi.fn(),
-    Status: vi.fn(),
-    OpenFile: vi.fn(),
-    Commit: vi.fn(),
-    SetMessageDraft: vi.fn(),
-  },
-}))
-
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock(
+  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('@/testing/mainWindowApp'),
+)
+import { AppService, Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
@@ -51,10 +39,8 @@ const treeLabels = (tree: DOMWrapper<Element>) =>
 describe('ChangesView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    for (const fn of Object.values(Facade)) fn.mockReset().mockResolvedValue(undefined)
-    Facade.Status.mockResolvedValue(changedFilesFixture())
+    resetMainWindowApp()
     confirmRequire.mockReset()
-    AppService.OpenDiff.mockReset()
     localStorage.clear()
   })
 

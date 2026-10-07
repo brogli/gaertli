@@ -2,17 +2,11 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { Facade } = vi.hoisted(() => ({
-  Facade: {
-    Commit: vi.fn(),
-    SetMessageDraft: vi.fn(),
-    CommitDetails: vi.fn(),
-    Push: vi.fn(),
-    PushTarget: vi.fn(),
-  },
-}))
-
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock(
+  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('@/testing/mainWindowApp'),
+)
+import { Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
@@ -56,11 +50,8 @@ describe('CommitBox', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     setActivePinia(createPinia())
-    Facade.Commit.mockReset().mockResolvedValue(undefined)
-    Facade.SetMessageDraft.mockReset().mockResolvedValue(undefined)
-    Facade.CommitDetails.mockReset()
-    Facade.Push.mockReset().mockResolvedValue('job-1')
-    Facade.PushTarget.mockReset()
+    resetMainWindowApp()
+    Facade.Push.mockResolvedValue('job-1')
   })
   afterEach(() => {
     vi.useRealTimers()

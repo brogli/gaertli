@@ -2,25 +2,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { AppService, Facade, SettingsService } = vi.hoisted(() => ({
-  AppService: {
-    PickAndOpen: vi.fn(),
-    RecentRepos: vi.fn().mockResolvedValue([]),
-    OpenPath: vi.fn(),
-  },
-  Facade: {
-    CompareCommits: vi.fn().mockResolvedValue([]),
-    DiffRange: vi.fn().mockResolvedValue(null),
-    OpenFile: vi.fn(),
-  },
-  SettingsService: { Get: vi.fn(), Set: vi.fn() },
-}))
-
-vi.mock('../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  AppService,
-  Facade,
-  SettingsService,
-}))
+vi.mock(
+  '../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('@/testing/mainWindowApp'),
+)
+import { Facade, SettingsService, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
@@ -32,11 +18,11 @@ import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { mountInBody } from '@/testing/mountInBody'
 import { Theme } from '../../bindings/github.com/brogli/nebegit/internal/settings'
 
-SettingsService.Get.mockResolvedValue(defaultSettingsFixture())
-
 describe('App', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    resetMainWindowApp()
+    Facade.DiffRange.mockResolvedValue(null)
   })
 
   afterEach(() => {

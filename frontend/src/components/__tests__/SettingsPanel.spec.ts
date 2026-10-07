@@ -2,17 +2,11 @@ import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { SettingsService, AppService, Facade } = vi.hoisted(() => ({
-  SettingsService: { Get: vi.fn(), Set: vi.fn() },
-  AppService: { ListWSLDistros: vi.fn(), LogPath: vi.fn() },
-  Facade: { Version: vi.fn() },
-}))
-
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
-  SettingsService,
-  AppService,
-  Facade,
-}))
+vi.mock(
+  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('@/testing/mainWindowApp'),
+)
+import { AppService, Facade, SettingsService, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
@@ -47,15 +41,14 @@ function withLocalBranches(...names: string[]): void {
 describe('SettingsPanel', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    SettingsService.Get.mockReset().mockResolvedValue(filled)
-    SettingsService.Set.mockReset().mockResolvedValue(undefined)
-    AppService.ListWSLDistros.mockReset().mockResolvedValue([])
+    resetMainWindowApp()
+    SettingsService.Get.mockResolvedValue(filled)
     System.IsWindows.mockReset().mockReturnValue(false)
-    AppService.LogPath.mockReset().mockResolvedValue({
+    AppService.LogPath.mockResolvedValue({
       path: '/home/user/.local/state/nebegit/nebegit.log',
       error: '',
     })
-    Facade.Version.mockReset().mockResolvedValue({ app: 'v0.1.0', commit: '', protocol: 1 })
+    Facade.Version.mockResolvedValue({ app: 'v0.1.0', commit: '', protocol: 1 })
   })
 
   afterEach(() => {

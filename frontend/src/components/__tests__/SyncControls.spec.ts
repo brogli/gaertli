@@ -3,20 +3,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { Facade, AppService } = vi.hoisted(() => ({
-  AppService: { OpenDiff: vi.fn() },
-  Facade: {
-    Fetch: vi.fn(),
-    Pull: vi.fn(),
-    Push: vi.fn(),
-    PushTarget: vi.fn(),
-    ForcePush: vi.fn(),
-    PullWithStash: vi.fn(),
-    Status: vi.fn(),
-  },
-}))
-
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock(
+  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  () => import('@/testing/mainWindowApp'),
+)
+import { AppService, Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
@@ -102,16 +93,16 @@ describe('SyncControls', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
-    Facade.Fetch.mockReset().mockResolvedValue('job-1')
-    Facade.Pull.mockReset().mockResolvedValue('job-1')
-    Facade.Push.mockReset().mockResolvedValue('job-1')
-    Facade.PushTarget.mockReset().mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
-    Facade.ForcePush.mockReset().mockResolvedValue('job-1')
-    Facade.PullWithStash.mockReset().mockResolvedValue('job-1')
-    Facade.Status.mockReset().mockResolvedValue(
+    resetMainWindowApp()
+    Facade.Fetch.mockResolvedValue('job-1')
+    Facade.Pull.mockResolvedValue('job-1')
+    Facade.Push.mockResolvedValue('job-1')
+    Facade.PushTarget.mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
+    Facade.ForcePush.mockResolvedValue('job-1')
+    Facade.PullWithStash.mockResolvedValue('job-1')
+    Facade.Status.mockResolvedValue(
       changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] }),
     )
-    AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
     confirmRequire.mockReset()
     setRefs()
     settingsStore.settings = defaultSettingsFixture()
