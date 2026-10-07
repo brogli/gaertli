@@ -56,16 +56,19 @@ type Entry struct {
 type Runner struct {
 	Git string      // git executable; "" resolves "git" via exec.LookPath
 	Log func(Entry) // called once per call, success or failure; nil is fine
+
+	// StopGrace overrides defaultStopGrace.
+	StopGrace time.Duration
 }
 
 // defaultTimeout bounds a call whose ctx has no deadline and whose
 // Call.Timeout is zero.
 const defaultTimeout = 30 * time.Second
 
-// stopGrace is how long a git interrupted by a done ctx has to exit (git
+// defaultStopGrace is how long a git interrupted by a done ctx has to exit (git
 // removes its lock files then) before it is killed; also how long its
 // pipes stay open after it exited, for a grandchild that still holds them.
-const stopGrace = 2 * time.Second
+const defaultStopGrace = 2 * time.Second
 
 // Run executes call and waits for it to finish, ctx to be done, or the
 // effective timeout to expire, whichever comes first.
@@ -109,8 +112,9 @@ func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, command 
 	cmd.Dir = call.Dir
 	cmd.Env = buildEnv(call)
 	cmd.SysProcAttr = proc.Interruptible()
-	cmd.Cancel = func() error { return interrupt(cmd.Process) }
-	cmd.WaitDelay = stopGrace
+	grace := cmp.Or(r.StopGrace, defaultStopGrace)
+	cmd.Cancel = func() error { return interrupt(cmd.Process, grace) }
+	cmd.WaitDelay = grace
 	if call.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(call.Stdin)
 	}
@@ -118,14 +122,14 @@ func (r Runner) prepare(ctx context.Context, call Call) (cmd *exec.Cmd, command 
 }
 
 // interrupt is a call's Cancel: it interrupts git's process group and kills
-// what of the group still runs stopGrace later, since exec's own kill then
+// what of the group still runs grace later, since exec's own kill then
 // reaches git alone, not a hook or transport that ignored the interrupt.
 // A git that ended before its ctx did is neither interrupted nor killed.
-func interrupt(git *os.Process) error {
+func interrupt(git *os.Process, grace time.Duration) error {
 	if err := proc.Interrupt(git); err != nil {
 		return err
 	}
-	time.AfterFunc(stopGrace, func() { proc.KillGroup(git) })
+	time.AfterFunc(grace, func() { proc.KillGroup(git) })
 	return nil
 }
 

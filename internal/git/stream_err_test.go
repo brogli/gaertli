@@ -57,7 +57,7 @@ func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
 	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()
-	_, err := (Runner{Git: fakegit}).StreamErr(ctx, Call{Args: []string{"fetch"}}, func([]byte) error { return nil })
+	_, err := (Runner{Git: fakegit, StopGrace: testGrace}).StreamErr(ctx, Call{Args: []string{"fetch"}}, func([]byte) error { return nil })
 	elapsed := time.Since(start)
 
 	coretest.AssertCode(t, err, core.Cancelled)
@@ -81,6 +81,7 @@ func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsOnlyStderr(t *tes
 
 func assertCancelReturnsDespiteGrandchild(t *testing.T, script string) {
 	t.Helper()
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("needs a POSIX shell")
 	}
@@ -88,12 +89,12 @@ func assertCancelReturnsDespiteGrandchild(t *testing.T, script string) {
 	time.AfterFunc(50*time.Millisecond, cancel)
 
 	start := time.Now()
-	_, err := (Runner{Git: "sh"}).StreamErr(ctx, Call{Args: []string{"-c", script}}, func([]byte) error { return nil })
+	_, err := (Runner{Git: "sh", StopGrace: testGrace}).StreamErr(ctx, Call{Args: []string{"-c", script}}, func([]byte) error { return nil })
 	elapsed := time.Since(start)
 
 	coretest.AssertCode(t, err, core.Cancelled)
-	if elapsed > 4*time.Second {
-		t.Errorf("StreamErr() took %s after cancel, want it back within the 2s wait delay", elapsed)
+	if elapsed > time.Second {
+		t.Errorf("StreamErr() took %s after cancel, want it back within the grace period", elapsed)
 	}
 }
 

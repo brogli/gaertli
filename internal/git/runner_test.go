@@ -290,13 +290,17 @@ func TestQA_SAFE_02_CancelActuallyKillsProcess(t *testing.T) {
 	assertStopped(t, heartbeat)
 }
 
+// testGrace shortens the wait for a git that ignores an interrupt.
+const testGrace = 200 * time.Millisecond
+
 // git removes its lock files when interrupted, not when killed.
 func TestQA_SAFE_04_CancelInterruptsGitBeforeKillingIt(t *testing.T) {
 	skipWithoutPOSIXSignals(t)
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(100*time.Millisecond, cancel)
 
-	result, err := (Runner{Git: "sh"}).Run(ctx, Call{Args: []string{"-c", `trap 'echo interrupted >&2; exit 1' TERM; sleep 10 & wait`}})
+	result, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", `trap 'echo interrupted >&2; exit 1' TERM; sleep 10 & wait`}})
 
 	coretest.AssertCode(t, err, core.Cancelled)
 	if !strings.Contains(string(result.Stderr), "interrupted") {
@@ -306,16 +310,17 @@ func TestQA_SAFE_04_CancelInterruptsGitBeforeKillingIt(t *testing.T) {
 
 func TestQA_SAFE_04_AGitIgnoringTheInterruptIsKilledAfterTheGracePeriod(t *testing.T) {
 	skipWithoutPOSIXSignals(t)
+	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(100*time.Millisecond, cancel)
 
 	start := time.Now()
-	_, err := (Runner{Git: "sh"}).Run(ctx, Call{Args: []string{"-c", `trap '' TERM; exec sleep 10`}})
+	_, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", `trap '' TERM; exec sleep 10`}})
 	elapsed := time.Since(start)
 
 	coretest.AssertCode(t, err, core.Cancelled)
-	if elapsed > 5*time.Second {
-		t.Errorf("Run() took %s, want it back soon after the 2s grace period", elapsed)
+	if elapsed > time.Second {
+		t.Errorf("Run() took %s, want it back soon after the grace period", elapsed)
 	}
 }
 
@@ -329,7 +334,7 @@ func TestQA_SAFE_04_CancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) 
 
 	coretest.AssertCode(t, err, core.Cancelled)
 	pid := readTrimmed(t, dir+"/pid")
-	if !within(4*time.Second, func() bool { return processGone(pid) }) {
+	if !within(time.Second, func() bool { return processGone(pid) }) {
 		t.Fatal("the child that ignored the interrupt still runs after the grace period")
 	}
 }
@@ -340,10 +345,10 @@ func TestQA_SAFE_04_AChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
 	dir := t.TempDir()
 
 	err := runCancelledAfter(t, 200*time.Millisecond,
-		`(exec >/dev/null 2>&1; trap 'sleep 0.3; echo x >`+dir+`/cleaned; exit 0' TERM; sleep 30 & wait) & wait`)
+		`(exec >/dev/null 2>&1; trap 'sleep 0.05; echo x >`+dir+`/cleaned; exit 0' TERM; sleep 30 & wait) & wait`)
 
 	coretest.AssertCode(t, err, core.Cancelled)
-	if !within(2*time.Second, func() bool { _, err := os.Stat(dir + "/cleaned"); return err == nil }) {
+	if !within(time.Second, func() bool { _, err := os.Stat(dir + "/cleaned"); return err == nil }) {
 		t.Fatal("the child was killed before its clean-up ended")
 	}
 }
@@ -353,12 +358,12 @@ func TestQA_SAFE_04_AChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
 func TestQA_SAFE_04_NothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 	dir := t.TempDir()
 
-	err := runCancelledAfter(t, 300*time.Millisecond, `(sleep 5 & echo $! >`+dir+`/pid; wait) &`)
+	err := runCancelledAfter(t, 100*time.Millisecond, `(sleep 5 & echo $! >`+dir+`/pid; wait) &`)
 
 	coretest.AssertCode(t, err, core.Cancelled)
 	pid := readTrimmed(t, dir+"/pid")
 	t.Cleanup(func() { _ = exec.Command("kill", pid).Run() })
-	time.Sleep(time.Second) // Run returned when the pipes closed, 2s in: now past cancel plus the grace period
+	time.Sleep(testGrace) // Run returned when the pipes closed, a grace period after the cancel
 	if processGone(pid) {
 		t.Error("the child of a git that ended before the cancel was killed")
 	}
@@ -368,12 +373,13 @@ func TestQA_SAFE_04_NothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 // ends after delay.
 func runCancelledAfter(t *testing.T, delay time.Duration, script string) error {
 	t.Helper()
+	t.Parallel()
 	if runtime.GOOS != "linux" {
 		t.Skip("reads /proc")
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(delay, cancel)
-	_, err := (Runner{Git: "sh"}).Run(ctx, Call{Args: []string{"-c", script}})
+	_, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", script}})
 	return err
 }
 
