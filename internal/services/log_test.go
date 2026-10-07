@@ -115,7 +115,7 @@ func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	streamFakeLog(t, c, id, 5, 500)
+	streamFakeLog(t, c, id, 5, 200)
 
 	if err := c.LoadLog(t.Context(), id); err != nil {
 		t.Fatal(err)

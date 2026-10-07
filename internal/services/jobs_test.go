@@ -31,7 +31,7 @@ func TestFR_SYNC_07_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T)
 	}
 	heartbeat := filepath.Join(t.TempDir(), "heartbeat")
 	t.Setenv("FAKEGIT_STDERR_FILE", file)
-	t.Setenv("FAKEGIT_STDERR_DELAY_MS", "200")
+	t.Setenv("FAKEGIT_STDERR_DELAY_MS", "50")
 	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
 
 	sess.Repo.Jobs().Start(t.Context(), "fetch", func(ctx context.Context, progress jobs.Progress) (any, error) {
@@ -52,7 +52,7 @@ func TestFR_SYNC_07_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T)
 	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.State == "cancelled" })
 
 	stopped := mtime(t, heartbeat)
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	if got := mtime(t, heartbeat); !got.Equal(stopped) {
 		t.Errorf("heartbeat mtime advanced after CancelJob: %v -> %v (process not killed)", stopped, got)
 	}

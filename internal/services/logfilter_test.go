@@ -384,7 +384,7 @@ func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T
 func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	streamFakeLog(t, c, id, 5, 300)
+	streamFakeLog(t, c, id, 5, 100)
 
 	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {
 		t.Fatal(err)
@@ -416,7 +416,7 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
-	streamFakeLog(t, c, id, 5, 500) // 5 records * 500ms = 2.5s unstreamed
+	streamFakeLog(t, c, id, 5, 200) // 5 records * 200ms = 1s unstreamed
 
 	start := time.Now()
 	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []string{"whatever"}}); err != nil {
@@ -424,7 +424,7 @@ func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *tes
 	}
 
 	var elapsed time.Duration
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
 		res, err := c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
@@ -438,10 +438,10 @@ func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *tes
 	}
 
 	if elapsed == 0 {
-		t.Fatal("no filtered row observed within 1s")
+		t.Fatal("no filtered row observed within 500ms")
 	}
-	if elapsed > time.Second {
-		t.Errorf("first filtered row observable after %s, want well under 1s (the full 2.5s unstreamed load)", elapsed)
+	if elapsed > 500*time.Millisecond {
+		t.Errorf("first filtered row observable after %s, want well under 500ms (the full 1s unstreamed load)", elapsed)
 	}
 
 	waitForLogRows(t, c, id) // drain the background stream so it doesn't leak noise into later tests
