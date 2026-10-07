@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { conflictFileFixture } from '@/testing/fixtures/conflicts'
+import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
 import { resultFromBase, takenLines } from '../conflictText'
 
 describe('conflictText', () => {
@@ -26,6 +26,29 @@ describe('conflictText', () => {
         { start: 2, lines: 0 },
       ],
     })
+  })
+
+  it('FR-CONF-05 the result holds the base lines of every change, also one with no lines in the result', () => {
+    const file = changesFileFixture()
+    const deleted = {
+      ...file.regions![0]!,
+      result: { start: 1, lines: 0 },
+      base: { start: 2, lines: 1 },
+    }
+    const state = {
+      ...file,
+      base: { present: true, content: 'x\nold\ny' },
+      result: 'x\ny',
+      regions: [deleted],
+    }
+
+    expect(resultFromBase(state)).toEqual({
+      text: 'x\nold\ny',
+      regions: [{ start: 2, lines: 1 }],
+    })
+    expect(resultFromBase({ ...file, regions: file.regions!.slice(0, 1) }).text).toBe(
+      'a\no1\nb\n<<<<<<< HEAD\nc2\n=======\ni2\n>>>>>>> side\nc\ni3\nz\nnew',
+    )
   })
 
   it('FR-CONF-05 builds each take from the side lines', () => {

@@ -23,6 +23,7 @@ import {
   pickSideRegion,
   regionCount,
   regionsExtension,
+  regionTint,
   regionStart,
   regionStates,
   resultRegions,
@@ -33,6 +34,7 @@ import {
   sideRegionStart,
   sideRegionsExtension,
   takeRegion,
+  takeRegions,
   unresolvedCount,
 } from '@/lib/conflictRegions'
 import { errorHeadline } from '@/lib/errorText'
@@ -41,15 +43,19 @@ import { regionAnchors, tieScrollY, type Anchor } from '@/lib/conflictScroll'
 import { iconClass } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { ConflictFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import {
+  RegionKind,
+  type ConflictFile,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 
 // MergeEditor shows one text conflict in three editors side by side: the
 // current side, the editable Result and the incoming side. The Result's
-// conflict regions start as the base text. git placed the regions and the
-// changes of each side; the editors only mark them. The selected region is the
-// one last clicked in any pane or holding the Result's cursor.
+// regions, the conflicts and the changes only one side made, start as the base
+// text. git placed the regions and the changes of each side; the editors only
+// mark them. The selected region is the one last clicked in any pane or
+// holding the Result's cursor.
 const props = defineProps<{ wt: string; file: ConflictFile }>()
 
 const emit = defineEmits<{
@@ -116,8 +122,8 @@ const panels = computed(
 
 const position = computed(() =>
   status.value.unresolved === 0
-    ? t('mergeEditor.noConflictsLeft')
-    : t('mergeEditor.conflictPosition', {
+    ? t('mergeEditor.noChangesLeft')
+    : t('mergeEditor.changePosition', {
         n: Math.max(status.value.selected, 0) + 1,
         total: status.value.count,
         left: status.value.unresolved,
@@ -132,13 +138,13 @@ const resolveBlocker = computed(() => {
 
 const previousLabel = computed(() =>
   t('shortcuts.withShortcut', {
-    action: t('mergeEditor.previousConflict'),
+    action: t('mergeEditor.previousChange'),
     shortcut: t('shortcuts.previousConflict'),
   }),
 )
 const nextLabel = computed(() =>
   t('shortcuts.withShortcut', {
-    action: t('mergeEditor.nextConflict'),
+    action: t('mergeEditor.nextChange'),
     shortcut: t('shortcuts.nextConflict'),
   }),
 )
@@ -159,6 +165,17 @@ const saveTitle = computed(
       shortcut: t('shortcuts.save'),
     }),
 )
+
+// openOneSided are the unresolved changes only one side made, or both alike.
+const openOneSided = computed(() => {
+  const state = resultState.value
+  if (!state) return []
+  return regions.value.flatMap((region, i) =>
+    region.kind !== RegionKind.RegionConflict && i < regionCount(state) && isUnresolved(state, i)
+      ? [i]
+      : [],
+  )
+})
 
 const takes = computed<{ take: Take; label: string }[]>(() => [
   { take: 'current', label: t('mergeEditor.takeCurrent') },
@@ -280,7 +297,8 @@ function createViews(shared: Extension[]): void {
           sideRegionsExtension(
             regions.value.map((region) => region[pane]),
             (pane === 'current' ? file.currentChanges : file.incomingChanges) ?? [],
-            t('mergeEditor.emptyConflict'),
+            t('mergeEditor.emptyChange'),
+            regions.value.map((region) => regionTint(region, pane)),
           ),
           EditorView.updateListener.of(selectClickedRegion),
         ],
@@ -299,7 +317,8 @@ function createViews(shared: Extension[]): void {
         regionsExtension(
           draft?.regions ?? initial.regions.map((range) => ({ range, resolved: false })),
           markerSize.value,
-          t('mergeEditor.emptyConflict'),
+          t('mergeEditor.emptyChange'),
+          regions.value.map((region) => regionTint(region, 'result')),
         ),
         EditorView.updateListener.of(onResultUpdate),
       ],
@@ -370,6 +389,18 @@ function take(kind: Take): void {
   result.dispatch(takeRegion(result.state, region, takenLines(props.file, region, kind)))
 }
 
+// applyNonConflicting takes the changed side of every open change only one
+// side made, as one undo step.
+function applyNonConflicting(): void {
+  const result = views.result
+  if (!result) return
+  const takes = openOneSided.value.map((region) => {
+    const incoming = regions.value[region]?.kind === RegionKind.RegionIncoming
+    return { region, lines: takenLines(props.file, region, incoming ? 'incoming' : 'current') }
+  })
+  result.dispatch(takeRegions(result.state, takes))
+}
+
 function markSelectedDone(): void {
   views.result?.dispatch(markDone(status.value.selected))
 }
@@ -436,6 +467,13 @@ onBeforeUnmount(() => {
         :disabled="!status.selectedUnresolved"
         data-test="mark-done"
         @click="markSelectedDone"
+      />
+      <Button
+        v-bind="SECONDARY_BUTTON"
+        :label="t('mergeEditor.applyNonConflicting')"
+        :disabled="openOneSided.length === 0"
+        data-test="apply-non-conflicting"
+        @click="applyNonConflicting"
       />
       <Button
         v-bind="SECONDARY_BUTTON"

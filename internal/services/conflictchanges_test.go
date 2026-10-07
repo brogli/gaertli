@@ -25,8 +25,8 @@ func TestFR_CONF_05_ConflictSideChangesMarkWhereASideDiffersFromTheBase(t *testi
 	if !reflect.DeepEqual(got.IncomingChanges, wantIncoming) {
 		t.Errorf("IncomingChanges = %+v, want %+v", got.IncomingChanges, wantIncoming)
 	}
-	if len(got.Regions) != 1 || got.Regions[0].Current.Start != 5 || got.Regions[0].Incoming.Start != 5 {
-		t.Errorf("Regions = %+v, want one at line 5 in both sides", got.Regions)
+	if len(conflictRegionsOf(got)) != 1 || conflictRegionsOf(got)[0].Current.Start != 5 || conflictRegionsOf(got)[0].Incoming.Start != 5 {
+		t.Errorf("Regions = %+v, want one at line 5 in both sides", conflictRegionsOf(got))
 	}
 }
 
@@ -63,5 +63,38 @@ func TestFR_CONF_05_ConflictSideChangesWithoutABaseAreTheWholeSide(t *testing.T)
 	}
 	if want := []core.SideChange{{Lines: core.LineRange{Start: 1, Lines: 2}, Added: true}}; !reflect.DeepEqual(got.IncomingChanges, want) {
 		t.Errorf("IncomingChanges = %+v, want %+v", got.IncomingChanges, want)
+	}
+}
+
+func TestFR_CONF_05_ConflictRegionsListEveryChangeWithItsKindAndRanges(t *testing.T) {
+	t.Parallel()
+	base := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\n"
+	current := "l1\nc2\nl3\nl4\nc5\nl6\nl7\nl8\nl9\nl10\n"
+	incoming := "l1\nl2\nl3\nl4\ni5\nl6\nl7\ni8\nl9\nl10\nend\n"
+	c, wt, _ := stoppedOn(t, "merge", "a.txt", version(base), version(current), version(incoming))
+
+	got := readConflict(t, c, wt, "a.txt")
+
+	rng := func(start, lines int) core.LineRange { return core.LineRange{Start: start, Lines: lines} }
+	want := []core.ConflictRegion{
+		{Kind: core.RegionCurrent, Result: rng(2, 1), Base: rng(2, 1), Current: rng(2, 1), Incoming: rng(2, 1)},
+		{Kind: core.RegionConflict, Result: rng(5, 5), Base: rng(5, 1), Current: rng(5, 1), Incoming: rng(5, 1)},
+		{Kind: core.RegionIncoming, Result: rng(12, 1), Base: rng(8, 1), Current: rng(8, 1), Incoming: rng(8, 1)},
+		{Kind: core.RegionIncoming, Added: true, Result: rng(15, 1), Base: rng(10, 0), Current: rng(10, 0), Incoming: rng(11, 1)},
+	}
+	if !reflect.DeepEqual(got.Regions, want) {
+		t.Errorf("Regions = %+v\nwant %+v\nresult:\n%s", got.Regions, want, got.Result)
+	}
+}
+
+func TestFR_CONF_05_ConflictRegionsLeaveOutAChangeBothSidesMadeAlike(t *testing.T) {
+	t.Parallel()
+	base := "l1\nl2\nl3\nl4\nl5\n"
+	c, wt, _ := stoppedOn(t, "merge", "a.txt", version(base), version("l1\nsame\nl3\nl4\nc5\n"), version("l1\nsame\nl3\nl4\ni5\n"))
+
+	got := readConflict(t, c, wt, "a.txt")
+
+	if len(got.Regions) != 1 || got.Regions[0].Kind != core.RegionConflict {
+		t.Errorf("Regions = %+v, want only the conflict", got.Regions)
 	}
 }

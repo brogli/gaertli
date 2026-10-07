@@ -79,7 +79,16 @@ A conflicted file is read from what git left, never merged a second time:
    Where each region sits in each side comes from git: the result with every block filled from one
    side is diffed against that side (`diff --no-index -U0`). The lines each side changed are that
    side's diff against the base the same way: a hunk without base lines is an addition, any other a
-   change. Without a base the whole side is one addition.
+   change. Without a base the whole side is one addition. The same diffs find the other changes:
+   with the blocks filled from the current side, what still differs from the current side is a
+   change only the incoming side made, which git applied to the result, and the other way round. Its
+   base lines are the hunk's lines mapped through that side's diff against the base, and the other
+   side's lines are found by their text near the base lines mapped through its diff, so that all
+   four ranges cover the same change. A change both sides made alike is applied and listed nowhere.
+   The merge editor starts from the base for every one of these regions and puts a side's lines in
+   only when the user takes them; taking the current side everywhere gives the current side's file,
+   taking the changed side of the non-conflicting changes and the current side in the conflicts
+   gives `merge -X ours`.
 4. All text reaches the UI with LF line breaks. Saving writes the working file's own convention
    back, refuses when the file changed since it was read, and stages it (`add`) only when no marker
    line is left.

@@ -1,7 +1,8 @@
-// Conflict regions in the merge editor's CodeMirror panes. The result pane
-// tracks each region's range through edits; a region is resolved once a take
-// or "mark done" says so, never by an edit alone. The read-only side panes
-// mark their regions' lines and the lines the side changed.
+// The merge editor's regions in its CodeMirror panes: the conflicts and the
+// changes only one side made. The result pane tracks each region's range
+// through edits; a region is resolved once a take or "mark done" says so,
+// never by an edit alone. The read-only side panes mark their regions' lines
+// and the lines the side changed.
 
 import {
   type ChangeSet,
@@ -16,8 +17,20 @@ import {
   type TransactionSpec,
 } from '@codemirror/state'
 import { invertedEffects, isolateHistory } from '@codemirror/commands'
-import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  gutter,
+  GutterMarker,
+  WidgetType,
+} from '@codemirror/view'
+import {
+  RegionKind,
+  type ConflictRegion,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { DEFAULT_MARKER_SIZE, isMarkerLine } from './conflictMarkers'
+import type { Pane } from './conflictPanes'
 
 export interface Region {
   from: number
@@ -70,9 +83,61 @@ function lineDecoration(doc: Text, lineNumber: number, className: string): Range
   return Decoration.line({ class: className }).range(doc.line(lineNumber).from)
 }
 
-function regionClass(resolved: boolean | undefined, selected: boolean): string {
-  const state = resolved ? 'cm-conflict-resolved' : 'cm-conflict-unresolved'
-  return selected ? `${state} cm-conflict-selected` : state
+// RegionTint is the line class of an unresolved region: red for a conflict,
+// blue for a change, green for added lines.
+export type RegionTint = 'cm-conflict-unresolved' | 'cm-change-changed' | 'cm-change-added'
+
+const CONFLICT_TINT: RegionTint = 'cm-conflict-unresolved'
+const HANDLED = 'cm-conflict-resolved'
+
+// regionTint is the tint of a region in a pane. A side pane shows a change
+// only one side made on the side that made it; its other side has no tint.
+export function regionTint(
+  { kind, added }: Pick<ConflictRegion, 'kind' | 'added'>,
+  pane: Pane,
+): RegionTint | undefined {
+  if (kind === RegionKind.RegionConflict) return CONFLICT_TINT
+  const changedHere =
+    pane === 'result' ||
+    (kind === RegionKind.RegionCurrent && pane === 'current') ||
+    (kind === RegionKind.RegionIncoming && pane === 'incoming')
+  if (!changedHere) return undefined
+  return added ? 'cm-change-added' : 'cm-change-changed'
+}
+
+const tintsFacet = Facet.define<(RegionTint | undefined)[], (RegionTint | undefined)[]>({
+  combine: (tints) => tints[0] ?? [],
+})
+
+// tintOf is region i's tint; a region without one given is a conflict.
+function tintOf(state: EditorState, i: number): RegionTint | undefined {
+  const tints = state.facet(tintsFacet)
+  return i < tints.length ? tints[i] : CONFLICT_TINT
+}
+
+interface RegionLook {
+  resolved?: boolean | undefined
+  selected: boolean
+  tint?: RegionTint | undefined
+}
+
+// lineClass is the class of line n of a region lying on lines: its tint or
+// resolved mark, and the outline of a selected region.
+function lineClass(look: RegionLook, n: number, lines: number[]): string {
+  const classes = [look.resolved ? 'cm-conflict-resolved' : look.tint]
+  if (look.selected) {
+    classes.push('cm-chunk-selected')
+    if (n === lines[0]) classes.push('cm-chunk-first')
+    if (n === lines.at(-1)) classes.push('cm-chunk-last')
+  }
+  return classes.filter(Boolean).join(' ')
+}
+
+// regionLineDecorations marks each line of region with its class.
+function regionLineDecorations(doc: Text, region: Region, look: RegionLook): Range<Decoration>[] {
+  const lines = linesOf(doc, region)
+  const classes = lines.map((n) => lineClass(look, n, lines))
+  return lines.flatMap((n, i) => (classes[i] ? [lineDecoration(doc, n, classes[i])] : []))
 }
 
 // ---- result pane ----
@@ -130,7 +195,7 @@ function mapPoint(pos: number, changes: ChangeSet, oldDoc: Text): Region {
 }
 
 const placeholderFacet = Facet.define<string, string>({
-  combine: (labels) => labels[0] ?? 'Unresolved conflict',
+  combine: (labels) => labels[0] ?? 'Unresolved change',
 })
 
 // Placeholder is the bar that shows an unresolved region with no lines;
@@ -138,20 +203,19 @@ const placeholderFacet = Facet.define<string, string>({
 class Placeholder extends WidgetType {
   constructor(
     readonly label: string,
-    readonly selected: boolean,
+    readonly className: string,
     readonly select: (view: EditorView) => void,
   ) {
     super()
   }
 
   eq(other: Placeholder): boolean {
-    return other.label === this.label && other.selected === this.selected
+    return other.label === this.label && other.className === this.className
   }
 
   toDOM(view: EditorView): HTMLElement {
     const bar = document.createElement('div')
-    bar.className = 'cm-conflict-placeholder cm-conflict-unresolved'
-    if (this.selected) bar.classList.add('cm-conflict-selected')
+    bar.className = this.className
     bar.textContent = this.label
     bar.addEventListener('mousedown', () => this.select(view))
     return bar
@@ -171,8 +235,16 @@ function placeholders(
   return regions.flatMap((region, i) => {
     if (region.from !== region.to || isResolved(i)) return []
     const select = (view: EditorView) => view.dispatch({ effects: pick.of(i) })
-    const widget = new Placeholder(label, i === selected, select)
-    return [Decoration.widget({ widget, block: true, side: -1 }).range(region.from)]
+    const className = `cm-conflict-placeholder ${lineClass({ selected: i === selected, tint: tintOf(state, i) }, 0, [0])}`
+    const widget = new Placeholder(label, className, select)
+    // A point after the last line puts the bar after it, not before an empty line.
+    const afterLastLine =
+      region.from === state.doc.length &&
+      state.doc.length > 0 &&
+      region.from !== state.doc.lineAt(region.from).from
+    return [
+      Decoration.widget({ widget, block: true, side: afterLastLine ? 1 : -1 }).range(region.from),
+    ]
   })
 }
 
@@ -182,9 +254,11 @@ function resultDecorations(
   selected: number,
 ): DecorationSet {
   const lines = regions.flatMap((region, i) =>
-    linesOf(state.doc, region).map((n) =>
-      lineDecoration(state.doc, n, regionClass(region.resolved, i === selected)),
-    ),
+    regionLineDecorations(state.doc, region, {
+      resolved: region.resolved,
+      selected: i === selected,
+      tint: tintOf(state, i),
+    }),
   )
   const empty = placeholders(state, regions, (i) => regions[i]?.resolved, selected, selectRegion)
   return Decoration.set([...lines, ...empty], true)
@@ -230,11 +304,14 @@ const undoResolved = invertedEffects.of((tr) =>
 export function regionsExtension(
   initial: ResultRegion[],
   markerSize: number,
-  placeholderLabel = 'Unresolved conflict',
+  placeholderLabel = 'Unresolved change',
+  tints?: (RegionTint | undefined)[],
 ): Extension {
   return [
     markerSizeFacet.of(markerSize),
     placeholderFacet.of(placeholderLabel),
+    tintsFacet.of(tints ?? initial.map(() => CONFLICT_TINT)),
+    selectionGutter(resultField, (value) => value.regions[value.selected]),
     undoResolved,
     resultField.init((state) => {
       const regions = initial.map(({ range, resolved }) => ({
@@ -321,6 +398,19 @@ export function takeRegion(state: EditorState, i: number, lines: string[]): Tran
   return { changes: replacement(state, regionOf(state, i), lines), ...markDone(i) }
 }
 
+// takeRegions replaces each listed region by its lines and marks it
+// resolved, as one undo step; the selection stays.
+export function takeRegions(
+  state: EditorState,
+  takes: { region: number; lines: string[] }[],
+): TransactionSpec {
+  return {
+    changes: takes.map(({ region, lines }) => replacement(state, regionOf(state, region), lines)),
+    effects: takes.map(({ region }) => setResolved.of({ region, resolved: true })),
+    annotations: isolateHistory.of('full'),
+  }
+}
+
 // replacement is the change that puts lines in place of region's lines. An
 // emptied region takes a line break along.
 function replacement(state: EditorState, region: Region, lines: string[]) {
@@ -334,6 +424,30 @@ function replacement(state: EditorState, region: Region, lines: string[]) {
   if (lines.length === 0) return []
   const atLineStart = region.from === doc.lineAt(region.from).from
   return { from: region.from, insert: atLineStart ? `${text}\n` : `\n${text}` }
+}
+
+// ---- selection marker ----
+
+const selectionMarker = new (class extends GutterMarker {
+  elementClass = 'cm-chunk-gutter-mark'
+})()
+
+// selectionGutter marks the lines of the selected region in a gutter beside
+// the pane's lines; selectedOf finds that region in the pane's field.
+function selectionGutter<V>(
+  field: StateField<V>,
+  selectedOf: (value: V) => Region | undefined,
+): Extension {
+  return gutter({
+    class: 'cm-chunk-gutter',
+    lineMarker: (view, line) => {
+      const region = selectedOf(view.state.field(field))
+      const inside =
+        region && region.from < region.to && region.from <= line.from && line.from <= region.to
+      return inside ? selectionMarker : null
+    },
+    lineMarkerChange: (update) => update.startState.field(field) !== update.state.field(field),
+  })
 }
 
 // ---- side panes ----
@@ -368,12 +482,13 @@ export function regionStates(state: EditorState): SideRegionStates {
   return { resolved: regions.map((region) => region.resolved), selected }
 }
 
-// changeLineClasses is the class of each line the side changed, by line number.
+// changeLineClasses marks each line the side changed. Those no region takes over are changes
+// both sides made alike, which are handled from the start.
 function changeLineClasses(doc: Text, changes: SideChange[]): Map<number, string> {
   const classes = new Map<number, string>()
-  for (const { lines, added } of changes) {
+  for (const { lines } of changes) {
     for (let n = lines.start; n < lines.start + lines.lines && n <= doc.lines; n++) {
-      classes.set(n, added ? 'cm-change-added' : 'cm-change-changed')
+      classes.set(n, HANDLED)
     }
   }
   return classes
@@ -383,11 +498,17 @@ function changeLineClasses(doc: Text, changes: SideChange[]): Map<number, string
 function sideDecorations(state: EditorState, value: Omit<SideValue, 'decorations'>): DecorationSet {
   const classes = changeLineClasses(state.doc, state.facet(sideConfigFacet).changes)
   value.regions.forEach((region, i) => {
-    for (const n of linesOf(state.doc, region)) {
-      classes.set(n, regionClass(value.resolved[i], i === value.selected))
+    const look = {
+      resolved: value.resolved[i],
+      selected: i === value.selected,
+      tint: tintOf(state, i),
     }
+    const lines = linesOf(state.doc, region)
+    for (const n of lines) classes.set(n, lineClass(look, n, lines))
   })
-  const lines = [...classes].map(([n, name]) => lineDecoration(state.doc, n, name))
+  const lines = [...classes]
+    .filter(([, name]) => name)
+    .map(([n, name]) => lineDecoration(state.doc, n, name))
   const empty = placeholders(
     state,
     value.regions,
@@ -420,9 +541,16 @@ const sideField = StateField.define<SideValue>({
 export function sideRegionsExtension(
   ranges: LineRange[],
   changes: SideChange[],
-  placeholderLabel = 'Unresolved conflict',
+  placeholderLabel = 'Unresolved change',
+  tints?: (RegionTint | undefined)[],
 ): Extension {
-  return [sideConfigFacet.of({ ranges, changes }), placeholderFacet.of(placeholderLabel), sideField]
+  return [
+    sideConfigFacet.of({ ranges, changes }),
+    placeholderFacet.of(placeholderLabel),
+    tintsFacet.of(tints ?? ranges.map(() => CONFLICT_TINT)),
+    selectionGutter(sideField, (value) => value.regions[value.selected]),
+    sideField,
+  ]
 }
 
 // sideRegionStart is the offset where side region i begins, if there is one.

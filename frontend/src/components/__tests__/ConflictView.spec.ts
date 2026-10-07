@@ -44,7 +44,7 @@ async function mountView(file: Partial<ConflictFile>) {
 
 // resolveAll takes the current side in both conflicts of the fixture.
 async function resolveAll(wrapper: VueWrapper): Promise<void> {
-  for (const label of ['Take current', 'Next conflict · Alt+Down', 'Take current']) {
+  for (const label of ['Take left', 'Next change · Alt+Down', 'Take left']) {
     await findButton(wrapper, label)!.trigger('click')
   }
 }
@@ -382,7 +382,7 @@ describe('ConflictView', () => {
 
     it('FR-CONF-06 a taken region and the edits survive a new page: the core returns them', async () => {
       const wrapper = await mountView({})
-      await findButton(wrapper, 'Take current')!.trigger('click')
+      await findButton(wrapper, 'Take left')!.trigger('click')
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       const text = resultView(wrapper).state.doc.toString()
       wrapper.unmount()

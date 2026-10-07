@@ -206,8 +206,8 @@ func TestFR_CONF_06_ConflictFindsTheMarkersOfAMixedLineEndingFile(t *testing.T) 
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(got.Regions) != 1 {
-		t.Fatalf("regions = %d, want 1; result:\n%q", len(got.Regions), got.Result)
+	if len(conflictRegionsOf(got)) != 1 {
+		t.Fatalf("regions = %d, want 1; result:\n%q", len(conflictRegionsOf(got)), got.Result)
 	}
 	assertRegion(t, got, 0, "two\n", "cur\n", "inc\n")
 	_, err := c.SaveConflict(t.Context(), wt, "a.txt", "one\r\n>>>>>>> side\r\n", got.Fingerprint, true)

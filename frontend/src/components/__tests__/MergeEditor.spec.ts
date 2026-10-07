@@ -15,9 +15,10 @@ import MergeEditor from '../MergeEditor.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { findButton } from '@/testing/findButton'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
-import { conflictFileFixture } from '@/testing/fixtures/conflicts'
+import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
 import {
   Operation,
+  RegionKind,
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
@@ -47,7 +48,7 @@ describe('MergeEditor layout', () => {
       file.incoming.content,
     ])
     expect(headers(wrapper)).toEqual(['main · current branch', 'Result', 'side · merged branch'])
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 1 of 2 · 2 left')
+    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 1 of 2 · 2 left')
   })
 
   it.each([
@@ -78,11 +79,11 @@ describe('MergeEditor layout', () => {
     const result = editorViews(wrapper)[1]!
 
     expect(result.state.doc.toString()).not.toMatch(/^[<>]{7}/m)
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 1 of 2 · 2 left')
+    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 1 of 2 · 2 left')
     expect(result.dom.querySelectorAll('.cm-conflict-unresolved')).toHaveLength(2)
   })
 
-  it('FR-CONF-05 the side panes tint changed lines blue, added lines green and conflicts red', async () => {
+  it('FR-CONF-05 the side panes tint conflicts red and show lines both sides changed alike as handled', async () => {
     const file = conflictFileFixture({
       currentChanges: [{ lines: { start: 1, lines: 1 }, added: true }],
       incomingChanges: [{ lines: { start: 5, lines: 1 }, added: false }],
@@ -91,13 +92,16 @@ describe('MergeEditor layout', () => {
     const [current, , incoming] = editorViews(wrapper)
     const classes = (view: EditorView) =>
       [...view.dom.querySelectorAll('.cm-line')].map((line) =>
-        ['cm-change-added', 'cm-change-changed', 'cm-conflict-unresolved'].find((name) =>
-          line.classList.contains(name),
-        ),
+        [
+          'cm-change-added',
+          'cm-change-changed',
+          'cm-conflict-unresolved',
+          'cm-conflict-resolved',
+        ].find((name) => line.classList.contains(name)),
       )
 
     expect(classes(current!)).toEqual([
-      'cm-change-added',
+      'cm-conflict-resolved',
       'cm-conflict-unresolved',
       undefined,
       'cm-conflict-unresolved',
@@ -108,7 +112,7 @@ describe('MergeEditor layout', () => {
       'cm-conflict-unresolved',
       undefined,
       'cm-conflict-unresolved',
-      'cm-change-changed',
+      'cm-conflict-resolved',
     ])
   })
 
@@ -124,12 +128,12 @@ describe('MergeEditor layout', () => {
     const placeholders = () => result.dom.querySelectorAll('.cm-conflict-placeholder')
 
     expect(placeholders()).toHaveLength(2)
-    expect(placeholders()[0]!.textContent).toBe('Unresolved conflict')
+    expect(placeholders()[0]!.textContent).toBe('Unresolved change')
     placeholders()[1]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     await flushPromises()
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 2 of 2 · 2 left')
+    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 2 of 2 · 2 left')
 
-    await click(wrapper, 'Take current')
+    await click(wrapper, 'Take left')
 
     expect(placeholders()).toHaveLength(1)
     expect(result.state.doc.toString()).toBe('a\nb\nc2\nz')
@@ -145,6 +149,7 @@ describe('MergeEditor layout', () => {
       result: 'A\n<<<<<<< HEAD\nB\n=======\nY\n>>>>>>> side\nC\nx',
       regions: [
         {
+          kind: RegionKind.RegionConflict,
           result: { start: 2, lines: 5 },
           base: { start: 2, lines: 1 },
           current: { start: 2, lines: 1 },
@@ -159,7 +164,7 @@ describe('MergeEditor layout', () => {
 
     expect(result.state.doc.toString()).toBe('A\nb\nC\nx')
 
-    await click(wrapper, 'Take incoming')
+    await click(wrapper, 'Take right')
 
     expect(result.state.doc.toString()).toBe('A\nY\nC\nx')
   })
@@ -177,7 +182,7 @@ describe('MergeEditor layout', () => {
     placeholder.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     await flushPromises()
 
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 2 of 2 · 2 left')
+    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 2 of 2 · 2 left')
   })
 
   it('FR-CONF-06 offers one save action and no base pane', async () => {
@@ -218,6 +223,7 @@ function threeRegionFile(): ConflictFile {
   const block = (n: number) => ['<<<<<<< HEAD', `c${n}`, '=======', `i${n}`, '>>>>>>> side']
   const result = ['a', ...block(1), 'b', ...block(2), 'c', ...block(3), 'z'].join('\n')
   const region = (n: number, resultStart: number) => ({
+    kind: RegionKind.RegionConflict,
     result: { start: resultStart, lines: 5 },
     base: { start: 2 * n, lines: 1 },
     current: { start: 2 * n, lines: 1 },
@@ -237,31 +243,31 @@ function threeRegionFile(): ConflictFile {
 
 // selectedLineCount is how many lines of the pane carry the selected mark.
 function selectedLineCount(view: EditorView): number {
-  return view.dom.querySelectorAll('.cm-conflict-selected').length
+  return view.dom.querySelectorAll('.cm-chunk-selected').length
 }
 
 describe('MergeEditor actions and navigation', () => {
   it('FR-CONF-05 next moves to the next conflict, and the takes resolve both', async () => {
     const wrapper = await mountEditor()
 
-    await click(wrapper, 'Next conflict · Alt+Down')
-    expect(position(wrapper)).toBe('Conflict 2 of 2 · 2 left')
+    await click(wrapper, 'Next change · Alt+Down')
+    expect(position(wrapper)).toBe('Change 2 of 2 · 2 left')
     const result = viewAt(wrapper, RESULT)
     expect(result.state.doc.lineAt(result.state.selection.main.head).number).toBe(4)
 
-    await click(wrapper, 'Take current')
+    await click(wrapper, 'Take left')
     expect(result.state.doc.toString()).toBe('a\no1\nb\nc2\nz')
 
-    await click(wrapper, 'Previous conflict · Alt+Up')
-    expect(position(wrapper)).toBe('Conflict 1 of 2 · 1 left')
-    await click(wrapper, 'Both, incoming first')
+    await click(wrapper, 'Previous change · Alt+Up')
+    expect(position(wrapper)).toBe('Change 1 of 2 · 1 left')
+    await click(wrapper, 'Both, right first')
     expect(result.state.doc.toString()).toBe('a\ni1\nc1\nb\nc2\nz')
-    expect(position(wrapper)).toBe('No conflicts left')
+    expect(position(wrapper)).toBe('No changes left')
   })
 
   it.each([
-    ['Take incoming', 'a\ni1\nb\no2\nz'],
-    ['Both, current first', 'a\nc1\ni1\nb\no2\nz'],
+    ['Take right', 'a\ni1\nb\no2\nz'],
+    ['Both, left first', 'a\nc1\ni1\nb\no2\nz'],
   ])('FR-CONF-05 "%s" acts on the selected conflict', async (label, text) => {
     const wrapper = await mountEditor()
 
@@ -273,13 +279,13 @@ describe('MergeEditor actions and navigation', () => {
   it('FR-CONF-05 take incoming resolves the region in every pane', async () => {
     const wrapper = await mountEditor()
 
-    await click(wrapper, 'Take incoming')
+    await click(wrapper, 'Take right')
 
     for (const pane of [CURRENT, RESULT, INCOMING] as const) {
       const resolved = viewAt(wrapper, pane).dom.querySelectorAll('.cm-conflict-resolved')
       expect(resolved).toHaveLength(1)
     }
-    expect(position(wrapper)).toBe('Conflict 1 of 2 · 1 left')
+    expect(position(wrapper)).toBe('Change 1 of 2 · 1 left')
   })
 
   it('FR-CONF-05 a hand edit leaves the region unresolved until Mark done, which undo reverts', async () => {
@@ -287,16 +293,16 @@ describe('MergeEditor actions and navigation', () => {
     const result = viewAt(wrapper, RESULT)
     result.dispatch({ changes: { from: result.state.doc.line(2).to, insert: ' mine' } })
     await flushPromises()
-    expect(position(wrapper)).toBe('Conflict 1 of 2 · 2 left')
+    expect(position(wrapper)).toBe('Change 1 of 2 · 2 left')
 
     await click(wrapper, 'Mark done')
-    expect(position(wrapper)).toBe('Conflict 1 of 2 · 1 left')
+    expect(position(wrapper)).toBe('Change 1 of 2 · 1 left')
     expect(result.state.doc.line(2).text).toBe('o1 mine')
     expect(findButton(wrapper, 'Mark done')?.attributes('disabled')).toBeDefined()
 
     undo(result)
     await flushPromises()
-    expect(position(wrapper)).toBe('Conflict 1 of 2 · 2 left')
+    expect(position(wrapper)).toBe('Change 1 of 2 · 2 left')
     expect(result.state.doc.line(2).text).toBe('o1 mine')
   })
 
@@ -310,7 +316,7 @@ describe('MergeEditor actions and navigation', () => {
     })
     await flushPromises()
 
-    expect(position(wrapper)).toBe('Conflict 3 of 3 · 3 left')
+    expect(position(wrapper)).toBe('Change 3 of 3 · 3 left')
     for (const pane of [CURRENT, RESULT, INCOMING] as const) {
       expect(selectedLineCount(viewAt(wrapper, pane))).toBeGreaterThan(0)
     }
@@ -318,7 +324,7 @@ describe('MergeEditor actions and navigation', () => {
 
     press(incoming, { key: 'ArrowUp', altKey: true })
     await flushPromises()
-    expect(position(wrapper)).toBe('Conflict 2 of 3 · 3 left')
+    expect(position(wrapper)).toBe('Change 2 of 3 · 3 left')
   })
 
   it('FR-CONF-05 clicking a side conflict the restored result lacks leaves the selection alone and logs no error', async () => {
@@ -339,7 +345,7 @@ describe('MergeEditor actions and navigation', () => {
     await flushPromises()
 
     expect(logged).not.toHaveBeenCalled()
-    expect(position(wrapper)).toBe('Conflict 1 of 1 · 1 left')
+    expect(position(wrapper)).toBe('Change 1 of 1 · 1 left')
     logged.mockRestore()
   })
 
@@ -350,7 +356,7 @@ describe('MergeEditor actions and navigation', () => {
     result.dispatch({ selection: { anchor: result.state.doc.line(6).from } })
     await flushPromises()
 
-    expect(position(wrapper)).toBe('Conflict 3 of 3 · 3 left')
+    expect(position(wrapper)).toBe('Change 3 of 3 · 3 left')
   })
 
   it('FR-CONF-05 Alt+Down in the result moves to the next conflict, not the line', async () => {
@@ -360,7 +366,7 @@ describe('MergeEditor actions and navigation', () => {
     press(result, { key: 'ArrowDown', altKey: true })
     await flushPromises()
 
-    expect(position(wrapper)).toBe('Conflict 2 of 3 · 3 left')
+    expect(position(wrapper)).toBe('Change 2 of 3 · 3 left')
     expect(result.state.doc.lineAt(result.state.selection.main.head).number).toBe(4)
     expect(result.state.doc.lines).toBe(7)
   })
@@ -370,9 +376,9 @@ const SAVE_AND_RESOLVE = 'Save and mark resolved'
 
 // resolveAll takes the current side in every conflict of the two-region file.
 async function resolveAll(wrapper: VueWrapper): Promise<void> {
-  await click(wrapper, 'Take current')
-  await click(wrapper, 'Next conflict · Alt+Down')
-  await click(wrapper, 'Take current')
+  await click(wrapper, 'Take left')
+  await click(wrapper, 'Next change · Alt+Down')
+  await click(wrapper, 'Take left')
 }
 
 describe('MergeEditor saving', () => {
@@ -385,7 +391,7 @@ describe('MergeEditor saving', () => {
 
     const resolve = findButton(wrapper, SAVE_AND_RESOLVE)!
     expect(resolve.attributes('disabled')).toBeDefined()
-    expect(resolve.attributes('title')).toBe('Resolve every conflict first')
+    expect(resolve.attributes('title')).toBe('Handle every change first')
     press(viewAt(wrapper, RESULT), { key: 's', ctrlKey: true })
     await flushPromises()
 
@@ -394,9 +400,9 @@ describe('MergeEditor saving', () => {
 
   it('FR-CONF-06 once every conflict is resolved the button and Ctrl+S save and mark resolved', async () => {
     const wrapper = await mountEditor()
-    await click(wrapper, 'Take current')
-    await click(wrapper, 'Next conflict · Alt+Down')
-    await click(wrapper, 'Both, incoming first')
+    await click(wrapper, 'Take left')
+    await click(wrapper, 'Next change · Alt+Down')
+    await click(wrapper, 'Both, right first')
 
     expect(findButton(wrapper, SAVE_AND_RESOLVE)!.attributes('title')).toBe(
       'Save and mark resolved · Ctrl+S',
@@ -456,21 +462,21 @@ describe('MergeEditor saving', () => {
 describe('MergeEditor toolbar and lifecycle', () => {
   it('FR-CONF-05 names the conflicts left next to the position', async () => {
     const wrapper = await mountEditor()
-    await click(wrapper, 'Take current')
+    await click(wrapper, 'Take left')
 
-    expect(position(wrapper)).toBe('Conflict 1 of 2 · 1 left')
+    expect(position(wrapper)).toBe('Change 1 of 2 · 1 left')
   })
 
   it('FR-CONF-06 a stray marker line explains the disabled Save and mark resolved', async () => {
     const wrapper = await mountEditor()
-    await click(wrapper, 'Take current')
-    await click(wrapper, 'Next conflict · Alt+Down')
-    await click(wrapper, 'Take current')
+    await click(wrapper, 'Take left')
+    await click(wrapper, 'Next change · Alt+Down')
+    await click(wrapper, 'Take left')
     const result = viewAt(wrapper, RESULT)
     result.dispatch({ changes: { from: 0, insert: '>>>>>>> stray\n' } })
     await flushPromises()
 
-    expect(position(wrapper)).toBe('No conflicts left')
+    expect(position(wrapper)).toBe('No changes left')
     const resolve = findButton(wrapper, SAVE_AND_RESOLVE)!
     expect(resolve.attributes('disabled')).toBeDefined()
     expect(resolve.attributes('title')).toBe(
@@ -552,19 +558,19 @@ describe('MergeEditor unsaved results', () => {
     const wrapper = await mountEditor(file)
 
     expect(editorTexts(wrapper)[RESULT]).toMatch(/^typed a\n/)
-    expect(position(wrapper)).toBe('Conflict 1 of 2 · 2 left')
+    expect(position(wrapper)).toBe('Change 1 of 2 · 2 left')
   })
 
   it('FR-CONF-06 resolved regions are still resolved when the file is shown again', async () => {
     const file = conflictFileFixture()
     const first = await mountEditor(file)
-    await click(first, 'Take incoming')
+    await click(first, 'Take right')
     first.unmount()
 
     const wrapper = await mountEditor(file)
 
     expect(editorTexts(wrapper)[RESULT]).toBe('a\ni1\nb\no2\nz')
-    expect(position(wrapper)).toBe('Conflict 2 of 2 · 1 left')
+    expect(position(wrapper)).toBe('Change 2 of 2 · 1 left')
     expect(viewAt(wrapper, RESULT).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
     expect(viewAt(wrapper, INCOMING).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
   })
@@ -647,5 +653,116 @@ describe('MergeEditor unsaved results', () => {
     await wrapper.setProps({ file: conflictFileFixture() })
 
     expect(wrapper.text()).not.toContain('changed on disk')
+  })
+})
+
+// lineClassesOf is the first tint or selection class each line of the pane
+// carries, by line.
+function tintsOf(view: EditorView): (string | undefined)[] {
+  const names = [
+    'cm-change-added',
+    'cm-change-changed',
+    'cm-conflict-unresolved',
+    'cm-conflict-resolved',
+  ]
+  return [...view.dom.querySelectorAll('.cm-line')].map((line) =>
+    names.find((name) => line.classList.contains(name)),
+  )
+}
+
+function markedLines(view: EditorView): number[] {
+  return [...view.dom.querySelectorAll('.cm-line')].flatMap((line, i) =>
+    line.classList.contains('cm-chunk-selected') ? [i + 1] : [],
+  )
+}
+
+describe('MergeEditor changes only one side made', () => {
+  it('FR-CONF-05 the result starts as the base text with every change open, tinted on the sides', async () => {
+    const wrapper = await mountEditor(changesFileFixture())
+
+    expect(viewAt(wrapper, RESULT).state.doc.toString()).toBe('a\no1\nb\no2\nc\no3\nz')
+    expect(position(wrapper)).toBe('Change 1 of 4 · 4 left')
+    expect(tintsOf(viewAt(wrapper, CURRENT))).toEqual([
+      undefined,
+      'cm-change-changed',
+      undefined,
+      'cm-conflict-unresolved',
+      undefined,
+      undefined,
+      undefined,
+    ])
+    expect(tintsOf(viewAt(wrapper, INCOMING))).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      'cm-conflict-unresolved',
+      undefined,
+      'cm-change-changed',
+      undefined,
+      'cm-change-added',
+    ])
+  })
+
+  it.each([
+    ['Take right', 'a\no1\nb\no2\nc\no3\nz'],
+    ['Take left', 'a\nc1\nb\no2\nc\no3\nz'],
+  ])(
+    'FR-CONF-05 "%s" on a change the current side made resolves it in every pane',
+    async (label, text) => {
+      const wrapper = await mountEditor(changesFileFixture())
+
+      await click(wrapper, label)
+
+      expect(viewAt(wrapper, RESULT).state.doc.toString()).toBe(text)
+      expect(position(wrapper)).toBe('Change 1 of 4 · 3 left')
+      for (const pane of [CURRENT, RESULT, INCOMING] as const) {
+        expect(viewAt(wrapper, pane).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
+      }
+    },
+  )
+
+  it('FR-CONF-05 Apply non-conflicting changes takes the changed side of every open one-side change in one undo step', async () => {
+    const wrapper = await mountEditor(changesFileFixture())
+    const result = viewAt(wrapper, RESULT)
+
+    await click(wrapper, 'Apply non-conflicting changes')
+
+    expect(result.state.doc.toString()).toBe('a\nc1\nb\no2\nc\ni3\nz\nnew')
+    expect(position(wrapper)).toBe('Change 1 of 4 · 1 left')
+    expect(
+      findButton(wrapper, 'Apply non-conflicting changes')?.attributes('disabled'),
+    ).toBeDefined()
+
+    undo(result)
+    await flushPromises()
+    expect(result.state.doc.toString()).toBe('a\no1\nb\no2\nc\no3\nz')
+    expect(position(wrapper)).toBe('Change 1 of 4 · 4 left')
+  })
+
+  it('FR-CONF-05 the selected change is outlined in every pane and marked in the gutter', async () => {
+    const wrapper = await mountEditor(changesFileFixture())
+
+    for (const pane of [CURRENT, RESULT, INCOMING] as const) {
+      expect(markedLines(viewAt(wrapper, pane))).toEqual([2])
+      expect(viewAt(wrapper, pane).dom.querySelectorAll('.cm-chunk-gutter-mark')).toHaveLength(1)
+    }
+    await click(wrapper, 'Next change · Alt+Down')
+    for (const pane of [CURRENT, RESULT, INCOMING] as const) {
+      expect(markedLines(viewAt(wrapper, pane))).toEqual([4])
+    }
+  })
+
+  it('FR-CONF-06 saving waits until the changes only one side made are handled too', async () => {
+    const wrapper = await mountEditor(changesFileFixture())
+    await click(wrapper, 'Next change · Alt+Down')
+    await click(wrapper, 'Take left')
+    const save = () => findButton(wrapper, SAVE_AND_RESOLVE)!
+
+    expect(save().attributes('disabled')).toBeDefined()
+    expect(save().attributes('title')).toBe('Handle every change first')
+
+    await click(wrapper, 'Apply non-conflicting changes')
+
+    expect(save().attributes('disabled')).toBeUndefined()
   })
 })

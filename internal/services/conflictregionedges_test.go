@@ -13,8 +13,8 @@ func TestFR_CONF_05_ConflictRegionBaseKeepsLinesTheCurrentSideDeleted(t *testing
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(got.Regions) != 1 {
-		t.Fatalf("regions = %d, want 1; result:\n%s", len(got.Regions), got.Result)
+	if len(conflictRegionsOf(got)) != 1 {
+		t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
 	}
 	assertRegion(t, got, 0, "b\n", "", "B\n")
 }
@@ -37,7 +37,7 @@ func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInDiff3Style(t *testing.T
 
 			got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
 
-			if len(got.Regions) == 0 {
+			if len(conflictRegionsOf(got)) == 0 {
 				t.Fatalf("no regions; result:\n%s", got.Result)
 			}
 			assertBaseIsMarkerSection(t, got)
@@ -58,7 +58,7 @@ func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInAFileRewrittenInDiff3St
 
 	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
 
-	if len(got.Regions) == 0 {
+	if len(conflictRegionsOf(got)) == 0 {
 		t.Fatalf("no regions; result:\n%s", got.Result)
 	}
 	assertBaseIsMarkerSection(t, got)
@@ -78,8 +78,8 @@ func TestFR_CONF_05_ConflictRegionBaseOfASharedChangeOfAnotherLengthIsTheReplace
 
 			got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
 
-			if len(got.Regions) != 1 {
-				t.Fatalf("regions = %d, want 1; result:\n%s", len(got.Regions), got.Result)
+			if len(conflictRegionsOf(got)) != 1 {
+				t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
 			}
 			if style == "diff3" {
 				assertRegion(t, got, 0, "X\n", "P\nQ\nR\nC\n", "P\nQ\nR\nI\n")
@@ -122,8 +122,8 @@ func TestFR_CONF_05_ConflictRegionBaseExcludesLinesBothSidesChangedTheSameWay(t 
 
 			got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
 
-			if len(got.Regions) != 1 {
-				t.Fatalf("regions = %d, want 1; result:\n%s", len(got.Regions), got.Result)
+			if len(conflictRegionsOf(got)) != 1 {
+				t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
 			}
 			if way.diff3 {
 				assertRegion(t, got, 0, "a\nb\nc\n", "A\nB\nC\n", "A\nY\nC\n")

@@ -1,6 +1,7 @@
 import {
   ConflictKind,
   Operation,
+  RegionKind,
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
@@ -48,12 +49,14 @@ export function conflictFileFixture(overrides: Partial<ConflictFile> = {}): Conf
     markerSize: 7,
     regions: [
       {
+        kind: RegionKind.RegionConflict,
         result: { start: 2, lines: 5 },
         base: { start: 2, lines: 1 },
         current: { start: 2, lines: 1 },
         incoming: { start: 2, lines: 1 },
       },
       {
+        kind: RegionKind.RegionConflict,
         result: { start: 8, lines: 5 },
         base: { start: 4, lines: 1 },
         current: { start: 4, lines: 1 },
@@ -93,12 +96,26 @@ export function scrollConflictFixture(): ConflictFile {
   // regionLines lines.
   const regionStart = (gaps: number[], regionLines: number, i: number) =>
     gaps.slice(0, i + 1).reduce((sum, gap) => sum + gap, 0) + i * regionLines + 1
-  const regions = [0, 1, 2].map((i) => ({
+  const conflicts = [0, 1, 2].map((i) => ({
+    kind: RegionKind.RegionConflict,
     result: { start: regionStart(currentGaps, 5, i), lines: 5 },
     base: { start: regionStart(currentGaps, 1, i), lines: 1 },
     current: { start: regionStart(currentGaps, 1, i), lines: 1 },
     incoming: { start: regionStart(incomingGaps, 1, i), lines: 1 },
   }))
+  // The current side changed line 5 and added line 6, outside the conflicts.
+  const currentChange = (line: number, added: boolean) => {
+    const one = { start: line, lines: 1 }
+    return {
+      kind: RegionKind.RegionCurrent,
+      added,
+      result: one,
+      base: one,
+      current: one,
+      incoming: one,
+    }
+  }
+  const regions = [currentChange(5, false), currentChange(6, true), ...conflicts]
 
   const fixture = conflictFileFixture()
   return {
@@ -109,10 +126,78 @@ export function scrollConflictFixture(): ConflictFile {
     incoming: { ...fixture.incoming, content: incomingLines.join('\n') },
     result: resultLines.join('\n'),
     regions,
-    // The current side changed line 5 and added line 6, outside the conflicts.
     currentChanges: [
       { lines: { start: 5, lines: 1 }, added: false },
       { lines: { start: 6, lines: 1 }, added: true },
+    ],
+  }
+}
+
+// changesFileFixture is a text ConflictFile of a merge with four changes: the
+// current side changed line 2 (current), both sides changed line 4 (conflict),
+// the incoming side changed line 6 (incoming) and added a line at the end
+// (incoming, added). The result starts as the base text, 'a o1 b o2 c o3 z'.
+export function changesFileFixture(): ConflictFile {
+  const fixture = conflictFileFixture()
+  const lines = (start: number, count: number) => ({ start, lines: count })
+  return {
+    ...fixture,
+    base: { present: true, content: 'a\no1\nb\no2\nc\no3\nz' },
+    current: { ...fixture.current, content: 'a\nc1\nb\nc2\nc\no3\nz' },
+    incoming: { ...fixture.incoming, content: 'a\no1\nb\ni2\nc\ni3\nz\nnew' },
+    result: [
+      'a',
+      'c1',
+      'b',
+      '<<<<<<< HEAD',
+      'c2',
+      '=======',
+      'i2',
+      '>>>>>>> side',
+      'c',
+      'i3',
+      'z',
+      'new',
+    ].join('\n'),
+    regions: [
+      {
+        kind: RegionKind.RegionCurrent,
+        result: lines(2, 1),
+        base: lines(2, 1),
+        current: lines(2, 1),
+        incoming: lines(2, 1),
+      },
+      {
+        kind: RegionKind.RegionConflict,
+        result: lines(4, 5),
+        base: lines(4, 1),
+        current: lines(4, 1),
+        incoming: lines(4, 1),
+      },
+      {
+        kind: RegionKind.RegionIncoming,
+        result: lines(10, 1),
+        base: lines(6, 1),
+        current: lines(6, 1),
+        incoming: lines(6, 1),
+      },
+      {
+        kind: RegionKind.RegionIncoming,
+        added: true,
+        result: lines(12, 1),
+        base: lines(7, 0),
+        current: lines(7, 0),
+        incoming: lines(8, 1),
+      },
+    ],
+    currentChanges: [
+      { lines: lines(2, 1), added: false },
+      { lines: lines(4, 1), added: false },
+    ],
+    incomingChanges: [
+      { lines: lines(4, 1), added: false },
+      { lines: lines(6, 1), added: false },
+      { lines: lines(8, 1), added: true },
     ],
   }
 }

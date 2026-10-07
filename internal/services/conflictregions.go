@@ -127,6 +127,7 @@ func conflictRegions(ctx context.Context, r git.Runner, dir string, out core.Con
 	regions := make([]core.ConflictRegion, len(blocks))
 	for i, b := range blocks {
 		regions[i] = core.ConflictRegion{
+			Kind:     core.RegionConflict,
 			Result:   core.LineRange{Start: b.open + 1, Lines: b.close - b.open + 1},
 			Current:  current[i],
 			Incoming: incoming[i],
@@ -145,6 +146,12 @@ func conflictRegions(ctx context.Context, r git.Runner, dir string, out core.Con
 		regions[i].Base = withoutMovedOut(base, regions[i], toCurrent, toIncoming)
 		from = edgeEnd(regions[i].Base)
 	}
+	changes, err := changeRegions(ctx, r, dir, out, result, toCurrent, toIncoming)
+	if err != nil {
+		return nil, err
+	}
+	regions = append(regions, changes...)
+	sortRegions(regions)
 	return regions, nil
 }
 

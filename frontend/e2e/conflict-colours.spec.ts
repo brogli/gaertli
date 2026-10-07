@@ -47,8 +47,8 @@ function composite(chain: string): string {
 async function measure(page: Page, className: string): Promise<Painted> {
   await page.evaluate(() =>
     document
-      .querySelectorAll('.cm-conflict-selected')
-      .forEach((el) => el.classList.remove('cm-conflict-selected')),
+      .querySelectorAll('.cm-chunk-selected')
+      .forEach((el) => el.classList.remove('cm-chunk-selected')),
   )
   const selector = `.merge-editor .cm-scroller ${className}`
   const text = await page.evaluate(
@@ -58,19 +58,32 @@ async function measure(page: Page, className: string): Promise<Painted> {
   return { bg: composite(await backgroundChain(page, selector)), text }
 }
 
+// outlineColour is the colour of the outline round the selected region's lines.
+async function outlineColour(page: Page): Promise<string> {
+  const shadow = await page.evaluate(
+    () =>
+      getComputedStyle(document.querySelector('.merge-editor .cm-scroller .cm-chunk-selected')!)
+        .boxShadow,
+  )
+  const colour = /(rgba?|color|oklch|oklab|lab|lch|hsl)\([^)]*\)|#[0-9a-f]{3,8}/i.exec(shadow)
+  if (!colour) throw new Error(`no colour in "${shadow}"`)
+  return colour[0]
+}
+
 for (const theme of THEMES) {
-  test(`FR-CONF-05 ${theme} theme: changed, added, unresolved and resolved lines are visibly distinct`, async ({
+  test(`FR-CONF-05 ${theme} theme: changed, added, unresolved and resolved lines and the selection outline are visibly distinct`, async ({
     page,
   }) => {
     await page.goto(`${mockConflictUrl}&theme=${theme}`)
     await page.locator('.merge-editor .cm-line').first().waitFor()
     const editorBg = composite(await backgroundChain(page, '.merge-editor .cm-editor'))
+    const outline = composite(await outlineColour(page))
     const painted: Record<string, Painted> = {
       changed: await measure(page, TINTS.changed),
       added: await measure(page, TINTS.added),
       unresolved: await measure(page, TINTS.unresolved),
     }
-    await page.getByRole('button', { name: 'Take current' }).click()
+    await page.getByRole('button', { name: 'Take left' }).click()
     painted.resolved = await measure(page, TINTS.resolved)
 
     const names = Object.keys(painted)
@@ -78,6 +91,13 @@ for (const theme of THEMES) {
       const { bg, text } = painted[name]!
       expect(deltaEOK(bg, editorBg), `${name} against the background`).toBeGreaterThanOrEqual(0.08)
       expect(contrastRatio(text, bg), `${name} text`).toBeGreaterThanOrEqual(4.5)
+    }
+    expect(deltaEOK(outline, editorBg), 'outline against the background').toBeGreaterThanOrEqual(
+      0.08,
+    )
+    for (const name of names) {
+      const distance = deltaEOK(outline, painted[name]!.bg)
+      expect(distance, `outline against ${name}`).toBeGreaterThanOrEqual(0.04)
     }
     for (const [i, a] of names.entries()) {
       for (const b of names.slice(i + 1)) {

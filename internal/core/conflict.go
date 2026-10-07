@@ -30,14 +30,28 @@ type ConflictSide struct {
 	Subject string `json:"subject,omitempty"` // SHA's subject, for a side that is one commit
 }
 
-// ConflictRegion is one marker block of Result and where its text sits in
-// each side, as DiffHunk numbers lines: 1-based Start; with Lines 0, Start
-// is the line after which the region would be.
+// RegionKind says who made the change a ConflictRegion is.
+type RegionKind string
+
+const (
+	RegionConflict RegionKind = "conflict" // both sides changed the same lines differently
+	RegionCurrent  RegionKind = "current"  // only the current side changed them
+	RegionIncoming RegionKind = "incoming" // only the incoming side changed them
+)
+
+// ConflictRegion is one change of the merge and where its text sits in
+// Result and each side, as DiffHunk numbers lines: 1-based Start; with Lines
+// 0, Start is the line after which the region would be. A conflict is a
+// marker block of Result. Any other change is applied in Result already; its
+// Result range holds the lines of the changed side. Added: the change added
+// lines and replaced none of the base's.
 type ConflictRegion struct {
-	Result   LineRange `json:"result"`
-	Base     LineRange `json:"base"`
-	Current  LineRange `json:"current"`
-	Incoming LineRange `json:"incoming"`
+	Kind     RegionKind `json:"kind"`
+	Added    bool       `json:"added,omitempty"`
+	Result   LineRange  `json:"result"`
+	Base     LineRange  `json:"base"`
+	Current  LineRange  `json:"current"`
+	Incoming LineRange  `json:"incoming"`
 }
 
 // SideChange is a run of a side's lines that differ from the base: lines the

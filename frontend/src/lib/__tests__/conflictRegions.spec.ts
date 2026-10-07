@@ -18,6 +18,7 @@ import {
   sideRegionStart,
   sideRegionsExtension,
   takeRegion,
+  takeRegions,
   unresolvedCount,
   type LineRange,
 } from '../conflictRegions'
@@ -262,10 +263,51 @@ describe('conflictRegions result pane', () => {
       4: 'cm-conflict-unresolved',
     })
     const selected = state.update({ effects: selectRegion.of(1) }).state
-    expect(lineClasses(selected)[4]).toBe('cm-conflict-unresolved cm-conflict-selected')
+    expect(lineClasses(selected)[4]).toBe(
+      'cm-conflict-unresolved cm-chunk-selected cm-chunk-first cm-chunk-last',
+    )
     const resolved = selected.update(takeRegion(selected, 1, ['x'])).state
-    expect(lineClasses(resolved)[4]).toBe('cm-conflict-resolved cm-conflict-selected')
+    expect(lineClasses(resolved)[4]).toBe(
+      'cm-conflict-resolved cm-chunk-selected cm-chunk-first cm-chunk-last',
+    )
     expect(lineClasses(resolved)[2]).toBe('cm-conflict-unresolved')
+  })
+
+  it('FR-CONF-05 tints a change by its kind and outlines a selected multi-line region', () => {
+    const state = EditorState.create({
+      doc: 'a\nb\nc\nd\ne',
+      extensions: regionsExtension(
+        [
+          { range: { start: 2, lines: 2 }, resolved: false },
+          { range: { start: 5, lines: 1 }, resolved: false },
+        ],
+        7,
+        'Unresolved change',
+        ['cm-change-added', undefined],
+      ),
+    })
+
+    const selected = state.update({ effects: selectRegion.of(0) }).state
+
+    expect(lineClasses(selected)).toEqual({
+      2: 'cm-change-added cm-chunk-selected cm-chunk-first',
+      3: 'cm-change-added cm-chunk-selected cm-chunk-last',
+    })
+  })
+
+  it('FR-CONF-05 takeRegions takes several regions in one undo step', () => {
+    const state = resultState()
+    const taken = state.update(
+      takeRegions(state, [
+        { region: 0, lines: ['x'] },
+        { region: 1, lines: ['y', 'z'] },
+      ]),
+    ).state
+
+    expect(taken.doc.toString()).toBe('a\nx\nb\ny\nz\nz')
+    expect(unresolvedCount(taken)).toBe(0)
+    expect(unresolvedCount(undone(taken))).toBe(2)
+    expect(undone(taken).doc.toString()).toBe(text)
   })
 
   it('FR-CONF-05 finds marker lines anywhere in the result', () => {
@@ -289,7 +331,7 @@ describe('conflictRegions side panes', () => {
     { lines: { start: 6, lines: 2 }, added: true },
   ]
 
-  it('FR-CONF-05 tints changed lines blue and added lines green, region lines over them', () => {
+  it('FR-CONF-05 shows changed lines no region covers as handled, region lines over them', () => {
     const state = EditorState.create({
       doc: sideDoc,
       extensions: sideRegionsExtension(sideRanges, changes),
@@ -297,10 +339,21 @@ describe('conflictRegions side panes', () => {
     expect(lineClasses(state)).toEqual({
       2: 'cm-conflict-unresolved',
       4: 'cm-conflict-unresolved',
-      5: 'cm-change-changed',
-      6: 'cm-change-added',
-      7: 'cm-change-added',
+      5: 'cm-conflict-resolved',
+      6: 'cm-conflict-resolved',
+      7: 'cm-conflict-resolved',
     })
+  })
+
+  it('FR-CONF-05 tints a side pane region by the kind it was given', () => {
+    const state = EditorState.create({
+      doc: sideDoc,
+      extensions: sideRegionsExtension(sideRanges, [], 'Unresolved change', [
+        'cm-change-changed',
+        undefined,
+      ]),
+    })
+    expect(lineClasses(state)).toEqual({ 2: 'cm-change-changed' })
   })
 
   it('FR-CONF-05 shows resolved and selected regions once told', () => {
@@ -313,7 +366,7 @@ describe('conflictRegions side panes', () => {
     }).state
     expect(lineClasses(next)).toEqual({
       2: 'cm-conflict-resolved',
-      4: 'cm-conflict-unresolved cm-conflict-selected',
+      4: 'cm-conflict-unresolved cm-chunk-selected cm-chunk-first cm-chunk-last',
     })
   })
 

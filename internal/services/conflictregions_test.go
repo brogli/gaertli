@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,7 +79,7 @@ func selected(content string, r core.LineRange) string {
 
 func assertRegion(t *testing.T, got core.ConflictFile, i int, base, current, incoming string) {
 	t.Helper()
-	r := got.Regions[i]
+	r := conflictRegionsOf(got)[i]
 	if s := selected(got.Base.Content, r.Base); s != base {
 		t.Errorf("region %d base = %q (%+v), want %q", i, s, r.Base, base)
 	}
@@ -106,8 +107,8 @@ func TestFR_CONF_05_ConflictRegionsOfOneConflict(t *testing.T) {
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if got.MarkerSize != 7 || len(got.Regions) != 1 {
-		t.Fatalf("MarkerSize, regions = %d, %d", got.MarkerSize, len(got.Regions))
+	if got.MarkerSize != 7 || len(conflictRegionsOf(got)) != 1 {
+		t.Fatalf("MarkerSize, regions = %d, %d", got.MarkerSize, len(conflictRegionsOf(got)))
 	}
 	assertRegion(t, got, 0, "base\n", "current\n", "incoming\n")
 }
@@ -121,8 +122,8 @@ func TestFR_CONF_05_ConflictRegionsWithZdiff3AndAnIncomingOnlyChangeBetween(t *t
 
 	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
 
-	if len(got.Regions) != 2 {
-		t.Fatalf("regions = %d, want 2; result:\n%s", len(got.Regions), got.Result)
+	if len(conflictRegionsOf(got)) != 2 {
+		t.Fatalf("regions = %d, want 2; result:\n%s", len(conflictRegionsOf(got)), got.Result)
 	}
 	assertRegion(t, got, 0, "x1\n", "c1\n", "i1\n")
 	assertRegion(t, got, 1, "x2\n", "c2a\nc2b\n", "i2\n")
@@ -145,8 +146,8 @@ func TestFR_CONF_05_ConflictRegionsSkipABlockTheUserResolved(t *testing.T) {
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(got.Regions) != 1 {
-		t.Fatalf("regions = %d, want 1; result:\n%s", len(got.Regions), got.Result)
+	if len(conflictRegionsOf(got)) != 1 {
+		t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
 	}
 	assertRegion(t, got, 0, "x2\n", "c2a\nc2b\n", "i2\n")
 }
@@ -165,8 +166,8 @@ func TestFR_CONF_05_ConflictRegionsUseTheMarkerSizeAttribute(t *testing.T) {
 
 	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
 
-	if got.MarkerSize != 10 || len(got.Regions) != 1 {
-		t.Fatalf("MarkerSize, regions = %d, %d; result:\n%s", got.MarkerSize, len(got.Regions), got.Result)
+	if got.MarkerSize != 10 || len(conflictRegionsOf(got)) != 1 {
+		t.Fatalf("MarkerSize, regions = %d, %d; result:\n%s", got.MarkerSize, len(conflictRegionsOf(got)), got.Result)
 	}
 	assertRegion(t, got, 0, "base\n", "current\n", "incoming\n")
 }
@@ -185,8 +186,13 @@ func TestFR_CONF_05_ConflictRegionsIgnoreTheDiffAttribute(t *testing.T) {
 
 	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
 
-	if len(got.Regions) != 1 {
-		t.Fatalf("regions = %d, want 1; result:\n%s", len(got.Regions), got.Result)
+	if len(conflictRegionsOf(got)) != 1 {
+		t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
 	}
 	assertRegion(t, got, 0, "base\n", "current\n", "incoming\n")
+}
+
+// conflictRegionsOf returns the regions of f that are conflicts.
+func conflictRegionsOf(f core.ConflictFile) []core.ConflictRegion {
+	return slices.DeleteFunc(slices.Clone(f.Regions), func(r core.ConflictRegion) bool { return r.Kind != core.RegionConflict })
 }

@@ -227,20 +227,30 @@ arrow keys move between tabs and pick as they go.
 - **Merge editor** (FR-CONF-05, FR-CONF-06, ADR-7): three CodeMirror editors in a splitter, the
   current side and the incoming side read-only around the editable result. Each pane names its side
   and that side's role in the operation.
-  - The result starts as the working file with each marker block replaced by the base version's
-    lines of that conflict (none without a base), so git's markers never appear in it. Each region
-    git reported keeps its range in the result through every edit (CodeMirror's position mapping)
-    and carries an explicit state, unresolved or resolved. A take sets resolved; "Mark done" sets it
-    on whatever the region holds then; a hand edit alone changes nothing. Takes and "Mark done" are
-    single undoable changes, and undo restores the state. "Save and mark resolved" waits until no
-    region is unresolved and no marker line is left anywhere in the result.
+  - One list of regions covers every change the user decides: the conflicts (marker blocks) and the
+    changes only one side made, which git already applied to the file. A change both sides made
+    alike is applied and not a region. The core computes the list, each region with a kind and its
+    lines in the result, base and both sides.
+  - The result starts as the working file with each region's lines replaced by the base version's
+    lines (none without a base), so neither git's markers nor a side's change appear in it until the
+    user takes it. Each region keeps its range in the result through every edit (CodeMirror's
+    position mapping) and carries an explicit state, unresolved or resolved. A take puts the left or
+    the right side's lines, or both, in the region's place and sets resolved, the same for every
+    kind; taking the side that left a change alone keeps the base. "Mark done" sets resolved on
+    whatever the region holds then; a hand edit alone changes nothing. "Apply non-conflicting
+    changes" takes the changed side of every open one-side region. Takes, "Apply non-conflicting
+    changes" and "Mark done" are single undoable changes, and undo restores the state. "Save and
+    mark resolved" waits until no region is unresolved and no marker line is left anywhere in the
+    result.
   - The toolbar's actions act on the selected region: the one last clicked in any pane, or holding
     the result's cursor; previous and next move between unresolved regions.
-  - The side panes tint the lines a side changed from the base by kind: blue for changed, green for
-    added. Conflict regions are red while unresolved and a neutral tint once resolved, in the result
-    too; the selected region's tint is stronger. The tints come from the theme's tone tokens, mixed
-    strong enough that each differs from the editor background by at least 0.08 ΔE in OKLab and
-    keeps 4.5:1 text contrast; an e2e check measures each theme.
+  - The panes tint the lines of an unresolved region by kind: blue for changed, green for added, red
+    for a conflict; a side pane tints a one-side change on the side that made it only. A resolved
+    region and the lines both sides changed alike are a neutral tint. The selected region is
+    outlined in the theme's accent colour and marked in a gutter in all three panes, and its tint is
+    stronger. The tints come from the theme's tone tokens, mixed strong enough that each differs
+    from the editor background by at least 0.08 ΔE in OKLab and keeps 4.5:1 text contrast, and the
+    outline differs from the background and each tint; an e2e check measures each theme.
   - The panes stay aligned by region: each region's first and last line in every pane are anchor
     points, lines between anchors map linearly, and scrolling any pane moves the others through the
     scroll event, as the diff view's sideways scrolling does.
