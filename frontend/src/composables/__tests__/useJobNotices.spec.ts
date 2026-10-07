@@ -77,11 +77,11 @@ const onPull = vi.fn()
 const onForcePush = vi.fn()
 const onStashPull = vi.fn()
 const onRetryJob = vi.fn()
-const onConflicts = vi.fn()
+const onPullEnded = vi.fn()
 
 const Host = defineComponent({
   setup() {
-    useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onConflicts })
+    useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onPullEnded })
     return () => null
   },
 })
@@ -100,7 +100,7 @@ describe('useJobNotices', () => {
     onForcePush.mockReset()
     onStashPull.mockReset()
     onRetryJob.mockReset()
-    onConflicts.mockReset()
+    onPullEnded.mockReset()
   })
 
   it('FR-SYNC-04 a failed push job shows a notice with the reason and Pull/Force push, running the actions', async () => {
@@ -165,19 +165,21 @@ describe('useJobNotices', () => {
     expect(onStashPull).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CONF-09 a pull job that stopped on conflicts opens the conflicts, with no notice', async () => {
+  it('FR-CONF-09 every pull end is passed on; one that stopped on conflicts shows no notice', async () => {
     const notice = await mountNotices()
+    const conflicted = jobFixture({
+      id: 'conflicted',
+      kind: JobKind.PullJob,
+      state: JobState.JobFailed,
+      error: { code: Code.Conflicts, message: 'conflicts' },
+    })
+    const done = jobFixture({ id: 'done', kind: JobKind.PullJob, state: JobState.JobDone })
 
-    useJobsStore().upsert(
-      jobFixture({
-        kind: JobKind.PullJob,
-        state: JobState.JobFailed,
-        error: { code: Code.Conflicts, message: 'conflicts' },
-      }),
-    )
+    useJobsStore().upsert(conflicted)
+    useJobsStore().upsert(done)
     await nextTick()
 
-    expect(onConflicts).toHaveBeenCalledTimes(1)
+    expect(onPullEnded.mock.calls.map(([job]) => job.id)).toEqual(['conflicted', 'done'])
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 

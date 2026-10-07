@@ -282,6 +282,15 @@ func (f *Forwarder) Merge(ctx context.Context, wt core.WorktreeID, ref string, s
 	return c.Merge(ctx, coreID, ref, stash)
 }
 
+func (f *Forwarder) MergeDraft(ctx context.Context, wt core.WorktreeID, path string) (*core.MergeDraft, error) {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		var zero *core.MergeDraft
+		return zero, err
+	}
+	return c.MergeDraft(ctx, coreID, path)
+}
+
 func (f *Forwarder) OpenFile(ctx context.Context, wt core.WorktreeID, path string, line int) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
@@ -486,6 +495,14 @@ func (f *Forwarder) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter
 		return err
 	}
 	return c.SetLogFilter(ctx, coreID, filter)
+}
+
+func (f *Forwarder) SetMergeDraft(ctx context.Context, wt core.WorktreeID, path string, draft *core.MergeDraft) error {
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		return err
+	}
+	return c.SetMergeDraft(ctx, coreID, path, draft)
 }
 
 func (f *Forwarder) SetMessageDraft(ctx context.Context, wt core.WorktreeID, message string) error {

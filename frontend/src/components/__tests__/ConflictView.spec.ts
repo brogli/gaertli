@@ -7,6 +7,8 @@ import { mountInBody } from '@/testing/mountInBody'
 const { Facade } = vi.hoisted(() => ({
   Facade: {
     Conflict: vi.fn(),
+    MergeDraft: vi.fn(),
+    SetMergeDraft: vi.fn(),
     SaveConflict: vi.fn(),
     ResolveConflict: vi.fn(),
     StageFile: vi.fn(),
@@ -40,12 +42,19 @@ async function mountView(file: Partial<ConflictFile>) {
   return wrapper
 }
 
+// resolveAll takes the current side in both conflicts of the fixture.
+async function resolveAll(wrapper: VueWrapper): Promise<void> {
+  for (const label of ['Take current', 'Next conflict · Alt+Down', 'Take current']) {
+    await findButton(wrapper, label)!.trigger('click')
+  }
+}
+
 describe('ConflictView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     for (const fn of Object.values(Facade)) fn.mockReset().mockResolvedValue(undefined)
     confirmRequire.mockReset()
-    useMergeDrafts().clearAll()
+    useMergeDrafts().keepOnly('/repo', [])
     document.body.innerHTML = ''
   })
 
@@ -180,11 +189,12 @@ describe('ConflictView', () => {
       }),
     )
     const wrapper = await mountView({})
-    const resultView = () => editorViews(wrapper)[2]!
+    await resolveAll(wrapper)
+    const resultView = () => editorViews(wrapper)[1]!
     resultView().dispatch({ changes: { from: 0, insert: 'typed ' } })
-    await findButton(wrapper, 'Save')!.trigger('click')
+    await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
     Facade.Conflict.mockResolvedValue(
-      conflictFileFixture({ result: 'on disk', fingerprint: 'fp2' }),
+      conflictFileFixture({ result: 'on disk', regions: [], fingerprint: 'fp2' }),
     )
 
     await findButton(wrapper, 'Reload')!.trigger('click')
@@ -195,7 +205,7 @@ describe('ConflictView', () => {
   })
 
   describe('reading the conflict again', () => {
-    const resultView = (wrapper: VueWrapper) => editorViews(wrapper)[2]!
+    const resultView = (wrapper: VueWrapper) => editorViews(wrapper)[1]!
 
     async function reread(file: Partial<ConflictFile>): Promise<void> {
       Facade.Conflict.mockResolvedValue(conflictFileFixture(file))
@@ -215,9 +225,10 @@ describe('ConflictView', () => {
     it('FR-CONF-06 a save keeps the editor, its edits and undo through the reload it causes', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView({})
+      await resolveAll(wrapper)
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
-      await findButton(wrapper, 'Save')!.trigger('click')
+      await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
       await flushPromises()
 
       await reread({ fingerprint: 'fpSaved', result: 'typed a' })
@@ -231,6 +242,7 @@ describe('ConflictView', () => {
     it('FR-CONF-06 a read that started before a save does not undo the save', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView({})
+      await resolveAll(wrapper)
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
       let answerStaleRead: (file: ConflictFile) => void = () => undefined
@@ -238,7 +250,7 @@ describe('ConflictView', () => {
         new Promise<ConflictFile>((resolve) => (answerStaleRead = resolve)),
       )
       emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
-      await findButton(wrapper, 'Save')!.trigger('click')
+      await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
       await flushPromises()
       answerStaleRead(conflictFileFixture({}))
       await flushPromises()
@@ -284,8 +296,9 @@ describe('ConflictView', () => {
         new Promise<string>((resolve) => (finishSave = resolve)),
       )
       const wrapper = await mountView({})
+      await resolveAll(wrapper)
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
-      await findButton(wrapper, 'Save')!.trigger('click')
+      await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
       let answerRead: (file: ConflictFile) => void = () => undefined
       Facade.Conflict.mockReturnValueOnce(
         new Promise<ConflictFile>((resolve) => (answerRead = resolve)),
@@ -294,7 +307,7 @@ describe('ConflictView', () => {
 
       finishSave('fpA2')
       await flushPromises()
-      answerRead(conflictFileFixture({ path: 'b.txt', result: 'other' }))
+      answerRead(conflictFileFixture({ path: 'b.txt', result: 'other', regions: [] }))
       await flushPromises()
 
       expect(resultView(wrapper).state.doc.toString()).toBe('other')
@@ -303,7 +316,7 @@ describe('ConflictView', () => {
     it('FR-CONF-06 a changed file without unsaved edits shows as it is now', async () => {
       const wrapper = await mountView({})
 
-      await reread({ result: 'on disk', fingerprint: 'fp2' })
+      await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
 
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
     })
@@ -312,21 +325,120 @@ describe('ConflictView', () => {
       const wrapper = await mountView({})
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
 
-      await reread({ result: 'on disk', fingerprint: 'fp2' })
+      await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
       expect(resultView(wrapper).state.doc.toString()).toMatch(/^typed /)
       expect(wrapper.text()).toContain('a.txt changed on disk.')
 
       await findButton(wrapper, 'Reload')!.trigger('click')
       await flushPromises()
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
-      expect(useMergeDrafts().hasUnsaved.value).toBe(false)
+      expect(useMergeDrafts().get('/repo', 'a.txt', '')).toBeUndefined()
+      expect(Facade.SetMergeDraft).toHaveBeenLastCalledWith('/repo', 'a.txt', null)
+    })
+
+    it.each([
+      ['a changed file', { result: 'on disk', regions: [], fingerprint: 'fp2' }],
+      ['the same file', {}],
+    ])(
+      'FR-CONF-06 %s read as a new conflict in the path shows afresh, without the edits made for the earlier one',
+      async (_, file) => {
+        const wrapper = await mountView({ conflictId: 'c1' })
+        resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
+        expect(Facade.SetMergeDraft.mock.lastCall![2].conflictId).toBe('c1')
+
+        await reread({ ...file, conflictId: 'c2' })
+
+        expect(resultView(wrapper).state.doc.toString()).not.toMatch(/^typed /)
+        expect(wrapper.text()).not.toContain('changed on disk')
+        expect(useMergeDrafts().get('/repo', 'a.txt', 'c2')).toBeUndefined()
+      },
+    )
+
+    it('FR-CONF-06 Reload reads the draft only after the core dropped it', async () => {
+      const wrapper = await mountView({})
+      resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
+      const [, , stored] = Facade.SetMergeDraft.mock.lastCall!
+      await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
+      let cored: unknown = stored
+      let finishWrite: () => void = () => undefined
+      Facade.SetMergeDraft.mockImplementation(
+        (_wt: string, _path: string, draft: unknown) =>
+          new Promise<void>((resolve) => {
+            finishWrite = () => {
+              cored = draft
+              resolve()
+            }
+          }),
+      )
+      Facade.MergeDraft.mockImplementation(() => Promise.resolve(cored))
+
+      await findButton(wrapper, 'Reload')!.trigger('click')
+      await flushPromises()
+      finishWrite()
+      await flushPromises()
+
+      expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
+    })
+
+    it('FR-CONF-06 a taken region and the edits survive a new page: the core returns them', async () => {
+      const wrapper = await mountView({})
+      await findButton(wrapper, 'Take current')!.trigger('click')
+      resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
+      const text = resultView(wrapper).state.doc.toString()
+      wrapper.unmount()
+      const [, , stored] = Facade.SetMergeDraft.mock.lastCall!
+      expect(stored.text).toBe(text)
+
+      useMergeDrafts().keepOnly('/repo', [])
+      Facade.MergeDraft.mockResolvedValue(stored)
+      const reopened = await mountView({})
+
+      expect(Facade.MergeDraft).toHaveBeenCalledWith('/repo', 'a.txt')
+      expect(resultView(reopened).state.doc.toString()).toBe(text)
+      expect(reopened.text()).toContain('1 left')
+    })
+
+    it('FR-CONF-06 edits reach the core while typing: the first at once, a burst after a pause', async () => {
+      vi.useFakeTimers()
+      try {
+        const wrapper = await mountView({})
+        resultView(wrapper).dispatch({ changes: { from: 0, insert: 'one ' } })
+        expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(1)
+        resultView(wrapper).dispatch({ changes: { from: 0, insert: 'two ' } })
+        expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(1)
+
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(2)
+        expect(Facade.SetMergeDraft.mock.lastCall![2].text).toMatch(/^two one a\n/)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('FR-CONF-06 edits still waiting reach the core when the window closes', async () => {
+      vi.useFakeTimers()
+      try {
+        const wrapper = await mountView({})
+        resultView(wrapper).dispatch({ changes: { from: 0, insert: 'one ' } })
+        resultView(wrapper).dispatch({ changes: { from: 0, insert: 'two ' } })
+
+        window.dispatchEvent(new Event('pagehide'))
+
+        expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(2)
+        expect(Facade.SetMergeDraft.mock.lastCall![2].text).toMatch(/^two one a\n/)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('FR-CONF-06 unsaved edits survive a visit to another file', async () => {
       const wrapper = await mountView({})
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
 
-      Facade.Conflict.mockResolvedValue(conflictFileFixture({ path: 'b.txt', result: 'other' }))
+      Facade.Conflict.mockResolvedValue(
+        conflictFileFixture({ path: 'b.txt', result: 'other', regions: [] }),
+      )
       await wrapper.setProps({ path: 'b.txt' })
       await flushPromises()
       expect(resultView(wrapper).state.doc.toString()).toBe('other')

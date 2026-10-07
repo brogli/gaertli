@@ -352,6 +352,17 @@ func (c *Client) Merge(ctx context.Context, wt core.WorktreeID, ref string, stas
 	return result, err
 }
 
+type mergeDraftParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Path string          `json:"path"`
+}
+
+func (c *Client) MergeDraft(ctx context.Context, wt core.WorktreeID, path string) (*core.MergeDraft, error) {
+	var result *core.MergeDraft
+	err := c.call(ctx, "MergeDraft", mergeDraftParams{Wt: wt, Path: path}, &result)
+	return result, err
+}
+
 type openFileParams struct {
 	Wt   core.WorktreeID `json:"wt"`
 	Path string          `json:"path"`
@@ -597,6 +608,16 @@ type setLogFilterParams struct {
 
 func (c *Client) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter core.LogFilter) error {
 	return c.call(ctx, "SetLogFilter", setLogFilterParams{Wt: wt, Filter: filter}, nil)
+}
+
+type setMergeDraftParams struct {
+	Wt    core.WorktreeID  `json:"wt"`
+	Path  string           `json:"path"`
+	Draft *core.MergeDraft `json:"draft"`
+}
+
+func (c *Client) SetMergeDraft(ctx context.Context, wt core.WorktreeID, path string, draft *core.MergeDraft) error {
+	return c.call(ctx, "SetMergeDraft", setMergeDraftParams{Wt: wt, Path: path, Draft: draft}, nil)
 }
 
 type setMessageDraftParams struct {

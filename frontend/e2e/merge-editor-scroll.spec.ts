@@ -7,9 +7,9 @@ import { mockConflictUrl } from './helpers'
 test.use({ viewport: { width: 1280, height: 800 } })
 
 const panes = (page: Page) => ({
-  current: page.locator('.merge-editor .cm-scroller').nth(1),
-  result: page.locator('.merge-editor .cm-scroller').nth(2),
-  incoming: page.locator('.merge-editor .cm-scroller').nth(3),
+  current: page.locator('.merge-editor .cm-scroller').nth(0),
+  result: page.locator('.merge-editor .cm-scroller').nth(1),
+  incoming: page.locator('.merge-editor .cm-scroller').nth(2),
 })
 
 // lineHeight is the height of the pane's first rendered line.
@@ -46,17 +46,17 @@ test('FR-CONF-05 scrolling a pane keeps the other panes at the same conflict', a
   await result.locator('.cm-line').first().waitFor()
   const height = await lineHeight(result)
 
-  await scrollLineToTop(result, 188)
+  await scrollLineToTop(result, 180)
   await expect
-    .poll(() => offsetBetween([current, 'current region 3'], [result, '<<<<<<< HEAD 3']))
+    .poll(() => offsetBetween([current, 'current region 3'], [result, 'base region 3']))
     .toBeLessThanOrEqual(height)
   expect(
-    await offsetBetween([incoming, 'incoming region 3'], [result, '<<<<<<< HEAD 3']),
+    await offsetBetween([incoming, 'incoming region 3'], [result, 'base region 3']),
   ).toBeLessThanOrEqual(height)
 
   await scrollLineToTop(incoming, 130)
   await expect
-    .poll(() => offsetBetween([result, '<<<<<<< HEAD 2'], [incoming, 'incoming region 2']))
+    .poll(() => offsetBetween([result, 'base region 2'], [incoming, 'incoming region 2']))
     .toBeLessThanOrEqual(height)
   expect(
     await offsetBetween([current, 'current region 2'], [incoming, 'incoming region 2']),

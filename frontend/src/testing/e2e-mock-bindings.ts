@@ -394,6 +394,14 @@ export const Facade = {
     return delay(scrollConflictFixture())
   },
 
+  MergeDraft(): Promise<null> {
+    return delay(null)
+  },
+
+  SetMergeDraft(): Promise<void> {
+    return delay(undefined)
+  },
+
   ListWorktrees(): Promise<Worktree[]> {
     return delay(worktreesFixture())
   },

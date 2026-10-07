@@ -107,6 +107,9 @@ func handlers(api core.API) handler.Map {
 		"Merge": handler.New(func(ctx context.Context, p mergeParams) (core.IntegrateResult, error) {
 			return api.Merge(ctx, p.Wt, p.Ref, p.Stash)
 		}),
+		"MergeDraft": handler.New(func(ctx context.Context, p mergeDraftParams) (*core.MergeDraft, error) {
+			return api.MergeDraft(ctx, p.Wt, p.Path)
+		}),
 		"OpenFile": handler.New(func(ctx context.Context, p openFileParams) error {
 			return api.OpenFile(ctx, p.Wt, p.Path, p.Line)
 		}),
@@ -181,6 +184,9 @@ func handlers(api core.API) handler.Map {
 		}),
 		"SetLogFilter": handler.New(func(ctx context.Context, p setLogFilterParams) error {
 			return api.SetLogFilter(ctx, p.Wt, p.Filter)
+		}),
+		"SetMergeDraft": handler.New(func(ctx context.Context, p setMergeDraftParams) error {
+			return api.SetMergeDraft(ctx, p.Wt, p.Path, p.Draft)
 		}),
 		"SetMessageDraft": handler.New(func(ctx context.Context, p setMessageDraftParams) error {
 			return api.SetMessageDraft(ctx, p.Wt, p.Message)

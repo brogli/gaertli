@@ -59,7 +59,7 @@ export function useCoreCall(): UseCoreCall {
 
 // toCoreError reads a rejected bound-method call's core.Error, or wraps any
 // other rejection's text.
-function toCoreError(e: unknown): CoreError {
+export function toCoreError(e: unknown): CoreError {
   const cause = hasCause(e) ? e.cause : undefined
   if (isCoreError(cause)) return cause
   return { message: e instanceof Error ? e.message : String(e) }

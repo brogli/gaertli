@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -45,7 +46,8 @@ func (c *Core) Conflict(ctx context.Context, id core.WorktreeID, path string) (c
 	out := core.ConflictFile{
 		Path: path, Kind: conflictKind(stages),
 		Base: core.ConflictSide{Present: stages[1] != nil}, Current: core.ConflictSide{Present: stages[2] != nil},
-		Incoming: core.ConflictSide{Present: stages[3] != nil},
+		Incoming:   core.ConflictSide{Present: stages[3] != nil},
+		ConflictID: conflictID(stages),
 	}
 	if err := labelSides(ctx, wt, &out); err != nil {
 		return core.ConflictFile{}, err
@@ -54,6 +56,72 @@ func (c *Core) Conflict(ctx context.Context, id core.WorktreeID, path string) (c
 		return out, nil
 	}
 	return readConflictText(ctx, wt.Runner, wt.Path, out, stages)
+}
+
+// MergeDraft implements core.API.
+func (c *Core) MergeDraft(ctx context.Context, id core.WorktreeID, path string) (*core.MergeDraft, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	draft := wt.MergeDraft(path)
+	if draft == nil {
+		return nil, nil
+	}
+	current, err := conflictIDOf(ctx, wt.Runner, wt.Path, path)
+	if err != nil {
+		return nil, err
+	}
+	if current == "" || draft.ConflictID != current {
+		wt.SetMergeDraft(path, nil)
+		return nil, nil
+	}
+	return draft, nil
+}
+
+// SetMergeDraft implements core.API.
+func (c *Core) SetMergeDraft(ctx context.Context, id core.WorktreeID, path string, draft *core.MergeDraft) error {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return err
+	}
+	if draft == nil {
+		wt.SetMergeDraft(path, nil)
+		return nil
+	}
+	current, err := conflictIDOf(ctx, wt.Runner, wt.Path, path)
+	if err != nil {
+		return err
+	}
+	if current != "" && draft.ConflictID == current {
+		wt.SetMergeDraft(path, draft)
+	}
+	return nil
+}
+
+// conflictIDOf is the ConflictID of path's conflict, "" if path is not
+// conflicted.
+func conflictIDOf(ctx context.Context, r git.Runner, dir, path string) (string, error) {
+	stages, err := unmergedStages(ctx, r, dir, path)
+	if ce, ok := errors.AsType[*core.Error](err); ok && ce.Key == "notConflicted" {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return conflictID(stages), nil
+}
+
+// conflictID identifies a conflict by its index entries.
+func conflictID(stages map[int]*unmerged) string {
+	var id strings.Builder
+	for stage := 1; stage <= 3; stage++ {
+		if s := stages[stage]; s != nil {
+			id.WriteString(s.mode + " " + s.oid)
+		}
+		id.WriteString("\n")
+	}
+	return id.String()
 }
 
 // unmergedStages returns path's index entries by stage (1 base, 2 current,
@@ -169,9 +237,15 @@ func readConflictText(ctx context.Context, r git.Runner, dir string, out core.Co
 	out.Result = text(texts[0])
 	out.Base.Content, out.Current.Content, out.Incoming.Content = text(texts[1]), text(texts[2]), text(texts[3])
 	out.MarkerSize = attrs.markerSize
-	if out.Regions, err = conflictRegions(ctx, r, dir, out); err != nil {
+	toCurrent, toIncoming, err := baseDiffs(ctx, r, dir, out)
+	if err != nil {
 		return core.ConflictFile{}, err
 	}
+	if out.Regions, err = conflictRegions(ctx, r, dir, out, toCurrent, toIncoming); err != nil {
+		return core.ConflictFile{}, err
+	}
+	out.CurrentChanges = sideChanges(out.Base, out.Current.Content, toCurrent)
+	out.IncomingChanges = sideChanges(out.Base, out.Incoming.Content, toIncoming)
 	out.Fingerprint = fingerprintOf(working)
 	return out, nil
 }

@@ -7,7 +7,6 @@ const { AppService, Facade, SettingsService } = vi.hoisted(() => ({
     PickAndOpen: vi.fn(),
     RecentRepos: vi.fn().mockResolvedValue([]),
     OpenPath: vi.fn(),
-    SetUnsavedWork: vi.fn().mockResolvedValue(undefined),
   },
   Facade: {
     CompareCommits: vi.fn().mockResolvedValue([]),

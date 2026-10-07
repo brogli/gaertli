@@ -361,6 +361,16 @@ type WindowAPI interface {
 	// record is GitFailed (key notReopenable).
 	ReopenConflict(ctx context.Context, wt WorktreeID, path string) error
 
+	// MergeDraft returns the unsaved merge result kept for path, nil if none.
+	// Drafts are kept per worktree session, in memory only. A draft of a path
+	// that is no longer conflicted, or was made for an earlier conflict in
+	// path, is dropped, and nil returned.
+	MergeDraft(ctx context.Context, wt WorktreeID, path string) (*MergeDraft, error)
+
+	// SetMergeDraft keeps draft as path's unsaved merge result; nil clears it.
+	// A draft whose ConflictID is not that of path's conflict now is not kept.
+	SetMergeDraft(ctx context.Context, wt WorktreeID, path string, draft *MergeDraft) error
+
 	// RenameBranch renames name to newName, validated first (Code
 	// InvalidName).
 	RenameBranch(ctx context.Context, wt WorktreeID, name, newName string) error

@@ -18,9 +18,9 @@ worktree must not race.
     shared commit log and graph rows (ADR-5), the repo-level write queue, the git-dir watcher,
     remote jobs. Refs and the worktree list are read fresh from git on every call, not cached here.
   - A **worktree session**, one per worktree in use (not per window): the worktree write queue, the
-    status poller, the commit message draft, and the worktree's own filtered log view (ADR-5).
-    Status and conflict state are read fresh from git, not cached here. Two windows selecting the
-    same worktree share it.
+    status poller, the commit message draft, the unsaved merge results (in memory only, ADR-4), and
+    the worktree's own filtered log view (ADR-5). Status and conflict state are read fresh from git,
+    not cached here. Two windows selecting the same worktree share it.
 - A call on a worktree carries its id. The core resolves it to a session and runs git in that
   worktree's directory. Calls that need no session, such as listing, adding and removing worktrees,
   carry a repo path (ADR-3).

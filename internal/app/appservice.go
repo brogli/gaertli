@@ -200,15 +200,6 @@ func (s *AppService) OpenDiff(ctx context.Context, wt core.WorktreeID, target Di
 	s.reg.OpenOrFocusDiff(key, wt, target)
 }
 
-// SetUnsavedWork tells the shell whether the calling diff window's page
-// holds work a close would lose; the window then asks its page before it
-// closes.
-func (s *AppService) SetUnsavedWork(ctx context.Context, unsaved bool) {
-	if w, ok := callingWindowFrom(ctx); ok {
-		s.reg.SetUnsavedWork(w.ID(), unsaved)
-	}
-}
-
 // LogPathInfo is LogPath's result: where the app log is, or why it could
 // not be opened.
 type LogPathInfo struct {

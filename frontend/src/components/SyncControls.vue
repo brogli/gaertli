@@ -15,6 +15,7 @@ import { useShortcut } from '@/composables/useShortcut'
 import { useWithShortcut } from '@/composables/useWithShortcut'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
+  Code,
   JobKind,
   PullMode,
   type JobInfo,
@@ -93,14 +94,27 @@ function choosePullMode(mode: PullMode): void {
   const next = { ...settings.settings, defaultPullMode: mode }
   void run(() => settings.save(next))
 }
-// startedPulls are the ids of the pull jobs this window started: only
-// their conflicts open the diff window here.
+// startedPulls are the ids of the running pull jobs this window started:
+// only their conflicts open the diff window here.
 const startedPulls = new Set<string>()
-function startPull(call: () => Promise<string>): void {
-  void run(async () => startedPulls.add(await call()))
+// A pull job can end before its start call returns. While a start call is
+// out, endedPulls keeps each pull end: its id and whether it stopped on
+// conflicts.
+let startCallsOut = 0
+const endedPulls = new Map<string, boolean>()
+
+async function startPull(call: () => Promise<string>): Promise<void> {
+  startCallsOut++
+  const id = await run(call)
+  startCallsOut--
+  if (id !== undefined) {
+    if (!endedPulls.has(id)) startedPulls.add(id)
+    else if (endedPulls.get(id)) void run(() => openConflicts(props.wt))
+  }
+  if (startCallsOut === 0) endedPulls.clear()
 }
 function onPull(): void {
-  startPull(() => Facade.Pull(props.wt, pullMode.value))
+  void startPull(() => Facade.Pull(props.wt, pullMode.value))
 }
 function onForcePush(): void {
   const branchName = refs.current?.name ?? ''
@@ -115,7 +129,7 @@ function onForcePush(): void {
   )
 }
 function onStashPull(): void {
-  startPull(() => Facade.PullWithStash(props.wt, pullMode.value))
+  void startPull(() => Facade.PullWithStash(props.wt, pullMode.value))
 }
 
 // onRetryJob starts a fresh job the same way job's own kind started.
@@ -146,11 +160,16 @@ useShortcut(
   },
 )
 
-function onConflicts(job: JobInfo): void {
-  if (startedPulls.delete(job.id)) void run(() => openConflicts(props.wt))
+function onPullEnded(job: JobInfo): void {
+  const conflicted = job.error?.code === Code.Conflicts
+  if (startedPulls.delete(job.id)) {
+    if (conflicted) void run(() => openConflicts(props.wt))
+  } else if (startCallsOut > 0) {
+    endedPulls.set(job.id, conflicted)
+  }
 }
 
-useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onConflicts })
+useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onPullEnded })
 </script>
 
 <template>

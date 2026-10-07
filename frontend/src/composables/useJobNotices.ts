@@ -32,8 +32,8 @@ interface JobNoticeActions {
   // onRetryJob starts a new job like the one that just failed: the job
   // itself carries no closure to call again.
   onRetryJob: (job: JobInfo) => void
-  // onConflicts is called with a pull job that stopped on conflicts.
-  onConflicts: (job: JobInfo) => void
+  // onPullEnded is called with each pull job that ended.
+  onPullEnded: (job: JobInfo) => void
 }
 
 // useJobNotices shows the result a sync or branch-update job ends with as a
@@ -53,7 +53,7 @@ export function useJobNotices(actions: JobNoticeActions): void {
     if (!ENDED.includes(job.state)) return
     // error.retry, once set, becomes the notice's "Try again" (lib/notice.ts).
     const error: CoreError | null | undefined = job.error
-    if (job.kind === JobKind.PullJob && error?.code === Code.Conflicts) actions.onConflicts(job)
+    if (job.kind === JobKind.PullJob) actions.onPullEnded(job)
     if (error?.code === Code.Locked) error.retry = () => actions.onRetryJob(job)
     const ended = endNotice(job)
     if (ended) show(...ended)

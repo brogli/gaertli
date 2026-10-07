@@ -77,7 +77,9 @@ A conflicted file is read from what git left, never merged a second time:
    edits made since; the sides are their blobs in working-tree form (`cat-file --filters`). The
    conflict regions are its marker blocks (marker size from the `conflict-marker-size` attribute).
    Where each region sits in each side comes from git: the result with every block filled from one
-   side is diffed against that side (`diff --no-index -U0`).
+   side is diffed against that side (`diff --no-index -U0`). The lines each side changed are that
+   side's diff against the base the same way: a hunk without base lines is an addition, any other a
+   change. Without a base the whole side is one addition.
 4. All text reaches the UI with LF line breaks. Saving writes the working file's own convention
    back, refuses when the file changed since it was read, and stages it (`add`) only when no marker
    line is left.

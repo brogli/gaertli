@@ -5,7 +5,7 @@ import { useEventListener } from '@vueuse/core'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
-import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import {
   ChangeScope,
   type ChangedFile,
@@ -14,7 +14,6 @@ import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '@/lib/d
 import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
 import { useChangesStore } from '@/stores/changes'
 import { useDiffStore } from '@/stores/diff'
-import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
@@ -41,8 +40,7 @@ const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(wt, run)
 const asTree = useFileTreeChoice()
 const { t } = useI18n()
-const { confirmAction } = useConfirmAction()
-const { hasUnsaved, keepOnly } = useMergeDrafts()
+const { keepOnly } = useMergeDrafts()
 
 const isWorking = computed(() => target.value.kind === DiffKind.WorkingDiff)
 
@@ -184,28 +182,6 @@ useWindowEvent('diff:show', (ev) => {
   target.value = ev.data.target
 })
 
-// The shell cancels a close of the window while it holds unsaved merge
-// results, and asks the page to confirm.
-watch(hasUnsaved, (unsaved) => void AppService.SetUnsavedWork(unsaved), { immediate: true })
-
-// closeWindow closes the window, after the user confirms losing unsaved
-// merge results if there are any.
-function closeWindow(): void {
-  if (!hasUnsaved.value) return void closeNow()
-  confirmAction(t('diffWindow.closeUnsavedHeader'), t('diffWindow.closeUnsavedMessage'), () => {
-    void closeNow()
-  })
-}
-
-// closeNow stops the shell holding the close back, whatever flag it still
-// holds, then closes.
-async function closeNow(): Promise<void> {
-  await AppService.SetUnsavedWork(false)
-  void Window.Close()
-}
-
-useWindowEvent('diff:closeRequested', closeWindow)
-
 // Escape closes the window, unless a dialog (a discard's confirmation) is
 // open: that Escape is the dialog's. Capturing runs this before the dialog
 // closes itself.
@@ -214,7 +190,7 @@ useEventListener(
   'keydown',
   (e: KeyboardEvent) => {
     if (e.key === 'Escape' && !document.querySelector('[role=dialog], [role=alertdialog]'))
-      closeWindow()
+      void Window.Close()
   },
   { capture: true },
 )

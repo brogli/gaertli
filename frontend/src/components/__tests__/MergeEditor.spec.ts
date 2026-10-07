@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { Facade } = vi.hoisted(() => ({ Facade: { SaveConflict: vi.fn() } }))
+const { Facade } = vi.hoisted(() => ({
+  Facade: { SaveConflict: vi.fn(), SetMergeDraft: vi.fn(), MergeDraft: vi.fn() },
+}))
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
-import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
-import type { Extension } from '@codemirror/state'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { Text, type Extension } from '@codemirror/state'
+import { undo } from '@codemirror/commands'
 import { EditorView, ViewPlugin } from '@codemirror/view'
 import * as codeEditor from '@/lib/codeEditor'
 import { editorViews } from '@/testing/editorView'
@@ -18,29 +21,19 @@ import {
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
-beforeEach(() => useMergeDrafts().clearAll())
+beforeEach(() => useMergeDrafts().keepOnly('/repo', []))
 
 async function mountEditor(file: ConflictFile = conflictFileFixture()) {
   const { wrapper } = await mountInBody(MergeEditor, { props: { wt: '/repo', file } })
   return wrapper
 }
 
-// shown keeps the elements outside the hidden base panel.
-function shown<T extends Element>(elements: DOMWrapper<T>[]): DOMWrapper<T>[] {
-  return elements.filter((el) => !el.element.closest('[inert]'))
-}
-
-// shownViews are the editors outside the hidden base panel, in pane order.
-function shownViews(wrapper: VueWrapper): EditorView[] {
-  return editorViews(wrapper).filter((view) => !view.dom.closest('[inert]'))
-}
-
 function editorTexts(wrapper: VueWrapper): string[] {
-  return shownViews(wrapper).map((view) => view.state.doc.toString())
+  return editorViews(wrapper).map((view) => view.state.doc.toString())
 }
 
 function headers(wrapper: VueWrapper): string[] {
-  return shown(wrapper.findAll('[data-test^="pane-header-"]')).map((h) => h.text())
+  return wrapper.findAll('[data-test^="pane-header-"]').map((h) => h.text())
 }
 
 describe('MergeEditor layout', () => {
@@ -48,7 +41,11 @@ describe('MergeEditor layout', () => {
     const file = conflictFileFixture()
     const wrapper = await mountEditor(file)
 
-    expect(editorTexts(wrapper)).toEqual([file.current.content, file.result, file.incoming.content])
+    expect(editorTexts(wrapper)).toEqual([
+      file.current.content,
+      'a\no1\nb\no2\nz',
+      file.incoming.content,
+    ])
     expect(headers(wrapper)).toEqual(['main · current branch', 'Result', 'side · merged branch'])
     expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 1 of 2 · 2 left')
   })
@@ -76,64 +73,120 @@ describe('MergeEditor layout', () => {
     expect([currentHeader, incomingHeader]).toEqual([current, incoming])
   })
 
-  it('FR-CONF-05 shows the base pane on demand', async () => {
-    const file = conflictFileFixture()
+  it('FR-CONF-05 the result holds the base text in each conflict, no marker line', async () => {
+    const wrapper = await mountEditor()
+    const result = editorViews(wrapper)[1]!
+
+    expect(result.state.doc.toString()).not.toMatch(/^[<>]{7}/m)
+    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 1 of 2 · 2 left')
+    expect(result.dom.querySelectorAll('.cm-conflict-unresolved')).toHaveLength(2)
+  })
+
+  it('FR-CONF-05 the side panes tint changed lines blue, added lines green and conflicts red', async () => {
+    const file = conflictFileFixture({
+      currentChanges: [{ lines: { start: 1, lines: 1 }, added: true }],
+      incomingChanges: [{ lines: { start: 5, lines: 1 }, added: false }],
+    })
     const wrapper = await mountEditor(file)
-    expect(editorTexts(wrapper)).toHaveLength(3)
+    const [current, , incoming] = editorViews(wrapper)
+    const classes = (view: EditorView) =>
+      [...view.dom.querySelectorAll('.cm-line')].map((line) =>
+        ['cm-change-added', 'cm-change-changed', 'cm-conflict-unresolved'].find((name) =>
+          line.classList.contains(name),
+        ),
+      )
 
-    await findButton(wrapper, 'Show base')?.trigger('click')
-
-    expect(editorTexts(wrapper)).toEqual([
-      file.base.content,
-      file.current.content,
-      file.result,
-      file.incoming.content,
+    expect(classes(current!)).toEqual([
+      'cm-change-added',
+      'cm-conflict-unresolved',
+      undefined,
+      'cm-conflict-unresolved',
+      undefined,
     ])
-    expect(headers(wrapper)[0]).toBe('Base')
+    expect(classes(incoming!)).toEqual([
+      undefined,
+      'cm-conflict-unresolved',
+      undefined,
+      'cm-conflict-unresolved',
+      'cm-change-changed',
+    ])
   })
 
-  it('FR-CONF-05 showing the base keeps every editor and its scroll position', async () => {
-    const wrapper = await mountEditor()
-    const hosts = () =>
-      wrapper.findAll<HTMLElement>('.cm-editor').map((el) => el.element.parentElement)
-    const before = hosts()
-    const result = wrapper.findAll<HTMLElement>('.cm-scroller')[2]!.element
-    result.scrollTop = 40
-
-    await findButton(wrapper, 'Show base')?.trigger('click')
-    await findButton(wrapper, 'Hide base')?.trigger('click')
-
-    expect(hosts().every((host, i) => host === before[i])).toBe(true)
-    expect(result.isConnected).toBe(true)
-    expect(result.scrollTop).toBe(40)
-  })
-
-  it('FR-CONF-05 the hidden base pane has no divider to drag', async () => {
-    const wrapper = await mountEditor()
-    const baseGutter = () => wrapper.find('.p-splitter-vertical > .p-splitter-gutter')
-
-    expect(baseGutter().classes()).toContain('hidden')
-
-    await findButton(wrapper, 'Show base')?.trigger('click')
-
-    expect(baseGutter().classes()).not.toContain('hidden')
-  })
-
-  it('FR-CONF-05 keeps the result when the base pane is shown', async () => {
-    const wrapper = await mountEditor()
-    const result = shownViews(wrapper)[1]!
-    result.dispatch({ changes: { from: 0, insert: 'typed ' } })
-
-    await findButton(wrapper, 'Show base')?.trigger('click')
-
-    expect(editorTexts(wrapper)[2]).toMatch(/^typed a\n/)
-  })
-
-  it('FR-CONF-05 offers no base toggle when the file has no base', async () => {
-    const file = { ...conflictFileFixture(), base: { present: false } }
+  it('FR-CONF-05 an unresolved conflict with no lines in the result shows a placeholder until it holds lines', async () => {
+    const base = conflictFileFixture()
+    const file = {
+      ...base,
+      base: { present: false },
+      regions: base.regions!.map((region) => ({ ...region, base: { start: 0, lines: 0 } })),
+    }
     const wrapper = await mountEditor(file)
+    const result = editorViews(wrapper)[1]!
+    const placeholders = () => result.dom.querySelectorAll('.cm-conflict-placeholder')
 
+    expect(placeholders()).toHaveLength(2)
+    expect(placeholders()[0]!.textContent).toBe('Unresolved conflict')
+    placeholders()[1]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 2 of 2 · 2 left')
+
+    await click(wrapper, 'Take current')
+
+    expect(placeholders()).toHaveLength(1)
+    expect(result.state.doc.toString()).toBe('a\nb\nc2\nz')
+  })
+
+  it('FR-CONF-05 a region git trimmed to the differing lines holds the base lines of those only', async () => {
+    const base = conflictFileFixture()
+    const file: ConflictFile = {
+      ...base,
+      base: { present: true, content: 'a\nb\nc\nx' },
+      current: { ...base.current, content: 'A\nB\nC\nx' },
+      incoming: { ...base.incoming, content: 'A\nY\nC\nx' },
+      result: 'A\n<<<<<<< HEAD\nB\n=======\nY\n>>>>>>> side\nC\nx',
+      regions: [
+        {
+          result: { start: 2, lines: 5 },
+          base: { start: 2, lines: 1 },
+          current: { start: 2, lines: 1 },
+          incoming: { start: 2, lines: 1 },
+        },
+      ],
+      currentChanges: [],
+      incomingChanges: [],
+    }
+    const wrapper = await mountEditor(file)
+    const result = editorViews(wrapper)[1]!
+
+    expect(result.state.doc.toString()).toBe('A\nb\nC\nx')
+
+    await click(wrapper, 'Take incoming')
+
+    expect(result.state.doc.toString()).toBe('A\nY\nC\nx')
+  })
+
+  it('FR-CONF-05 pressing the placeholder of a region the incoming side deleted selects it', async () => {
+    const base = conflictFileFixture()
+    const file = {
+      ...base,
+      incoming: { ...base.incoming, content: 'a\ni1\nb\nz' },
+      regions: [base.regions![0]!, { ...base.regions![1]!, incoming: { start: 4, lines: 0 } }],
+    }
+    const wrapper = await mountEditor(file)
+    const placeholder = editorViews(wrapper)[2]!.dom.querySelector('.cm-conflict-placeholder')!
+
+    placeholder.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Conflict 2 of 2 · 2 left')
+  })
+
+  it('FR-CONF-06 offers one save action and no base pane', async () => {
+    const wrapper = await mountEditor()
+
+    expect(findButton(wrapper, 'Save')).toBeUndefined()
     expect(findButton(wrapper, 'Show base')).toBeUndefined()
+    expect(findButton(wrapper, SAVE_AND_RESOLVE)).toBeDefined()
+    expect(wrapper.find('[data-test="pane-header-base"]').exists()).toBe(false)
   })
 })
 
@@ -142,7 +195,7 @@ const RESULT = 1
 const INCOMING = 2
 
 function viewAt(wrapper: VueWrapper, pane: 0 | 1 | 2): EditorView {
-  return shownViews(wrapper)[pane]!
+  return editorViews(wrapper)[pane]!
 }
 
 function position(wrapper: VueWrapper): string {
@@ -176,6 +229,7 @@ function threeRegionFile(): ConflictFile {
     ...base,
     result,
     regions: [region(1, 2), region(2, 8), region(3, 14)],
+    base: { ...base.base, content: side('o').join('\n') },
     current: { ...base.current, content: side('c').join('\n') },
     incoming: { ...base.incoming, content: side('i').join('\n') },
   }
@@ -193,12 +247,10 @@ describe('MergeEditor actions and navigation', () => {
     await click(wrapper, 'Next conflict · Alt+Down')
     expect(position(wrapper)).toBe('Conflict 2 of 2 · 2 left')
     const result = viewAt(wrapper, RESULT)
-    expect(result.state.doc.lineAt(result.state.selection.main.head).number).toBe(8)
+    expect(result.state.doc.lineAt(result.state.selection.main.head).number).toBe(4)
 
     await click(wrapper, 'Take current')
-    expect(result.state.doc.toString()).toBe(
-      'a\n<<<<<<< HEAD\nc1\n=======\ni1\n>>>>>>> side\nb\nc2\nz',
-    )
+    expect(result.state.doc.toString()).toBe('a\no1\nb\nc2\nz')
 
     await click(wrapper, 'Previous conflict · Alt+Up')
     expect(position(wrapper)).toBe('Conflict 1 of 2 · 1 left')
@@ -208,8 +260,8 @@ describe('MergeEditor actions and navigation', () => {
   })
 
   it.each([
-    ['Take incoming', 'a\ni1\nb\n<<<<<<< HEAD\nc2\n=======\ni2\n>>>>>>> side\nz'],
-    ['Both, current first', 'a\nc1\ni1\nb\n<<<<<<< HEAD\nc2\n=======\ni2\n>>>>>>> side\nz'],
+    ['Take incoming', 'a\ni1\nb\no2\nz'],
+    ['Both, current first', 'a\nc1\ni1\nb\no2\nz'],
   ])('FR-CONF-05 "%s" acts on the selected conflict', async (label, text) => {
     const wrapper = await mountEditor()
 
@@ -218,15 +270,34 @@ describe('MergeEditor actions and navigation', () => {
     expect(viewAt(wrapper, RESULT).state.doc.toString()).toBe(text)
   })
 
-  it('FR-CONF-05 disables the takes when no unresolved conflict is selected', async () => {
+  it('FR-CONF-05 take incoming resolves the region in every pane', async () => {
     const wrapper = await mountEditor()
-    await click(wrapper, 'Take current')
-    await click(wrapper, 'Next conflict · Alt+Down')
-    await click(wrapper, 'Take current')
 
-    for (const label of ['Take current', 'Take incoming', 'Both, current first']) {
-      expect(findButton(wrapper, label)?.attributes('disabled')).toBeDefined()
+    await click(wrapper, 'Take incoming')
+
+    for (const pane of [CURRENT, RESULT, INCOMING] as const) {
+      const resolved = viewAt(wrapper, pane).dom.querySelectorAll('.cm-conflict-resolved')
+      expect(resolved).toHaveLength(1)
     }
+    expect(position(wrapper)).toBe('Conflict 1 of 2 · 1 left')
+  })
+
+  it('FR-CONF-05 a hand edit leaves the region unresolved until Mark done, which undo reverts', async () => {
+    const wrapper = await mountEditor()
+    const result = viewAt(wrapper, RESULT)
+    result.dispatch({ changes: { from: result.state.doc.line(2).to, insert: ' mine' } })
+    await flushPromises()
+    expect(position(wrapper)).toBe('Conflict 1 of 2 · 2 left')
+
+    await click(wrapper, 'Mark done')
+    expect(position(wrapper)).toBe('Conflict 1 of 2 · 1 left')
+    expect(result.state.doc.line(2).text).toBe('o1 mine')
+    expect(findButton(wrapper, 'Mark done')?.attributes('disabled')).toBeDefined()
+
+    undo(result)
+    await flushPromises()
+    expect(position(wrapper)).toBe('Conflict 1 of 2 · 2 left')
+    expect(result.state.doc.line(2).text).toBe('o1 mine')
   })
 
   it('FR-CONF-05 clicking a conflict in the incoming pane selects it everywhere', async () => {
@@ -243,7 +314,7 @@ describe('MergeEditor actions and navigation', () => {
     for (const pane of [CURRENT, RESULT, INCOMING] as const) {
       expect(selectedLineCount(viewAt(wrapper, pane))).toBeGreaterThan(0)
     }
-    expect(selectedLineCount(viewAt(wrapper, RESULT))).toBe(5)
+    expect(selectedLineCount(viewAt(wrapper, RESULT))).toBe(1)
 
     press(incoming, { key: 'ArrowUp', altKey: true })
     await flushPromises()
@@ -252,11 +323,11 @@ describe('MergeEditor actions and navigation', () => {
 
   it('FR-CONF-05 clicking a side conflict the restored result lacks leaves the selection alone and logs no error', async () => {
     const file = threeRegionFile()
-    useMergeDrafts().set('/repo', 'a.txt', {
-      text: file.result!,
+    useMergeDrafts().set('/repo', 'a.txt', '', () => ({
+      text: 'a\no1\nb\no2\nc\no3\nz',
       fingerprint: 'fp',
-      regions: [{ start: 2, lines: 5 }],
-    })
+      regions: [{ range: { start: 2, lines: 1 }, resolved: false }],
+    }))
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const wrapper = await mountEditor(file)
     const incoming = viewAt(wrapper, INCOMING)
@@ -272,21 +343,11 @@ describe('MergeEditor actions and navigation', () => {
     logged.mockRestore()
   })
 
-  it('FR-CONF-05 the takes stay disabled while the selected conflict holds no complete block', async () => {
-    const wrapper = await mountEditor()
-    const result = viewAt(wrapper, RESULT)
-    const doc = result.state.doc
-    result.dispatch({ changes: { from: doc.line(3).from, to: doc.line(9).to } })
-    await flushPromises()
-
-    expect(findButton(wrapper, 'Take current')?.attributes('disabled')).toBeDefined()
-  })
-
   it('FR-CONF-05 the result cursor entering a conflict selects it', async () => {
     const wrapper = await mountEditor(threeRegionFile())
     const result = viewAt(wrapper, RESULT)
 
-    result.dispatch({ selection: { anchor: result.state.doc.line(15).from } })
+    result.dispatch({ selection: { anchor: result.state.doc.line(6).from } })
     await flushPromises()
 
     expect(position(wrapper)).toBe('Conflict 3 of 3 · 3 left')
@@ -300,37 +361,46 @@ describe('MergeEditor actions and navigation', () => {
     await flushPromises()
 
     expect(position(wrapper)).toBe('Conflict 2 of 3 · 3 left')
-    expect(result.state.doc.lineAt(result.state.selection.main.head).number).toBe(8)
-    expect(result.state.doc.lines).toBe(19)
+    expect(result.state.doc.lineAt(result.state.selection.main.head).number).toBe(4)
+    expect(result.state.doc.lines).toBe(7)
   })
 })
 
 const SAVE_AND_RESOLVE = 'Save and mark resolved'
+
+// resolveAll takes the current side in every conflict of the two-region file.
+async function resolveAll(wrapper: VueWrapper): Promise<void> {
+  await click(wrapper, 'Take current')
+  await click(wrapper, 'Next conflict · Alt+Down')
+  await click(wrapper, 'Take current')
+}
 
 describe('MergeEditor saving', () => {
   beforeEach(() => {
     Facade.SaveConflict.mockReset().mockResolvedValue('fp2')
   })
 
-  it('FR-CONF-06 saves the result; marking resolved waits for the last conflict', async () => {
-    const file = conflictFileFixture()
-    const wrapper = await mountEditor(file)
+  it('FR-CONF-06 saving waits for the last conflict, and says so', async () => {
+    const wrapper = await mountEditor()
 
     const resolve = findButton(wrapper, SAVE_AND_RESOLVE)!
     expect(resolve.attributes('disabled')).toBeDefined()
     expect(resolve.attributes('title')).toBe('Resolve every conflict first')
-    expect(findButton(wrapper, 'Save')!.attributes('title')).toBe('Save · Ctrl+S')
-    await click(wrapper, 'Save')
+    press(viewAt(wrapper, RESULT), { key: 's', ctrlKey: true })
+    await flushPromises()
 
-    expect(Facade.SaveConflict).toHaveBeenCalledWith('/repo', 'a.txt', file.result, 'fp', false)
+    expect(Facade.SaveConflict).not.toHaveBeenCalled()
   })
 
-  it('FR-CONF-06 marks resolved once no marker line is left; Ctrl+S saves without marking', async () => {
+  it('FR-CONF-06 once every conflict is resolved the button and Ctrl+S save and mark resolved', async () => {
     const wrapper = await mountEditor()
     await click(wrapper, 'Take current')
     await click(wrapper, 'Next conflict · Alt+Down')
     await click(wrapper, 'Both, incoming first')
 
+    expect(findButton(wrapper, SAVE_AND_RESOLVE)!.attributes('title')).toBe(
+      'Save and mark resolved · Ctrl+S',
+    )
     await click(wrapper, SAVE_AND_RESOLVE)
     expect(Facade.SaveConflict).toHaveBeenLastCalledWith(
       '/repo',
@@ -347,7 +417,7 @@ describe('MergeEditor saving', () => {
       'a.txt',
       'a\nc1\nb\ni2\nc2\nz',
       'fp2',
-      false,
+      true,
     )
   })
 
@@ -362,8 +432,9 @@ describe('MergeEditor saving', () => {
       }),
     )
     const wrapper = await mountEditor()
+    await resolveAll(wrapper)
 
-    await click(wrapper, 'Save')
+    await click(wrapper, SAVE_AND_RESOLVE)
     expect(wrapper.text()).toContain('a.txt changed since it was opened.')
     await click(wrapper, 'Reload')
 
@@ -373,8 +444,9 @@ describe('MergeEditor saving', () => {
   it('FR-CONF-06 any other save error shows as an error', async () => {
     Facade.SaveConflict.mockRejectedValue(new Error('disk full'))
     const wrapper = await mountEditor()
+    await resolveAll(wrapper)
 
-    await click(wrapper, 'Save')
+    await click(wrapper, SAVE_AND_RESOLVE)
 
     expect(wrapper.find('.error-banner').text()).toContain('disk full')
     expect(findButton(wrapper, 'Reload')).toBeUndefined()
@@ -435,15 +507,16 @@ describe('MergeEditor saving while typing', () => {
       new Promise<string>((resolve) => (finish = resolve)),
     )
     const wrapper = await mountEditor()
+    await resolveAll(wrapper)
     const result = viewAt(wrapper, RESULT)
     result.dispatch({ changes: { from: 0, insert: 'one ' } })
-    await click(wrapper, 'Save')
+    await click(wrapper, SAVE_AND_RESOLVE)
 
     result.dispatch({ changes: { from: 0, insert: 'two ' } })
     finish('fpSaved')
     await flushPromises()
 
-    const draft = useMergeDrafts().get('/repo', 'a.txt')
+    const draft = useMergeDrafts().get('/repo', 'a.txt', '')
     expect(draft?.text).toMatch(/^two one a\n/)
     expect(draft?.fingerprint).toBe('fpSaved')
     expect(wrapper.emitted('saved')).toEqual([['fpSaved']])
@@ -452,8 +525,9 @@ describe('MergeEditor saving while typing', () => {
   it('FR-CONF-06 a save tells the new fingerprint', async () => {
     Facade.SaveConflict.mockReset().mockResolvedValue('fpSaved')
     const wrapper = await mountEditor()
+    await resolveAll(wrapper)
 
-    await click(wrapper, 'Save')
+    await click(wrapper, SAVE_AND_RESOLVE)
 
     expect(wrapper.emitted('saved')).toEqual([['fpSaved']])
   })
@@ -481,17 +555,31 @@ describe('MergeEditor unsaved results', () => {
     expect(position(wrapper)).toBe('Conflict 1 of 2 · 2 left')
   })
 
-  it('FR-CONF-06 a saved result leaves nothing to restore', async () => {
+  it('FR-CONF-06 resolved regions are still resolved when the file is shown again', async () => {
     const file = conflictFileFixture()
     const first = await mountEditor(file)
-    await editResult(first)
-    await click(first, 'Save')
+    await click(first, 'Take incoming')
     first.unmount()
 
     const wrapper = await mountEditor(file)
 
-    expect(editorTexts(wrapper)[RESULT]).toBe(file.result)
-    expect(useMergeDrafts().hasUnsaved.value).toBe(false)
+    expect(editorTexts(wrapper)[RESULT]).toBe('a\ni1\nb\no2\nz')
+    expect(position(wrapper)).toBe('Conflict 2 of 2 · 1 left')
+    expect(viewAt(wrapper, RESULT).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
+    expect(viewAt(wrapper, INCOMING).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
+  })
+
+  it('FR-CONF-06 a saved result leaves nothing to restore', async () => {
+    const file = conflictFileFixture()
+    const first = await mountEditor(file)
+    await resolveAll(first)
+    await click(first, SAVE_AND_RESOLVE)
+    first.unmount()
+
+    const wrapper = await mountEditor(file)
+
+    expect(editorTexts(wrapper)[RESULT]).toBe('a\no1\nb\no2\nz')
+    expect(useMergeDrafts().get('/repo', 'a.txt', '')).toBeUndefined()
   })
 
   it('FR-CONF-06 unsaved edits stay when the file changed on disk, which Reload discards', async () => {
@@ -504,6 +592,52 @@ describe('MergeEditor unsaved results', () => {
     expect(editorTexts(wrapper)[RESULT]).toMatch(/^typed /)
     await click(wrapper, 'Reload')
     expect(wrapper.emitted('reload')).toHaveLength(1)
+  })
+
+  it('FR-CONF-06 a burst of edits reads the result once per write, not per keystroke', async () => {
+    vi.useFakeTimers()
+    try {
+      Facade.SetMergeDraft.mockClear()
+      const wrapper = await mountEditor()
+      const result = viewAt(wrapper, RESULT)
+      const reads = vi.spyOn(Text.prototype, 'toString')
+
+      for (const word of ['one ', 'two ', 'three ', 'four ']) {
+        result.dispatch({ changes: { from: 0, insert: word } })
+      }
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(2)
+      expect(reads).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.restoreAllMocks()
+      vi.useRealTimers()
+    }
+  })
+
+  it('FR-CONF-06 closing the editor writes nothing the core already has', async () => {
+    vi.useFakeTimers()
+    try {
+      Facade.SetMergeDraft.mockClear()
+      const wrapper = await mountEditor()
+      viewAt(wrapper, RESULT).dispatch({ changes: { from: 0, insert: 'typed ' } })
+      await vi.advanceTimersByTimeAsync(1000)
+
+      wrapper.unmount()
+
+      expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('FR-CONF-06 an edit the core failed to keep shows the error', async () => {
+    Facade.SetMergeDraft.mockRejectedValueOnce(new Error('no session'))
+    const wrapper = await mountEditor()
+
+    await editResult(wrapper)
+
+    expect(wrapper.find('.error-banner').text()).toContain('no session')
   })
 
   it('FR-CONF-06 the same file read again changes nothing', async () => {

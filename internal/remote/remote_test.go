@@ -26,6 +26,8 @@ type fake struct {
 	// keyed by method name; AddWorktree and RemoveWorktree additionally
 	// record their target under "<method>:target".
 	paths map[string]string
+
+	draft *core.MergeDraft
 }
 
 func (f *fake) recordPath(method, path string) {
@@ -36,6 +38,15 @@ func (f *fake) recordPath(method, path string) {
 }
 
 func (f *fake) Version(context.Context) (core.Version, error) { return f.version() }
+
+func (f *fake) SetMergeDraft(_ context.Context, _ core.WorktreeID, _ string, draft *core.MergeDraft) error {
+	f.draft = draft
+	return nil
+}
+
+func (f *fake) MergeDraft(context.Context, core.WorktreeID, string) (*core.MergeDraft, error) {
+	return f.draft, nil
+}
 
 func (f *fake) OpenWorktree(_ context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
 	f.recordPath("OpenWorktree", string(path))
@@ -108,6 +119,25 @@ func TestADR_3_VersionCallCrossesThePipe(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("Version = %+v, want %+v", got, want)
+	}
+}
+
+func TestFR_CONF_06_MergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
+	c := pipeClient(t, &fake{}, nil)
+	want := &core.MergeDraft{
+		Text: "a\nb\n", Fingerprint: "fp",
+		Regions: []core.DraftRegion{{Range: core.LineRange{Start: 2, Lines: 1}, Resolved: true}},
+	}
+
+	if err := c.SetMergeDraft(t.Context(), "/wt", "a.txt", want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.MergeDraft(t.Context(), "/wt", "a.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("MergeDraft = %+v, want %+v", got, want)
 	}
 }
 

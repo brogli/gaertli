@@ -252,7 +252,7 @@ test.describe('the merge editor', () => {
     return page.locator(`[data-test=pane-header-${name}]`)
   }
 
-  test('FR-CONF-06 a merge conflict with two regions resolves in the merge editor: a side taken, one region edited by hand, saved and staged', async ({
+  test('FR-CONF-05 a merge conflict with two regions resolves in the merge editor: a side taken, a region edited by hand and marked done, saved and staged with no markers', async ({
     app,
     openDiff,
     repos,
@@ -274,20 +274,49 @@ test.describe('the merge editor', () => {
     await expect(pane(diff, 'incoming')).toHaveText('feature · merged branch')
     const position = diff.locator('[data-test=conflict-position]')
     await expect(position).toHaveText('Conflict 1 of 2 · 2 left')
+    const result = diff.locator('[data-test=pane-header-result] ~ div .cm-content')
+    await expect(result).toContainText('line 1')
+    await expect(result).not.toContainText('<<<<<<<')
+    const save = diff.getByRole('button', { name: 'Save and mark resolved' })
+    await expect(save).toBeDisabled()
 
     await diff.getByRole('button', { name: 'Take incoming' }).click()
     await diff.locator('[data-test=next-conflict]').click()
     await expect(position).toHaveText('Conflict 2 of 2 · 1 left')
-    await diff.getByRole('button', { name: 'Both, current first' }).click()
+    await result.focus()
+    await diff.keyboard.type('edited ')
+    await expect(position).toHaveText('Conflict 2 of 2 · 1 left')
+    await expect(save).toBeDisabled()
+    await diff.getByRole('button', { name: 'Mark done' }).click()
     await expect(position).toHaveText('No conflicts left')
-    await diff.locator('[data-test=pane-header-result] ~ div .cm-content').click()
-    await diff.keyboard.press('Control+End')
-    await diff.keyboard.type('typed by hand\n')
-    await diff.getByRole('button', { name: 'Save and mark resolved' }).click()
+    await save.click()
 
-    const expected = hunksText({ 1: 'feature 1', 20: 'main 20\nfeature 20' }) + 'typed by hand\n'
+    const expected = hunksText({ 1: 'feature 1', 20: 'edited line 20' })
     await expect.poll(() => stagedText(git, repos.work, 'hunks.txt')).toBe(expected)
+    expect(fs.readFileSync(path.join(repos.work, 'hunks.txt'), 'utf8')).toBe(expected)
     await expect(fileGroup(app, 'Conflicted').locator('.path')).toHaveText(['conflict.txt'])
+  })
+
+  test('FR-CONF-06 a side taken and an edit survive closing the diff window and opening the file again', async ({
+    openDiff,
+    repos,
+    git,
+  }) => {
+    stopOnConflicts(git, repos.work, 'merge', 'feature')
+    const diff = await openConflict(openDiff, repos.work, 'conflict.txt')
+    await diff.getByRole('button', { name: 'Take incoming' }).click()
+    const result = diff.locator('[data-test=pane-header-result] ~ div .cm-content')
+    await result.focus()
+    await diff.keyboard.type('kept ')
+    const text = await result.innerText()
+    await diff.waitForTimeout(1000)
+
+    await diff.close()
+    const reopened = await openConflict(openDiff, repos.work, 'conflict.txt')
+
+    const again = reopened.locator('[data-test=pane-header-result] ~ div .cm-content')
+    await expect(again).toHaveText(text)
+    await expect(reopened.locator('[data-test=conflict-position]')).toHaveText('No conflicts left')
   })
 
   test('FR-CONF-05 a rebase conflict names the sides: the branch rebased onto and the commit being replayed', async ({

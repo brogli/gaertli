@@ -3,16 +3,22 @@ package core
 // ConflictFile is one conflicted file as the merge editor or the choice
 // panel needs it.
 type ConflictFile struct {
-	Path        string           `json:"path"`
-	Kind        ConflictKind     `json:"kind"`
-	Operation   Operation        `json:"operation"` // "" for a conflict no operation records (a stash pop)
-	Base        ConflictSide     `json:"base"`
-	Current     ConflictSide     `json:"current"`          // stage 2, the side checked out
-	Incoming    ConflictSide     `json:"incoming"`         // stage 3, the side brought in
-	Result      string           `json:"result,omitempty"` // Kind text: the working file
-	MarkerSize  int              `json:"markerSize,omitempty"`
-	Regions     []ConflictRegion `json:"regions,omitempty"` // Kind text, in Result order
-	Fingerprint string           `json:"fingerprint,omitempty"`
+	Path       string           `json:"path"`
+	Kind       ConflictKind     `json:"kind"`
+	Operation  Operation        `json:"operation"` // "" for a conflict no operation records (a stash pop)
+	Base       ConflictSide     `json:"base"`
+	Current    ConflictSide     `json:"current"`          // stage 2, the side checked out
+	Incoming   ConflictSide     `json:"incoming"`         // stage 3, the side brought in
+	Result     string           `json:"result,omitempty"` // Kind text: the working file
+	MarkerSize int              `json:"markerSize,omitempty"`
+	Regions    []ConflictRegion `json:"regions,omitempty"` // Kind text, in Result order
+	// Kind text: where each side differs from the base, in the side's lines.
+	CurrentChanges  []SideChange `json:"currentChanges,omitempty"`
+	IncomingChanges []SideChange `json:"incomingChanges,omitempty"`
+	Fingerprint     string       `json:"fingerprint,omitempty"`
+	// ConflictID identifies the conflict as read: a later conflict in the
+	// same path has another.
+	ConflictID string `json:"conflictId,omitempty"`
 }
 
 // ConflictSide is one side's version and what it comes from.
@@ -32,6 +38,30 @@ type ConflictRegion struct {
 	Base     LineRange `json:"base"`
 	Current  LineRange `json:"current"`
 	Incoming LineRange `json:"incoming"`
+}
+
+// SideChange is a run of a side's lines that differ from the base: lines the
+// side added (Added) or changed.
+type SideChange struct {
+	Lines LineRange `json:"lines"`
+	Added bool      `json:"added"`
+}
+
+// MergeDraft is a merge result with unsaved edits: its text (LF line
+// breaks), the conflict regions in it with their states, the fingerprint of
+// the working file it was read from and the ConflictID of the conflict it was
+// made for.
+type MergeDraft struct {
+	Text        string        `json:"text"`
+	Fingerprint string        `json:"fingerprint"`
+	ConflictID  string        `json:"conflictId"`
+	Regions     []DraftRegion `json:"regions"`
+}
+
+// DraftRegion is one conflict region of a MergeDraft's text.
+type DraftRegion struct {
+	Range    LineRange `json:"range"`
+	Resolved bool      `json:"resolved"`
 }
 
 // LineRange is a run of Lines lines from line Start.

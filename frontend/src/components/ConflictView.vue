@@ -51,16 +51,21 @@ async function load(): Promise<void> {
   const ignoreError = (e: CoreError) => started !== version || e.key === 'notConflicted'
   const next = (await run(() => Facade.Conflict(props.wt, props.path), ignoreError)) ?? null
   if (started !== version) return
+  const conflictId = next?.conflictId ?? ''
+  if (next) await run(() => drafts.load(props.wt, props.path, conflictId), ignoreError)
+  if (started !== version) return
   const shown = conflict.value
-  const changed = next?.path === shown?.path && next?.fingerprint !== shown?.fingerprint
-  if (changed && !drafts.get(props.wt, props.path)) generation.value++
+  const samePath = next?.path === shown?.path
+  const changed = samePath && next?.fingerprint !== shown?.fingerprint
+  const newConflict = samePath && conflictId !== (shown?.conflictId ?? '')
+  if (newConflict || (changed && !drafts.has(props.wt, props.path, conflictId))) generation.value++
   conflict.value = next
 }
 
 // reload drops the merge editor's unsaved edits for the file as it is on
 // disk.
 async function reload(): Promise<void> {
-  drafts.discard(props.wt, props.path)
+  await drafts.discard(props.wt, props.path)
   await load()
   generation.value++
 }

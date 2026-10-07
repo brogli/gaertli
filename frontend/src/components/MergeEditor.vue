@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { EditorState, type Extension, Prec } from '@codemirror/state'
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -7,23 +7,25 @@ import Button from 'openvue/button'
 import Message from 'openvue/message'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
-import ToggleButton from 'openvue/togglebutton'
 import { useI18n } from '@/i18n'
 import { codeEditorExtensions } from '@/lib/codeEditor'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { conflictColours } from '@/lib/conflictColours'
-import { DEFAULT_MARKER_SIZE, type Take } from '@/lib/conflictMarkers'
+import { DEFAULT_MARKER_SIZE } from '@/lib/conflictMarkers'
+import { resultFromBase, takenLines, type Take } from '@/lib/conflictText'
 import { SIDE_PANES, type Pane } from '@/lib/conflictPanes'
 import {
-  canTakeRegion,
   hasStrayMarkers,
+  isUnresolved,
+  markDone,
   nextUnresolved,
+  pickSideRegion,
   regionCount,
-  regionLineRanges,
   regionsExtension,
   regionStart,
   regionStates,
+  resultRegions,
   selectedRegion,
   selectRegion,
   setSideRegionStates,
@@ -44,10 +46,10 @@ import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 
 // MergeEditor shows one text conflict in three editors side by side: the
-// current side, the editable Result (git's marker blocks), and the incoming
-// side, with the base on demand above them. git placed the conflict regions;
-// the editors only mark them. The selected region is the one last clicked in
-// any pane or holding the Result's cursor.
+// current side, the editable Result and the incoming side. The Result's
+// conflict regions start as the base text. git placed the regions and the
+// changes of each side; the editors only mark them. The selected region is the
+// one last clicked in any pane or holding the Result's cursor.
 const props = defineProps<{ wt: string; file: ConflictFile }>()
 
 const emit = defineEmits<{
@@ -60,24 +62,27 @@ const { t } = useI18n()
 const { error, run } = useCoreCall()
 const drafts = useMergeDrafts()
 
+// conflictId is the conflict the editor shows; a later one in the path
+// mounts another editor.
+const conflictId = props.file.conflictId ?? ''
 // The result may start as unsaved edits left by an earlier view of the file.
-const draft = drafts.get(props.wt, props.file.path)
+const draft = drafts.get(props.wt, props.file.path, conflictId)
+const initial = resultFromBase(props.file)
 // fingerprint is the working file's state the result is based on: the one
 // the file was opened with, then each save's.
 const fingerprint = ref(draft?.fingerprint ?? props.file.fingerprint ?? '')
 // diskFingerprint is the working file's latest known state.
 const diskFingerprint = computed(() => props.file.fingerprint ?? '')
-// The draft's text is written when the editor unmounts or a save leaves
-// edits; until then the draft only records that edits exist.
-const dirty = computed(() => !!drafts.get(props.wt, props.file.path))
+const dirty = computed(() => drafts.has(props.wt, props.file.path, conflictId))
 const fileChanged = ref<CoreError | null>(null)
+// shownError is the last core call's failure, else the draft's failed write.
+const shownError = computed(() => error.value ?? drafts.writeError(props.wt, props.file.path))
 
 const regions = computed(() => props.file.regions ?? [])
 const markerSize = computed(() => props.file.markerSize ?? DEFAULT_MARKER_SIZE)
 
 const hosts: Partial<Record<Pane, HTMLElement>> = {}
 const views: Partial<Record<Pane, EditorView>> = {}
-const showBase = ref(false)
 
 // The result editor's state when its document or selected region last changed.
 const resultState = shallowRef<EditorState>()
@@ -85,13 +90,13 @@ const resultState = shallowRef<EditorState>()
 const status = computed(() => {
   const state = resultState.value
   if (!state)
-    return { count: 0, unresolved: 0, selected: -1, selectedTakeable: false, hasMarkers: false }
+    return { count: 0, unresolved: 0, selected: -1, selectedUnresolved: false, hasMarkers: false }
   const selected = selectedRegion(state)
   return {
     count: regionCount(state),
     unresolved: unresolvedCount(state),
     selected,
-    selectedTakeable: selected >= 0 && canTakeRegion(state, selected),
+    selectedUnresolved: selected >= 0 && isUnresolved(state, selected),
     hasMarkers: hasStrayMarkers(state),
   }
 })
@@ -146,11 +151,13 @@ const changedMessage = computed(() => {
   return changed ? t('mergeEditor.changedOnDisk', { path: props.file.path }) : ''
 })
 
-const saveLabel = computed(() =>
-  t('shortcuts.withShortcut', {
-    action: t('mergeEditor.save'),
-    shortcut: t('shortcuts.save'),
-  }),
+const saveTitle = computed(
+  () =>
+    resolveBlocker.value ??
+    t('shortcuts.withShortcut', {
+      action: t('mergeEditor.saveAndResolve'),
+      shortcut: t('shortcuts.save'),
+    }),
 )
 
 const takes = computed<{ take: Take; label: string }[]>(() => [
@@ -185,17 +192,18 @@ const CONFLICT_KEYS = Prec.highest(
   keymap.of([
     { key: 'Alt-ArrowUp', run: () => (goToRegion(-1), true) },
     { key: 'Alt-ArrowDown', run: () => (goToRegion(1), true) },
-    { key: 'Mod-s', run: () => (void save(false), true) },
+    { key: 'Mod-s', run: () => (void save(), true) },
   ]),
 )
 
-// storeDraft keeps the result's text as the file's draft.
-function storeDraft(state: EditorState): void {
-  drafts.set(props.wt, props.file.path, {
-    text: state.doc.toString(),
+// storeDraft keeps the result as the file's draft, read from result as it
+// is when the draft is written.
+function storeDraft(result: EditorView): void {
+  drafts.set(props.wt, props.file.path, conflictId, () => ({
+    text: result.state.doc.toString(),
     fingerprint: fingerprint.value,
-    regions: regionLineRanges(state),
-  })
+    regions: resultRegions(result.state),
+  }))
 }
 
 // sentSideStates is what the side panes were last told of the result's regions.
@@ -218,7 +226,7 @@ function syncSidePanes(state: EditorState): void {
 let anchors: Anchor[] = []
 
 function updateAnchors(state: EditorState): void {
-  const resultRanges = regionLineRanges(state)
+  const resultRanges = resultRegions(state).map(({ range }) => range)
   const aligned = regions.value.map((region, i) => ({
     ...region,
     ...(resultRanges[i] && { result: resultRanges[i] }),
@@ -233,20 +241,26 @@ function updateAnchors(state: EditorState): void {
 // the result has unsaved edits.
 function onResultUpdate(update: ViewUpdate): void {
   const selectionMoved = selectedRegion(update.state) !== selectedRegion(update.startState)
-  if (!update.docChanged && !selectionMoved) return
+  const marked = unresolvedCount(update.state) !== unresolvedCount(update.startState)
+  if (!update.docChanged && !selectionMoved && !marked) return
   resultState.value = update.state
   syncSidePanes(update.state)
-  if (!update.docChanged) return
-  updateAnchors(update.state)
-  if (!dirty.value) storeDraft(update.state)
+  if (update.docChanged) updateAnchors(update.state)
+  if (update.docChanged || marked) storeDraft(update.view)
 }
 
 // selectClickedRegion selects the region a side pane's user selection
 // landed in.
 function selectClickedRegion(update: ViewUpdate): void {
+  const picked = update.transactions
+    .flatMap((tr) => tr.effects)
+    .find((effect) => effect.is(pickSideRegion))
   const byUser = update.transactions.some((tr) => tr.isUserEvent('select'))
-  if (!update.selectionSet || !byUser) return
-  const region = sideRegionAt(update.state, update.state.selection.main.head)
+  const clicked =
+    update.selectionSet && byUser
+      ? sideRegionAt(update.state, update.state.selection.main.head)
+      : -1
+  const region = picked?.value ?? clicked
   const result = views.result
   if (result && region >= 0 && region < regionCount(result.state))
     result.dispatch({ effects: selectRegion.of(region) })
@@ -265,7 +279,8 @@ function createViews(shared: Extension[]): void {
           EditorState.readOnly.of(true),
           sideRegionsExtension(
             regions.value.map((region) => region[pane]),
-            pane,
+            (pane === 'current' ? file.currentChanges : file.incomingChanges) ?? [],
+            t('mergeEditor.emptyConflict'),
           ),
           EditorView.updateListener.of(selectClickedRegion),
         ],
@@ -276,14 +291,15 @@ function createViews(shared: Extension[]): void {
   const resultView = new EditorView({
     parent: hostOf('result'),
     state: EditorState.create({
-      doc: draft?.text ?? file.result ?? '',
+      doc: draft?.text ?? initial.text,
       extensions: [
         ...paneExtensions,
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         regionsExtension(
-          draft?.regions ?? regions.value.map((region) => region.result),
+          draft?.regions ?? initial.regions.map((range) => ({ range, resolved: false })),
           markerSize.value,
+          t('mergeEditor.emptyConflict'),
         ),
         EditorView.updateListener.of(onResultUpdate),
       ],
@@ -322,11 +338,12 @@ function takeFileChanged(err: CoreError): boolean {
   return true
 }
 
-async function save(markResolved: boolean): Promise<void> {
+async function save(): Promise<void> {
+  if (resolveBlocker.value) return
   const text = views.result?.state.doc.toString() ?? ''
   fileChanged.value = null
   const saved = await run(
-    () => Facade.SaveConflict(props.wt, props.file.path, text, fingerprint.value, markResolved),
+    () => Facade.SaveConflict(props.wt, props.file.path, text, fingerprint.value, true),
     takeFileChanged,
   )
   if (saved === undefined) return
@@ -340,15 +357,21 @@ async function save(markResolved: boolean): Promise<void> {
 function keepEditsSince(saved: string): void {
   const result = views.result
   if (!result || result.state.doc.toString() === saved) {
-    drafts.discard(props.wt, props.file.path)
+    void drafts.discard(props.wt, props.file.path)
     return
   }
-  storeDraft(result.state)
+  storeDraft(result)
 }
 
 function take(kind: Take): void {
   const result = views.result
-  if (result) result.dispatch(takeRegion(result.state, selectedRegion(result.state), kind))
+  if (!result) return
+  const region = selectedRegion(result.state)
+  result.dispatch(takeRegion(result.state, region, takenLines(props.file, region, kind)))
+}
+
+function markSelectedDone(): void {
+  views.result?.dispatch(markDone(status.value.selected))
 }
 
 let untieScroll: (() => void) | undefined
@@ -356,8 +379,7 @@ let untieScroll: (() => void) | undefined
 // tieScroll keeps the shown panes aligned by conflict region.
 function tieScroll(): void {
   untieScroll?.()
-  const shown = Object.entries(views).filter(([pane]) => showBase.value || pane !== 'base')
-  untieScroll = tieScrollY(Object.fromEntries(shown), () => anchors)
+  untieScroll = tieScrollY(views, () => anchors)
 }
 
 let unmounted = false
@@ -369,12 +391,10 @@ onMounted(async () => {
   tieScroll()
 })
 
-watch(showBase, tieScroll)
-
 onBeforeUnmount(() => {
   unmounted = true
   untieScroll?.()
-  if (dirty.value && views.result) storeDraft(views.result.state)
+  drafts.flush(props.wt, props.file.path)
   Object.values(views).forEach((view) => view.destroy())
 })
 </script>
@@ -406,33 +426,25 @@ onBeforeUnmount(() => {
         :key="kind"
         v-bind="SECONDARY_BUTTON"
         :label="label"
-        :disabled="!status.selectedTakeable"
+        :disabled="status.selected < 0"
         :data-test="`take-${kind}`"
         @click="take(kind)"
       />
       <Button
         v-bind="SECONDARY_BUTTON"
-        class="ml-auto"
-        :label="t('mergeEditor.save')"
-        :title="saveLabel"
-        data-test="save"
-        @click="save(false)"
+        :label="t('mergeEditor.markDone')"
+        :disabled="!status.selectedUnresolved"
+        data-test="mark-done"
+        @click="markSelectedDone"
       />
       <Button
         v-bind="SECONDARY_BUTTON"
+        class="ml-auto"
         :label="t('mergeEditor.saveAndResolve')"
-        :title="resolveBlocker"
-        :disabled="status.hasMarkers"
+        :title="saveTitle"
+        :disabled="!!resolveBlocker"
         data-test="save-resolve"
-        @click="save(true)"
-      />
-      <ToggleButton
-        v-if="file.base.present"
-        v-model="showBase"
-        :on-label="t('mergeEditor.hideBase')"
-        :off-label="t('mergeEditor.showBase')"
-        size="small"
-        data-test="show-base"
+        @click="save"
       />
     </div>
     <Message v-if="changedMessage" severity="warn" class="save-conflict">
@@ -446,43 +458,24 @@ onBeforeUnmount(() => {
         />
       </div>
     </Message>
-    <ErrorBanner v-else-if="error" :error="error" />
+    <ErrorBanner v-else-if="shownError" :error="shownError" />
     <Splitter
-      layout="vertical"
+      layout="horizontal"
       class="min-h-0 flex-1"
-      :pt="{ gutter: { class: showBase ? undefined : 'hidden' } }"
+      state-key="nebegit.layout.mergePanes"
+      state-storage="local"
     >
       <SplitterPanel
-        :size="showBase ? 30 : 0"
-        :min-size="showBase ? 10 : 0"
-        :inert="!showBase"
-        class="flex min-h-0 flex-col overflow-hidden"
+        v-for="{ pane, title, size } in panels"
+        :key="pane"
+        :size="size"
+        :min-size="10"
+        class="flex min-h-0 flex-col"
       >
-        <div class="truncate px-2 py-0.5 font-semibold" data-test="pane-header-base">
-          {{ t('mergeEditor.base') }}
+        <div class="truncate px-2 py-0.5 font-semibold" :data-test="`pane-header-${pane}`">
+          {{ title }}
         </div>
-        <div :ref="hostRef('base')" class="min-h-0 flex-1" />
-      </SplitterPanel>
-      <SplitterPanel :size="showBase ? 70 : 100" :min-size="20" class="min-h-0">
-        <Splitter
-          layout="horizontal"
-          class="h-full"
-          state-key="nebegit.layout.mergePanes"
-          state-storage="local"
-        >
-          <SplitterPanel
-            v-for="{ pane, title, size } in panels"
-            :key="pane"
-            :size="size"
-            :min-size="10"
-            class="flex min-h-0 flex-col"
-          >
-            <div class="truncate px-2 py-0.5 font-semibold" :data-test="`pane-header-${pane}`">
-              {{ title }}
-            </div>
-            <div :ref="hostRef(pane)" class="min-h-0 flex-1" />
-          </SplitterPanel>
-        </Splitter>
+        <div :ref="hostRef(pane)" class="min-h-0 flex-1" />
       </SplitterPanel>
     </Splitter>
   </div>

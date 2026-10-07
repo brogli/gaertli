@@ -178,8 +178,6 @@
   },
   "diffWindow": {
     "noConflictsLeft": "No conflicts left.",
-    "closeUnsavedHeader": "Close the diff window?",
-    "closeUnsavedMessage": "Unsaved merge results are lost.",
     "loading": "Loading…",
     "switchToSideBySide": "Switch to side-by-side",
     "switchToUnified": "Switch to unified",
@@ -377,7 +375,6 @@
   },
   "mergeEditor": {
     "result": "Result",
-    "base": "Base",
     "paneHeader": "{name} · {role}",
     "currentSide": "Current side",
     "incomingSide": "Incoming side",
@@ -399,9 +396,8 @@
     "takeIncoming": "Take incoming",
     "takeCurrentFirst": "Both, current first",
     "takeIncomingFirst": "Both, incoming first",
-    "showBase": "Show base",
-    "hideBase": "Hide base",
-    "save": "Save",
+    "markDone": "Mark done",
+    "emptyConflict": "Unresolved conflict",
     "saveAndResolve": "Save and mark resolved",
     "resolveFirst": "Resolve every conflict first",
     "strayMarker": "A line still starts with a conflict marker. Remove it, or mark the file resolved from the conflict list.",

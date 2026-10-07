@@ -68,8 +68,8 @@ export function conflictFileFixture(overrides: Partial<ConflictFile> = {}): Conf
 // scrollConflictFixture is a ConflictFile of three one-line conflicts far
 // apart. The lines between them differ in number per pane, so the panes line
 // up only at the conflicts: the current side's conflicts start at lines 20,
-// 100 and 180, the incoming side's at 20, 130 and 230, the result's at 20,
-// 104 and 188.
+// 100 and 180, the incoming side's at 20, 130 and 230, the result's, which
+// starts from the base text, at 20, 100 and 180.
 export function scrollConflictFixture(): ConflictFile {
   const currentGaps = [19, 79, 79, 100]
   const incomingGaps = [19, 109, 99, 100]
@@ -80,6 +80,7 @@ export function scrollConflictFixture(): ConflictFile {
     ])
   const currentLines = withRegions(currentGaps, 'current', (n) => [`current region ${n}`])
   const incomingLines = withRegions(incomingGaps, 'incoming', (n) => [`incoming region ${n}`])
+  const baseLines = withRegions(currentGaps, 'base', (n) => [`base region ${n}`])
   const resultLines = withRegions(currentGaps, 'result', (n) => [
     `<<<<<<< HEAD ${n}`,
     `current region ${n}`,
@@ -103,10 +104,15 @@ export function scrollConflictFixture(): ConflictFile {
   return {
     ...fixture,
     path: 'scroll.txt',
-    base: { present: true, content: currentLines.join('\n') },
+    base: { present: true, content: baseLines.join('\n') },
     current: { ...fixture.current, content: currentLines.join('\n') },
     incoming: { ...fixture.incoming, content: incomingLines.join('\n') },
     result: resultLines.join('\n'),
     regions,
+    // The current side changed line 5 and added line 6, outside the conflicts.
+    currentChanges: [
+      { lines: { start: 5, lines: 1 }, added: false },
+      { lines: { start: 6, lines: 1 }, added: true },
+    ],
   }
 }

@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
-const { Facade, SettingsService, AppService } = vi.hoisted(() => ({
+const { Facade, SettingsService } = vi.hoisted(() => ({
   Facade: {
     CommitDetails: vi.fn(),
     CompareCommits: vi.fn(),
@@ -16,23 +16,23 @@ const { Facade, SettingsService, AppService } = vi.hoisted(() => ({
     StageLines: vi.fn(),
     OpenFile: vi.fn(),
     Conflict: vi.fn(),
+    MergeDraft: vi.fn(),
+    SetMergeDraft: vi.fn(),
     StageFile: vi.fn(),
   },
   SettingsService: { Get: vi.fn(), Set: vi.fn() },
-  AppService: { SetUnsavedWork: vi.fn() },
 }))
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade,
   SettingsService,
-  AppService,
 }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { Events, Window, emit } from '@/testing/runtime'
 
-import { confirmOptions, confirmRequire } from '@/testing/confirm'
+import { confirmRequire } from '@/testing/confirm'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import DiffWindowView from '../DiffWindowView.vue'
 import DiffView from '@/components/DiffView.vue'
@@ -71,7 +71,7 @@ const selectedRow = (wrapper: VueWrapper) => wrapper.get('.files li.selected .pa
 describe('DiffWindowView', () => {
   beforeEach(() => {
     localStorage.clear()
-    useMergeDrafts().clearAll()
+    useMergeDrafts().keepOnly('/repo', [])
     setActivePinia(createPinia())
     for (const fn of Object.values(Facade)) fn.mockReset()
     Facade.CommitDetails.mockResolvedValue({ sha: 'abc', files })
@@ -98,7 +98,6 @@ describe('DiffWindowView', () => {
     Facade.Conflict.mockResolvedValue({})
     Facade.StageFile.mockResolvedValue(undefined)
     SettingsService.Get.mockResolvedValue(defaultSettingsFixture())
-    AppService.SetUnsavedWork.mockReset().mockResolvedValue(undefined)
     Events.On.mockClear()
     Window.Close.mockReset()
   })
@@ -435,8 +434,8 @@ describe('DiffWindowView', () => {
       oldPath: '',
     })
     const drafts = useMergeDrafts()
-    drafts.set('/repo', 'one.txt', { text: 'x', fingerprint: 'fp', regions: [] })
-    drafts.set('/repo', 'two.txt', { text: 'y', fingerprint: 'fp', regions: [] })
+    drafts.set('/repo', 'one.txt', '', () => ({ text: 'x', fingerprint: 'fp', regions: [] }))
+    drafts.set('/repo', 'two.txt', '', () => ({ text: 'y', fingerprint: 'fp', regions: [] }))
 
     Facade.Status.mockResolvedValue(
       changedFilesFixture({ conflicted: [{ path: 'one.txt', status: 'UU' }] }),
@@ -444,8 +443,8 @@ describe('DiffWindowView', () => {
     emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
     await flushPromises()
 
-    expect(drafts.get('/repo', 'one.txt')).toBeDefined()
-    expect(drafts.get('/repo', 'two.txt')).toBeUndefined()
+    expect(drafts.get('/repo', 'one.txt', '')).toBeDefined()
+    expect(drafts.get('/repo', 'two.txt', '')).toBeUndefined()
   })
 
   it('FR-DIFF-07 Escape closes the window, unless it closes an open dialog first', async () => {
@@ -463,68 +462,20 @@ describe('DiffWindowView', () => {
     expect(Window.Close).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CONF-06 closing with nothing unsaved clears the shell flag first, whatever it held', async () => {
-    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
-    AppService.SetUnsavedWork.mockClear()
-
-    emit('diff:closeRequested')
-    await flushPromises()
-
-    expect(AppService.SetUnsavedWork).toHaveBeenCalledWith(false)
-    expect(Window.Close).toHaveBeenCalledTimes(1)
-    expect(AppService.SetUnsavedWork.mock.invocationCallOrder[0]).toBeLessThan(
-      Window.Close.mock.invocationCallOrder[0]!,
-    )
-  })
-
-  it('FR-CONF-06 Escape with an unsaved merge result asks before closing the window', async () => {
+  it('FR-CONF-06 Escape with an unsaved merge result closes the window without asking', async () => {
     confirmRequire.mockReset()
     await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
-    useMergeDrafts().set('/repo', 'a.txt', { text: 'x', fingerprint: 'fp', regions: [] })
+    useMergeDrafts().set('/repo', 'a.txt', '', () => ({
+      text: 'x',
+      fingerprint: 'fp',
+      regions: [],
+    }))
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-
-    expect(Window.Close).not.toHaveBeenCalled()
-    const { header, message, accept } = confirmOptions()
-    expect([header, message]).toEqual(['Close the diff window?', 'Unsaved merge results are lost.'])
-    accept()
     await flushPromises()
+
+    expect(confirmRequire).not.toHaveBeenCalled()
     expect(Window.Close).toHaveBeenCalledTimes(1)
-  })
-
-  it('FR-CONF-06 the shell is told whenever the window gains or loses unsaved merge results', async () => {
-    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
-    expect(AppService.SetUnsavedWork).toHaveBeenLastCalledWith(false)
-    AppService.SetUnsavedWork.mockClear()
-
-    useMergeDrafts().set('/repo', 'a.txt', { text: 'x', fingerprint: 'fp', regions: [] })
-    await flushPromises()
-    expect(AppService.SetUnsavedWork).toHaveBeenLastCalledWith(true)
-
-    useMergeDrafts().discard('/repo', 'a.txt')
-    await flushPromises()
-    expect(AppService.SetUnsavedWork).toHaveBeenLastCalledWith(false)
-  })
-
-  it('FR-CONF-06 the close button of the window asks first, and confirming clears the flag before closing', async () => {
-    confirmRequire.mockReset()
-    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
-    useMergeDrafts().set('/repo', 'a.txt', { text: 'x', fingerprint: 'fp', regions: [] })
-    await flushPromises()
-    AppService.SetUnsavedWork.mockClear()
-
-    emit('diff:closeRequested')
-    await flushPromises()
-
-    expect(Window.Close).not.toHaveBeenCalled()
-    expect(confirmOptions().header).toBe('Close the diff window?')
-    confirmOptions().accept()
-    await flushPromises()
-    expect(AppService.SetUnsavedWork).toHaveBeenCalledWith(false)
-    expect(Window.Close).toHaveBeenCalledTimes(1)
-    expect(AppService.SetUnsavedWork.mock.invocationCallOrder[0]).toBeLessThan(
-      Window.Close.mock.invocationCallOrder[0]!,
-    )
   })
 
   it('FR-ED-02 a file of the list opens in the editor', async () => {

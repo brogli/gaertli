@@ -225,22 +225,29 @@ arrow keys move between tabs and pick as they go.
   4.5:1 contrast; the change marker keeps 3:1 against the diff's background. An e2e check measures
   each theme.
 - **Merge editor** (FR-CONF-05, FR-CONF-06, ADR-7): three CodeMirror editors in a splitter, the
-  current side and the incoming side read-only around the editable result, and the base in a pane
-  above them while shown. Each pane names its side and that side's role in the operation.
-  - Conflict regions are tracked by their markers: each region git reported keeps its range in the
-    result through every edit (CodeMirror's position mapping), and it counts as resolved once that
-    range holds no marker line. A take or a hand edit of any shape is therefore handled the same
-    way, and "Save and mark resolved" waits until no marker line is left anywhere in the result.
+  current side and the incoming side read-only around the editable result. Each pane names its side
+  and that side's role in the operation.
+  - The result starts as the working file with each marker block replaced by the base version's
+    lines of that conflict (none without a base), so git's markers never appear in it. Each region
+    git reported keeps its range in the result through every edit (CodeMirror's position mapping)
+    and carries an explicit state, unresolved or resolved. A take sets resolved; "Mark done" sets it
+    on whatever the region holds then; a hand edit alone changes nothing. Takes and "Mark done" are
+    single undoable changes, and undo restores the state. "Save and mark resolved" waits until no
+    region is unresolved and no marker line is left anywhere in the result.
   - The toolbar's actions act on the selected region: the one last clicked in any pane, or holding
-    the result's cursor; previous and next move between unresolved regions. A take is one undoable
-    change.
+    the result's cursor; previous and next move between unresolved regions.
+  - The side panes tint the lines a side changed from the base by kind: blue for changed, green for
+    added. Conflict regions are red while unresolved and a neutral tint once resolved, in the result
+    too; the selected region's tint is stronger. The tints come from the theme's tone tokens, mixed
+    strong enough that each differs from the editor background by at least 0.08 ΔE in OKLab and
+    keeps 4.5:1 text contrast; an e2e check measures each theme.
   - The panes stay aligned by region: each region's first and last line in every pane are anchor
     points, lines between anchors map linearly, and scrolling any pane moves the others through the
     scroll event, as the diff view's sideways scrolling does.
-  - Unsaved results live per file for as long as the diff window does; closing the window over one
-    asks first, by Escape and by the window's own close button, which the shell holds back while the
-    page reports unsaved work. A result whose file changed on disk meanwhile stays, with a reload
-    that discards it.
+  - Unsaved results live per file in the worktree's session in the core, with their region states,
+    in memory only: they outlive the diff window, die with the app, and closing the window never
+    asks. The page writes them through as the user edits and reads them back when it shows the file.
+    A result whose file changed on disk meanwhile stays, with a reload that discards it.
 
 ## Communication
 

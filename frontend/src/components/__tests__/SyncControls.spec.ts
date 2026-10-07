@@ -83,6 +83,16 @@ async function rejectPush(): Promise<void> {
   await flushPromises()
 }
 
+// conflictedPull is pull job id stopped on conflicts.
+function conflictedPull(id: string) {
+  return jobFixture({
+    id,
+    kind: JobKind.PullJob,
+    state: JobState.JobFailed,
+    error: { code: Code.Conflicts, message: 'conflicts' },
+  })
+}
+
 // openPullMenu opens the Pull SplitButton's mode menu.
 async function openPullMenu(body: DOMWrapper<Element>): Promise<void> {
   await body.get('.p-splitbutton-dropdown').trigger('click')
@@ -140,21 +150,47 @@ describe('SyncControls', () => {
     await flushPromises()
     await body.get('.p-splitbutton-button').trigger('click')
     await flushPromises()
-    const conflicted = (id: string) =>
-      jobFixture({
-        id,
-        kind: JobKind.PullJob,
-        state: JobState.JobFailed,
-        error: { code: Code.Conflicts, message: 'conflicts' },
-      })
 
-    useJobsStore().upsert(conflicted('other-window'))
+    useJobsStore().upsert(conflictedPull('other-window'))
     await flushPromises()
     expect(AppService.OpenDiff).not.toHaveBeenCalled()
 
-    useJobsStore().upsert(conflicted('job-1'))
+    useJobsStore().upsert(conflictedPull('job-1'))
     await flushPromises()
     expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-CONF-09 a pull that stops on conflicts before its start call returns opens the diff window', async () => {
+    setRefs({ upstream: 'origin/main' })
+    let answerPull: (id: string) => void = () => undefined
+    Facade.Pull.mockReturnValueOnce(new Promise<string>((resolve) => (answerPull = resolve)))
+    const { body } = await mountControls()
+    await flushPromises()
+    await body.get('.p-splitbutton-button').trigger('click')
+
+    useJobsStore().upsert(conflictedPull('job-1'))
+    await flushPromises()
+    answerPull('job-1')
+    await flushPromises()
+
+    expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-CONF-09 a pull that ended is forgotten: a later conflicted end with its id opens nothing', async () => {
+    setRefs({ upstream: 'origin/main' })
+    const { body } = await mountControls()
+    await flushPromises()
+    await body.get('.p-splitbutton-button').trigger('click')
+    await flushPromises()
+
+    useJobsStore().upsert(
+      jobFixture({ id: 'job-1', kind: JobKind.PullJob, state: JobState.JobDone }),
+    )
+    await flushPromises()
+    useJobsStore().upsert(conflictedPull('job-1'))
+    await flushPromises()
+
+    expect(AppService.OpenDiff).not.toHaveBeenCalled()
   })
 
   it('FR-SYNC-11 without a remote, Fetch, Pull and Push are disabled with the no-remote tooltip; no select', async () => {

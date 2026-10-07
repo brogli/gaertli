@@ -68,11 +68,12 @@ func TestFR_CONF_05_ParseMarkerBlocksIgnoresALoneSeparator(t *testing.T) {
 
 // selected returns the lines r selects in content.
 func selected(content string, r core.LineRange) string {
-	lines := strings.SplitAfter(content, "\n")
-	if r.Start < 1 || r.Start-1+r.Lines > len(lines) {
+	lines := splitLines(content)
+	start, end := edges(r)
+	if start < 0 || end > len(lines) {
 		return "<out of range>"
 	}
-	return strings.Join(lines[r.Start-1:r.Start-1+r.Lines], "")
+	return strings.Join(lines[start:end], "")
 }
 
 func assertRegion(t *testing.T, got core.ConflictFile, i int, base, current, incoming string) {

@@ -50,6 +50,10 @@ type Worktree struct {
 	messageMu    sync.Mutex
 	messageDraft string
 
+	// mergeMu guards mergeDrafts, the unsaved merge results by path.
+	mergeMu     sync.Mutex
+	mergeDrafts map[string]core.MergeDraft
+
 	// This worktree's filtered log view, apart from the repo's shared log.
 	filterMu     sync.Mutex
 	filterActive bool
@@ -79,6 +83,31 @@ func (w *Worktree) MessageDraft() string {
 	w.messageMu.Lock()
 	defer w.messageMu.Unlock()
 	return w.messageDraft
+}
+
+// SetMergeDraft keeps draft as path's unsaved merge result; nil clears it.
+func (w *Worktree) SetMergeDraft(path string, draft *core.MergeDraft) {
+	w.mergeMu.Lock()
+	defer w.mergeMu.Unlock()
+	if draft == nil {
+		delete(w.mergeDrafts, path)
+		return
+	}
+	if w.mergeDrafts == nil {
+		w.mergeDrafts = map[string]core.MergeDraft{}
+	}
+	w.mergeDrafts[path] = *draft
+}
+
+// MergeDraft returns path's unsaved merge result, nil if none.
+func (w *Worktree) MergeDraft(path string) *core.MergeDraft {
+	w.mergeMu.Lock()
+	defer w.mergeMu.Unlock()
+	draft, ok := w.mergeDrafts[path]
+	if !ok {
+		return nil
+	}
+	return &draft
 }
 
 // Repo is a per-repo session, shared by every Worktree with the same Key.

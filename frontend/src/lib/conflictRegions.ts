@@ -1,10 +1,10 @@
 // Conflict regions in the merge editor's CodeMirror panes. The result pane
-// tracks each region's range through edits and reads a region's status from
-// its text: unresolved while it still holds a marker line. The read-only side
-// panes only mark their regions' lines.
+// tracks each region's range through edits; a region is resolved once a take
+// or "mark done" says so, never by an edit alone. The read-only side panes
+// mark their regions' lines and the lines the side changed.
 
 import {
-  type ChangeDesc,
+  type ChangeSet,
   EditorState,
   type Extension,
   Facet,
@@ -15,17 +15,9 @@ import {
   type Text,
   type TransactionSpec,
 } from '@codemirror/state'
-import { Decoration, type DecorationSet, EditorView } from '@codemirror/view'
-import type { SidePane } from './conflictPanes'
-import {
-  DEFAULT_MARKER_SIZE,
-  findBlocks,
-  hasMarkerLines,
-  isMarkerLine,
-  takeLines,
-  type MarkerBlock,
-  type Take,
-} from './conflictMarkers'
+import { invertedEffects, isolateHistory } from '@codemirror/commands'
+import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'
+import { DEFAULT_MARKER_SIZE, isMarkerLine } from './conflictMarkers'
 
 export interface Region {
   from: number
@@ -37,18 +29,22 @@ export interface LineRange {
   lines: number
 }
 
-// regionsFromLineRanges converts 1-based line ranges to offsets from the
-// first line's start to the last line's end. A range without lines becomes
-// the point before the line it precedes.
-export function regionsFromLineRanges(doc: Text, ranges: LineRange[]): Region[] {
+// SideChange is a run of a side's lines that differ from the base.
+export interface SideChange {
+  lines: LineRange
+  added: boolean
+}
+
+// regionFromLineRange converts a 1-based line range to offsets from the first
+// line's start to the last line's end. A range without lines becomes the
+// point before the line it precedes.
+export function regionFromLineRange(doc: Text, { start, lines }: LineRange): Region {
   const lineAt = (n: number) => doc.line(Math.min(Math.max(n, 1), doc.lines))
-  return ranges.map(({ start, lines }) => {
-    if (lines <= 0) {
-      const point = start >= doc.lines ? doc.length : lineAt(start + 1).from
-      return { from: point, to: point }
-    }
-    return { from: lineAt(start).from, to: lineAt(start + lines - 1).to }
-  })
+  if (lines <= 0) {
+    const point = start >= doc.lines ? doc.length : lineAt(start + 1).from
+    return { from: point, to: point }
+  }
+  return { from: lineAt(start).from, to: lineAt(start + lines - 1).to }
 }
 
 // lastEffectValue is the value of the last effect of the given type, if any.
@@ -70,16 +66,28 @@ function linesOf(doc: Text, region: Region): number[] {
   return Array.from({ length: last - first + 1 }, (_, i) => first + i)
 }
 
-function lineDecoration(doc: Text, lineNumber: number, classes: string[]): Range<Decoration> {
-  return Decoration.line({ class: classes.join(' ') }).range(doc.line(lineNumber).from)
+function lineDecoration(doc: Text, lineNumber: number, className: string): Range<Decoration> {
+  return Decoration.line({ class: className }).range(doc.line(lineNumber).from)
+}
+
+function regionClass(resolved: boolean | undefined, selected: boolean): string {
+  const state = resolved ? 'cm-conflict-resolved' : 'cm-conflict-unresolved'
+  return selected ? `${state} cm-conflict-selected` : state
 }
 
 // ---- result pane ----
 
+export interface ResultRegion {
+  range: LineRange
+  resolved: boolean
+}
+
+interface TrackedRegion extends Region {
+  resolved: boolean
+}
+
 interface ResultValue {
-  regions: Region[]
-  // Whether each region still holds a marker line.
-  unresolved: boolean[]
+  regions: TrackedRegion[]
   selected: number
   decorations: DecorationSet
 }
@@ -90,118 +98,150 @@ const markerSizeFacet = Facet.define<number, number>({
 
 export const selectRegion = StateEffect.define<number>()
 
-// mapRegions maps the regions through changes. A region that was empty
-// shrinks back to empty when text inserted at its point gets mapped into it.
-function mapRegions(regions: Region[], changes: ChangeDesc, doc: Text): Region[] {
-  return regions.map((r) => {
-    let from = changes.mapPos(r.from, -1)
-    let to = changes.mapPos(r.to, 1)
-    if (r.from === r.to && from < to) {
-      if (doc.sliceString(to - 1, to) === '\n') to -= 1
-      if (from < to && doc.sliceString(from, from + 1) === '\n') from += 1
-    }
-    return { from, to }
+const setResolved = StateEffect.define<{ region: number; resolved: boolean }>()
+
+// mapRegions maps the regions through changes. Regions stay on whole lines:
+// an empty one is a point before a line and grows only by inserted whole
+// lines.
+function mapRegions<R extends Region>(regions: R[], changes: ChangeSet, oldDoc: Text): R[] {
+  return regions.map((r) => ({
+    ...r,
+    ...(r.from === r.to
+      ? mapPoint(r.from, changes, oldDoc)
+      : { from: changes.mapPos(r.from, -1), to: changes.mapPos(r.to, 1) }),
+  }))
+}
+
+// mapPoint maps an empty region at pos. Text inserted at the point whole lines
+// at a time (ending in a line break at a line start, or starting with one at
+// the end of the text) becomes the region; any other stays outside it.
+function mapPoint(pos: number, changes: ChangeSet, oldDoc: Text): Region {
+  const atLineStart = pos === oldDoc.lineAt(pos).from
+  const atEnd = pos === oldDoc.length && !atLineStart
+  let grown: Region | undefined
+  changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+    if (fromA !== pos || toA !== pos) return
+    const text = inserted.toString()
+    if (atLineStart && text.endsWith('\n')) grown = { from: fromB, to: toB - 1 }
+    else if (atEnd && text.startsWith('\n')) grown = { from: fromB + 1, to: toB }
   })
+  const point = changes.mapPos(pos, atEnd ? 1 : -1)
+  return grown ?? { from: point, to: point }
 }
 
-// regionText is the text of the lines the region touches; empty for an empty
-// region.
-function regionText(state: EditorState, region: Region): string {
-  if (region.from >= region.to) return ''
-  return state.sliceDoc(state.doc.lineAt(region.from).from, state.doc.lineAt(region.to).to)
-}
+const placeholderFacet = Facet.define<string, string>({
+  combine: (labels) => labels[0] ?? 'Unresolved conflict',
+})
 
-function blockLineKinds(block: MarkerBlock): string[] {
-  return [
-    'cm-conflict-marker',
-    ...block.current.map(() => 'cm-conflict-current'),
-    ...(block.base ? ['cm-conflict-marker', ...block.base.map(() => 'cm-conflict-base')] : []),
-    'cm-conflict-marker',
-    ...block.incoming.map(() => 'cm-conflict-incoming'),
-    'cm-conflict-marker',
-  ]
-}
-
-// regionLineKinds returns the line class of each of the region's lines for
-// an unresolved region.
-function regionLineKinds(
-  state: EditorState,
-  region: Region,
-  lines: number[],
-): (string | undefined)[] {
-  const size = state.facet(markerSizeFacet)
-  const kinds: (string | undefined)[] = lines.map((n) =>
-    isMarkerLine(state.doc.line(n).text, size) ? 'cm-conflict-marker' : undefined,
-  )
-  for (const block of findBlocks(regionText(state, region), size)) {
-    blockLineKinds(block).forEach((kind, i) => {
-      kinds[block.startLine - 1 + i] = kind
-    })
+// Placeholder is the bar that shows an unresolved region with no lines;
+// pressing it selects the region.
+class Placeholder extends WidgetType {
+  constructor(
+    readonly label: string,
+    readonly selected: boolean,
+    readonly select: (view: EditorView) => void,
+  ) {
+    super()
   }
-  return kinds
+
+  eq(other: Placeholder): boolean {
+    return other.label === this.label && other.selected === this.selected
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const bar = document.createElement('div')
+    bar.className = 'cm-conflict-placeholder cm-conflict-unresolved'
+    if (this.selected) bar.classList.add('cm-conflict-selected')
+    bar.textContent = this.label
+    bar.addEventListener('mousedown', () => this.select(view))
+    return bar
+  }
+}
+
+// placeholders are the bars of the unresolved regions with no lines; pressing
+// region i's dispatches pick.of(i).
+function placeholders(
+  state: EditorState,
+  regions: Region[],
+  isResolved: (i: number) => boolean | undefined,
+  selected: number,
+  pick: StateEffectType<number>,
+): Range<Decoration>[] {
+  const label = state.facet(placeholderFacet)
+  return regions.flatMap((region, i) => {
+    if (region.from !== region.to || isResolved(i)) return []
+    const select = (view: EditorView) => view.dispatch({ effects: pick.of(i) })
+    const widget = new Placeholder(label, i === selected, select)
+    return [Decoration.widget({ widget, block: true, side: -1 }).range(region.from)]
+  })
 }
 
 function resultDecorations(
   state: EditorState,
-  regions: Region[],
-  unresolved: boolean[],
+  regions: TrackedRegion[],
   selected: number,
 ): DecorationSet {
-  const ranges = regions.flatMap((region, i) => {
-    const lines = linesOf(state.doc, region)
-    const kinds = unresolved[i]
-      ? regionLineKinds(state, region, lines)
-      : lines.map(() => 'cm-conflict-resolved')
-    return lines.flatMap((n, j) => {
-      const classes = [kinds[j], i === selected ? 'cm-conflict-selected' : undefined].filter(
-        (c) => c !== undefined,
-      )
-      return classes.length > 0 ? [lineDecoration(state.doc, n, classes)] : []
-    })
-  })
-  return Decoration.set(ranges, true)
-}
-
-function unresolvedRegions(state: EditorState, regions: Region[]): boolean[] {
-  const size = state.facet(markerSizeFacet)
-  return regions.map((region) => hasMarkerLines(regionText(state, region), size))
+  const lines = regions.flatMap((region, i) =>
+    linesOf(state.doc, region).map((n) =>
+      lineDecoration(state.doc, n, regionClass(region.resolved, i === selected)),
+    ),
+  )
+  const empty = placeholders(state, regions, (i) => regions[i]?.resolved, selected, selectRegion)
+  return Decoration.set([...lines, ...empty], true)
 }
 
 const resultField = StateField.define<ResultValue>({
-  create: () => ({ regions: [], unresolved: [], selected: -1, decorations: Decoration.none }),
+  create: () => ({ regions: [], selected: -1, decorations: Decoration.none }),
   update(value, tr) {
-    const regions = tr.docChanged ? mapRegions(value.regions, tr.changes, tr.newDoc) : value.regions
+    const moved = tr.docChanged
+      ? mapRegions(value.regions, tr.changes, tr.startState.doc)
+      : value.regions
     const requested = lastEffectValue(tr.effects, selectRegion)
-    const chosen = requested !== undefined && requested < regions.length ? requested : undefined
+    const chosen = requested !== undefined && requested < moved.length ? requested : undefined
     // A cursor inside a region selects it; outside, the selection stays.
-    const entered = tr.selection ? regionIndexAt(regions, tr.newSelection.main.head) : -1
+    const entered = tr.selection ? regionIndexAt(moved, tr.newSelection.main.head) : -1
     const selected = chosen ?? (entered >= 0 ? entered : value.selected)
-    if (!tr.docChanged && selected === value.selected) return value
-    const unresolved = tr.docChanged ? unresolvedRegions(tr.state, regions) : value.unresolved
-    return {
-      regions,
-      unresolved,
-      selected,
-      decorations: resultDecorations(tr.state, regions, unresolved, selected),
+    const marks = tr.effects.filter((effect) => effect.is(setResolved))
+    if (!tr.docChanged && selected === value.selected && marks.length === 0) return value
+    const regions = [...moved]
+    for (const { value: mark } of marks) {
+      const region = regions[mark.region]
+      if (region) regions[mark.region] = { ...region, resolved: mark.resolved }
     }
+    return { regions, selected, decorations: resultDecorations(tr.state, regions, selected) }
   },
   provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
 })
 
-// regionsExtension tracks the result's regions, given as line ranges, and
-// styles their lines. markerSize is the size of git's markers in the text.
-export function regionsExtension(initial: LineRange[], markerSize: number): Extension {
+// Undoing a take or a mark restores the region's previous state.
+const undoResolved = invertedEffects.of((tr) =>
+  tr.effects
+    .filter((effect) => effect.is(setResolved))
+    .map((effect) =>
+      setResolved.of({
+        region: effect.value.region,
+        resolved: tr.startState.field(resultField).regions[effect.value.region]?.resolved ?? false,
+      }),
+    ),
+)
+
+// regionsExtension tracks the result's regions and styles their lines.
+// markerSize is the size of git's markers, for hasStrayMarkers.
+export function regionsExtension(
+  initial: ResultRegion[],
+  markerSize: number,
+  placeholderLabel = 'Unresolved conflict',
+): Extension {
   return [
     markerSizeFacet.of(markerSize),
+    placeholderFacet.of(placeholderLabel),
+    undoResolved,
     resultField.init((state) => {
-      const regions = regionsFromLineRanges(state.doc, initial)
-      const unresolved = unresolvedRegions(state, regions)
-      return {
-        regions,
-        unresolved,
-        selected: -1,
-        decorations: resultDecorations(state, regions, unresolved, -1),
-      }
+      const regions = initial.map(({ range, resolved }) => ({
+        ...regionFromLineRange(state.doc, range),
+        resolved,
+      }))
+      return { regions, selected: -1, decorations: resultDecorations(state, regions, -1) }
     }),
   ]
 }
@@ -214,20 +254,18 @@ export function selectedRegion(state: EditorState): number {
   return state.field(resultField).selected
 }
 
-function regionOf(state: EditorState, i: number): Region {
+function regionOf(state: EditorState, i: number): TrackedRegion {
   const region = state.field(resultField).regions[i]
   if (!region) throw new RangeError(`no conflict region ${i}`)
   return region
 }
 
 export function isUnresolved(state: EditorState, i: number): boolean {
-  const unresolved = state.field(resultField).unresolved[i]
-  if (unresolved === undefined) throw new RangeError(`no conflict region ${i}`)
-  return unresolved
+  return !regionOf(state, i).resolved
 }
 
 export function unresolvedCount(state: EditorState): number {
-  return state.field(resultField).unresolved.filter(Boolean).length
+  return state.field(resultField).regions.filter((region) => !region.resolved).length
 }
 
 // hasStrayMarkers reports whether any line of the document is a marker line.
@@ -244,56 +282,58 @@ export function regionStart(state: EditorState, i: number): number {
   return regionOf(state, i).from
 }
 
-// regionLineRanges are the regions' 1-based line ranges in the doc, the
-// inverse of regionsFromLineRanges.
-export function regionLineRanges(state: EditorState): LineRange[] {
+// resultRegions are the regions as line ranges, the inverse of
+// regionFromLineRange, with their resolved flags.
+export function resultRegions(state: EditorState): ResultRegion[] {
   const { doc } = state
-  return state.field(resultField).regions.map(({ from, to }) => {
+  return state.field(resultField).regions.map(({ from, to, resolved }) => {
     const first = doc.lineAt(from)
-    if (from >= to)
-      return { start: from === first.from ? first.number - 1 : first.number, lines: 0 }
-    return { start: first.number, lines: doc.lineAt(to).number - first.number + 1 }
+    const range =
+      from >= to
+        ? { start: from === first.from ? first.number - 1 : first.number, lines: 0 }
+        : { start: first.number, lines: doc.lineAt(to).number - first.number + 1 }
+    return { range, resolved }
   })
 }
 
 // nextUnresolved returns the nearest unresolved region after (dir 1) or
 // before (dir -1) region from, or -1.
 export function nextUnresolved(state: EditorState, from: number, dir: 1 | -1): number {
-  const { unresolved } = state.field(resultField)
-  for (let i = from + dir; i >= 0 && i < unresolved.length; i += dir) {
-    if (unresolved[i]) return i
+  const { regions } = state.field(resultField)
+  for (let i = from + dir; i >= 0 && i < regions.length; i += dir) {
+    if (!regions[i]?.resolved) return i
   }
   return -1
 }
 
-// canTakeRegion reports whether region i holds a complete marker block.
-export function canTakeRegion(state: EditorState, i: number): boolean {
-  if (!isUnresolved(state, i)) return false
-  const text = regionText(state, regionOf(state, i))
-  return findBlocks(text, state.facet(markerSizeFacet)).length > 0
+// markDone marks region i resolved as it stands and selects it, as one undo
+// step.
+export function markDone(i: number): TransactionSpec {
+  return {
+    effects: [selectRegion.of(i), setResolved.of({ region: i, resolved: true })],
+    annotations: isolateHistory.of('full'),
+  }
 }
 
-// takeRegion replaces the marker block in region i by the taken lines and
-// selects the region. It does nothing when the region holds no complete block.
-export function takeRegion(state: EditorState, i: number, take: Take): TransactionSpec {
-  const region = regionOf(state, i)
-  const text = regionText(state, region)
-  const block = findBlocks(text, state.facet(markerSizeFacet))[0]
-  if (!block) return {}
+// takeRegion replaces region i by lines, marks it resolved and selects it, as
+// one undo step.
+export function takeRegion(state: EditorState, i: number, lines: string[]): TransactionSpec {
+  return { changes: replacement(state, regionOf(state, i), lines), ...markDone(i) }
+}
 
-  const firstLine = state.doc.lineAt(region.from).number
-  let from = state.doc.line(firstLine + block.startLine - 1).from
-  let to = state.doc.line(firstLine + block.endLine - 1).to
-  const taken = takeLines(block, take)
-  if (taken.length === 0) {
-    // Remove the emptied lines with one line break.
-    if (to < state.doc.length) to += 1
-    else if (from > 0) from -= 1
+// replacement is the change that puts lines in place of region's lines. An
+// emptied region takes a line break along.
+function replacement(state: EditorState, region: Region, lines: string[]) {
+  const { doc } = state
+  const text = lines.join('\n')
+  if (region.from < region.to) {
+    if (lines.length > 0) return { from: region.from, to: region.to, insert: text }
+    if (region.to < doc.length) return { from: region.from, to: region.to + 1 }
+    return { from: Math.max(region.from - 1, 0), to: region.to }
   }
-  return {
-    changes: { from, to, insert: taken.join('\n') },
-    effects: selectRegion.of(i),
-  }
+  if (lines.length === 0) return []
+  const atLineStart = region.from === doc.lineAt(region.from).from
+  return { from: region.from, insert: atLineStart ? `${text}\n` : `\n${text}` }
 }
 
 // ---- side panes ----
@@ -305,7 +345,7 @@ export interface SideRegionStates {
 
 interface SideConfig {
   ranges: LineRange[]
-  tone: SidePane
+  changes: SideChange[]
 }
 
 interface SideValue extends SideRegionStates {
@@ -314,37 +354,54 @@ interface SideValue extends SideRegionStates {
 }
 
 const sideConfigFacet = Facet.define<SideConfig, SideConfig>({
-  combine: (configs) => configs[0] ?? { ranges: [], tone: 'current' },
+  combine: (configs) => configs[0] ?? { ranges: [], changes: [] },
 })
+
+// pickSideRegion says the user pressed region i's placeholder in a side pane.
+export const pickSideRegion = StateEffect.define<number>()
 
 export const setSideRegionStates = StateEffect.define<SideRegionStates>()
 
 // regionStates are the result's regions' states, as the side panes show them.
 export function regionStates(state: EditorState): SideRegionStates {
-  const { unresolved, selected } = state.field(resultField)
-  return { resolved: unresolved.map((open) => !open), selected }
+  const { regions, selected } = state.field(resultField)
+  return { resolved: regions.map((region) => region.resolved), selected }
 }
 
+// changeLineClasses is the class of each line the side changed, by line number.
+function changeLineClasses(doc: Text, changes: SideChange[]): Map<number, string> {
+  const classes = new Map<number, string>()
+  for (const { lines, added } of changes) {
+    for (let n = lines.start; n < lines.start + lines.lines && n <= doc.lines; n++) {
+      classes.set(n, added ? 'cm-change-added' : 'cm-change-changed')
+    }
+  }
+  return classes
+}
+
+// A region's lines win over the change they lie in.
 function sideDecorations(state: EditorState, value: Omit<SideValue, 'decorations'>): DecorationSet {
-  const { tone } = state.facet(sideConfigFacet)
-  const ranges = value.regions.flatMap((region, i) =>
-    linesOf(state.doc, region).map((n) =>
-      lineDecoration(
-        state.doc,
-        n,
-        [
-          value.resolved[i] ? 'cm-conflict-resolved' : `cm-conflict-${tone}`,
-          i === value.selected ? 'cm-conflict-selected' : undefined,
-        ].filter((c) => c !== undefined),
-      ),
-    ),
+  const classes = changeLineClasses(state.doc, state.facet(sideConfigFacet).changes)
+  value.regions.forEach((region, i) => {
+    for (const n of linesOf(state.doc, region)) {
+      classes.set(n, regionClass(value.resolved[i], i === value.selected))
+    }
+  })
+  const lines = [...classes].map(([n, name]) => lineDecoration(state.doc, n, name))
+  const empty = placeholders(
+    state,
+    value.regions,
+    (i) => value.resolved[i],
+    value.selected,
+    pickSideRegion,
   )
-  return Decoration.set(ranges, true)
+  return Decoration.set([...lines, ...empty], true)
 }
 
 const sideField = StateField.define<SideValue>({
   create(state) {
-    const regions = regionsFromLineRanges(state.doc, state.facet(sideConfigFacet).ranges)
+    const { ranges } = state.facet(sideConfigFacet)
+    const regions = ranges.map((range) => regionFromLineRange(state.doc, range))
     const value = { regions, resolved: regions.map(() => false), selected: -1 }
     return { ...value, decorations: sideDecorations(state, value) }
   },
@@ -357,10 +414,15 @@ const sideField = StateField.define<SideValue>({
   provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
 })
 
-// sideRegionsExtension marks the lines of a read-only pane's regions; the
-// regions' states are set with setSideRegionStates.
-export function sideRegionsExtension(ranges: LineRange[], tone: SidePane): Extension {
-  return [sideConfigFacet.of({ ranges, tone }), sideField]
+// sideRegionsExtension marks the lines of a read-only pane's regions and the
+// lines its side changed; the regions' states are set with
+// setSideRegionStates.
+export function sideRegionsExtension(
+  ranges: LineRange[],
+  changes: SideChange[],
+  placeholderLabel = 'Unresolved conflict',
+): Extension {
+  return [sideConfigFacet.of({ ranges, changes }), placeholderFacet.of(placeholderLabel), sideField]
 }
 
 // sideRegionStart is the offset where side region i begins, if there is one.
