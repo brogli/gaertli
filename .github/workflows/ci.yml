@@ -37,10 +37,15 @@ jobs:
 
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
 
-      # Go is not part of the Nix shell. Its caches are keyed by job and
-      # commit, with the previous commit's as the fallback, so each run
-      # compiles only what changed (setup-go's own cache saves once per
-      # go.sum).
+      # The dev shell's store paths, downloaded once per flake lock rather
+      # than by every job on every run.
+      - uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 2G
+
+      # Go is not part of the Nix shell.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -53,15 +58,22 @@ jobs:
           echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
           echo "pnpm=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ${{ steps.paths.outputs.gomod }}
-            ${{ steps.paths.outputs.gobuild }}
-          key: go-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key:
+            gobuild-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-
-            go-${{ matrix.task }}-${{ runner.os }}-
+            gobuild-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            gobuild-${{ matrix.task }}-${{ runner.os }}-
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -126,15 +138,21 @@ jobs:
           echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
           echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
 
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ${{ steps.paths.outputs.gomod }}
-            ${{ steps.paths.outputs.gobuild }}
-          key: go-windows-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key: gobuild-windows-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-windows-${{ hashFiles('go.sum') }}-
-            go-windows-
+            gobuild-windows-${{ hashFiles('go.sum') }}-
+            gobuild-windows-
 
       - name: Setup (online)
         run: go mod download
@@ -183,15 +201,21 @@ jobs:
           echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
           echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
 
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ${{ steps.paths.outputs.gomod }}
-            ${{ steps.paths.outputs.gobuild }}
-          key: go-macos-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key: gobuild-macos-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-macos-${{ hashFiles('go.sum') }}-
-            go-macos-
+            gobuild-macos-${{ hashFiles('go.sum') }}-
+            gobuild-macos-
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -240,15 +264,21 @@ jobs:
           echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
           echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
 
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ${{ steps.paths.outputs.gomod }}
-            ${{ steps.paths.outputs.gobuild }}
-          key: go-git-2-42-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key: gobuild-git-2-42-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-git-2-42-${{ hashFiles('go.sum') }}-
-            go-git-2-42-
+            gobuild-git-2-42-${{ hashFiles('go.sum') }}-
+            gobuild-git-2-42-
 
       - name: Cache git 2.42 build
         id: git-2-42-cache
