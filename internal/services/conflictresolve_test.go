@@ -76,6 +76,25 @@ func TestFR_CONF_08_ReopenConflictRestoresASymlinkAsGitLeftIt(t *testing.T) {
 	}
 }
 
+func TestFR_CONF_08_ReopenConflictRefusesAFileStillConflicted(t *testing.T) {
+	t.Parallel()
+	c, wt, dir := stoppedOn(t, "merge", "f", version("base\n"), nil, version("incoming\n"))
+	gittest.Run(t, dir, "rm", "-q", "--", "f")
+	if err := c.ReopenConflict(t.Context(), wt, "f"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "f"), []byte("my edit\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := c.ReopenConflict(t.Context(), wt, "f")
+
+	requireGitFailedKey(t, err, "notReopenable")
+	if got := readFile(t, dir, "f"); got != "my edit\n" {
+		t.Errorf("working file = %q, want the edit kept", got)
+	}
+}
+
 func TestFR_CONF_08_ReopenConflictRestoresAFileTheCurrentSideDeletedAsGitLeftIt(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("base\n"), nil, version("incoming\n"))
