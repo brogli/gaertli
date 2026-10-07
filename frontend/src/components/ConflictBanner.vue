@@ -7,12 +7,14 @@ import { useRepoStore } from '@/stores/repo'
 import { useChangesStore } from '@/stores/changes'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
+import { openConflicts } from '@/lib/openConflicts'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Operation } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
 // ConflictBanner shows while a merge, rebase, cherry-pick, or revert is
-// stopped on conflicts: Continue (once no conflicted file remains), Skip
+// stopped on conflicts: Resolve conflicts (opens the diff window while a
+// conflicted file remains), Continue (once no conflicted file remains), Skip
 // (cherry-pick and revert only: merge has no --skip, rebase's is not
 // supported), and Abort. The repo watcher keeps the stores it reads
 // current, so it refreshes nothing itself.
@@ -33,6 +35,10 @@ function onContinue(): void {
   void run(() => Facade.ContinueOperation(props.wt))
 }
 
+function onResolve(): void {
+  void run(() => openConflicts(props.wt))
+}
+
 function onSkip(): void {
   void run(() => Facade.SkipOperation(props.wt))
 }
@@ -51,6 +57,12 @@ function onAbort(): void {
     <Message severity="warn" data-test="conflict-banner">
       <div class="flex flex-wrap items-center gap-2">
         <span>{{ t('notices.conflictStopped', { operation: repo.summary.operation }) }}</span>
+        <Button
+          v-if="unresolvedCount > 0"
+          :label="t('notices.resolveConflicts')"
+          size="small"
+          @click="onResolve"
+        />
         <Button
           :label="t('notices.continue')"
           size="small"

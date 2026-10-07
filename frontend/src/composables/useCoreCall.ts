@@ -12,7 +12,11 @@ export interface UseCoreCall {
     call: () => Promise<T>,
     onError?: (error: CoreError) => boolean,
   ) => Promise<T | undefined>
-  runAndClose: <T>(call: () => Promise<T>, onSuccess: () => void) => Promise<void>
+  runAndClose: <T>(
+    call: () => Promise<T>,
+    onSuccess: () => void,
+    onError?: (error: CoreError) => boolean,
+  ) => Promise<void>
 }
 
 // useCoreCall wraps a bound-method call: run(call) awaits it,
@@ -39,10 +43,14 @@ export function useCoreCall(): UseCoreCall {
   }
 
   // runAndClose is run's "then close on success" shape for a dialog:
-  // onSuccess runs only when call did not reject, so a failure leaves the
-  // error set and the dialog open.
-  async function runAndClose<T>(call: () => Promise<T>, onSuccess: () => void): Promise<void> {
-    await run(call)
+  // onSuccess runs only when call did not reject or onError handled the
+  // rejection, so any other failure leaves the error set and the dialog open.
+  async function runAndClose<T>(
+    call: () => Promise<T>,
+    onSuccess: () => void,
+    onError?: (error: CoreError) => boolean,
+  ): Promise<void> {
+    await run(call, onError)
     if (!error.value) onSuccess()
   }
 

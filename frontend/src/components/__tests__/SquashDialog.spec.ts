@@ -2,20 +2,24 @@ import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { Facade, SettingsService } = vi.hoisted(() => ({
-  Facade: { Squash: vi.fn(), Fixup: vi.fn() },
+const { Facade, SettingsService, AppService } = vi.hoisted(() => ({
+  Facade: { Squash: vi.fn(), Fixup: vi.fn(), Status: vi.fn() },
+  AppService: { OpenDiff: vi.fn() },
   SettingsService: { Get: vi.fn() },
 }))
 
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
   Facade,
   SettingsService,
+  AppService,
 }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import SquashDialog from '../SquashDialog.vue'
 import NoticeArea from '../NoticeArea.vue'
+import { DiffKind } from '@/lib/diffTarget'
+import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { field, fieldLabels, footerButtons } from '@/testing/dialog'
 import { useRepoStore } from '@/stores/repo'
@@ -43,6 +47,10 @@ describe('SquashDialog', () => {
     onBranch('feature')
     Facade.Squash.mockReset().mockResolvedValue({ previousHead: 'deadbeef1234' })
     Facade.Fixup.mockReset().mockResolvedValue({ previousHead: 'deadbeef1234' })
+    Facade.Status.mockReset().mockResolvedValue(
+      changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] }),
+    )
+    AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
   })
 
   it('FR-LOG-14 squash shows the combined message for editing and squashes with the edited one', async () => {
@@ -135,6 +143,12 @@ describe('SquashDialog', () => {
     await first.body.get('[data-test="squash-submit"]').trigger('click')
     await flushPromises()
     expect(first.wrapper.emitted('done')).toHaveLength(1)
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: DiffKind.WorkingDiff,
+      conflicted: true,
+      path: 'a.txt',
+      oldPath: '',
+    })
     first.wrapper.unmount()
 
     const refused = { code: Code.GitFailed, message: 'hook said no' }

@@ -1,11 +1,16 @@
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { Facade } = vi.hoisted(() => ({ Facade: { CherryPick: vi.fn(), Revert: vi.fn() } }))
+const { Facade, AppService } = vi.hoisted(() => ({
+  Facade: { CherryPick: vi.fn(), Revert: vi.fn(), Status: vi.fn() },
+  AppService: { OpenDiff: vi.fn() },
+}))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
 
 import PickDialog from '../PickDialog.vue'
+import { DiffKind } from '@/lib/diffTarget'
+import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { footerButtons } from '@/testing/dialog'
 
@@ -17,6 +22,10 @@ describe('PickDialog', () => {
   beforeEach(() => {
     Facade.CherryPick.mockReset().mockResolvedValue(undefined)
     Facade.Revert.mockReset().mockResolvedValue(undefined)
+    Facade.Status.mockReset().mockResolvedValue(
+      changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] }),
+    )
+    AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
   })
 
   it('FR-CP-06 does not render the "cherry picked from" checkbox for a revert', async () => {
@@ -64,6 +73,24 @@ describe('PickDialog', () => {
 
     expect(body.text()).toContain('conflict')
     expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  it('FR-CONF-09 a stop on conflicts opens the diff window and closes the dialog', async () => {
+    Facade.CherryPick.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
+    )
+    const { wrapper, body } = await mountDialog('cherry-pick', ['a1'])
+
+    await body.get('[data-test="pick-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: DiffKind.WorkingDiff,
+      conflicted: true,
+      path: 'a.txt',
+      oldPath: '',
+    })
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('FR-UX-17 Cancel and Confirm sit together at the bottom; Cancel closes', async () => {

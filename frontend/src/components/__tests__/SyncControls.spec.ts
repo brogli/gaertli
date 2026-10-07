@@ -3,7 +3,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { Facade } = vi.hoisted(() => ({
+const { Facade, AppService } = vi.hoisted(() => ({
+  AppService: { OpenDiff: vi.fn() },
   Facade: {
     Fetch: vi.fn(),
     Pull: vi.fn(),
@@ -11,10 +12,11 @@ const { Facade } = vi.hoisted(() => ({
     PushTarget: vi.fn(),
     ForcePush: vi.fn(),
     PullWithStash: vi.fn(),
+    Status: vi.fn(),
   },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
@@ -36,6 +38,7 @@ vi.mock('@/stores/settings', () => ({
 
 import { createI18n } from 'vue-i18n'
 import en from '@/locales/en.json'
+import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 import SyncControls from '../SyncControls.vue'
@@ -95,6 +98,10 @@ describe('SyncControls', () => {
     Facade.PushTarget.mockReset().mockResolvedValue({ remote: 'origin', autoSetUpstream: false })
     Facade.ForcePush.mockReset().mockResolvedValue('job-1')
     Facade.PullWithStash.mockReset().mockResolvedValue('job-1')
+    Facade.Status.mockReset().mockResolvedValue(
+      changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] }),
+    )
+    AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
     confirmRequire.mockReset()
     setRefs()
     settingsStore.settings = defaultSettingsFixture()
@@ -125,6 +132,29 @@ describe('SyncControls', () => {
 
     expect(Facade.Fetch).toHaveBeenCalledTimes(1)
     expect(Facade.Fetch).toHaveBeenCalledWith('/repo', '')
+  })
+
+  it('FR-CONF-09 a pull this window started that stops on conflicts opens the diff window; one it did not start opens nothing', async () => {
+    setRefs({ upstream: 'origin/main' })
+    const { body } = await mountControls()
+    await flushPromises()
+    await body.get('.p-splitbutton-button').trigger('click')
+    await flushPromises()
+    const conflicted = (id: string) =>
+      jobFixture({
+        id,
+        kind: JobKind.PullJob,
+        state: JobState.JobFailed,
+        error: { code: Code.Conflicts, message: 'conflicts' },
+      })
+
+    useJobsStore().upsert(conflicted('other-window'))
+    await flushPromises()
+    expect(AppService.OpenDiff).not.toHaveBeenCalled()
+
+    useJobsStore().upsert(conflicted('job-1'))
+    await flushPromises()
+    expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
   })
 
   it('FR-SYNC-11 without a remote, Fetch, Pull and Push are disabled with the no-remote tooltip; no select', async () => {

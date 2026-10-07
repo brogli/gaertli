@@ -141,9 +141,10 @@ arrow keys move between tabs and pick as they go.
     does, falling back to the repo's main worktree, then opens or focuses that worktree's window.
   - The branch picker lists "New branch…" first, then local branches, remote branches and tags. A
     menu action's refusal shows as a notice; a row click's refusal stays in the list. A tag's Show
-    history sets the log's filter and brings the log view forward. Merge and rebase leave a conflict
-    to the conflict banner, and a refusal over local changes offers the stash-and-retry as its
-    notice's action. Every entry action is menu-only, so each entry has a "…" button.
+    history sets the log's filter and brings the log view forward. Merge and rebase that stop on
+    conflicts open the diff window on the first conflicted file and leave the rest to the conflict
+    banner, and a refusal over local changes offers the stash-and-retry as its notice's action.
+    Every entry action is menu-only, so each entry has a "…" button.
 - **Settings** (FR-UX-04): a dialog over the window, opened from the toolbar's gear button, laid out
   like every dialog, with a group per editor environment and a base-folder field per environment
   found (local and each WSL distro).
@@ -191,7 +192,11 @@ arrow keys move between tabs and pick as they go.
   buttons. The commit message field spans the commit box's full width. A conflicted file opens in
   the diff window; a staged file resolved during the stopped operation can be reopened from its row,
   after a confirmation. A resolved file with no change left (resolved to the current side's version)
-  is in no other group, so the conflicted list shows it for the same reopen.
+  is in no other group, so the conflicted list shows it for the same reopen. Every operation the
+  window starts that stops on conflicts (pull, merge, rebase, cherry-pick, revert, squash, fixup)
+  opens the diff window on the first conflicted file; a conflict a terminal command causes does not.
+  The conflict banner's "Resolve conflicts" button, shown while a file is conflicted, opens it
+  again.
 - **Diff window** (FR-DIFF-07): a separate OS window; the main window stays usable behind it. The
   target's files on the left, a working tree's in their groups, and the diff view on the right. A
   target is a commit, a range, a commit against the working tree, a working-tree side, or a

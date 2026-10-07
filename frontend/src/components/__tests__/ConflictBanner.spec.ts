@@ -1,12 +1,18 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { Facade } = vi.hoisted(() => ({
-  Facade: { ContinueOperation: vi.fn(), AbortOperation: vi.fn(), SkipOperation: vi.fn() },
+const { Facade, AppService } = vi.hoisted(() => ({
+  Facade: {
+    ContinueOperation: vi.fn(),
+    AbortOperation: vi.fn(),
+    SkipOperation: vi.fn(),
+    Status: vi.fn(),
+  },
+  AppService: { OpenDiff: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
@@ -19,6 +25,7 @@ import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
 import { summaryFixture } from '@/testing/fixtures/summary'
+import { DiffKind } from '@/lib/diffTarget'
 import { Operation } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
 // mountDuring mounts ConflictBanner while operation is in progress.
@@ -33,6 +40,8 @@ describe('ConflictBanner', () => {
     Facade.ContinueOperation.mockReset().mockResolvedValue(undefined)
     Facade.AbortOperation.mockReset().mockResolvedValue(undefined)
     Facade.SkipOperation.mockReset().mockResolvedValue(undefined)
+    Facade.Status.mockReset()
+    AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
     confirmRequire.mockReset()
   })
 
@@ -55,6 +64,34 @@ describe('ConflictBanner', () => {
     await wrapper.vm.$nextTick()
 
     expect(findButton(wrapper, 'Continue')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('FR-CONF-09 "Resolve conflicts" opens the diff window on the first conflicted file', async () => {
+    const conflicted = [
+      { path: 'a.txt', status: 'UU' },
+      { path: 'b.txt', status: 'UU' },
+    ]
+    Facade.Status.mockResolvedValue(changedFilesFixture({ conflicted }))
+    const changes = useChangesStore()
+    changes.files = changedFilesFixture({ conflicted })
+    const wrapper = mountDuring(Operation.MergeOperation)
+
+    await findButton(wrapper, 'Resolve conflicts')!.trigger('click')
+    await flushPromises()
+
+    expect(AppService.OpenDiff).toHaveBeenCalledExactlyOnceWith('/repo', {
+      kind: DiffKind.WorkingDiff,
+      conflicted: true,
+      path: 'a.txt',
+      oldPath: '',
+    })
+  })
+
+  it('FR-CONF-09 offers no "Resolve conflicts" once no file is conflicted', () => {
+    useChangesStore().files = changedFilesFixture({ conflicted: [] })
+    const wrapper = mountDuring(Operation.MergeOperation)
+
+    expect(findButton(wrapper, 'Resolve conflicts')).toBeUndefined()
   })
 
   it('FR-CONF-04, FR-UX-03, QA-SAFE-01 clicking Abort confirms before calling Facade.AbortOperation', async () => {

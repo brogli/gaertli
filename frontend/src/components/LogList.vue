@@ -20,6 +20,7 @@ import {
 } from '@/menus/commitMenu'
 import { exactDate, timeAgo } from '@/lib/format'
 import { laneSpan } from '@/lib/graphLanes'
+import { openOnConflicts } from '@/lib/openConflicts'
 import { errorHeadline } from '@/lib/errorText'
 import type {
   LogCommit,
@@ -264,9 +265,14 @@ function pickAndRevertActions() {
 }
 
 // pickWithDefaults runs pick on the selection with git's defaults; a
-// refusal shows in the error banner.
+// refusal shows in the error banner, a stop on conflicts opens the diff
+// window.
 function pickWithDefaults(pick: typeof Facade.CherryPick): void {
-  void runAndClose(() => pick(props.wt, shasOf(log.selection), gitDefaults), log.dropSelection)
+  void runAndClose(
+    () => pick(props.wt, shasOf(log.selection), gitDefaults),
+    log.dropSelection,
+    openOnConflicts(props.wt),
+  )
 }
 
 function openPickDialog(verb: 'cherry-pick' | 'revert'): void {

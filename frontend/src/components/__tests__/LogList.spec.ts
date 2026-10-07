@@ -1,9 +1,12 @@
 import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DiffKind } from '@/lib/diffTarget'
+import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 
-const { Facade } = vi.hoisted(() => ({
+const { Facade, AppService } = vi.hoisted(() => ({
+  AppService: { OpenDiff: vi.fn() },
   Facade: {
     LoadLog: vi.fn(),
     LogRows: vi.fn(),
@@ -14,10 +17,11 @@ const { Facade } = vi.hoisted(() => ({
     SquashCheck: vi.fn(),
     Squash: vi.fn(),
     Fixup: vi.fn(),
+    Status: vi.fn(),
   },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import LogList from '../LogList.vue'
@@ -77,6 +81,10 @@ describe('LogList', () => {
     Facade.CommitDetails.mockReset().mockResolvedValue(commitDetailsFixture())
     Facade.CherryPick.mockReset().mockResolvedValue(undefined)
     Facade.Revert.mockReset().mockResolvedValue(undefined)
+    Facade.Status.mockReset().mockResolvedValue(
+      changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] }),
+    )
+    AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
     Facade.SquashCheck.mockReset().mockResolvedValue({ pushed: false, message: 'A\n\nB' })
     Facade.Fixup.mockReset().mockResolvedValue({ previousHead: 'prev' })
   })
@@ -478,6 +486,26 @@ describe('LogList', () => {
 
     expect(wrapper.text()).toContain('would be overwritten by merge')
     expect(log.selection).toHaveLength(3)
+  })
+
+  it('FR-CONF-09 a cherry-pick that stops on conflicts opens the diff window and shows no error', async () => {
+    Facade.CherryPick.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
+    )
+    const { wrapper, body, rowEls } = await mountWithRows(['sha-a'])
+
+    await rowEls[0]!.trigger('click')
+    await openMenu(wrapper, rowEls[0]!)
+    await clickMenuItem(body, 'Cherry-pick')
+    await flushPromises()
+
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: DiffKind.WorkingDiff,
+      conflicted: true,
+      path: 'a.txt',
+      oldPath: '',
+    })
+    expect(wrapper.text()).not.toContain('conflicts')
   })
 
   it('FR-LOG-11 "Revert" acts directly, the pre-existing call path', async () => {

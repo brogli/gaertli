@@ -5,7 +5,7 @@ import { mountInBody } from '@/testing/mountInBody'
 import NoticeArea from '../NoticeArea.vue'
 
 const { AppService, Facade } = vi.hoisted(() => ({
-  AppService: { SelectWorktree: vi.fn() },
+  AppService: { SelectWorktree: vi.fn(), OpenDiff: vi.fn() },
   Facade: {
     Checkout: vi.fn(),
     UpdateBranch: vi.fn(),
@@ -13,6 +13,7 @@ const { AppService, Facade } = vi.hoisted(() => ({
     DeleteBranch: vi.fn(),
     Merge: vi.fn(),
     Rebase: vi.fn(),
+    Status: vi.fn(),
   },
 }))
 
@@ -35,6 +36,8 @@ import {
   type Refs,
   type Summary,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { DiffKind } from '@/lib/diffTarget'
+import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { branchFixture } from '@/testing/fixtures/branch'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
@@ -124,6 +127,10 @@ describe('BranchPicker', () => {
     Facade.DeleteBranch.mockReset().mockResolvedValue(undefined)
     Facade.Merge.mockReset().mockResolvedValue({ outcome: 'merged' })
     Facade.Rebase.mockReset().mockResolvedValue({ outcome: 'rebased' })
+    Facade.Status.mockReset().mockResolvedValue(
+      changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] }),
+    )
+    AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
     confirmRequire.mockReset()
   })
 
@@ -429,6 +436,23 @@ describe('BranchPicker', () => {
     await findButton(notice, 'Stash and merge')!.trigger('click')
 
     expect(Facade.Merge).toHaveBeenLastCalledWith('/repo', 'refs/heads/feat', true)
+  })
+
+  it('FR-CONF-09 a merge that stops on conflicts opens the diff window on the first conflicted file', async () => {
+    Facade.Merge.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'CONFLICTS', message: 'conflicts' } }),
+    )
+    const { body } = await openPicker()
+
+    await pickAction(body, 'feat', 'Merge into main')
+    await flushPromises()
+
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: DiffKind.WorkingDiff,
+      conflicted: true,
+      path: 'a.txt',
+      oldPath: '',
+    })
   })
 
   it('FR-BR-11 a merge that stops on conflicts shows no notice', async () => {

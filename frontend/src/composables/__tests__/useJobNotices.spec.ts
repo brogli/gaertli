@@ -77,10 +77,11 @@ const onPull = vi.fn()
 const onForcePush = vi.fn()
 const onStashPull = vi.fn()
 const onRetryJob = vi.fn()
+const onConflicts = vi.fn()
 
 const Host = defineComponent({
   setup() {
-    useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
+    useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onConflicts })
     return () => null
   },
 })
@@ -99,6 +100,7 @@ describe('useJobNotices', () => {
     onForcePush.mockReset()
     onStashPull.mockReset()
     onRetryJob.mockReset()
+    onConflicts.mockReset()
   })
 
   it('FR-SYNC-04 a failed push job shows a notice with the reason and Pull/Force push, running the actions', async () => {
@@ -161,6 +163,22 @@ describe('useJobNotices', () => {
     expect(notice.text()).toContain('local changes in the way')
     await findButton(notice, 'Stash and pull')!.trigger('click')
     expect(onStashPull).toHaveBeenCalledTimes(1)
+  })
+
+  it('FR-CONF-09 a pull job that stopped on conflicts opens the conflicts, with no notice', async () => {
+    const notice = await mountNotices()
+
+    useJobsStore().upsert(
+      jobFixture({
+        kind: JobKind.PullJob,
+        state: JobState.JobFailed,
+        error: { code: Code.Conflicts, message: 'conflicts' },
+      }),
+    )
+    await nextTick()
+
+    expect(onConflicts).toHaveBeenCalledTimes(1)
+    expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
   it('FR-SYNC-08, FR-UX-01 a sync failure not explained elsewhere shows a plain notice', async () => {

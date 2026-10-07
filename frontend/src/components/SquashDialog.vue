@@ -12,6 +12,7 @@ import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
 import { Code, type SquashCheck } from '../../bindings/github.com/brogli/nebegit/internal/core'
 import { shortSha } from '@/lib/format'
 import { DIALOG } from '@/lib/layout'
+import { openOnConflicts } from '@/lib/openConflicts'
 import { errorNotice, useNotices } from '@/lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
 import FormField from './FormField.vue'
@@ -41,11 +42,12 @@ const pushedWarning = computed(() => {
     : warning
 })
 
-// leftForBanner handles a stop: the rebase waits in the conflict banner,
-// and a stop without conflicts names git's reason in a notice.
+// leftForBanner handles a stop: the rebase waits in the conflict banner and
+// a stop on conflicts opens the diff window; a stop without conflicts names
+// git's reason in a notice.
 function leftForBanner(e: CoreError): boolean {
   if (e.code === Code.Stopped) notices.show('squash', errorNotice(e))
-  return e.code === Code.Conflicts || e.code === Code.Stopped
+  return e.code === Code.Stopped || openOnConflicts(props.wt)(e)
 }
 
 async function submit(): Promise<void> {

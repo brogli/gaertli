@@ -128,6 +128,7 @@
     "skip": "Skip",
     "abort": "Abort",
     "abortEllipsis": "Abort…",
+    "resolveConflicts": "Resolve conflicts",
     "abortConfirm": "Abort the {operation}? This discards its changes.",
     "stashedHint": "Local changes from before a pull, merge or rebase are stashed.",
     "restore": "Restore",

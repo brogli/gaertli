@@ -18,6 +18,7 @@ import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { shortSha } from '@/lib/format'
 import { iconClass } from '@/lib/icons'
+import { openOnConflicts } from '@/lib/openConflicts'
 import { useLayout, useToolbarButton } from '@/lib/layout'
 import { errorNotice, useNotices } from '@/lib/notice'
 import ErrorBanner from './ErrorBanner.vue'
@@ -227,7 +228,8 @@ function worktreeStart(row: RefRow): WorktreeStart {
 type Integrate = 'merge' | 'rebase'
 
 // integrate merges row's ref into the current branch or rebases the current
-// branch onto it. A stop on conflicts waits in the conflict banner; local
+// branch onto it. A stop on conflicts opens the diff window and waits in the
+// conflict banner; local
 // changes in the way offer to stash them and run again.
 async function integrate(verb: Integrate, row: RefRow, stash = false): Promise<void> {
   const head = headName.value
@@ -235,7 +237,7 @@ async function integrate(verb: Integrate, row: RefRow, stash = false): Promise<v
   const result = await run<IntegrateResult>(
     () => call(props.wt, row.ref, stash),
     (refusal) => {
-      if (refusal.code === Code.Conflicts) return true
+      if (openOnConflicts(props.wt)(refusal)) return true
       if (refusal.code !== Code.DirtyWorktree) return showRefusal(refusal)
       const retry = {
         label: t(`branchPicker.stashAnd.${verb}`),

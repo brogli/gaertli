@@ -6,11 +6,13 @@ import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { openOnConflicts } from '@/lib/openConflicts'
 import { DIALOG } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 
 // PickDialog is cherry-pick's and revert's options dialog: apply without
-// committing, and add the "cherry picked from" line (cherry-pick only).
+// committing, and add the "cherry picked from" line (cherry-pick only). A
+// stop on conflicts opens the diff window and closes the dialog.
 const props = defineProps<{
   wt: string
   verb: 'cherry-pick' | 'revert'
@@ -33,6 +35,7 @@ async function onSubmit(): Promise<void> {
   await runAndClose(
     () => pick(props.wt, props.shas, opts),
     () => emit('close'),
+    openOnConflicts(props.wt),
   )
 }
 </script>

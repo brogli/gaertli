@@ -8,6 +8,7 @@ import { useRefsStore } from '@/stores/refs'
 import { useSettingsStore } from '@/stores/settings'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
+import { openConflicts } from '@/lib/openConflicts'
 import { useJobNotices } from '@/composables/useJobNotices'
 import { usePush } from '@/composables/usePush'
 import { useShortcut } from '@/composables/useShortcut'
@@ -92,8 +93,14 @@ function choosePullMode(mode: PullMode): void {
   const next = { ...settings.settings, defaultPullMode: mode }
   void run(() => settings.save(next))
 }
+// startedPulls are the ids of the pull jobs this window started: only
+// their conflicts open the diff window here.
+const startedPulls = new Set<string>()
+function startPull(call: () => Promise<string>): void {
+  void run(async () => startedPulls.add(await call()))
+}
 function onPull(): void {
-  void run(() => Facade.Pull(props.wt, pullMode.value))
+  startPull(() => Facade.Pull(props.wt, pullMode.value))
 }
 function onForcePush(): void {
   const branchName = refs.current?.name ?? ''
@@ -108,7 +115,7 @@ function onForcePush(): void {
   )
 }
 function onStashPull(): void {
-  void run(() => Facade.PullWithStash(props.wt, pullMode.value))
+  startPull(() => Facade.PullWithStash(props.wt, pullMode.value))
 }
 
 // onRetryJob starts a fresh job the same way job's own kind started.
@@ -139,7 +146,11 @@ useShortcut(
   },
 )
 
-useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob })
+function onConflicts(job: JobInfo): void {
+  if (startedPulls.delete(job.id)) void run(() => openConflicts(props.wt))
+}
+
+useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onConflicts })
 </script>
 
 <template>
