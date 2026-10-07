@@ -63,7 +63,7 @@ test('FR-BR-12 Rebase onto main replays the current branch on main and says so',
   git(repos.work, 'checkout', '-q', 'dev1')
   const app = await openApp(repos.work)
 
-  await pickRefAction(app, 'main', 'Rebase dev1 onto this')
+  await pickRefAction(app, 'main', 'Rebase dev1 onto main')
 
   await expect(notice(app)).toContainText('Rebased dev1 onto main')
   expect(currentBranch(git, repos.work)).toBe('dev1')
@@ -79,7 +79,7 @@ test('FR-BR-12 a rebase that conflicts stops with the conflict banner', async ({
   git(repos.work, 'checkout', '-q', 'feature')
   const app = await openApp(repos.work)
 
-  await pickRefAction(app, 'main', 'Rebase feature onto this')
+  await pickRefAction(app, 'main', 'Rebase feature onto main')
 
   await expect(conflictBanner(app)).toContainText('rebase stopped on conflicts')
 })

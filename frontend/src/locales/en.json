@@ -457,7 +457,7 @@
     "rename": "Rename…",
     "delete": "Delete",
     "mergeInto": "Merge into {current}",
-    "rebaseOnto": "Rebase {current} onto this",
+    "rebaseOnto": "Rebase {current} onto {branch}",
     "stashAnd": {
       "merge": "Stash and merge",
       "rebase": "Stash and rebase"

@@ -153,6 +153,11 @@ const rows = computed<Row[]>(() => {
 
 const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
 
+function onShow(): void {
+  query.value = ''
+  error.value = null
+}
+
 function hide(): void {
   popover.value?.hide()
 }
@@ -283,7 +288,7 @@ function menuItems(row: RefRow): MenuItem[] {
             command: () => void integrate('merge', row),
           },
           {
-            label: t('branchPicker.rebaseOnto', { current: headName.value }),
+            label: t('branchPicker.rebaseOnto', { current: headName.value, branch: row.name }),
             command: () => void integrate('rebase', row),
           },
         ]
@@ -347,7 +352,7 @@ function deleteBranch(name: string): void {
       <i :class="iconClass('dropdown')" aria-hidden="true"></i>
     </template>
   </Button>
-  <Popover ref="popover" @show="query = ''">
+  <Popover ref="popover" @show="onShow">
     <div class="branch-list flex flex-col gap-1.5 w-112 max-w-[90vw] max-h-[70vh]">
       <ErrorBanner v-if="error" :error="error" />
       <PickerList

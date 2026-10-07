@@ -295,6 +295,23 @@ describe('BranchPicker', () => {
     expect(body.get('.branch-list .error-banner').text()).toContain('would be overwritten')
   })
 
+  it('FR-BR-09 a refusal shown in the list is gone when the list opens again', async () => {
+    Facade.Checkout.mockRejectedValueOnce(
+      new Error('boom', { cause: { code: 'DIRTY_WORKTREE', message: 'would be overwritten' } }),
+    )
+    const { wrapper, body } = await openPicker()
+    await checkoutRow(body, 'feat')
+    await flushPromises()
+    expect(body.find('.branch-list .error-banner').exists()).toBe(true)
+
+    await wrapper.get('[data-test="branch-picker"]').trigger('click')
+    expect(await listOpen(body)).toBe(false)
+    await wrapper.get('[data-test="branch-picker"]').trigger('click')
+
+    expect(await listOpen(body)).toBe(true)
+    expect(body.find('.branch-list .error-banner').exists()).toBe(false)
+  })
+
   it('FR-BR-09 typing keeps only the matching refs, under their section; Enter checks out the first', async () => {
     const { body } = await openPicker()
     const filter = body.get('.picker-list input')
@@ -340,7 +357,7 @@ describe('BranchPicker', () => {
       'Rename…',
       'Delete',
       'Merge into main',
-      'Rebase main onto this',
+      'Rebase main onto feat',
       'Show in log',
     ])
 
@@ -354,19 +371,19 @@ describe('BranchPicker', () => {
 
   it("FR-BR-09 a remote branch's actions offer check out, new branch, new worktree and show in log; a tag's also show history", async () => {
     const { body } = await openPicker()
-    const expected = [
+    const expected = (name: string) => [
       'Check out',
       'New branch from here…',
       'New worktree from here…',
       'Merge into main',
-      'Rebase main onto this',
+      `Rebase main onto ${name}`,
       'Show in log',
     ]
 
     await openActions(body, 'origin/x')
-    expect(menuLabels(body)).toEqual(expected)
+    expect(menuLabels(body)).toEqual(expected('origin/x'))
     await openActions(body, 'v1')
-    expect(menuLabels(body)).toEqual([...expected, 'Show history'])
+    expect(menuLabels(body)).toEqual([...expected('v1'), 'Show history'])
   })
 
   it('FR-BR-11 a detached HEAD names itself in the merge and rebase actions', async () => {
@@ -380,7 +397,7 @@ describe('BranchPicker', () => {
     await openActions(body, 'feat')
 
     expect(menuLabels(body)).toContain('Merge into abcdef1 (detached)')
-    expect(menuLabels(body)).toContain('Rebase abcdef1 (detached) onto this')
+    expect(menuLabels(body)).toContain('Rebase abcdef1 (detached) onto feat')
   })
 
   it.each([
@@ -442,13 +459,13 @@ describe('BranchPicker', () => {
     ['rebased', 'Rebased main onto feat'],
     ['upToDate', 'main is already up to date with feat'],
   ])(
-    'FR-BR-12 "Rebase main onto this" rebases onto the full ref; outcome %s shows a success notice',
+    'FR-BR-12 "Rebase main onto feat" rebases onto the full ref; outcome %s shows a success notice',
     async (outcome, text) => {
       Facade.Rebase.mockResolvedValueOnce({ outcome })
       const { body: notice } = await mountInBody(NoticeArea)
       const { body } = await openPicker()
 
-      await pickAction(body, 'feat', 'Rebase main onto this')
+      await pickAction(body, 'feat', 'Rebase main onto feat')
 
       expect(Facade.Rebase).toHaveBeenCalledWith('/repo', 'refs/heads/feat', false)
       expect(notice.get('.p-toast').text()).toContain(text)
@@ -462,7 +479,7 @@ describe('BranchPicker', () => {
     const { body: notice } = await mountInBody(NoticeArea)
     const { body } = await openPicker()
 
-    await pickAction(body, 'feat', 'Rebase main onto this')
+    await pickAction(body, 'feat', 'Rebase main onto feat')
     await findButton(notice, 'Stash and rebase')!.trigger('click')
 
     expect(Facade.Rebase).toHaveBeenLastCalledWith('/repo', 'refs/heads/feat', true)
