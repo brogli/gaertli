@@ -58,7 +58,8 @@ tasks:
       GOFLAGS: -mod=readonly
       GOTOOLCHAIN: local
     cmds:
-      - go test ./...
+      # Tests mostly wait on git, so more of them run at once than there are cores.
+      - go test -parallel 16 ./...
 
   test:go:core:
     summary:
@@ -71,7 +72,8 @@ tasks:
       GOFLAGS: -mod=readonly
       GOTOOLCHAIN: local
     cmds:
-      - go test {{.FLAGS}} ./internal/... ./cmd/nebegit-core/... ./build/windows/bin/...
+      - go test -parallel 16 {{.FLAGS}} ./internal/... ./cmd/nebegit-core/...
+        ./build/windows/bin/...
 
   test:frontend:
     summary: Runs the Vitest component tests offline

@@ -8,9 +8,14 @@ import { defineConfig, devices } from '@playwright/test'
 const port = 10000 + (createHash('sha1').update(process.cwd()).digest().readUInt16BE(0) % 10000)
 const baseURL = `http://127.0.0.1:${port}`
 
+// Tests share nothing (own browser context, the mock bindings live in the
+// page), so every test runs in parallel; Playwright's default on CI is one
+// worker.
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
+  fullyParallel: true,
+  workers: process.env.CI ? 4 : '50%',
   use: { baseURL },
   webServer: {
     command: `pnpm exec vite --mode e2e --port ${port} --strictPort`,
