@@ -320,7 +320,7 @@ test("FR-UX-01 a reset git refuses during a merge shows git's message and change
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 
-test('FR-BR-07 a keep reset refuses when a local change would be lost and nothing moves', async ({
+test('FR-BR-02 a keep reset refuses when a local change would be lost and nothing moves', async ({
   app,
   repos,
   git,
@@ -336,7 +336,7 @@ test('FR-BR-07 a keep reset refuses when a local change would be lost and nothin
   expect(fs.readFileSync(file, 'utf8')).toContain('local change')
 })
 
-test('FR-BR-07 a keep reset on a clean tree moves the branch like hard, without confirmation', async ({
+test('FR-BR-02 a keep reset on a clean tree moves the branch like hard, without confirmation', async ({
   app,
   repos,
   git,

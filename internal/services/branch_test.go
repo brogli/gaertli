@@ -391,7 +391,7 @@ func TestFR_BR_10_DeleteBranchSucceedsOnTheBareMainReposHEADBranch(t *testing.T)
 	}
 }
 
-func TestFR_BR_07_ResetFlagMapsKeepToGitFlag(t *testing.T) {
+func TestFR_BR_02_ResetFlagMapsKeepToGitFlag(t *testing.T) {
 	t.Parallel()
 	got, err := resetFlag(core.ResetKeep)
 	if err != nil {
@@ -988,7 +988,7 @@ func TestFR_BR_02_ResetHardSucceedsDuringAnUnresolvedConflictEndingIt(t *testing
 	}
 }
 
-func TestFR_BR_07_ResetKeepMatchesTargetExactlyOnACleanTree(t *testing.T) {
+func TestFR_BR_02_ResetKeepMatchesTargetExactlyOnACleanTree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -1013,7 +1013,7 @@ func TestFR_BR_07_ResetKeepMatchesTargetExactlyOnACleanTree(t *testing.T) {
 	}
 }
 
-func TestFR_BR_07_ResetKeepRefusesALocalChangeLeavingHEADIndexAndWorkingTreeUntouched(t *testing.T) {
+func TestFR_BR_02_ResetKeepRefusesALocalChangeLeavingHEADIndexAndWorkingTreeUntouched(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	firstSHA := resetFixture(t, repo.Dir)
@@ -1037,7 +1037,7 @@ func TestFR_BR_07_ResetKeepRefusesALocalChangeLeavingHEADIndexAndWorkingTreeUnto
 	}
 }
 
-func TestFR_BR_07_ResetKeepRefusesDuringAnUnresolvedConflict(t *testing.T) {
+func TestFR_BR_02_ResetKeepRefusesDuringAnUnresolvedConflict(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	baseSHA := mergeConflictFixture(t, repo.Dir)

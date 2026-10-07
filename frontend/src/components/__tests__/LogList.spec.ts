@@ -149,7 +149,7 @@ describe('LogList', () => {
     expect(wrapper.emitted('reset')).toEqual([['abc123', 'Fix the bug']])
   })
 
-  it('FR-LOG-12 clicking a menu item copies to the clipboard and closes the menu', async () => {
+  it('FR-LOG-11 clicking a menu item copies to the clipboard and closes the menu', async () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
 
@@ -165,7 +165,7 @@ describe('LogList', () => {
     expect(body.find('.p-contextmenu').exists()).toBe(false)
   })
 
-  it('FR-LOG-12 the list cannot be text-selected', async () => {
+  it('FR-LOG-13 the list cannot be text-selected', async () => {
     const { wrapper } = await mountWithRows([sampleRow])
 
     expect(wrapper.get<HTMLElement>('.log-list').element.style.userSelect).toBe('none')

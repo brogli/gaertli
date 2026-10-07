@@ -78,9 +78,9 @@ editor start (Warn), a WSL core's stderr (Warn). A successful git command or edi
   - A new branch's start point (FR-BR-01) is a filterable drop-down over the window's refs, grouped
     like the log's branch filter and sent by its full ref name (`git-mapping.md`). From the log
     view, or while detached, it is a fixed commit.
-  - Reset (FR-BR-02, FR-BR-07) names the branch and the target commit and lists the four modes one
-    below the other, each with its one-line explanation. On success it closes, and the notice naming
-    the previous commit is the only result (FR-BR-04).
+  - Reset (FR-BR-02) names the branch and the target commit and lists the four modes one below the
+    other, each with its one-line explanation. On success it closes, and the notice naming the
+    previous commit is the only result (FR-BR-04).
   - A local branch checked out in another worktree, or being rebased or bisected there (FR-BR-05),
     gets a dialog naming that worktree and the operation when there is one, with "Switch to
     worktree" and Cancel.
@@ -162,7 +162,7 @@ arrow keys move between tabs and pick as they go.
   - Search (message text or hash) does not filter: it highlights the matching rows of whichever view
     is showing, scrolls to the first, and Enter/Shift+Enter step through them, wrapping.
   - Enter or a double-click opens a commit, which brings up the commit detail view in medium and
-    narrow (FR-UX-08). The list's text cannot be selected (FR-LOG-12), so a drag never fights the
+    narrow (FR-UX-08). The list's text cannot be selected (FR-LOG-13), so a drag never fights the
     click handling.
 - **Selection** (FR-LOG-13): the log store keeps one ordered selection, however it was built.
   - A plain click replaces it with one row and loads its details. Ctrl-click toggles one row,

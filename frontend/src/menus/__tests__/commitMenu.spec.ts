@@ -110,7 +110,7 @@ describe('buildOneCommitMenuItems', () => {
     expect(a.revertOptions).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-LOG-12 the two copy items write to the clipboard', () => {
+  it('FR-LOG-11 the two copy items write to the clipboard', () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const items = buildOneCommitMenuItems(row(), oneCommitActions(), t)

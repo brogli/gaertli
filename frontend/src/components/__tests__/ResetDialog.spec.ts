@@ -69,7 +69,7 @@ describe('ResetDialog', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it('FR-BR-07 clicking Reset at keep mode calls Facade.Reset directly, no confirmation', async () => {
+  it('FR-BR-02 clicking Reset at keep mode calls Facade.Reset directly, no confirmation', async () => {
     Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
     const { body } = await mountDialog()
 
