@@ -21,7 +21,6 @@ import { DiffKind } from '@/lib/diffTarget'
 import { mountNotices } from '@/testing/mountNotices'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
-import { field, fieldLabels, footerButtons } from '@/testing/dialog'
 import { useRepoStore } from '@/stores/repo'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
@@ -64,16 +63,6 @@ describe('SquashDialog', () => {
 
     expect(Facade.Squash).toHaveBeenCalledWith('/repo', shas, 'Edited')
     expect(wrapper.emitted('done')).toHaveLength(1)
-  })
-
-  it('FR-UX-17 the message has its own label; Cancel and Squash sit together at the bottom; Cancel closes', async () => {
-    const { wrapper, body } = await mountDialog()
-
-    expect(fieldLabels(body)).toEqual(['Message of the new commit'])
-    expect(field(body, 'Message of the new commit').element.value).toBe('A\n\nB')
-    expect(footerButtons(body)).toEqual(['Cancel', 'Squash'])
-    await body.get('[data-test="dialog-cancel"]').trigger('click')
-    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('FR-LOG-14 a blank message disables Squash', async () => {

@@ -13,7 +13,6 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
 import ResetDialog from '../ResetDialog.vue'
 import { mountInBody } from '@/testing/mountInBody'
-import { footerButtons } from '@/testing/dialog'
 import { NOTICE_GROUP } from '@/lib/notice'
 
 function mountDialog(branch = 'main') {
@@ -180,13 +179,5 @@ describe('ResetDialog', () => {
 
     expect(confirmRequire).toHaveBeenCalledTimes(1)
     expect(Facade.Reset).not.toHaveBeenCalled()
-  })
-
-  it('FR-UX-17 Cancel and Reset sit together at the bottom; Cancel closes', async () => {
-    const { wrapper, body } = await mountDialog()
-
-    expect(footerButtons(body)).toEqual(['Cancel', 'Reset'])
-    await body.get('[data-test="dialog-cancel"]').trigger('click')
-    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 })

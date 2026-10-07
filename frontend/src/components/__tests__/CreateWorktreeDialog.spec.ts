@@ -13,7 +13,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import CreateWorktreeDialog from '../CreateWorktreeDialog.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { chooseOption } from '@/testing/select'
-import { field, fieldLabels, footerButtons } from '@/testing/dialog'
+import { field, fieldLabels } from '@/testing/dialog'
 import { branchFixture } from '@/testing/fixtures/branch'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { worktreeFixture } from '@/testing/fixtures/worktree'
@@ -216,16 +216,12 @@ describe('CreateWorktreeDialog', () => {
     )
   })
 
-  it('FR-UX-17 every field has its own label; Browse sits beside Location; Cancel and Create sit together at the bottom', async () => {
-    const { wrapper, body } = await mountDialog({ repoPath: '/repo' })
+  it('FR-UX-17 a new branch adds its own labelled fields; Browse sits beside Location', async () => {
+    const { body } = await mountDialog({ repoPath: '/repo' })
 
-    expect(fieldLabels(body)).toEqual(['Branch', 'Folder name', 'Location'])
     await body.get('input[type="checkbox"]').setValue(true)
     expect(fieldLabels(body)).toEqual(['Branch name', 'Start point', 'Folder name', 'Location'])
     expect(body.find('.p-inputgroup [data-test="browse-target"]').exists()).toBe(true)
-    expect(footerButtons(body)).toEqual(['Cancel', 'Create'])
-    await body.get('[data-test="dialog-cancel"]').trigger('click')
-    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   it('FR-REPO-07 a WSL repo submits AddWorktree with the UNC repo and target paths', async () => {

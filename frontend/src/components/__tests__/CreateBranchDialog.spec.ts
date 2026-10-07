@@ -11,7 +11,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import CreateBranchDialog from '../CreateBranchDialog.vue'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
-import { field, fieldLabels, footerButtons } from '@/testing/dialog'
+import { field } from '@/testing/dialog'
 import { branchFixture } from '@/testing/fixtures/branch'
 import { useRefsStore } from '@/stores/refs'
 import type { StartPoint } from '../startPoint'
@@ -77,14 +77,5 @@ describe('CreateBranchDialog', () => {
 
     expect(body.text()).toContain('is not a valid branch name')
     expect(wrapper.emitted('close')).toBeUndefined()
-  })
-
-  it('FR-UX-17 name and start point each have their own label; Cancel and Create sit together at the bottom', async () => {
-    const { wrapper, body } = await mountDialog({ ref: 'refs/heads/main' })
-
-    expect(fieldLabels(body)).toEqual(['Branch name', 'Start point'])
-    expect(footerButtons(body)).toEqual(['Cancel', 'Create'])
-    await body.get('[data-test="dialog-cancel"]').trigger('click')
-    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 })

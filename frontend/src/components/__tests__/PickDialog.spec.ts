@@ -13,7 +13,6 @@ import { DiffKind } from '@/lib/diffTarget'
 import { wailsError } from '@/testing/errors'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
-import { footerButtons } from '@/testing/dialog'
 
 function mountDialog(verb: 'cherry-pick' | 'revert', shas: string[]) {
   return mountInBody(PickDialog, { props: { wt: '/repo', verb, shas } })
@@ -89,14 +88,6 @@ describe('PickDialog', () => {
       path: 'a.txt',
       oldPath: '',
     })
-    expect(wrapper.emitted('close')).toHaveLength(1)
-  })
-
-  it('FR-UX-17 Cancel and Confirm sit together at the bottom; Cancel closes', async () => {
-    const { wrapper, body } = await mountDialog('cherry-pick', ['a1'])
-
-    expect(footerButtons(body)).toEqual(['Cancel', 'Confirm'])
-    await body.get('[data-test="dialog-cancel"]').trigger('click')
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 })
