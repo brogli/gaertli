@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,6 +44,9 @@ func TestFR_CONF_07_ResolveConflictRefusesAFileNoLongerConflicted(t *testing.T) 
 
 func TestFR_CONF_08_ReopenConflictRestoresASymlinkAsGitLeftIt(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("git on Windows does not create symlinks in the working tree")
+	}
 	dir := gittest.New(t).Dir
 	link := func(target, msg string) {
 		_ = os.Remove(filepath.Join(dir, "l"))

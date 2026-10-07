@@ -935,11 +935,11 @@ func TestFR_DIFF_06_StageLinesOfAnIgnoreWhitespaceHunkLeavesTheWhitespaceChangeU
 	assertDiff(t, unstaged, err, "one\ntwo\nTHREE\n", "one\ntwo  \nTHREE\n", hunk(2, 1, 2, 1))
 }
 
-// patternTwins commits f1.txt and the file named "f?.txt", which a pathspec
+// patternTwins commits f.txt and the file named "[f].txt", which a pathspec
 // pattern would also match, then changes line 2 of both the same way.
 func patternTwins(t *testing.T, dir string) {
 	t.Helper()
-	names := []string{"f1.txt", "f?.txt"}
+	names := []string{"f.txt", "[f].txt"}
 	for _, name := range names {
 		gittest.Commit(t, dir, name, "a\nb\nc\n", "add "+name)
 	}
@@ -954,15 +954,15 @@ func TestFR_CHG_03_StageLinesOfAPatternNamedFileStagesOnlyThatFile(t *testing.T)
 	patternTwins(t, repo.Dir)
 	c, id := openWorktree(t, repo.Dir)
 
-	sel := shown(t, c, id, "f?.txt", false, []int{2}, []int{2})
-	if err := c.StageLines(t.Context(), id, "f?.txt", sel, false); err != nil {
+	sel := shown(t, c, id, "[f].txt", false, []int{2}, []int{2})
+	if err := c.StageLines(t.Context(), id, "[f].txt", sel, false); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := indexBlob(t, repo.Dir, "f?.txt"); got != "a\nX\nc" {
-		t.Errorf("index f?.txt = %q, want the change staged", got)
+	if got := indexBlob(t, repo.Dir, "[f].txt"); got != "a\nX\nc" {
+		t.Errorf("index [f].txt = %q, want the change staged", got)
 	}
-	if got := indexBlob(t, repo.Dir, "f1.txt"); got != "a\nb\nc" {
-		t.Errorf("index f1.txt = %q, want it untouched", got)
+	if got := indexBlob(t, repo.Dir, "f.txt"); got != "a\nb\nc" {
+		t.Errorf("index f.txt = %q, want it untouched", got)
 	}
 }

@@ -304,15 +304,15 @@ func TestFR_CHG_10_DiscardLinesOfAPatternNamedFileChangesOnlyThatFile(t *testing
 	patternTwins(t, repo.Dir)
 	c, id := openWorktree(t, repo.Dir)
 
-	sel := shown(t, c, id, "f?.txt", false, []int{2}, []int{2})
-	if err := c.DiscardLines(t.Context(), id, "f?.txt", sel); err != nil {
+	sel := shown(t, c, id, "[f].txt", false, []int{2}, []int{2})
+	if err := c.DiscardLines(t.Context(), id, "[f].txt", sel); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := readFile(t, repo.Dir, "f?.txt"); got != "a\nb\nc\n" {
-		t.Errorf("f?.txt = %q, want the change discarded", got)
+	if got := readFile(t, repo.Dir, "[f].txt"); got != "a\nb\nc\n" {
+		t.Errorf("[f].txt = %q, want the change discarded", got)
 	}
-	if got := readFile(t, repo.Dir, "f1.txt"); got != "a\nX\nc\n" {
-		t.Errorf("f1.txt = %q, want it untouched", got)
+	if got := readFile(t, repo.Dir, "f.txt"); got != "a\nX\nc\n" {
+		t.Errorf("f.txt = %q, want it untouched", got)
 	}
 }

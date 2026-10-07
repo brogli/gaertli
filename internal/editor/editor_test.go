@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 
 func TestFR_ED_05_Default(t *testing.T) {
 	t.Parallel()
-	want := core.EditorProfile{Name: "the editor", FolderCmd: "editor {path}", FileCmd: "editor {path}", FileAtLineCmd: "editor {path}:{line}"}
+	want := defaultFor(runtime.GOOS)
 	if got := Default(); got != want {
 		t.Errorf("Default() = %+v, want %+v", got, want)
 	}

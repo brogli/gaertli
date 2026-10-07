@@ -567,24 +567,27 @@ func TestFR_CHG_02_UnstageFileTakesAGlobLikeNameLiterally(t *testing.T) {
 func TestFR_CHG_04_DiffWorkingOfAPatternNamedFileShowsItsOwnContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "f1.txt", "one\n", "add f1.txt")
-	gittest.Commit(t, repo.Dir, "f?.txt", "other\n", "add f?.txt")
-	writeFile(t, repo.Dir, "f1.txt", "one changed\n")
-	writeFile(t, repo.Dir, "f?.txt", "other changed\n")
+	gittest.Commit(t, repo.Dir, "f.txt", "one\n", "add f.txt")
+	gittest.Commit(t, repo.Dir, "[f].txt", "other\n", "add [f].txt")
+	writeFile(t, repo.Dir, "f.txt", "one changed\n")
+	writeFile(t, repo.Dir, "[f].txt", "other changed\n")
 	c, id := openWorktree(t, repo.Dir)
 
-	diff, err := c.DiffWorking(t.Context(), id, "f?.txt", "", false, core.DiffOptions{})
+	diff, err := c.DiffWorking(t.Context(), id, "[f].txt", "", false, core.DiffOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if diff.OldContent != "other\n" || diff.NewContent != "other changed\n" {
-		t.Errorf("DiffWorking = %+v, want only f?.txt's contents", diff)
+		t.Errorf("DiffWorking = %+v, want only [f].txt's contents", diff)
 	}
 }
 
 func TestFR_CHG_04_DiffWorkingOfAPathLikeAStageNumberShowsItsOwnContent(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows file names cannot hold a colon")
+	}
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "x", "plain x\n", "add x")
 	gittest.Commit(t, repo.Dir, "1:x", "one colon x\n", "add 1:x")
