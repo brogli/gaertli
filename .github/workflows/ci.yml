@@ -219,9 +219,9 @@ jobs:
   git-2-42:
     # The Go tests also run against the oldest supported git (git.MinVersion),
     # built from source since ubuntu-24.04 ships a newer one. No frontend
-    # build, so only the packages that do not embed it; race detector on.
-    # Outside the Nix shell: apt supplies the GTK4 and WebKitGTK headers the
-    # Wails shell package builds against.
+    # build and no Wails shell package (it needs cgo and GTK/WebKit headers
+    # and knows nothing of git), so only the packages whose behaviour depends
+    # on git; race detector on. Outside the Nix shell, which it does not need.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -273,9 +273,7 @@ jobs:
         run: echo /opt/git-2.42/bin >> "$GITHUB_PATH"
 
       - name: Setup (online)
-        run: |
-          sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
-          go mod download
+        run: go mod download
 
       - name: Go tests with the race detector on git 2.42 (offline)
         env:
@@ -284,4 +282,4 @@ jobs:
           GOFLAGS: -mod=readonly
         run: |
           git --version
-          go tool task test:go:core FLAGS=-race
+          go tool task test:go:oldgit FLAGS=-race
