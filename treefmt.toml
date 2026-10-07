@@ -41,12 +41,19 @@ includes = [
 ]
 priority = 3
 
-# gofumpt and goimports, as .golangci.yml's formatters configure them.
-[formatter.gofumpt]
-command = "golangci-lint"
-options = ["fmt"]
+# The standalone binaries: `golangci-lint fmt` does the same work in ~40 s
+# instead of under a second.
+[formatter.goimports]
+command = "goimports"
+options = ["-w"]
 includes = ["*.go"]
 priority = 3
+
+[formatter.gofumpt]
+command = "gofumpt"
+options = ["-w"]
+includes = ["*.go"]
+priority = 4
 
 [formatter.nixfmt]
 command = "nixfmt"

@@ -22,8 +22,3 @@ linters:
         - name: context-as-argument
         - name: package-comments
         - name: redefines-builtin-id
-
-formatters:
-  enable:
-    - gofumpt
-    - goimports

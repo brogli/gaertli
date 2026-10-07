@@ -351,10 +351,13 @@ func TestTR_38_TreefmtCIFailsOnALintErrorAndAnUnformattedFile(t *testing.T) {
 	root := repoRoot(t)
 	lintFault := "frontend/src/__fixture_treefmt_lint.ts"
 	formatFault := "docs/__fixture_treefmt_format.md"
+	goFormatFault := "internal/graph/__fixture_treefmt_format.go"
 	plant(t, root, lintFault, "export function fixture(): void {\n  for (let i = 0; i < 3; i--) {\n    console.log(i)\n  }\n}\n")
 	plant(t, root, formatFault, "#  Title\n\n\n*   item\n")
+	plant(t, root, goFormatFault, "package graph\n\nimport \"strings\"\nimport \"fmt\"\n\nvar   Fixture = fmt.Sprint(strings.TrimSpace(\"x\"))\n")
 
-	assertTreefmtCIFails(t, root, []string{lintFault, formatFault}, "for-direction", formatFault)
+	assertTreefmtCIFails(t, root, []string{lintFault, formatFault, goFormatFault},
+		"for-direction", formatFault, goFormatFault)
 }
 
 // One treefmt run covers both faults: an e2e spec only the Playwright
