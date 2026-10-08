@@ -136,12 +136,26 @@ const noRows = `| ID | Requirement |
 |---|---|
 `
 
-func TestQA_MNT_02_GoTestCoversRequiredID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
-	writeFile(t, filepath.Join(cfg.GoRoot, "foo_test.go"),
-		"package foo_test\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n")
+func TestQA_MNT_02_EachSourceKindCoversRequiredID(t *testing.T) {
+	goRoot := func(c Config) string { return c.GoRoot }
+	frontendRoot := func(c Config) string { return c.FrontendRoot }
+	cases := []struct {
+		name, file, content string
+		root                func(Config) string
+	}{
+		{"go test", "foo_test.go", "package foo_test\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n", goRoot},
+		{"vitest", "src/components/__tests__/foo.spec.ts", "import { it } from 'vitest'\n\nit('FR-AB-01 does a thing', () => {})\n", frontendRoot},
+		{"vitest each", "src/components/__tests__/foo.spec.ts", "import { it } from 'vitest'\n\nit.each([\n  { name: 'a' },\n  { name: 'b' },\n])(`FR-AB-01 does a thing with $name`, () => {})\n", frontendRoot},
+		{"playwright", "e2e-real/foo.spec.ts", "import { test } from './fixtures'\n\ntest('FR-AB-01 does a thing', async () => {})\n", frontendRoot},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
+			writeFile(t, filepath.Join(c.root(cfg), c.file), c.content)
 
-	assertReport(t, cfg, "")
+			assertReport(t, cfg, "")
+		})
+	}
 }
 
 func TestQA_MNT_02_GoTestNameDigitBoundaryDoesNotFalseMatch(t *testing.T) {
@@ -156,30 +170,6 @@ func TestQA_MNT_02_GoTestNameDigitBoundaryDoesNotFalseMatch(t *testing.T) {
 	if !strings.Contains(out, "FR-AB-01") {
 		t.Errorf("output = %q, want it to mention FR-AB-01", out)
 	}
-}
-
-func TestQA_MNT_02_VitestCoversRequiredID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
-	writeFile(t, filepath.Join(cfg.FrontendRoot, "src/components/__tests__/foo.spec.ts"),
-		"import { it } from 'vitest'\n\nit('FR-AB-01 does a thing', () => {})\n")
-
-	assertReport(t, cfg, "")
-}
-
-func TestQA_MNT_02_VitestEachRowCoversRequiredID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
-	writeFile(t, filepath.Join(cfg.FrontendRoot, "src/components/__tests__/foo.spec.ts"),
-		"import { it } from 'vitest'\n\nit.each([\n  { name: 'a' },\n  { name: 'b' },\n])(`FR-AB-01 does a thing with $name`, () => {})\n")
-
-	assertReport(t, cfg, "")
-}
-
-func TestQA_MNT_02_PlaywrightSpecCoversRequiredID(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
-	writeFile(t, filepath.Join(cfg.FrontendRoot, "e2e-real", "foo.spec.ts"),
-		"import { test } from './fixtures'\n\ntest('FR-AB-01 does a thing', async () => {})\n")
-
-	assertReport(t, cfg, "")
 }
 
 func TestQA_MNT_02_ManualChecklistCoversRequiredID(t *testing.T) {

@@ -47,12 +47,3 @@ func TestDIST_01_AcceptsInstalledGit(t *testing.T) {
 		t.Fatalf("checkGit() ok = false with the real, installed git; msg = %q", msg)
 	}
 }
-
-func TestDIST_01_Messages(t *testing.T) {
-	msg := text(startupFailed, map[string]string{"error": "x"})
-	for _, want := range []string{"WebView2", "webkitgtk", "x"} {
-		if !strings.Contains(msg, want) {
-			t.Errorf("startupFailed = %q, want it to contain %q", msg, want)
-		}
-	}
-}

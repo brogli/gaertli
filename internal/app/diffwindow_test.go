@@ -17,6 +17,7 @@ func TestFR_DIFF_07_DiffWindowTitleNamesTheWorktreeAndWhatItShows(t *testing.T) 
 		want   string
 	}{
 		{DiffTarget{Kind: CommitDiff, Sha: a}, "project: 1111111"},
+		{DiffTarget{Kind: CommitDiff, Sha: "abc"}, "project: abc"},
 		{DiffTarget{Kind: RangeDiff, From: a, To: b}, "project: compare 1111111..2222222"},
 		{DiffTarget{Kind: AgainstWorkingDiff, Sha: a}, "project: compare 1111111..working tree"},
 		{DiffTarget{Kind: WorkingDiff}, "project: changes"},

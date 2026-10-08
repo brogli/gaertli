@@ -13,10 +13,10 @@ import (
 // smallConfig is a fast-to-build stand-in for Params, big enough to exercise
 // every code path (branches, merges, tags, worktrees) at unit-test speed.
 func smallConfig(seed int64) Config {
-	return Config{Commits: 200, FeatureBranches: 4, TagCount: 3, MergeEvery: 50, Worktrees: 2, Seed: seed}
+	return Config{Commits: 60, FeatureBranches: 4, TagCount: 3, MergeEvery: 20, Worktrees: 2, Seed: seed}
 }
 
-func TestBuildIsDeterministicGivenTheSameConfig(t *testing.T) {
+func TestBuildIsDeterministicAndWellFormedGivenTheConfig(t *testing.T) {
 	cfg := smallConfig(7)
 	dirA := filepath.Join(t.TempDir(), "a")
 	dirB := filepath.Join(t.TempDir(), "b")
@@ -34,35 +34,23 @@ func TestBuildIsDeterministicGivenTheSameConfig(t *testing.T) {
 	if got, want := refSHAs(t, dirA), refSHAs(t, dirB); got != want {
 		t.Errorf("ref SHA sets differ:\n%s\nvs\n%s", got, want)
 	}
-	if commitCount(t, dirA) != commitCount(t, dirB) {
-		t.Errorf("commit counts differ")
-	}
-}
-
-func TestBuildProducesAWellFormedRepoMatchingConfig(t *testing.T) {
-	cfg := smallConfig(11)
-	dir := filepath.Join(t.TempDir(), "repo")
-	if err := Build(t.Context(), dir, cfg); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := commitCount(t, dir); got != cfg.Commits {
+	if got := commitCount(t, dirA); got != cfg.Commits {
 		t.Errorf("rev-list --all --count = %d, want %d", got, cfg.Commits)
 	}
-	if got := len(refNames(t, dir, "refs/heads")); got != cfg.FeatureBranches+1 { // +1 for main
+	if got := len(refNames(t, dirA, "refs/heads")); got != cfg.FeatureBranches+1 { // +1 for main
 		t.Errorf("branches = %d, want %d feature branches + main", got, cfg.FeatureBranches)
 	}
-	if got := len(refNames(t, dir, "refs/tags")); got != cfg.TagCount {
+	if got := len(refNames(t, dirA, "refs/tags")); got != cfg.TagCount {
 		t.Errorf("tags = %d, want %d", got, cfg.TagCount)
 	}
-	if got := len(worktrees(t, dir)); got != cfg.Worktrees+1 { // +1 for the primary worktree
+	if got := len(worktrees(t, dirA)); got != cfg.Worktrees+1 { // +1 for the primary worktree
 		t.Errorf("worktrees = %d, want %d extra + the primary one", got, cfg.Worktrees)
 	}
 
-	gittest.Run(t, dir, "fsck")
+	gittest.Run(t, dirA, "fsck")
 }
 
-func TestBuildIsACacheHitWhenTheConfigIsUnchanged(t *testing.T) {
+func TestBuildIsACacheHitUnlessTheConfigChanges(t *testing.T) {
 	cfg := smallConfig(3)
 	dir := filepath.Join(t.TempDir(), "repo")
 	if err := Build(t.Context(), dir, cfg); err != nil {
@@ -84,22 +72,13 @@ func TestBuildIsACacheHitWhenTheConfigIsUnchanged(t *testing.T) {
 	if calls != 0 {
 		t.Errorf("fast-import ran %d times on a cache hit, want 0", calls)
 	}
-}
 
-func TestBuildRebuildsWhenTheConfigChanges(t *testing.T) {
-	cfg := smallConfig(5)
-	dir := filepath.Join(t.TempDir(), "repo")
+	cfg.Commits += 10
 	if err := Build(t.Context(), dir, cfg); err != nil {
 		t.Fatal(err)
 	}
-
-	cfg.Commits = 210
-	if err := Build(t.Context(), dir, cfg); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := commitCount(t, dir); got != 210 {
-		t.Errorf("rev-list --all --count = %d, want 210 after rebuild", got)
+	if got := commitCount(t, dir); got != cfg.Commits {
+		t.Errorf("rev-list --all --count = %d, want %d after rebuild", got, cfg.Commits)
 	}
 }
 

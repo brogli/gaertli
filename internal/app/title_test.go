@@ -14,9 +14,3 @@ func TestFR_WT_09_WindowTitle(t *testing.T) {
 		}
 	}
 }
-
-func TestFR_DIFF_07_ShortSHAKeepsAShorterSHA(t *testing.T) {
-	if got := shortSHA("abc"); got != "abc" {
-		t.Errorf("shortSHA(%q) = %q, want %q", "abc", got, "abc")
-	}
-}

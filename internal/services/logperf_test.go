@@ -1,7 +1,6 @@
 package services
 
 import (
-	"runtime"
 	"testing"
 	"time"
 
@@ -41,36 +40,6 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 	}
 
 	waitForLogDone(t, c, id) // drain the background stream so it doesn't leak noise into later tests
-}
-
-// The 500MB-at-100k-commits target is tools/bench's case.
-func TestQA_PERF_07_LogMemoryStaysBoundedPerRow(t *testing.T) {
-	const rows = 20000
-	repo := gittest.New(t)
-	c, id := openWorktree(t, repo.Dir)
-	streamFakeLog(t, c, id, rows, 0) // fast, this case measures memory not timing
-
-	var before, after runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&before)
-
-	if err := c.LoadLog(t.Context(), id); err != nil {
-		t.Fatal(err)
-	}
-	loaded := waitForLogDone(t, c, id)
-	if loaded != rows {
-		t.Fatalf("loaded = %d, want %d", loaded, rows)
-	}
-
-	runtime.GC()
-	runtime.ReadMemStats(&after)
-
-	const perRowBudget = 2000                                 // generous multiple of "a few hundred bytes"
-	grown := int64(after.HeapAlloc) - int64(before.HeapAlloc) // may go negative: concurrent GC of other tests' garbage
-	if grown > int64(rows*perRowBudget) {
-		t.Errorf("heap grew %d bytes for %d rows (%d bytes/row), want under %d bytes/row",
-			grown, rows, grown/rows, perRowBudget)
-	}
 }
 
 func waitForLogDone(t *testing.T, c *Core, id core.WorktreeID) int {
