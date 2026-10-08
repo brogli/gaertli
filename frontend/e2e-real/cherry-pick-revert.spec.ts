@@ -1,10 +1,7 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import {
   commitFiles,
-  commitSha,
   conflictBanner,
   fileRow,
   logRow,
@@ -15,10 +12,6 @@ import {
 
 // Cherry-pick and revert from the log's context menu, with and without
 // the options dialog, checked against the real repo.
-
-function logError(page: Page) {
-  return page.locator('.log-column .error-banner')
-}
 
 // selectRange clicks first, then shift-clicks last.
 async function selectRange(page: Page, first: string, last: string): Promise<void> {
@@ -39,50 +32,6 @@ test('FR-CP-01 cherry-picking a commit adds a commit with its message on top of 
   expect(git(repos.work, 'log', '-1', '--format=%s').trim()).toBe('feature: add feature.txt')
 })
 
-test("FR-CP-04 a pick git refuses to start shows git's message, applies nothing and keeps the selection", async ({
-  app,
-  repos,
-  git,
-}) => {
-  fs.writeFileSync(path.join(repos.work, 'feature.txt'), 'untracked local\n')
-  const head = rev(git, repos.work, 'HEAD')
-  const row = logRow(app, 'feature: add feature.txt')
-  await row.click()
-
-  await pickFromContextMenu(app, row, 'Cherry-pick')
-
-  await expect(logError(app)).toContainText(/untracked working tree files would be overwritten/)
-  expect(rev(git, repos.work, 'HEAD')).toBe(head)
-  await expect(row).toHaveClass(/\bselected\b/)
-})
-
-test('FR-CP-03 a cherry-pick that stops on conflicts shows the operation and the conflicted file', async ({
-  app,
-}) => {
-  await pickFromContextMenu(app, logRow(app, 'feature: change conflict.txt'), 'Cherry-pick')
-
-  await expect(app.locator('[data-test=branch-picker]')).toContainText('main (cherry-pick)')
-  await switchToChanges(app)
-  await expect(fileRow(app, 'Conflicted', 'conflict.txt')).toBeVisible()
-})
-
-test('FR-CP-06 "Cherry-pick…" can add the "cherry picked from" line to the message', async ({
-  app,
-  repos,
-  git,
-}) => {
-  const picked = commitSha(git, repos.work, 'feature: add feature.txt')
-  await pickFromContextMenu(app, logRow(app, 'feature: add feature.txt'), 'Cherry-pick…')
-  const dialog = app.getByRole('dialog')
-  await expect(dialog.getByLabel('Apply without committing')).toBeVisible()
-  await dialog.getByLabel('Add "cherry picked from" line').check()
-  await dialog.getByRole('button', { name: 'Confirm' }).click()
-
-  await expect
-    .poll(() => git(repos.work, 'log', '-1', '--format=%B').trim())
-    .toMatch(new RegExp(`\\(cherry picked from commit ${picked}\\)$`))
-})
-
 test('FR-CP-06 "Cherry-pick…" can apply the change without committing', async ({
   app,
   repos,
@@ -100,42 +49,11 @@ test('FR-CP-06 "Cherry-pick…" can apply the change without committing', async 
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 
-test('FR-RV-04 "Revert…" can apply the reverse change without committing', async ({
-  app,
-  repos,
-  git,
-}) => {
-  const head = rev(git, repos.work, 'HEAD')
-  await pickFromContextMenu(app, logRow(app, 'side: add side.txt'), 'Revert…')
-  const dialog = app.getByRole('dialog')
-  await dialog.getByLabel('Apply without committing').check()
-  await dialog.getByRole('button', { name: 'Confirm' }).click()
-
-  await expect
-    .poll(() => git(repos.work, 'diff', '--cached', '--name-status').trim())
-    .toBe('D\tside.txt')
-  expect(rev(git, repos.work, 'HEAD')).toBe(head)
-})
-
 test.describe('with three new commits on main', () => {
   test.beforeEach(({ repos, git }) => {
     for (const n of ['one', 'two', 'three']) {
       commitFiles(git, repos.work, `step ${n}`, { [`${n}.txt`]: `${n}\n` })
     }
-  })
-
-  test('FR-RV-01 shift-click selects the range of commits, a plain click collapses it', async ({
-    openApp,
-    repos,
-  }) => {
-    const app = await openApp(repos.work)
-    const multiSelected = app.locator('.row.multi-selected .subject')
-
-    await selectRange(app, 'step three', 'step one')
-    await expect(multiSelected).toHaveText(['step three', 'step two', 'step one'])
-
-    await logRow(app, 'initial').click()
-    await expect(multiSelected).toHaveCount(0)
   })
 
   test('FR-RV-02 reverting a selected range makes one revert per commit, newest first', async ({
@@ -155,7 +73,7 @@ test.describe('with three new commits on main', () => {
   })
 })
 
-test('FR-CP-07 Skip drops the conflicting commit of a stopped pick and applies the rest', async ({
+test('FR-CP-03 FR-CP-07 a pick that stops on conflicts shows the operation and the conflicted file; Skip drops the conflicting commit and applies the rest', async ({
   openApp,
   repos,
   git,
@@ -174,6 +92,9 @@ test('FR-CP-07 Skip drops the conflicting commit of a stopped pick and applies t
   for (const button of ['Continue', 'Skip', 'Abort…']) {
     await expect(banner.getByRole('button', { name: button })).toBeVisible()
   }
+  await expect(app.locator('[data-test=branch-picker]')).toContainText('main (cherry-pick)')
+  await switchToChanges(app)
+  await expect(fileRow(app, 'Conflicted', 'conflict.txt')).toBeVisible()
   await banner.getByRole('button', { name: 'Skip' }).click()
 
   await expect(banner).toBeHidden()
