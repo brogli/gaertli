@@ -16,6 +16,9 @@ export { expect }
 
 const serverBin = path.resolve(process.env.NEBEGIT_SERVER_BIN ?? '../bin/nebegit-server')
 
+const maxStartAttempts = 5
+const portTaken = 'failed to listen on'
+
 interface Server {
   url: string
   pid: number
@@ -74,19 +77,14 @@ export const test = base.extend<Options & Fixtures>({
       JSON.stringify(seedSettings(sandbox, repos, open, settings)),
     )
     const logPath = path.join(sandbox.dir, 'server.log')
-    const port = await freePort()
-    const proc = spawn(serverBin, [], {
-      cwd: sandbox.dir,
-      env: { ...sandbox.env, WAILS_SERVER_PORT: String(port) },
-      stdio: ['ignore', fs.openSync(logPath, 'w'), fs.openSync(logPath, 'a')],
-    })
-    const url = `http://localhost:${port}`
+    let proc: ChildProcess | undefined
     try {
-      await waitUntilServing(url, proc)
+      const started = await startServer(sandbox, logPath)
+      proc = started.proc
       expectNoGitEditor(proc.pid!)
-      await use({ url, pid: proc.pid! })
+      await use({ url: started.url, pid: proc.pid! })
     } finally {
-      await stop(proc)
+      if (proc) await stop(proc)
       if (testInfo.status !== testInfo.expectedStatus)
         await testInfo.attach('server.log', { path: logPath })
     }
@@ -198,6 +196,33 @@ interface WailsEvent {
 
 function isFullLogLoaded(e: WailsEvent): boolean {
   return e.name === 'log:progress' && e.data?.done === true && !e.data.filtered
+}
+
+// startServer spawns the server on a free port. The probe in freePort
+// releases its port before the server binds it, so a parallel worker can
+// take it in between; the server then exits with a listen failure and is
+// started again on a new port.
+async function startServer(
+  sandbox: Sandbox,
+  logPath: string,
+): Promise<{ proc: ChildProcess; url: string }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await freePort()
+    const proc = spawn(serverBin, [], {
+      cwd: sandbox.dir,
+      env: { ...sandbox.env, WAILS_SERVER_PORT: String(port) },
+      stdio: ['ignore', fs.openSync(logPath, 'w'), fs.openSync(logPath, 'a')],
+    })
+    const url = `http://localhost:${port}`
+    try {
+      await waitUntilServing(url, proc)
+      return { proc, url }
+    } catch (e) {
+      await stop(proc)
+      if (attempt === maxStartAttempts || !fs.readFileSync(logPath, 'utf8').includes(portTaken))
+        throw e
+    }
+  }
 }
 
 function freePort(): Promise<number> {
