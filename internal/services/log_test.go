@@ -353,15 +353,11 @@ func TestQA_PERF_08_LargeLoadWritesCommitGraphOnce(t *testing.T) {
 	largeRepoRows.Store(3)
 	t.Cleanup(func() { largeRepoRows.Store(prev) })
 
+	step := func(n string) gittest.Step { return gittest.Step{Message: n, Files: map[string]string{"a.txt": n}} }
 	large := gittest.New(t)
-	gittest.Commit(t, large.Dir, "a.txt", "1", "one")
-	gittest.Commit(t, large.Dir, "a.txt", "2", "two")
-	gittest.Commit(t, large.Dir, "a.txt", "3", "three")
-	gittest.Commit(t, large.Dir, "a.txt", "4", "four")
-
+	gittest.History(t, large.Dir, step("1"), step("2"), step("3"), step("4"))
 	small := gittest.New(t)
-	gittest.Commit(t, small.Dir, "a.txt", "1", "one")
-	gittest.Commit(t, small.Dir, "a.txt", "2", "two")
+	gittest.History(t, small.Dir, step("1"), step("2"))
 
 	c := New(func(core.Event) {})
 
@@ -374,10 +370,7 @@ func TestQA_PERF_08_LargeLoadWritesCommitGraphOnce(t *testing.T) {
 	loadLog(t, c, smallInfo.ID)
 
 	// The write runs after the done signal, so wait for its recorded call.
-	deadline := time.Now().Add(10 * time.Second)
-	for countCommands(largeRec, "git commit-graph write") == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitFor(t, func() bool { return countCommands(largeRec, "git commit-graph write") > 0 })
 	largeGraph := filepath.Join(large.Dir, ".git", "objects", "info", "commit-graph")
 	if _, err := os.Stat(largeGraph); err != nil {
 		t.Errorf("large repo commit-graph missing: %v", err)
@@ -609,6 +602,22 @@ func waitFor(t *testing.T, cond func() bool) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
+}
+
+// waitForFirstRow polls LogRows until id's load, filtered or not, holds a
+// row, and returns that first row's result.
+func waitForFirstRow(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsResult {
+	t.Helper()
+	var res core.LogRowsResult
+	waitFor(t, func() bool {
+		var err error
+		res, err = c.LogRows(t.Context(), id, 0, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(res.Rows) > 0
+	})
+	return res
 }
 
 // waitForLogRows polls LogRows until the window's load, filtered or not,

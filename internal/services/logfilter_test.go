@@ -339,24 +339,9 @@ func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *tes
 		t.Fatal(err)
 	}
 
-	var elapsed time.Duration
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		res, err := c.LogRows(t.Context(), id, 0, 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(res.Rows) > 0 {
-			elapsed = time.Since(start)
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	waitForFirstRow(t, c, id)
 
-	if elapsed == 0 {
-		t.Fatal("no filtered row observed within 500ms")
-	}
-	if elapsed > 500*time.Millisecond {
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("first filtered row observable after %s, want well under 500ms (the full 1s unstreamed load)", elapsed)
 	}
 

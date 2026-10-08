@@ -134,8 +134,7 @@ func TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingRebasedElsewhere(t *tes
 
 // TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingBisected asks the
 // bisecting worktree itself to rename (refuseBranchInUse finds a branch in
-// use in any worktree, this one included, the way UpdateBranch already does)
-// and the main worktree to delete.
+// use in any worktree, this one included) and the main worktree to delete.
 func TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingBisected(t *testing.T) {
 	t.Parallel()
 	repo, wtDir := bisectInProgressFixture(t)
@@ -436,9 +435,8 @@ func TestFR_BR_01_CreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
 	}
 }
 
-// TestFR_BR_01_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush
-// covers the owner's decision end to end: a branch started at a remote
-// branch tracks nothing until it is pushed, then gets its own upstream.
+// A branch started at a remote branch tracks nothing until its first push
+// gives it its own upstream.
 func TestFR_BR_01_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

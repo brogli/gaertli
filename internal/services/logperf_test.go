@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -18,18 +17,9 @@ func TestQA_PERF_02_FR_LOG_09_FirstRowObservableWhileLoadingWellUnderFullStreamD
 		t.Fatal(err)
 	}
 
-	var observed core.LogRowsResult
-	waitFor(t, func() bool {
-		var err error
-		observed, err = c.LogRows(t.Context(), id, 0, 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return len(observed.Rows) > 0
-	})
-	elapsed := time.Since(start)
+	observed := waitForFirstRow(t, c, id)
 
-	if elapsed > 500*time.Millisecond {
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Errorf("first row observable after %s, want well under 500ms (the full 1s unstreamed load)", elapsed)
 	}
 
