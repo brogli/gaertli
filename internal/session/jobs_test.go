@@ -46,7 +46,7 @@ func TestFR_SYNC_07_RepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 			if info.Progress == 50 {
 				sawProgress = true
 			}
-			if info.State == "done" {
+			if info.State == core.JobDone {
 				sawDone = true
 			}
 		case <-deadline:

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,11 +37,10 @@ func newConfig(t *testing.T, functional, quality, distribution, testing string) 
 	writeFile(t, filepath.Join(cfg.RequirementsDir, "quality.md"), quality)
 	writeFile(t, filepath.Join(cfg.RequirementsDir, "distribution.md"), distribution)
 	writeFile(t, cfg.TestingPath, testing)
-	if err := os.MkdirAll(cfg.GoRoot, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(cfg.FrontendRoot, 0o755); err != nil {
-		t.Fatal(err)
+	for _, root := range []string{cfg.GoRoot, cfg.FrontendRoot} {
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return cfg
 }
@@ -104,17 +104,8 @@ func TestQA_MNT_02_RequiredIDsAreTheMustFRFromEveryFunctionalFile(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	want := map[string]bool{"FR-AB-01": true, "FR-GH-01": true}
-	if len(required) != len(want) {
-		t.Fatalf("required = %v, want %v", required, want)
-	}
-	for id := range want {
-		if !required[id] {
-			t.Errorf("required missing %s", id)
-		}
-	}
-	if required["FR-CD-01"] {
-		t.Error("SHOULD requirement FR-CD-01 must be excluded")
+	if want := map[string]bool{"FR-AB-01": true, "FR-GH-01": true}; !maps.Equal(required, want) {
+		t.Errorf("required = %v, want %v: MUST rows of every .md file, no SHOULD row", required, want)
 	}
 }
 

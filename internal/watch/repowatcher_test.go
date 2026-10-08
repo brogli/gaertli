@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -46,9 +47,8 @@ func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
 		if len(got) != 2 {
 			t.Fatalf("onChange calls = %d %v, want 2", len(got), got)
 		}
-		seen := map[core.ChangeScope]bool{got[0]: true, got[1]: true}
-		if !seen[core.RefsChanged] || !seen[core.StateChanged] {
-			t.Errorf("onChange scopes = %v, want one core.RefsChanged and one State", got)
+		if !slices.Contains(got, core.RefsChanged) || !slices.Contains(got, core.StateChanged) {
+			t.Errorf("onChange scopes = %v, want one RefsChanged and one StateChanged", got)
 		}
 	})
 }

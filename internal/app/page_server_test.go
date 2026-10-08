@@ -3,6 +3,7 @@
 package app
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -87,12 +88,10 @@ func TestTR_31_ServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
 	hold.send("p", "c", nil)
 	waitFor(t, func() bool { return len(f.names()) == 3 })
 
-	for i, want := range []string{"a", "b", "c"} {
-		if got := f.names()[i]; got != want {
-			t.Fatalf("event %d = %q, want %q (all: %v)", i, got, want, f.names())
-		}
+	if got, want := f.names(), []string{"a", "b", "c"}; !slices.Equal(got, want) {
+		t.Fatalf("events = %v, want %v", got, want)
 	}
-	waitFor(t, func() bool { return hold.idle() })
+	waitFor(t, hold.idle)
 	hold.send("p", "d", nil)
 	if got := f.names(); len(got) != 4 || got[3] != "d" {
 		t.Fatalf("direct send after drain: %v", got)
@@ -108,7 +107,7 @@ func TestTR_31_ServerPageDropsHeldEventsOfAGonePage(t *testing.T) {
 	hold.giveUp = 20 * time.Millisecond
 
 	hold.send("p", "a", nil)
-	waitFor(t, func() bool { return hold.idle() })
+	waitFor(t, hold.idle)
 	if got := f.names(); len(got) != 0 {
 		t.Fatalf("sent for a gone page: %v", got)
 	}
