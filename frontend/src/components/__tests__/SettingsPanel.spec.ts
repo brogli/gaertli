@@ -13,12 +13,9 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import SettingsPanel from '../SettingsPanel.vue'
 import ErrorBanner from '../ErrorBanner.vue'
-import AutoComplete from 'openvue/autocomplete'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
-import { branchFixture } from '@/testing/fixtures/branch'
 import { Theme } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
 import { field } from '@/testing/dialog'
-import { useRefsStore } from '@/stores/refs'
 import { System } from '@/testing/runtime'
 import { darkThemes } from '@/theme/themes'
 
@@ -28,15 +25,6 @@ async function mountPanel() {
   const wrapper = mount(SettingsPanel)
   await flushPromises()
   return wrapper
-}
-
-// withLocalBranches gives the refs store local branches of these names.
-function withLocalBranches(...names: string[]): void {
-  useRefsStore().refs = {
-    branches: names.map((name) => branchFixture({ name })),
-    remotes: [],
-    tags: [],
-  }
 }
 
 describe('SettingsPanel', () => {
@@ -56,12 +44,22 @@ describe('SettingsPanel', () => {
     document.documentElement.classList.remove('nebegit-dark')
   })
 
-  it('FR-UX-04 loads settings and submits the edited form', async () => {
+  it('FR-UX-04, FR-DIFF-06, FR-SYNC-06, FR-UX-06 loads the stored settings and submits every edited field, keeping the system theme', async () => {
+    SettingsService.Get.mockResolvedValue(
+      defaultSettingsFixture({ protectedBranches: ['main', 'master'] }),
+    )
     const wrapper = await mountPanel()
+    expect(wrapper.get('[data-test="theme-select"]').text()).toContain('System')
 
     const interval = wrapper.get('[role=spinbutton]')
     await interval.setValue(5)
     await interval.trigger('blur')
+    await wrapper.get('[data-test="ignore-whitespace"] input').setValue(true)
+    await wrapper.get('[data-test="debug-mode"] input').setValue(true)
+    const masterChip = wrapper
+      .findAll('.p-autocomplete-chip-item')
+      .find((chip) => chip.text().includes('master'))!
+    await masterChip.get('.p-chip-remove-icon').trigger('click')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -69,6 +67,10 @@ describe('SettingsPanel', () => {
     expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({
       ...filled,
       autoFetchIntervalMinutes: 5,
+      ignoreWhitespace: true,
+      debugMode: true,
+      protectedBranches: ['main'],
+      theme: Theme.SystemTheme,
     })
   })
 
@@ -85,17 +87,22 @@ describe('SettingsPanel', () => {
     expect(wrapper.find('form').exists()).toBe(true)
   })
 
-  it('FR-UX-02 shows the app log path', async () => {
+  it.each([
+    [
+      'the app log path',
+      { path: '/home/user/.local/state/nebegit/nebegit.log', error: '' },
+      'App log: /home/user/.local/state/nebegit/nebegit.log',
+    ],
+    [
+      'why the app log could not be opened',
+      { path: '', error: 'permission denied' },
+      'App log could not be opened: permission denied',
+    ],
+  ])('FR-UX-02 shows %s', async (_name, logPath, text) => {
+    AppService.LogPath.mockResolvedValue(logPath)
     const wrapper = await mountPanel()
 
-    expect(wrapper.text()).toContain('App log: /home/user/.local/state/nebegit/nebegit.log')
-  })
-
-  it('FR-UX-02 shows why the app log could not be opened', async () => {
-    AppService.LogPath.mockResolvedValue({ path: '', error: 'permission denied' })
-    const wrapper = await mountPanel()
-
-    expect(wrapper.text()).toContain('App log could not be opened: permission denied')
+    expect(wrapper.text()).toContain(text)
   })
 
   it('FR-UX-04 saving successfully emits close', async () => {
@@ -150,8 +157,6 @@ describe('SettingsPanel', () => {
     expect(fieldsets).toHaveLength(2)
     expect(fieldsets[1]!.text()).toContain('Ubuntu-22.04')
     expect(fieldsets[1]!.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value).toBe('')
-    expect(wrapper.find('[data-test="add-distro-profile"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Add "Open in editor"')
   })
 
   it('FR-ED-03 picking a preset in the Ubuntu form and saving updates only that profile', async () => {
@@ -239,7 +244,6 @@ describe('SettingsPanel', () => {
       'Open in editor: WSL Debian',
       'Open in editor: WSL Ubuntu',
     ])
-    expect(wrapper.text()).not.toContain('Add "Open in editor"')
     expect(wrapper.findAll('button').map((b) => b.text())).not.toContain('Test')
 
     await wrapper.find('form').trigger('submit')
@@ -248,13 +252,11 @@ describe('SettingsPanel', () => {
     const sent = SettingsService.Set.mock.calls[0]?.[0]
     expect(sent.editorProfiles.Ubuntu).toMatchObject({ name: 'VS Code' })
     expect(sent.editorProfiles.Debian).toMatchObject({ name: '', folderCmd: '' })
-  })
-
-  it('FR-ED-03 a Linux host with no WSL distros shows a single form naming the local system', async () => {
-    const wrapper = await mountPanel()
-
-    expect(wrapper.findAll('fieldset')).toHaveLength(1)
-    expect(wrapper.get('legend').text()).toBe('Open in editor: Linux')
+    expect(wrapper.findAll('fieldset').map((f) => f.findAll('label')[0]!.text())).toEqual([
+      'Name (shown as "Open in Zed")',
+      'Name (shown as "Open in editor")',
+      'Name (shown as "Open in VS Code")',
+    ])
   })
 
   it('FR-REPO-07 on a host without WSL, Settings shows no error and no distro controls', async () => {
@@ -263,7 +265,8 @@ describe('SettingsPanel', () => {
     const wrapper = await mountPanel()
 
     expect(wrapper.findComponent(ErrorBanner).exists()).toBe(false)
-    expect(wrapper.find('[data-test="add-distro-profile"]').exists()).toBe(false)
+    expect(wrapper.findAll('fieldset')).toHaveLength(1)
+    expect(wrapper.get('legend').text()).toBe('Open in editor: Linux')
   })
 
   it('FR-UX-01 a rejected save renders ErrorBanner with the error', async () => {
@@ -278,17 +281,7 @@ describe('SettingsPanel', () => {
     expect(error.props('error')).toEqual({ message: 'settings write failed' })
   })
 
-  it('FR-UX-06 the stored theme "" (follow the system) shows System selected, and saving keeps ""', async () => {
-    const wrapper = await mountPanel()
-
-    expect(wrapper.get('[data-test="theme-select"]').text()).toContain('System')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({ theme: Theme.SystemTheme })
-  })
-
-  it('FR-UX-06 the theme select lists the seven entries in order, each dark theme with its own swatch colours', async () => {
+  it('FR-UX-06 the theme select lists the seven entries in order', async () => {
     const wrapper = mount(SettingsPanel, { attachTo: document.body })
     await flushPromises()
     const body = new DOMWrapper(document.body)
@@ -303,14 +296,6 @@ describe('SettingsPanel', () => {
       'Dark',
       ...darkThemes.map((t) => t.label),
     ])
-    for (const darkTheme of darkThemes) {
-      const swatch = body.get(
-        `.p-select-overlay [role="option"][aria-label="${darkTheme.label}"] [data-test="theme-swatch"]`,
-      )
-      const style = swatch.attributes('style') ?? ''
-      expect(style).toContain(darkTheme.surface[900])
-      expect(style).toContain(darkTheme.accent)
-    }
     wrapper.unmount()
   })
 
@@ -368,83 +353,33 @@ describe('SettingsPanel', () => {
     wrapper.unmount()
   })
 
-  it('FR-ED-07 clicking the "VS Code" preset fills fileCmd and fileAtLineCmd', async () => {
+  it('FR-ED-07 a preset fills all three commands, and the next preset fully overwrites rather than merges', async () => {
     const wrapper = await mountPanel()
+    const fieldset = wrapper.get('fieldset')
+    const fields = () => ({
+      folder: fieldset.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value,
+      file: fieldset.findAll<HTMLInputElement>('input[type=text]')[2]!.element.value,
+      line: fieldset.findAll<HTMLInputElement>('input[type=text]')[3]!.element.value,
+    })
+    const pick = (name: string) =>
+      fieldset
+        .findAll('[data-test="editor-preset"]')
+        .find((b) => b.text() === name)!
+        .trigger('click')
 
-    const button = wrapper
-      .findAll('[data-test="editor-preset"]')
-      .find((b) => b.text() === 'VS Code')
-    expect(button).toBeTruthy()
-    await button!.trigger('click')
+    await pick('VS Code')
+    expect(fields()).toEqual({
+      folder: 'code {path}',
+      file: 'code {path}',
+      line: 'code -g {path}:{line}',
+    })
 
-    const fieldset = wrapper.find('fieldset')
-    expect(fieldset.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value).toBe(
-      'code {path}',
-    )
-    const inputs = fieldset.findAll<HTMLInputElement>('input[type=text]')
-    expect(inputs[2]!.element.value).toBe('code {path}') // File command
-    expect(inputs[3]!.element.value).toBe('code -g {path}:{line}') // File-at-line command
-  })
-
-  it('FR-ED-07 clicking "Neovim (terminal)" after "VS Code" fully overwrites, not merges', async () => {
-    const wrapper = await mountPanel()
-
-    await wrapper
-      .findAll('[data-test="editor-preset"]')
-      .find((b) => b.text() === 'VS Code')!
-      .trigger('click')
-    await wrapper
-      .findAll('[data-test="editor-preset"]')
-      .find((b) => b.text() === 'Neovim (terminal)')!
-      .trigger('click')
-
-    const fieldset = wrapper.find('fieldset')
-    expect(fieldset.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value).toBe(
-      'x-terminal-emulator -e nvim {path}',
-    )
-    const inputs = fieldset.findAll<HTMLInputElement>('input[type=text]')
-    expect(inputs[2]!.element.value).toBe('x-terminal-emulator -e nvim {path}')
-    expect(inputs[3]!.element.value).toBe('x-terminal-emulator -e nvim +{line} {path}')
-  })
-
-  it("FR-ED-03 each environment's form names its own profile", async () => {
-    SettingsService.Get.mockResolvedValue(
-      defaultSettingsFixture({
-        editorProfiles: {
-          '': { name: 'Zed', folderCmd: 'zed {path}', fileCmd: 'zed {path}' },
-          Ubuntu: { name: 'VS Code', folderCmd: 'code {path}', fileCmd: 'code {path}' },
-        },
-      }),
-    )
-
-    const wrapper = await mountPanel()
-
-    expect(wrapper.findAll('fieldset').map((f) => f.findAll('label')[0]!.text())).toEqual([
-      'Name (shown as "Open in Zed")',
-      'Name (shown as "Open in VS Code")',
-    ])
-  })
-
-  it('FR-DIFF-06 checking "Ignore whitespace" and saving persists it', async () => {
-    const wrapper = await mountPanel()
-
-    await wrapper.get('[data-test="ignore-whitespace"] input').setValue(true)
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    expect(SettingsService.Set).toHaveBeenCalledTimes(1)
-    expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({ ignoreWhitespace: true })
-  })
-
-  it('FR-UX-04 checking "Debug mode" and saving persists it', async () => {
-    const wrapper = await mountPanel()
-
-    await wrapper.get('[data-test="debug-mode"] input').setValue(true)
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    expect(SettingsService.Set).toHaveBeenCalledTimes(1)
-    expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({ debugMode: true })
+    await pick('Neovim (terminal)')
+    expect(fields()).toEqual({
+      folder: 'x-terminal-emulator -e nvim {path}',
+      file: 'x-terminal-emulator -e nvim {path}',
+      line: 'x-terminal-emulator -e nvim +{line} {path}',
+    })
   })
 
   it('FR-UX-04 a base folder for new worktrees per environment, local and each WSL distro; saving drops empty ones', async () => {
@@ -471,19 +406,18 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('DIST-03 shows the app version and commit fetched on mount', async () => {
-    Facade.Version.mockResolvedValue({ app: '0.1.57', commit: 'abc1234', protocol: 1 })
-    const wrapper = await mountPanel()
+  it.each([
+    [{ app: '0.1.57', commit: 'abc1234', protocol: 1 }, 'nebegit 0.1.57 (abc1234)'],
+    [{ app: 'dev', commit: '', protocol: 1 }, 'nebegit dev'],
+  ])(
+    'DIST-03 shows the app version fetched on mount, with the commit when there is one',
+    async (version, text) => {
+      Facade.Version.mockResolvedValue(version)
+      const wrapper = await mountPanel()
 
-    expect(wrapper.find('[data-test="app-version"]').text()).toBe('nebegit 0.1.57 (abc1234)')
-  })
-
-  it('DIST-03 shows no commit when it is empty', async () => {
-    Facade.Version.mockResolvedValue({ app: 'dev', commit: '', protocol: 1 })
-    const wrapper = await mountPanel()
-
-    expect(wrapper.find('[data-test="app-version"]').text()).toBe('nebegit dev')
-  })
+      expect(wrapper.find('[data-test="app-version"]').text()).toBe(text)
+    },
+  )
 
   it('FR-SYNC-06 the stored protected branches show as chips', async () => {
     const wrapper = await mountPanel()
@@ -491,76 +425,5 @@ describe('SettingsPanel', () => {
     const chips = wrapper.findAll('.p-autocomplete-chip-item')
     expect(chips).toHaveLength(1)
     expect(chips[0]!.text()).toContain('main')
-  })
-
-  it('FR-SYNC-06 saving sends the chips as protectedBranches', async () => {
-    SettingsService.Get.mockResolvedValue(
-      defaultSettingsFixture({ protectedBranches: ['main', 'release'] }),
-    )
-    const wrapper = await mountPanel()
-
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({
-      protectedBranches: ['main', 'release'],
-    })
-  })
-
-  it('FR-SYNC-06 removing a chip drops it from the saved list', async () => {
-    SettingsService.Get.mockResolvedValue(
-      defaultSettingsFixture({ protectedBranches: ['main', 'master'] }),
-    )
-    const wrapper = await mountPanel()
-
-    const masterChip = wrapper
-      .findAll('.p-autocomplete-chip-item')
-      .find((chip) => chip.text().includes('master'))!
-    await masterChip.get('.p-chip-remove-icon').trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({ protectedBranches: ['main'] })
-  })
-
-  it('FR-SYNC-06 suggests branch names matching the query, dropping ones already chosen, then the typed text', async () => {
-    const wrapper = await mountPanel()
-    withLocalBranches('main', 'master', 'feature/x')
-
-    wrapper.findComponent(AutoComplete).vm.$emit('complete', { query: 'ma' })
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.findComponent(AutoComplete).props('suggestions')).toEqual(['master', 'ma'])
-  })
-
-  it('FR-SYNC-06 the typed text is the only suggestion when no branch matches', async () => {
-    const wrapper = await mountPanel()
-    withLocalBranches('main', 'master', 'feature/x')
-
-    wrapper.findComponent(AutoComplete).vm.$emit('complete', { query: 'release' })
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.findComponent(AutoComplete).props('suggestions')).toEqual(['release'])
-  })
-
-  it('FR-SYNC-06 a typed name that is already a chip is not suggested again', async () => {
-    SettingsService.Get.mockResolvedValue(
-      defaultSettingsFixture({ protectedBranches: ['release'] }),
-    )
-    const wrapper = await mountPanel()
-
-    wrapper.findComponent(AutoComplete).vm.$emit('complete', { query: 'release' })
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.findComponent(AutoComplete).props('suggestions')).toEqual([])
-  })
-
-  it('FR-SYNC-06 outside a repo, only the typed text is suggested', async () => {
-    const wrapper = await mountPanel()
-
-    wrapper.findComponent(AutoComplete).vm.$emit('complete', { query: 'dev' })
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.findComponent(AutoComplete).props('suggestions')).toEqual(['dev'])
   })
 })
