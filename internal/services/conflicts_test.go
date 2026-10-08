@@ -64,7 +64,9 @@ func stoppedByLocalOperation(t *testing.T, c *Core, kind string, files []string)
 		gittest.Step{Message: "local commit", Files: contents("local change\n")},
 	)
 	beforeHEAD := gittest.HeadSHA(t, dir)
-	tryGit(t, dir, kind, "side")
+	if tryGit(t, dir, kind, "side") != nil {
+		t.Fatalf("%s did not stop on a conflict", kind)
+	}
 	info := openOn(t, c, dir)
 	return dir, c, info.ID, beforeHEAD
 }
