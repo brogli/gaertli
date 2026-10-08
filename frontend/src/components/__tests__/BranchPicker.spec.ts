@@ -172,22 +172,16 @@ describe('BranchPicker', () => {
     expect(wrapper.find('[data-test="ahead-behind"]').exists()).toBe(false)
   })
 
-  it('FR-UX-09 narrow (400px): the button shows no ahead/behind, even with an upstream', async () => {
+  it('FR-UX-09 narrow (400px): the button shows its icon only, the branch name in title and aria-label, and no ahead/behind even with an upstream', async () => {
     window.innerWidth = 400
     const { wrapper } = await mountPicker(
       refsWith([branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })]),
       summaryFixture(),
     )
 
-    expect(wrapper.find('[data-test="ahead-behind"]').exists()).toBe(false)
-  })
-
-  it('FR-UX-09 narrow (400px): the button shows its icon only, the branch name in title and aria-label', async () => {
-    window.innerWidth = 400
-    const { wrapper } = await mountPicker(refsWith([main]), summaryFixture())
-
     const button = wrapper.get('[data-test="branch-picker"]')
     expectIconOnly(button, 'main')
+    expect(button.find('[data-test="ahead-behind"]').exists()).toBe(false)
   })
 
   it('FR-BR-08 while detached the button shows the short hash and says so', async () => {
@@ -233,79 +227,62 @@ describe('BranchPicker', () => {
     expect(Facade.Checkout).toHaveBeenCalledWith('/repo', 'x')
   })
 
-  it('FR-BR-05 a local branch checked out in another worktree asks instead of checking out, by click or "Check out"', async () => {
-    const side = branchFixture({
-      name: 'side',
-      sha: 'sha-side',
-      current: false,
-      checkedOutIn: '/repo-side',
-    })
-    const { wrapper, body } = await openPicker(refsWith([main, feat, side]))
+  it.each([
+    [
+      'a local branch checked out in another worktree',
+      branchFixture({ name: 'side', current: false, checkedOutIn: '/repo-side' }),
+      [],
+      'side',
+      '',
+    ],
+    [
+      'a local branch another worktree is rebasing or bisecting, which the event includes',
+      branchFixture({
+        name: 'side',
+        current: false,
+        checkedOutIn: '/repo-side',
+        inUse: BranchInUse.BranchRebasing,
+      }),
+      [],
+      'side',
+      BranchInUse.BranchRebasing,
+    ],
+    [
+      'a remote branch whose local branch of the same name is checked out elsewhere',
+      branchFixture({ name: 'side', current: false, checkedOutIn: '/repo-side' }),
+      [{ name: 'origin', branches: [{ name: 'side', sha: 'sha-side' }] }],
+      'origin/side',
+      '',
+    ],
+  ])(
+    'FR-BR-05 %s asks instead of checking out, by click or "Check out"',
+    async (_name, side, remotes, row, inUse) => {
+      const { wrapper, body } = await openPicker({
+        branches: [main, side],
+        remotes,
+        tags: [],
+      })
 
-    await checkoutRow(body, 'side')
-    expect(await listOpen(body)).toBe(false)
+      await checkoutRow(body, row)
+      expect(await listOpen(body)).toBe(false)
 
-    await wrapper.get('[data-test="branch-picker"]').trigger('click')
-    await flushPromises()
-    await pickAction(body, 'side', 'Check out')
+      await wrapper.get('[data-test="branch-picker"]').trigger('click')
+      await flushPromises()
+      await pickAction(body, row, 'Check out')
 
-    expect(wrapper.emitted('checkout-elsewhere')).toEqual([
-      ['side', '/repo-side', ''],
-      ['side', '/repo-side', ''],
-    ])
-    expect(AppService.SelectWorktree).not.toHaveBeenCalled()
-    expect(Facade.Checkout).not.toHaveBeenCalled()
-  })
+      const event = ['side', '/repo-side', inUse]
+      expect(wrapper.emitted('checkout-elsewhere')).toEqual([event, event])
+      expect(AppService.SelectWorktree).not.toHaveBeenCalled()
+      expect(Facade.Checkout).not.toHaveBeenCalled()
+    },
+  )
 
-  it('FR-BR-05 a local branch another worktree is rebasing or bisecting includes that in the event', async () => {
-    const rebasing = branchFixture({
-      name: 'side',
-      sha: 'sha-side',
-      current: false,
-      checkedOutIn: '/repo-side',
-      inUse: BranchInUse.BranchRebasing,
-    })
-    const { wrapper, body } = await openPicker(refsWith([main, feat, rebasing]))
-
-    await checkoutRow(body, 'side')
-
-    expect(wrapper.emitted('checkout-elsewhere')).toEqual([
-      ['side', '/repo-side', BranchInUse.BranchRebasing],
-    ])
-    expect(Facade.Checkout).not.toHaveBeenCalled()
-  })
-
-  it('FR-BR-05 a remote branch whose local branch of the same name is checked out elsewhere asks the same way', async () => {
-    const side = branchFixture({ name: 'side', current: false, checkedOutIn: '/repo-side' })
-    const { wrapper, body } = await openPicker({
-      branches: [main, side],
-      remotes: [{ name: 'origin', branches: [{ name: 'side', sha: 'sha-side' }] }],
-      tags: [],
-    })
-
-    await checkoutRow(body, 'origin/side')
-
-    expect(wrapper.emitted('checkout-elsewhere')).toEqual([['side', '/repo-side', '']])
-    expect(AppService.SelectWorktree).not.toHaveBeenCalled()
-    expect(Facade.Checkout).not.toHaveBeenCalled()
-  })
-
-  it("FR-BR-05 a checkout git refuses shows git's reason in the list", async () => {
-    Facade.Checkout.mockRejectedValueOnce(wailsError('would be overwritten', 'DIRTY_WORKTREE'))
-    const { body } = await openPicker()
-
-    await checkoutRow(body, 'feat')
-    await flushPromises()
-
-    expect(body.get('.branch-list .error-banner').text()).toContain('would be overwritten')
-  })
-
-  it('FR-BR-09 a refusal shown in the list is gone when the list opens again', async () => {
+  it("FR-BR-05 FR-BR-09 a checkout git refuses shows git's reason in the list, gone when the list opens again", async () => {
     Facade.Checkout.mockRejectedValueOnce(wailsError('would be overwritten', 'DIRTY_WORKTREE'))
     const { wrapper, body } = await openPicker()
     await checkoutRow(body, 'feat')
     await flushPromises()
-    expect(body.find('.branch-list .error-banner').exists()).toBe(true)
+    expect(body.get('.branch-list .error-banner').text()).toContain('would be overwritten')
 
     await wrapper.get('[data-test="branch-picker"]').trigger('click')
     expect(await listOpen(body)).toBe(false)
@@ -404,57 +381,63 @@ describe('BranchPicker', () => {
   })
 
   it.each([
-    ['fastForward', 'Fast-forwarded main to feat'],
-    ['merged', 'Merged feat into main'],
-    ['upToDate', 'main is already up to date with feat'],
-  ])(
-    'FR-BR-11 "Merge into main" merges the full ref; outcome %s shows a success notice',
-    async (outcome, text) => {
-      Facade.Merge.mockResolvedValueOnce({ outcome })
+    ['FR-BR-11', 'Merge', 'Merge into main', 'fastForward', 'Fast-forwarded main to feat'],
+    ['FR-BR-11', 'Merge', 'Merge into main', 'merged', 'Merged feat into main'],
+    ['FR-BR-11', 'Merge', 'Merge into main', 'upToDate', 'main is already up to date with feat'],
+    ['FR-BR-12', 'Rebase', 'Rebase main onto feat', 'rebased', 'Rebased main onto feat'],
+    [
+      'FR-BR-12',
+      'Rebase',
+      'Rebase main onto feat',
+      'upToDate',
+      'main is already up to date with feat',
+    ],
+  ] as const)(
+    '%s "%s" action calls the full ref; outcome %s shows a success notice (%#)',
+    async (_id, kind, action, outcome, text) => {
+      Facade[kind].mockResolvedValueOnce({ outcome })
       const notice = await mountNotices()
       const { body } = await openPicker()
 
-      await pickAction(body, 'feat', 'Merge into main')
+      await pickAction(body, 'feat', action)
 
-      expect(Facade.Merge).toHaveBeenCalledWith('/repo', 'refs/heads/feat', false)
+      expect(Facade[kind]).toHaveBeenCalledWith('/repo', 'refs/heads/feat', false)
       expect(notice.get('.p-toast').text()).toContain(text)
     },
   )
 
-  it('FR-BR-11 a merge refused for local changes offers "Stash and merge", which merges with stash', async () => {
-    Facade.Merge.mockRejectedValueOnce(wailsError('local changes in the way', 'DIRTY_WORKTREE'))
-    const notice = await mountNotices()
-    const { body } = await openPicker()
+  it.each([
+    ['FR-BR-11', 'Merge', 'Merge into main', 'Stash and merge'],
+    ['FR-BR-12', 'Rebase', 'Rebase main onto feat', 'Stash and rebase'],
+  ] as const)(
+    '%s a %s refused for local changes offers "%s", which retries with stash',
+    async (_id, kind, action, stashAction) => {
+      Facade[kind].mockRejectedValueOnce(wailsError('local changes in the way', 'DIRTY_WORKTREE'))
+      const notice = await mountNotices()
+      const { body } = await openPicker()
 
-    await pickAction(body, 'feat', 'Merge into main')
-    await findButton(notice, 'Stash and merge')!.trigger('click')
+      await pickAction(body, 'feat', action)
+      await findButton(notice, stashAction)!.trigger('click')
 
-    expect(Facade.Merge).toHaveBeenLastCalledWith('/repo', 'refs/heads/feat', true)
-  })
+      expect(Facade[kind]).toHaveBeenLastCalledWith('/repo', 'refs/heads/feat', true)
+    },
+  )
 
-  it('FR-CONF-09 a merge that stops on conflicts opens the diff window on the first conflicted file', async () => {
+  it('FR-CONF-09 FR-BR-11 a merge that stops on conflicts opens the diff window on the first conflicted file, with no notice', async () => {
     Facade.Merge.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
+    const notice = await mountNotices()
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Merge into main')
     await flushPromises()
 
+    expect(notice.find('.p-toast-message').exists()).toBe(false)
     expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
       kind: DiffKind.WorkingDiff,
       conflicted: true,
       path: 'a.txt',
       oldPath: '',
     })
-  })
-
-  it('FR-BR-11 a merge that stops on conflicts shows no notice', async () => {
-    Facade.Merge.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
-    const notice = await mountNotices()
-    const { body } = await openPicker()
-
-    await pickAction(body, 'feat', 'Merge into main')
-
-    expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
   it('FR-BR-11 a merge that stops for another reason shows the reason as a notice', async () => {
@@ -465,34 +448,6 @@ describe('BranchPicker', () => {
     await pickAction(body, 'feat', 'Merge into main')
 
     expect(notice.get('.p-toast').text()).toContain('hook failed')
-  })
-
-  it.each([
-    ['rebased', 'Rebased main onto feat'],
-    ['upToDate', 'main is already up to date with feat'],
-  ])(
-    'FR-BR-12 "Rebase main onto feat" rebases onto the full ref; outcome %s shows a success notice',
-    async (outcome, text) => {
-      Facade.Rebase.mockResolvedValueOnce({ outcome })
-      const notice = await mountNotices()
-      const { body } = await openPicker()
-
-      await pickAction(body, 'feat', 'Rebase main onto feat')
-
-      expect(Facade.Rebase).toHaveBeenCalledWith('/repo', 'refs/heads/feat', false)
-      expect(notice.get('.p-toast').text()).toContain(text)
-    },
-  )
-
-  it('FR-BR-12 a rebase refused for local changes offers "Stash and rebase", which rebases with stash', async () => {
-    Facade.Rebase.mockRejectedValueOnce(wailsError('local changes in the way', 'DIRTY_WORKTREE'))
-    const notice = await mountNotices()
-    const { body } = await openPicker()
-
-    await pickAction(body, 'feat', 'Rebase main onto feat')
-    await findButton(notice, 'Stash and rebase')!.trigger('click')
-
-    expect(Facade.Rebase).toHaveBeenLastCalledWith('/repo', 'refs/heads/feat', true)
   })
 
   it('FR-BR-09 clicking a row\'s "…" opens the same menu as its right-click', async () => {
