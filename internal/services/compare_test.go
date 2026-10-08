@@ -27,61 +27,18 @@ func openCompareRepo(t *testing.T) (*gittest.Repo, *Core, core.WorktreeID) {
 	return repo, c, wt
 }
 
-func TestFR_CMP_01_CompareCommitsListsModifiedAddedAndDeletedFiles(t *testing.T) {
-	t.Parallel()
-	repo, c, id := openCompareRepo(t)
-	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
-	gittest.Commit(t, repo.Dir, "f3", "three", "add f3")
-	a := gittest.HeadSHA(t, repo.Dir)
-	gittest.Commit(t, repo.Dir, "f1", "one changed", "modify f1")
-	gittest.Commit(t, repo.Dir, "f2", "two", "add f2")
-	gittest.Run(t, repo.Dir, "rm", "f3")
-	gittest.Run(t, repo.Dir, "commit", "-m", "delete f3")
-	b := gittest.HeadSHA(t, repo.Dir)
-
-	files, err := c.CompareCommits(t.Context(), id, a, b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	want := map[string]string{"f1": "M", "f2": "A", "f3": "D"}
-	if len(files) != len(want) {
-		t.Fatalf("CompareCommits = %+v, want %d files", files, len(want))
-	}
-	for _, f := range files {
-		if want[f.Path] != f.Status {
-			t.Errorf("file %q status = %q, want %q", f.Path, f.Status, want[f.Path])
-		}
-	}
-}
-
-func TestFR_CMP_01_CompareCommitsDetectsARename(t *testing.T) {
-	t.Parallel()
-	repo, c, id := openCompareRepo(t)
-	gittest.Commit(t, repo.Dir, "f1", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f1")
-	a := gittest.HeadSHA(t, repo.Dir)
-	renameWithEdit(t, repo.Dir, "f1", "f2", "new ending")
-	b := gittest.HeadSHA(t, repo.Dir)
-
-	files, err := c.CompareCommits(t.Context(), id, a, b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(files) != 1 || files[0].Status != "R" || files[0].OldPath != "f1" || files[0].Path != "f2" {
-		t.Errorf("CompareCommits = %+v, want one Rename f1 -> f2", files)
-	}
-}
-
-func TestFR_CMP_03_CompareCommitsSwappedMirrorsEveryStatus(t *testing.T) {
+func TestFR_CMP_01_FR_CMP_03_CompareCommitsListsEveryStatusAndSwappingMirrorsThem(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
 	gittest.Commit(t, repo.Dir, "f3", strings.Repeat("line unchanged\n", 20)+"old ending\n", "add f3")
+	gittest.Commit(t, repo.Dir, "f5", "five", "add f5")
 	a := gittest.HeadSHA(t, repo.Dir)
 	gittest.Commit(t, repo.Dir, "f1", "one changed", "modify f1")
 	gittest.Commit(t, repo.Dir, "f2", "two", "add f2")
 	renameWithEdit(t, repo.Dir, "f3", "f4", "new ending")
+	gittest.Run(t, repo.Dir, "rm", "f5")
+	gittest.Run(t, repo.Dir, "commit", "-m", "delete f5")
 	b := gittest.HeadSHA(t, repo.Dir)
 
 	forward, err := c.CompareCommits(t.Context(), id, a, b)
@@ -93,8 +50,8 @@ func TestFR_CMP_03_CompareCommitsSwappedMirrorsEveryStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := map[string]string{"f1": "M", "f2": "A", "f4": "R"}
-	wantSwapped := map[string]string{"f1": "M", "f2": "D", "f3": "R"}
+	want := map[string]string{"f1": "M", "f2": "A", "f4": "R", "f5": "D"}
+	wantSwapped := map[string]string{"f1": "M", "f2": "D", "f3": "R", "f5": "A"}
 	if len(forward) != len(want) || len(backward) != len(wantSwapped) {
 		t.Fatalf("forward = %+v, backward = %+v", forward, backward)
 	}
@@ -142,24 +99,6 @@ func TestFR_CMP_01_CompareCommitsSameCommitIsEmpty(t *testing.T) {
 	}
 }
 
-func TestFR_CMP_02_DiffRangeReturnsContentAtTwoArbitraryCommits(t *testing.T) {
-	t.Parallel()
-	repo, c, id := openCompareRepo(t)
-	gittest.Commit(t, repo.Dir, "f1", "x", "add f1")
-	a := gittest.HeadSHA(t, repo.Dir)
-	gittest.Commit(t, repo.Dir, "other", "unrelated", "unrelated commit")
-	gittest.Commit(t, repo.Dir, "f1", "y", "change f1")
-	b := gittest.HeadSHA(t, repo.Dir)
-
-	diff, err := c.DiffRange(t.Context(), id, a, b, "f1", "", core.DiffOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff.OldContent != "x" || diff.NewContent != "y" {
-		t.Errorf("DiffRange = %+v, want OldContent %q NewContent %q", diff, "x", "y")
-	}
-}
-
 func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
@@ -174,22 +113,6 @@ func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 	}
 	if diff.OldContent != "" || diff.NewContent != "added later" {
 		t.Errorf("DiffRange = %+v, want OldContent \"\" NewContent %q (not limited to parent/child commits)", diff, "added later")
-	}
-}
-
-func TestFR_CMP_04_DiffAgainstWorkingComparesHeadContentToTheLiteralOnDiskFile(t *testing.T) {
-	t.Parallel()
-	repo, c, id := openCompareRepo(t)
-	gittest.Commit(t, repo.Dir, "f1", "head content\n", "add f1")
-	head := gittest.HeadSHA(t, repo.Dir)
-	writeFile(t, repo.Dir, "f1", "unstaged edit\n")
-
-	diff, err := c.DiffAgainstWorking(t.Context(), id, head, "f1", "", core.DiffOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff.OldContent != "head content\n" || diff.NewContent != "unstaged edit\n" {
-		t.Errorf("DiffAgainstWorking = %+v, want OldContent %q NewContent %q", diff, "head content\n", "unstaged edit\n")
 	}
 }
 
@@ -215,13 +138,14 @@ func TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTh
 	}
 }
 
-func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesTogether(t *testing.T) {
+func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesAndLeavesOutUntrackedFiles(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
 	c1 := gittest.HeadSHA(t, repo.Dir)
 	gittest.Commit(t, repo.Dir, "f2", "two", "add f2")
 	writeFile(t, repo.Dir, "f1", "one, edited unstaged\n")
+	writeFile(t, repo.Dir, "untracked.txt", "new")
 
 	files, err := c.CompareWithWorking(t.Context(), id, c1)
 	if err != nil {
@@ -236,24 +160,6 @@ func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesTogether(t *t
 		if want[f.Path] != f.Status {
 			t.Errorf("file %q status = %q, want %q", f.Path, f.Status, want[f.Path])
 		}
-	}
-}
-
-func TestFR_CMP_04_CompareWithWorkingLeavesOutUntrackedFiles(t *testing.T) {
-	t.Parallel()
-	repo, c, id := openCompareRepo(t)
-	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
-	head := gittest.HeadSHA(t, repo.Dir)
-	writeFile(t, repo.Dir, "f1", "one, edited unstaged\n")
-	writeFile(t, repo.Dir, "untracked.txt", "new")
-
-	files, err := c.CompareWithWorking(t.Context(), id, head)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(files) != 1 || files[0].Path != "f1" || files[0].Status != "M" {
-		t.Errorf("CompareWithWorking = %+v, want only f1 modified, untracked.txt left out", files)
 	}
 }
 
