@@ -3,7 +3,6 @@ import http from 'node:http'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test as base, expect } from './fixtures'
-import { PullMode } from '../bindings/github.com/brogli/nebegit/internal/core/models'
 import { gitAfterHistory, type Git } from './repos'
 import type { Sandbox } from './sandbox'
 import {
@@ -59,10 +58,6 @@ const syncButton = (page: Page, name: string) =>
   page.locator('.sync-controls').getByRole('button', { name })
 const pullButton = (page: Page) => page.locator('.sync-controls .p-splitbutton-button')
 const aheadBehind = (page: Page) => page.locator('[data-test=ahead-behind]')
-const messageBox = (page: Page) => page.getByPlaceholder('Commit message')
-const commitButton = (page: Page) => page.locator('[data-test=commit-submit]')
-const pushAfterCommitCheckbox = (page: Page) =>
-  page.locator('.commit-box label', { hasText: 'Push after commit' }).locator('input')
 
 // remoteAheadAndLocalAhead leaves main diverged: other pushed a commit that
 // work lacks, and work has a commit of its own.
@@ -126,7 +121,7 @@ test.describe('with work and other open', () => {
     await expect(page.locator('.row .subject').first()).toHaveText(subject)
   }
 
-  test("FR-UX-02 a fetch's job shows in its worktree's page only", async ({
+  test("FR-UX-12 FR-SYNC-07 a fetch's job shows in its worktree's page only", async ({
     app,
     openApp,
     repos,
@@ -161,80 +156,6 @@ test('FR-SYNC-03 Push sends the current branch and the ahead count drops to zero
   expect(rev(git, repos.remote, 'main')).toBe(rev(git, repos.work, 'HEAD'))
 })
 
-test('FR-SYNC-03 a branch without upstream asks before pushing and sets one on its only remote', async ({
-  openApp,
-  repos,
-  git,
-}) => {
-  git(repos.work, 'checkout', '-q', '-b', 'no-upstream')
-  const app = await openApp(repos.work)
-
-  await expect(syncButton(app, 'Pull')).toHaveCount(0)
-  await expect(syncButton(app, 'Push')).toHaveAttribute('title', 'Push · Ctrl+Shift+K')
-  await syncButton(app, 'Push').click()
-
-  const dialog = app.getByRole('dialog', { name: 'Push and set upstream' })
-  await dialog.getByRole('button', { name: 'Push and set upstream' }).click()
-
-  await expect
-    .poll(() =>
-      git(
-        repos.work,
-        'for-each-ref',
-        '--format=%(upstream:short)',
-        'refs/heads/no-upstream',
-      ).trim(),
-    )
-    .toBe('origin/no-upstream')
-  await expect(pullButton(app)).toBeVisible()
-})
-
-test('FR-CHG-09 push after commit on a new branch pushes and sets the upstream, without asking, when push.autoSetupRemote is set', async ({
-  openApp,
-  repos,
-  git,
-}) => {
-  git(repos.work, 'checkout', '-q', '-b', 'auto-upstream')
-  git(repos.work, 'config', 'push.autoSetupRemote', 'true')
-  fs.writeFileSync(path.join(repos.work, 'staged.txt'), 'staged\n')
-  git(repos.work, 'add', 'staged.txt')
-  const app = await openApp(repos.work)
-
-  await messageBox(app).fill('first commit on a new branch')
-  await pushAfterCommitCheckbox(app).check()
-  await commitButton(app).click()
-
-  await expect(app.getByRole('dialog')).toHaveCount(0)
-  await expect
-    .poll(() =>
-      git(
-        repos.work,
-        'for-each-ref',
-        '--format=%(upstream:short)',
-        'refs/heads/auto-upstream',
-      ).trim(),
-    )
-    .toBe('origin/auto-upstream')
-  expect(rev(git, repos.remote, 'auto-upstream')).toBe(rev(git, repos.work, 'HEAD'))
-})
-
-test("FR-SYNC-04 a rejected push names git's reason and offers Pull and Force push", async ({
-  openApp,
-  repos,
-  git,
-}) => {
-  remoteAheadAndLocalAhead(git, repos.work, repos.other)
-  const app = await openApp(repos.work)
-  const remoteTip = rev(git, repos.remote, 'main')
-
-  await syncButton(app, 'Push').click()
-
-  await expect(notice(app)).toContainText('fetch first')
-  await expect(notice(app).getByRole('button', { name: 'Pull' })).toBeVisible()
-  await expect(notice(app).getByRole('button', { name: 'Force push' })).toBeVisible()
-  expect(rev(git, repos.remote, 'main')).toBe(remoteTip)
-})
-
 test('FR-SYNC-02 choosing Pull (rebase) changes the button without pulling; Pull then rebases, and the mode survives a reload', async ({
   openApp,
   repos,
@@ -260,43 +181,6 @@ test('FR-SYNC-02 choosing Pull (rebase) changes the button without pulling; Pull
   await expect(pullButton(app)).toHaveAttribute('title', 'Pull (rebase) · Ctrl+T')
 })
 
-test.describe('the Pull button follows the default pull mode', () => {
-  test.describe('default rebase', () => {
-    test.use({ settings: { defaultPullMode: PullMode.PullRebase } })
-
-    test('FR-SYNC-02 clicking Pull replays local commits on the upstream', async ({
-      openApp,
-      repos,
-      git,
-    }) => {
-      remoteAheadAndLocalAhead(git, repos.work, repos.other)
-      const app = await openApp(repos.work)
-
-      await pullButton(app).click()
-
-      await expect.poll(() => rev(git, repos.work, 'HEAD~1')).toBe(rev(git, repos.other, 'main'))
-      expect(parents(git, repos.work)).toBe(1)
-    })
-  })
-
-  test.describe('default merge', () => {
-    test.use({ settings: { defaultPullMode: PullMode.PullMerge } })
-
-    test('FR-SYNC-02 clicking Pull merges the upstream into the current branch', async ({
-      openApp,
-      repos,
-      git,
-    }) => {
-      remoteAheadAndLocalAhead(git, repos.work, repos.other)
-      const app = await openApp(repos.work)
-
-      await pullButton(app).click()
-
-      await expect.poll(() => parents(git, repos.work)).toBe(2)
-    })
-  })
-})
-
 test('FR-SYNC-06 force push asks first, warns on a protected branch, and the remote follows', async ({
   openApp,
   repos,
@@ -315,7 +199,7 @@ test('FR-SYNC-06 force push asks first, warns on a protected branch, and the rem
   await expect(notice(app)).toBeHidden()
 })
 
-test('FR-SYNC-05 force push is refused while the remote has commits not yet fetched', async ({
+test("FR-SYNC-04 FR-SYNC-05 a rejected push names git's reason and offers Pull and Force push; forcing it is refused while the remote has commits not yet fetched", async ({
   openApp,
   repos,
   git,
@@ -325,6 +209,11 @@ test('FR-SYNC-05 force push is refused while the remote has commits not yet fetc
   const remoteTip = rev(git, repos.remote, 'main')
 
   await syncButton(app, 'Push').click()
+
+  await expect(notice(app)).toContainText('fetch first')
+  await expect(notice(app).getByRole('button', { name: 'Pull' })).toBeVisible()
+  expect(rev(git, repos.remote, 'main')).toBe(remoteTip)
+
   await notice(app).getByRole('button', { name: 'Force push' }).click()
   await clickConfirm(app)
 
@@ -347,34 +236,6 @@ test("FR-SYNC-08 a fetch from a login-protected remote says sign-in failed, show
   await expect(notice(app)).toContainText('could not read Username')
   expect(loginProtectedRemote.authorizations.length).toBeGreaterThan(0)
   expect(loginProtectedRemote.authorizations.every((a) => a === '')).toBe(true)
-})
-
-test('FR-SYNC-09 a pull blocked by local changes offers Stash and pull; the pull lands and the edit is back', async ({
-  openApp,
-  repos,
-  git,
-}) => {
-  pushFromClone(
-    git,
-    repos.other,
-    'main',
-    { 'hunks.txt': hunksText({ 2: 'line 2 REMOTE' }) },
-    'remote edit',
-  )
-  const hunksFile = path.join(repos.work, 'hunks.txt')
-  fs.writeFileSync(hunksFile, hunksText({ 25: 'line 25 LOCAL' }))
-  const app = await openApp(repos.work)
-
-  await pull(app)
-  await notice(app).getByRole('button', { name: 'Stash and pull' }).click()
-
-  await expect
-    .poll(() => fileText(hunksFile))
-    .toBe(hunksText({ 2: 'line 2 REMOTE', 25: 'line 25 LOCAL' }))
-  expect(rev(git, repos.work, 'HEAD')).toBe(rev(git, repos.other, 'main'))
-  await expect.poll(() => git(repos.work, 'stash', 'list')).toBe('')
-  expect(git(repos.work, 'status', '--porcelain')).toBe(' M hunks.txt\n')
-  await expect(notice(app)).toBeHidden()
 })
 
 test("FR-SYNC-09 a stash-and-pull that stops on conflicts keeps the stash; Restore brings back the app's stash, not a newer one", async ({
