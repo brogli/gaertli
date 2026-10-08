@@ -31,10 +31,11 @@ func tagPage(next http.Handler) http.Handler {
 // its BrowserWindow itself, the name the page's Window.Name() returns.
 type browserPage struct{ clientID string }
 
-// EmitEvent holds the event until the page's websocket connects.
+// EmitEvent holds the event until the page's websocket connects; it never
+// reports the event cancelled.
 func (p browserPage) EmitEvent(name string, data ...any) bool {
 	pageEvents.send(p.clientID, name, data)
-	return true
+	return false
 }
 
 // pageEvents holds each page's events, because a page's first calls run
@@ -48,12 +49,12 @@ var pageEvents = &eventHold{
 		}
 		return w.Name(), true
 	},
-	emit: func(sender, name string, data []any) bool {
+	emit: func(sender, name string, data []any) {
 		ev := &application.CustomEvent{Name: name, Sender: sender}
 		if len(data) == 1 {
 			ev.Data = data[0]
 		}
-		return application.Get().Event.EmitEvent(ev)
+		application.Get().Event.EmitEvent(ev)
 	},
 	poll:    20 * time.Millisecond,
 	giveUp:  10 * time.Second,
@@ -71,7 +72,7 @@ type heldEvent struct {
 // and its queue is dropped.
 type eventHold struct {
 	lookup  func(clientID string) (sender string, ok bool)
-	emit    func(sender, name string, data []any) bool
+	emit    func(sender, name string, data []any)
 	poll    time.Duration
 	giveUp  time.Duration
 	mu      sync.Mutex
@@ -96,22 +97,22 @@ func (h *eventHold) send(clientID, name string, data []any) {
 
 func (h *eventHold) drainWhenFound(clientID string) {
 	deadline := time.Now().Add(h.giveUp)
-	for time.Now().Before(deadline) {
+	for {
 		time.Sleep(h.poll)
 		h.mu.Lock()
-		if sender, ok := h.lookup(clientID); ok {
+		sender, found := h.lookup(clientID)
+		if found {
 			for _, ev := range h.pending[clientID] {
 				h.emit(sender, ev.name, ev.data)
 			}
+		}
+		if found || time.Now().After(deadline) {
 			delete(h.pending, clientID)
 			h.mu.Unlock()
 			return
 		}
 		h.mu.Unlock()
 	}
-	h.mu.Lock()
-	delete(h.pending, clientID)
-	h.mu.Unlock()
 }
 
 // A page has no OS window to focus, title or watch.

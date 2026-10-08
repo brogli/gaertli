@@ -28,11 +28,10 @@ func (f *fakeBrowser) lookup(string) (string, bool) {
 	return "window-1", f.connected
 }
 
-func (f *fakeBrowser) emit(sender, name string, _ []any) bool {
+func (f *fakeBrowser) emit(sender, name string, _ []any) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, sentEvent{sender, name})
-	return true
 }
 
 func (f *fakeBrowser) senders() []sentEvent {

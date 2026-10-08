@@ -1,7 +1,6 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
-import net from 'node:net'
 import path from 'node:path'
 import { PullMode } from '../bindings/github.com/brogli/nebegit/internal/core/models'
 import {
@@ -16,6 +15,8 @@ export { expect }
 
 const serverBin = path.resolve(process.env.NEBEGIT_SERVER_BIN ?? '../bin/nebegit-server')
 
+const firstPort = 20000
+const portsPerWorker = 100
 const maxStartAttempts = 5
 const portTaken = 'failed to listen on'
 
@@ -79,7 +80,7 @@ export const test = base.extend<Options & Fixtures>({
     const logPath = path.join(sandbox.dir, 'server.log')
     let proc: ChildProcess | undefined
     try {
-      const started = await startServer(sandbox, logPath)
+      const started = await startServer(sandbox, logPath, testInfo.parallelIndex)
       proc = started.proc
       expectNoGitEditor(proc.pid!)
       await use({ url: started.url, pid: proc.pid! })
@@ -167,7 +168,9 @@ function seedSettings(
 
 // load opens worktree's page and waits until its log shows. Server mode
 // holds a page's events until its event websocket connects, so the page's
-// first full log load is announced to load.
+// first full log load is announced to load. The websocket carries every
+// page's events; a test opening two pages at once would see the other
+// page's too.
 async function load(page: Page, url: string, worktree: string): Promise<void> {
   const events: WailsEvent[] = []
   page.on('websocket', (ws) =>
@@ -198,46 +201,34 @@ function isFullLogLoaded(e: WailsEvent): boolean {
   return e.name === 'log:progress' && e.data?.done === true && !e.data.filtered
 }
 
-// startServer spawns the server on a free port. The probe in freePort
-// releases its port before the server binds it, so a parallel worker can
-// take it in between; the server then exits with a listen failure and is
-// started again on a new port.
+// startServer spawns the server on a port of this worker's own range, so
+// no two workers' servers can take each other's port. A port some other
+// process holds makes the server exit with a listen failure; the next port
+// is tried.
 async function startServer(
   sandbox: Sandbox,
   logPath: string,
+  worker: number,
 ): Promise<{ proc: ChildProcess; url: string }> {
-  for (let attempt = 1; ; attempt++) {
-    const port = await freePort()
+  for (let attempt = 0; ; attempt++) {
+    const port = firstPort + worker * portsPerWorker + attempt
+    const out = fs.openSync(logPath, 'w')
     const proc = spawn(serverBin, [], {
       cwd: sandbox.dir,
       env: { ...sandbox.env, WAILS_SERVER_PORT: String(port) },
-      stdio: ['ignore', fs.openSync(logPath, 'w'), fs.openSync(logPath, 'a')],
+      stdio: ['ignore', out, out],
     })
+    fs.closeSync(out)
     const url = `http://localhost:${port}`
     try {
       await waitUntilServing(url, proc)
       return { proc, url }
     } catch (e) {
       await stop(proc)
-      if (attempt === maxStartAttempts || !fs.readFileSync(logPath, 'utf8').includes(portTaken))
+      if (attempt + 1 === maxStartAttempts || !fs.readFileSync(logPath, 'utf8').includes(portTaken))
         throw e
     }
   }
-}
-
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer()
-    probe.once('error', reject)
-    probe.listen(0, 'localhost', () => {
-      const address = probe.address()
-      if (address === null || typeof address === 'string') {
-        probe.close(() => reject(new Error('probe socket has no port address')))
-        return
-      }
-      probe.close(() => resolve(address.port))
-    })
-  })
 }
 
 // expectNoGitEditor: a GIT_EDITOR from the caller's shell would let tests
