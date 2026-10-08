@@ -53,6 +53,7 @@ func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *te
 	gittest.Commit(t, repo.Dir, "b.txt", "b", "urgent fix")
 	gittest.Commit(t, repo.Dir, "c.txt", "c", "another Fix here")
 	gittest.Commit(t, repo.Dir, "d.txt", "d", "unrelated")
+	gittest.Commit(t, repo.Dir, "e.txt", "e", "mentions deadbeef in passing")
 
 	c, wt := openWorktree(t, repo.Dir)
 	if err := c.LoadLog(t.Context(), wt); err != nil {
@@ -78,22 +79,13 @@ func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *te
 	if !slices.Equal(subjects, []string{"another Fix here", "urgent fix"}) { // newest first, log order
 		t.Errorf("matched subjects = %v, want the two case-insensitive matches in log order", subjects)
 	}
-}
 
-func TestFR_LOG_05_SearchLogHexShapedNonexistentQueryFallsBackToMessageSearch(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "a", "mentions deadbeef in passing")
-
-	c, wt := openWorktree(t, repo.Dir)
-	rows := loadLog(t, c, wt)
-
-	res, err := c.SearchLog(t.Context(), wt, "deadbeef")
+	hex, err := c.SearchLog(t.Context(), wt, "deadbeef")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Indices) != 1 || rows[res.Indices[0]].Subject != "mentions deadbeef in passing" {
-		t.Fatalf("Indices = %v, want the one matching commit (a hex-shaped but nonexistent hash is not an error)", res.Indices)
+	if len(hex.Indices) != 1 || loaded.Rows[hex.Indices[0]].Subject != "mentions deadbeef in passing" {
+		t.Fatalf("Indices = %v, want the one matching commit (a hex-shaped but nonexistent hash is not an error)", hex.Indices)
 	}
 }
 
@@ -125,34 +117,11 @@ func TestFR_LOG_05_SearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_05_SearchLogByHashOutsideFilteredViewReturnsNoIndices(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	_, _ = branchAndTagNamedV1(t, repo.Dir)
-	outsideSHA := gittest.HeadSHA(t, repo.Dir) // "third", past v1's history
-
-	c, wt := openWorktree(t, repo.Dir)
-	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"refs/tags/v1"}}); err != nil {
-		t.Fatal(err)
-	}
-	waitForLogRows(t, c, wt)
-
-	res, err := c.SearchLog(t.Context(), wt, outsideSHA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Indices) != 0 {
-		t.Errorf("Indices = %v, want none: %s is outside v1's history", res.Indices, outsideSHA)
-	}
-	if !res.Filtered {
-		t.Error("Filtered = false, want true: the tag filter is active")
-	}
-}
-
-func TestFR_LOG_05_SearchLogByHashInsideFilteredViewReturnsItsIndex(t *testing.T) {
+func TestFR_LOG_05_SearchLogByHashInAFilteredViewFindsOnlyCommitsInsideIt(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	_, tagSHA := branchAndTagNamedV1(t, repo.Dir)
+	outsideSHA := gittest.HeadSHA(t, repo.Dir) // "third", past v1's history
 
 	c, wt := openWorktree(t, repo.Dir)
 	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Branches: []string{"refs/tags/v1"}}); err != nil {
@@ -160,14 +129,25 @@ func TestFR_LOG_05_SearchLogByHashInsideFilteredViewReturnsItsIndex(t *testing.T
 	}
 	res := waitForLogRows(t, c, wt)
 
-	search, err := c.SearchLog(t.Context(), wt, tagSHA)
+	outside, err := c.SearchLog(t.Context(), wt, outsideSHA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(search.Indices) != 1 || res.Rows[search.Indices[0]].SHA != tagSHA {
-		t.Fatalf("Indices = %v, want exactly tagSHA %s's row in the filtered view", search.Indices, tagSHA)
+	if len(outside.Indices) != 0 {
+		t.Errorf("Indices = %v, want none: %s is outside v1's history", outside.Indices, outsideSHA)
 	}
-	if !search.Filtered {
+	if !outside.Filtered {
+		t.Error("Filtered = false, want true: the tag filter is active")
+	}
+
+	inside, err := c.SearchLog(t.Context(), wt, tagSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inside.Indices) != 1 || res.Rows[inside.Indices[0]].SHA != tagSHA {
+		t.Fatalf("Indices = %v, want exactly tagSHA %s's row in the filtered view", inside.Indices, tagSHA)
+	}
+	if !inside.Filtered {
 		t.Error("Filtered = false, want true: the tag filter is active")
 	}
 }

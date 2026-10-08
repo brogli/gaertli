@@ -8,7 +8,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) {
+func TestQA_PERF_02_FR_LOG_09_FirstRowObservableWhileLoadingWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
 	streamFakeLog(t, c, id, 5, 200) // 5 records * 200ms = 1s unstreamed
@@ -19,6 +19,7 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 	}
 
 	var elapsed time.Duration
+	var observed core.LogRowsResult
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
 		res, err := c.LogRows(t.Context(), id, 0, 1)
@@ -27,6 +28,7 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 		}
 		if len(res.Rows) > 0 {
 			elapsed = time.Since(start)
+			observed = res
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -37,6 +39,16 @@ func TestQA_PERF_02_FirstRowObservableWellUnderFullStreamDuration(t *testing.T) 
 	}
 	if elapsed > 500*time.Millisecond {
 		t.Errorf("first row observable after %s, want well under 500ms (the full 1s unstreamed load)", elapsed)
+	}
+
+	if observed.Done {
+		t.Error("Done = true with the first row, want a partial load")
+	}
+	if observed.Error != nil {
+		t.Errorf("Error = %v, want nil", observed.Error)
+	}
+	if len(observed.Rows) != 1 {
+		t.Errorf("Rows = %d, want exactly the 1 asked for", len(observed.Rows))
 	}
 
 	waitForLogDone(t, c, id) // drain the background stream so it doesn't leak noise into later tests

@@ -112,42 +112,6 @@ func TestFR_LOG_01_LoadLogIncludesAllBranchesExcludesStash(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_09_LogRowsWindowAheadOfLoadReturnsFewerRowsNotError(t *testing.T) {
-	repo := gittest.New(t)
-	c, id := openWorktree(t, repo.Dir)
-	streamFakeLog(t, c, id, 5, 200)
-
-	if err := c.LoadLog(t.Context(), id); err != nil {
-		t.Fatal(err)
-	}
-
-	var res core.LogRowsResult
-	deadline := time.Now().Add(400 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		var err error
-		res, err = c.LogRows(t.Context(), id, 0, 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if res.Loaded > 0 {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-
-	if res.Done {
-		t.Fatal("Done became true before a partial-load observation; the test's timing assumption is off")
-	}
-	if res.Error != nil {
-		t.Fatalf("Error = %v, want nil", res.Error)
-	}
-	if len(res.Rows) != 1 {
-		t.Fatalf("Rows = %d, want exactly 1", len(res.Rows))
-	}
-
-	waitForLog(t, c, id) // drain the background stream so it doesn't leak noise into later tests
-}
-
 // The merge row has a line out to each parent's lane, the base row a line
 // in from each branch's lane.
 func TestFR_LOG_02_LogRowsJoinAMergeAndItsForkPointToBothLanes(t *testing.T) {
@@ -235,49 +199,37 @@ func TestFR_REPO_04_ReloadLogNoOpsWhenTipsUnchanged(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_04_ReloadLogRestartsWhenARefMoved(t *testing.T) {
+func TestFR_REPO_04_ReloadLogRestartsWhenARefOrOnlyHEADsTargetMoved(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
 	c, id := openWorktree(t, repo.Dir)
 	loadLog(t, c, id)
-	beforeGen := logGeneration(t, c, id)
+	gen := logGeneration(t, c, id)
 
 	gittest.Run(t, repo.Dir, "branch", "feature")
-
 	if err := c.ReloadLog(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
 	rows := waitForLog(t, c, id)
 
-	if got := logGeneration(t, c, id); got == beforeGen {
-		t.Errorf("Generation = %d, want incremented from %d", got, beforeGen)
+	if got := logGeneration(t, c, id); got == gen {
+		t.Errorf("Generation = %d, want incremented after a new ref", gen)
 	}
 	if !hasRefLabel(rows, "feature") {
 		t.Errorf("rows after reload = %+v, want the new branch label", rows)
 	}
-}
-
-func TestFR_REPO_04_ReloadLogRestartsWhenOnlyHEADsTargetChanged(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	gittest.Run(t, repo.Dir, "branch", "feature")
-
-	c, id := openWorktree(t, repo.Dir)
-	loadLog(t, c, id)
-	beforeGen := logGeneration(t, c, id)
+	gen = logGeneration(t, c, id)
 
 	gittest.Run(t, repo.Dir, "switch", "feature") // no new commit: only HEAD's target ref changes
-
 	if err := c.ReloadLog(t.Context(), id); err != nil {
 		t.Fatal(err)
 	}
 	waitForLog(t, c, id)
 
-	if got := logGeneration(t, c, id); got == beforeGen {
-		t.Errorf("Generation = %d, want incremented from %d", got, beforeGen)
+	if got := logGeneration(t, c, id); got == gen {
+		t.Errorf("Generation = %d, want incremented after HEAD's target changed", gen)
 	}
 }
 

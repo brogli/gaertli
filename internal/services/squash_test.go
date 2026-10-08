@@ -77,45 +77,29 @@ func TestFR_LOG_14_AnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
 	coretest.AssertCode(t, asStop(core.Errorf(core.GitFailed, "could not apply"), true), core.Conflicts)
 }
 
-func TestFR_LOG_14_SquashFoldsAdjacentCommitsWithTheGivenMessageAndTheOldestsAuthor(t *testing.T) {
+func TestFR_LOG_14_SquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldestsAuthor(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
 
-	result, err := c.Squash(t.Context(), wt, []string{l.C, l.B}, "Folded\n\n#123 stays\n")
+	result, err := c.Squash(t.Context(), wt, []string{l.D, l.B}, "B and D\n\n#123 stays\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assertHistory(t, repo.Dir, "E subject: e.txt", "D subject: d.txt", "Folded: b.txt c.txt", "base subject: base.txt")
-	if got := rawMessage(t, repo.Dir, "HEAD~2"); got != "Folded\n\n#123 stays" {
+	assertHistory(t, repo.Dir, "E subject: e.txt", "C subject: c.txt", "B and D: b.txt d.txt", "base subject: base.txt")
+	if got := rawMessage(t, repo.Dir, "HEAD~2"); got != "B and D\n\n#123 stays" {
 		t.Errorf("folded message = %q, want the given one verbatim", got)
 	}
 	if got := gittest.Out(t, repo.Dir, "log", "-1", "--format=%an", "HEAD~2"); got != "Bea" {
 		t.Errorf("folded author = %q, want Bea (the oldest commit's)", got)
 	}
-	if got := rawMessage(t, repo.Dir, "HEAD"); got != "E subject\n\nE body" {
-		t.Errorf("E's message = %q, want unchanged", got)
+	if got := rawMessage(t, repo.Dir, "HEAD~1"); got != "C subject\n\nC body" {
+		t.Errorf("C's message = %q, want unchanged", got)
 	}
 	if result.PreviousHead != l.E {
 		t.Errorf("PreviousHead = %s, want %s", result.PreviousHead, l.E)
-	}
-}
-
-func TestFR_LOG_14_SquashMovesALaterCommitUpNextToTheOldest(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
-
-	if _, err := c.Squash(t.Context(), wt, []string{l.B, l.D}, "B and D"); err != nil {
-		t.Fatal(err)
-	}
-
-	assertHistory(t, repo.Dir, "E subject: e.txt", "C subject: c.txt", "B and D: b.txt d.txt", "base subject: base.txt")
-	if got := rawMessage(t, repo.Dir, "HEAD~1"); got != "C subject\n\nC body" {
-		t.Errorf("C's message = %q, want unchanged", got)
 	}
 }
 
@@ -263,147 +247,130 @@ func TestFR_LOG_14_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T
 	}
 }
 
-func TestFR_LOG_14_UncommittedChangesToTrackedFilesBlock(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	writeFile(t, repo.Dir, "untracked.txt", "fine")
-	c, wt := openWorktree(t, repo.Dir)
-
-	check, err := c.SquashCheck(t.Context(), wt, []string{l.D, l.E})
-	if err != nil || check.Blocker != nil {
-		t.Fatalf("with an untracked file only: blocker %v, err %v; want none", check.Blocker, err)
-	}
-
-	writeFile(t, repo.Dir, "b.txt", "edited")
-	check, err = c.SquashCheck(t.Context(), wt, []string{l.D, l.E})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertBlocker(t, check.Blocker, core.DirtyWorktree, "squashUncommittedChanges")
-	_, err = c.Fixup(t.Context(), wt, []string{l.D, l.E})
-	coretest.AssertCode(t, err, core.DirtyWorktree)
-	if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
-		t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
-	}
-}
-
-func TestFR_LOG_14_AMergeCommitInTheWayBlocksAndIsNamed(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	x1, merge, x2 := mergeCommitFixture(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
-
-	check, err := c.SquashCheck(t.Context(), wt, []string{x1, x2})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	args := assertBlocker(t, check.Blocker, core.GitFailed, "squashMergeInTheWay")
-	if !strings.HasPrefix(merge, args["sha"]) || args["sha"] == "" {
-		t.Errorf("sha = %q, want the merge %s abbreviated", args["sha"], merge)
-	}
-}
-
-func TestFR_LOG_14_ACommitOffTheCurrentBranchBlocks(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "switch", "-c", "side", l.C)
-	gittest.Commit(t, repo.Dir, "side.txt", "side", "side")
-	side := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "switch", "master")
-	const emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-	orphan := gittest.Out(t, repo.Dir, "commit-tree", "-m", "unrelated root", emptyTree)
-	c, wt := openWorktree(t, repo.Dir)
-
-	for name, shas := range map[string][]string{
-		"on another branch":   {l.B, side},
-		"no common ancestor":  {l.D, orphan},
-		"only another branch": {side, orphan},
-	} {
-		check, err := c.SquashCheck(t.Context(), wt, shas)
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		assertBlocker(t, check.Blocker, core.GitFailed, "squashNotOnBranch")
-	}
-}
-
-func TestFR_LOG_14_ADetachedHeadOrARunningOperationBlocks(t *testing.T) {
+func TestFR_LOG_14_SquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
-
-	gittest.Run(t, repo.Dir, "switch", "--detach", l.E)
-	check, err := c.SquashCheck(t.Context(), wt, []string{l.D, l.E})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertBlocker(t, check.Blocker, core.GitFailed, "squashDetached")
-
-	gittest.Run(t, repo.Dir, "switch", "master")
-	writeFile(t, repo.Dir, filepath.Join(".git", "CHERRY_PICK_HEAD"), l.B+"\n")
-	check, err = c.SquashCheck(t.Context(), wt, []string{l.D, l.E})
-	if err != nil {
-		t.Fatal(err)
-	}
-	args := assertBlocker(t, check.Blocker, core.GitFailed, "squashOperationInProgress")
-	if args["operation"] != "cherry-pick" {
-		t.Errorf("operation = %q, want cherry-pick", args["operation"])
-	}
-}
-
-func TestFR_LOG_14_CheckSaysWhetherTheOldestSelectedCommitIsPushed(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
-
-	check, err := c.SquashCheck(t.Context(), wt, []string{l.C, l.D})
-	if err != nil || check.Pushed {
-		t.Fatalf("without an upstream: Pushed %v, err %v; want false", check.Pushed, err)
-	}
-
-	bareRemote(t, repo, "origin")
-	gittest.Run(t, repo.Dir, "push", "origin", l.C+":refs/heads/master")
-	gittest.Run(t, repo.Dir, "branch", "--set-upstream-to=origin/master")
-	for _, tc := range []struct {
-		shas []string
-		want bool
-	}{
-		{[]string{l.D, l.E}, false},
-		{[]string{l.E, l.C}, true},
-		{[]string{l.B, l.E}, true},
-	} {
-		check, err := c.SquashCheck(t.Context(), wt, tc.shas)
+	check := func(t *testing.T, shas ...string) core.SquashCheck {
+		t.Helper()
+		res, err := c.SquashCheck(t.Context(), wt, shas)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if check.Pushed != tc.want {
-			t.Errorf("Pushed = %v, want %v", check.Pushed, tc.want)
+		return res
+	}
+
+	t.Run("uncommitted changes to tracked files block, untracked ones do not", func(t *testing.T) {
+		writeFile(t, repo.Dir, "untracked.txt", "fine")
+		if res := check(t, l.D, l.E); res.Blocker != nil {
+			t.Fatalf("with an untracked file only: blocker %v; want none", res.Blocker)
 		}
-	}
-}
 
-func TestFR_LOG_14_CheckProposesTheSelectedMessagesOldestFirst(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
+		writeFile(t, repo.Dir, "b.txt", "edited")
+		assertBlocker(t, check(t, l.D, l.E).Blocker, core.DirtyWorktree, "squashUncommittedChanges")
+		_, err := c.Fixup(t.Context(), wt, []string{l.D, l.E})
+		coretest.AssertCode(t, err, core.DirtyWorktree)
+		if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
+			t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
+		}
+		gittest.Run(t, repo.Dir, "checkout", "--", "b.txt")
+	})
 
-	check, err := c.SquashCheck(t.Context(), wt, []string{l.D, l.B})
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("a commit off the current branch blocks", func(t *testing.T) {
+		gittest.Run(t, repo.Dir, "switch", "-c", "side", l.C)
+		gittest.Commit(t, repo.Dir, "side.txt", "side", "side")
+		side := gittest.HeadSHA(t, repo.Dir)
+		gittest.Run(t, repo.Dir, "switch", "master")
+		const emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+		orphan := gittest.Out(t, repo.Dir, "commit-tree", "-m", "unrelated root", emptyTree)
 
-	if check.Blocker != nil {
-		t.Fatalf("Blocker = %v, want none", check.Blocker)
-	}
-	if want := "B subject\n\nB body\n\nD subject\n\nD body"; check.Message != want {
-		t.Errorf("Message = %q, want %q", check.Message, want)
-	}
+		for name, shas := range map[string][]string{
+			"on another branch":   {l.B, side},
+			"no common ancestor":  {l.D, orphan},
+			"only another branch": {side, orphan},
+		} {
+			t.Run(name, func(t *testing.T) {
+				assertBlocker(t, check(t, shas...).Blocker, core.GitFailed, "squashNotOnBranch")
+			})
+		}
+	})
+
+	t.Run("a detached head or a running operation blocks", func(t *testing.T) {
+		gittest.Run(t, repo.Dir, "switch", "--detach", l.E)
+		assertBlocker(t, check(t, l.D, l.E).Blocker, core.GitFailed, "squashDetached")
+		gittest.Run(t, repo.Dir, "switch", "master")
+
+		cherryPickHead := filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD")
+		writeFile(t, repo.Dir, filepath.Join(".git", "CHERRY_PICK_HEAD"), l.B+"\n")
+		args := assertBlocker(t, check(t, l.D, l.E).Blocker, core.GitFailed, "squashOperationInProgress")
+		if args["operation"] != "cherry-pick" {
+			t.Errorf("operation = %q, want cherry-pick", args["operation"])
+		}
+		if err := os.Remove(cherryPickHead); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("fewer than two commits or a blank message is a bad request", func(t *testing.T) {
+		_, err := c.Fixup(t.Context(), wt, []string{l.E})
+		coretest.AssertCode(t, err, core.Internal)
+		_, err = c.Fixup(t.Context(), wt, []string{l.E, l.E})
+		coretest.AssertCode(t, err, core.Internal)
+		_, err = c.SquashCheck(t.Context(), wt, []string{l.D, l.D})
+		coretest.AssertCode(t, err, core.Internal)
+		_, err = c.Squash(t.Context(), wt, []string{l.D, l.E}, " \n")
+		coretest.AssertCode(t, err, core.Internal)
+		if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
+			t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
+		}
+	})
+
+	t.Run("the proposed message is the selected messages, oldest first", func(t *testing.T) {
+		res := check(t, l.D, l.B)
+		if res.Blocker != nil {
+			t.Fatalf("Blocker = %v, want none", res.Blocker)
+		}
+		if want := "B subject\n\nB body\n\nD subject\n\nD body"; res.Message != want {
+			t.Errorf("Message = %q, want %q", res.Message, want)
+		}
+	})
+
+	t.Run("pushed says whether the oldest selected commit is pushed", func(t *testing.T) {
+		if res := check(t, l.C, l.D); res.Pushed {
+			t.Fatal("without an upstream: Pushed = true, want false")
+		}
+
+		bareRemote(t, repo, "origin")
+		gittest.Run(t, repo.Dir, "push", "origin", l.C+":refs/heads/master")
+		gittest.Run(t, repo.Dir, "branch", "--set-upstream-to=origin/master")
+		for _, tc := range []struct {
+			shas []string
+			want bool
+		}{
+			{[]string{l.D, l.E}, false},
+			{[]string{l.E, l.C}, true},
+			{[]string{l.B, l.E}, true},
+		} {
+			if got := check(t, tc.shas...).Pushed; got != tc.want {
+				t.Errorf("Pushed for %v = %v, want %v", tc.shas, got, tc.want)
+			}
+		}
+	})
+
+	t.Run("a merge commit in the way blocks and is named", func(t *testing.T) {
+		gittest.Run(t, repo.Dir, "switch", "-c", "merged", l.base)
+		gittest.Commit(t, repo.Dir, "m.txt", "m", "merged side")
+		gittest.Run(t, repo.Dir, "switch", "master")
+		gittest.Run(t, repo.Dir, "merge", "--no-ff", "-m", "Merge branch 'merged'", "merged")
+		merge := gittest.HeadSHA(t, repo.Dir)
+		gittest.Commit(t, repo.Dir, "x.txt", "x", "after the merge")
+
+		args := assertBlocker(t, check(t, l.E, gittest.HeadSHA(t, repo.Dir)).Blocker, core.GitFailed, "squashMergeInTheWay")
+		if !strings.HasPrefix(merge, args["sha"]) || args["sha"] == "" {
+			t.Errorf("sha = %q, want the merge %s abbreviated", args["sha"], merge)
+		}
+	})
 }
 
 func TestFR_LOG_14_SquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *testing.T) {
@@ -430,25 +397,6 @@ func TestFR_LOG_14_SquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *
 	assertHistory(t, repo.Dir, "E subject: e.txt", "C subject: c.txt", "#1 folded: b.txt d.txt", "base subject: base.txt")
 	if got := branchTip(t, repo.Dir, "stacked"); got != l.C {
 		t.Errorf("stacked = %s, want unchanged %s", got, l.C)
-	}
-}
-
-func TestFR_LOG_14_FewerThanTwoCommitsOrABlankMessageIsABadRequest(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
-
-	_, err := c.Fixup(t.Context(), wt, []string{l.E})
-	coretest.AssertCode(t, err, core.Internal)
-	_, err = c.Fixup(t.Context(), wt, []string{l.E, l.E})
-	coretest.AssertCode(t, err, core.Internal)
-	_, err = c.SquashCheck(t.Context(), wt, []string{l.D, l.D})
-	coretest.AssertCode(t, err, core.Internal)
-	_, err = c.Squash(t.Context(), wt, []string{l.D, l.E}, " \n")
-	coretest.AssertCode(t, err, core.Internal)
-	if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
-		t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
 	}
 }
 
@@ -530,24 +478,6 @@ func TestFR_LOG_14_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertHistory(t, repo.Dir, "E subject: e.txt", "C subject: c.txt", "Folded: b.txt d.txt", "base subject: base.txt")
-}
-
-func TestFR_LOG_14_AFailedAmendStopsAndAbortRestores(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	writeHook(t, repo.Dir, "prepare-commit-msg", refuseAmendHook)
-	c, wt := openWorktree(t, repo.Dir)
-
-	_, err := c.Squash(t.Context(), wt, []string{l.B, l.D}, "Folded")
-
-	coretest.AssertCode(t, err, core.Stopped)
-	if err := c.AbortOperation(t.Context(), wt); err != nil {
-		t.Fatal(err)
-	}
-	if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
-		t.Errorf("HEAD after abort = %s, want %s", got, l.E)
-	}
 }
 
 func TestFR_LOG_14_ACommitMadeAfterTheCheckStopsTheRebaseInsteadOfBeingDropped(t *testing.T) {
