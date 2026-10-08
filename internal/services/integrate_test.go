@@ -38,25 +38,37 @@ func divergedConflictRepo(t *testing.T) *gittest.Repo {
 	return diverge(t, "base\n", edit{"base.txt", "side\n"}, edit{"base.txt", "main\n"})
 }
 
-// refuseBeforeGit asserts call is refused before git runs while a
-// cherry-pick is stopped and while HEAD is detached, leaving HEAD alone.
-func refuseBeforeGit(t *testing.T, call func(c *Core, wt core.WorktreeID) error) {
-	t.Helper()
+func TestFR_BR_11_FR_BR_12_MergeAndRebaseRefuseBeforeGitRunsWithAnOperationOrDetachedHead(t *testing.T) {
+	t.Parallel()
 	repo := divergedConflictRepo(t)
 	c, wt := openWorktree(t, repo.Dir)
+	calls := map[string]func() error{
+		"merge": func() error {
+			_, err := c.Merge(t.Context(), wt, "refs/heads/side", false)
+			return err
+		},
+		"rebase": func() error {
+			_, err := c.Rebase(t.Context(), wt, "refs/heads/side", false)
+			return err
+		},
+	}
 	sideTip := gittest.Out(t, repo.Dir, "rev-parse", "side")
 	coretest.AssertCode(t, c.CherryPick(t.Context(), wt, []string{sideTip}, core.PickOptions{}), core.Conflicts)
 
-	ce := coretest.AsError(t, call(c, wt), core.GitFailed)
-	if ce.Key != "operationInProgress" || ce.Args["operation"] != "cherry-pick" {
-		t.Errorf("error = %+v, want key operationInProgress, operation cherry-pick", ce)
+	for name, call := range calls {
+		ce := coretest.AsError(t, call(), core.GitFailed)
+		if ce.Key != "operationInProgress" || ce.Args["operation"] != "cherry-pick" {
+			t.Errorf("%s: error = %+v, want key operationInProgress, operation cherry-pick", name, ce)
+		}
 	}
 
 	gittest.Run(t, repo.Dir, "cherry-pick", "--abort")
 	gittest.Run(t, repo.Dir, "checkout", "--detach")
 	head := gittest.HeadSHA(t, repo.Dir)
-	if ce := coretest.AsError(t, call(c, wt), core.GitFailed); ce.Key != "detachedHead" {
-		t.Errorf("Key = %q, want detachedHead", ce.Key)
+	for name, call := range calls {
+		if ce := coretest.AsError(t, call(), core.GitFailed); ce.Key != "detachedHead" {
+			t.Errorf("%s: Key = %q, want detachedHead", name, ce.Key)
+		}
 	}
 	if after := gittest.HeadSHA(t, repo.Dir); after != head {
 		t.Errorf("HEAD = %q, want unchanged %q", after, head)
@@ -85,9 +97,13 @@ func TestFR_BR_11_MergeFastForwards(t *testing.T) {
 	}
 }
 
-func TestFR_BR_11_MergeMakesAMergeCommitAndRunsHooks(t *testing.T) {
+func TestFR_BR_11_MergeMakesAMergeCommitRunsHooksAndIgnoresHostileConfig(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
+	gittest.Run(t, repo.Dir, "config", "merge.ff", "only")
+	gittest.Run(t, repo.Dir, "config", "branch.master.mergeOptions", "--squash")
+	gittest.Run(t, repo.Dir, "config", "merge.autoStash", "true")
+	gittest.Run(t, repo.Dir, "config", "pull.twohead", "ours")
 	writeHook(t, repo.Dir, "post-merge", "echo ran > hook-ran.txt")
 	mainTip := gittest.HeadSHA(t, repo.Dir)
 	sideTip := gittest.Out(t, repo.Dir, "rev-parse", "side")
@@ -109,25 +125,8 @@ func TestFR_BR_11_MergeMakesAMergeCommitAndRunsHooks(t *testing.T) {
 	if !fileExists(filepath.Join(repo.Dir, "hook-ran.txt")) {
 		t.Error("post-merge hook did not run")
 	}
-}
-
-func TestFR_BR_11_MergeIgnoresHostileConfig(t *testing.T) {
-	t.Parallel()
-	repo := divergedFixture(t)
-	gittest.Run(t, repo.Dir, "config", "merge.ff", "only")
-	gittest.Run(t, repo.Dir, "config", "branch.master.mergeOptions", "--squash")
-	gittest.Run(t, repo.Dir, "config", "merge.autoStash", "true")
-
-	c, wt := openWorktree(t, repo.Dir)
-	got, err := c.Merge(t.Context(), wt, "refs/heads/side", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Outcome != core.IntegrateMerged {
-		t.Errorf("Outcome = %q, want %q", got.Outcome, core.IntegrateMerged)
-	}
-	if subject := gittest.Out(t, repo.Dir, "log", "-1", "--format=%s"); subject != "Merge branch 'side'" {
-		t.Errorf("subject = %q, want a merge commit", subject)
+	if content := readFile(t, repo.Dir, "side.txt"); content != "side\n" {
+		t.Errorf("side.txt = %q, want the side's change", content)
 	}
 }
 
@@ -191,14 +190,6 @@ func TestFR_BR_11_MergeOfAContainedBranchIsUpToDate(t *testing.T) {
 	if after := gittest.HeadSHA(t, repo.Dir); after != head {
 		t.Errorf("HEAD moved to %q, want %q", after, head)
 	}
-}
-
-func TestFR_BR_11_MergeRefusesBeforeGitRunsWithAnOperationOrDetachedHead(t *testing.T) {
-	t.Parallel()
-	refuseBeforeGit(t, func(c *Core, wt core.WorktreeID) error {
-		_, err := c.Merge(t.Context(), wt, "refs/heads/side", false)
-		return err
-	})
 }
 
 func TestFR_BR_11_MergeBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
@@ -341,14 +332,6 @@ func TestFR_BR_12_RebaseStopsOnConflictsLeavingTheRebase(t *testing.T) {
 	if !fileExists(filepath.Join(repo.Dir, ".git", "rebase-merge")) {
 		t.Error("rebase-merge missing, want the rebase left for the conflict flow")
 	}
-}
-
-func TestFR_BR_12_RebaseRefusesBeforeGitRunsWithAnOperationOrDetachedHead(t *testing.T) {
-	t.Parallel()
-	refuseBeforeGit(t, func(c *Core, wt core.WorktreeID) error {
-		_, err := c.Rebase(t.Context(), wt, "refs/heads/side", false)
-		return err
-	})
 }
 
 const tenNumberLines = "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n"
@@ -515,20 +498,5 @@ func TestFR_BR_11_MergeWithStashGivesTheEntryBackWhenTheMergeNeverStarted(t *tes
 	}
 	if content := readFile(t, repo.Dir, "f"); content != "local\n" {
 		t.Errorf("f = %q, want the local change back", content)
-	}
-}
-
-func TestFR_BR_11_MergeIgnoresThePullTwoheadConfig(t *testing.T) {
-	t.Parallel()
-	repo := divergedFixture(t)
-	gittest.Run(t, repo.Dir, "config", "pull.twohead", "ours")
-
-	c, wt := openWorktree(t, repo.Dir)
-	if _, err := c.Merge(t.Context(), wt, "refs/heads/side", false); err != nil {
-		t.Fatal(err)
-	}
-
-	if content := readFile(t, repo.Dir, "side.txt"); content != "side\n" {
-		t.Errorf("side.txt = %q, want the side's change", content)
 	}
 }

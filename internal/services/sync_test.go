@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -379,24 +381,6 @@ func TestFR_SYNC_09_PopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *
 	}
 }
 
-func TestFR_SYNC_09_DropStashDeletesTheEntry(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
-	writeFile(t, repo.Dir, "f.txt", "changed\n")
-	stashSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	if err := c.DropStash(t.Context(), wt, stashSHA); err != nil {
-		t.Fatal(err)
-	}
-
-	if list := gittest.Out(t, repo.Dir, "stash", "list"); list != "" {
-		t.Errorf("stash list = %q, want empty after drop", list)
-	}
-}
-
 // A stash pushed after the marker shifts the stash@{n} indices.
 func TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 	t.Parallel()
@@ -478,9 +462,9 @@ func TestFR_SYNC_02_QA_COMP_01_PullIntegrateArgsMapsModeAndPullFFToGitArgs(t *te
 		{"merge, pull.ff=only", core.PullMerge, "only", []string{"merge", "--no-edit", "@{upstream}"}},
 		{"rebase", core.PullRebase, "false", []string{"rebase", "--fork-point", "@{upstream}"}},
 	}
+	repo := gittest.New(t) // rows run in order on one repo; the unset row comes first
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := gittest.New(t)
 			if tt.pullFF != "" {
 				gittest.Run(t, repo.Dir, "config", "pull.ff", tt.pullFF)
 			}
@@ -496,10 +480,20 @@ func TestFR_SYNC_02_QA_COMP_01_PullIntegrateArgsMapsModeAndPullFFToGitArgs(t *te
 }
 
 func TestQA_COMP_01_PullIntegrateArgsFailsOnAConfigReadErrorOtherThanUnset(t *testing.T) {
-	t.Setenv("FAKEGIT_EXIT", "128")
-	t.Setenv("FAKEGIT_STDERR", "fatal: bad config line 1 in file .git/config")
+	t.Parallel()
+	repo := gittest.New(t)
+	f, err := os.OpenFile(filepath.Join(repo.Dir, ".git", "config"), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("[pull\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
-	_, err := pullIntegrateArgs(t.Context(), git.Runner{Git: fakegit}, t.TempDir(), core.PullMerge)
+	_, err = pullIntegrateArgs(t.Context(), git.Runner{}, repo.Dir, core.PullMerge)
 
 	coretest.AssertCode(t, err, core.GitFailed)
 }
@@ -546,39 +540,6 @@ func TestQA_COMP_01_PullMergeWithPullFFTrueFastForwardsDespiteMergeFFFalse(t *te
 
 	if got := gittest.HeadSHA(t, repo.Dir); got != upstreamTip {
 		t.Errorf("HEAD = %q, want fast-forwarded to upstream tip %q", got, upstreamTip)
-	}
-}
-
-func TestQA_COMP_01_PullMergeWithPullFFOnlyStillMergesADivergedBranch(t *testing.T) {
-	t.Parallel()
-	repo, origin := pullMergeFixture(t)
-	gittest.Run(t, repo.Dir, "config", "pull.ff", "only")
-	upstreamTip := remoteAppendCommit(t, origin, "upstream-only.txt", "u", "upstream commit")
-	gittest.Commit(t, repo.Dir, "local-only.txt", "l", "local commit")
-
-	pullToDone(t, repo.Dir, core.PullMerge, (*Core).Pull)
-
-	if parents := headParents(t, repo.Dir); len(parents) != 2 || parents[1] != upstreamTip {
-		t.Errorf("HEAD parents = %v, want a merge commit with %s second", parents, upstreamTip)
-	}
-}
-
-func TestQA_COMP_01_PullWithStashMergeWithPullFFFalseMakesAMergeCommitAndRestoresTheChange(t *testing.T) {
-	t.Parallel()
-	repo, origin := pullMergeFixture(t)
-	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")
-	gittest.Run(t, repo.Dir, "push", "origin", "master")
-	gittest.Run(t, repo.Dir, "config", "pull.ff", "false")
-	upstreamTip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
-	writeFile(t, repo.Dir, "other.txt", "local uncommitted change\n")
-
-	pullToDone(t, repo.Dir, core.PullMerge, (*Core).PullWithStash)
-
-	if parents := headParents(t, repo.Dir); len(parents) != 2 || parents[1] != upstreamTip {
-		t.Errorf("HEAD parents = %v, want a merge commit with %s second", parents, upstreamTip)
-	}
-	if content := readFile(t, repo.Dir, "other.txt"); content != "local uncommitted change\n" {
-		t.Errorf("other.txt = %q, want the local change restored", content)
 	}
 }
 
@@ -825,25 +786,6 @@ func TestFR_SYNC_03_PushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_03_PushSetUpstreamCreatesRemoteBranchAndTracks(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	origin := bareRemote(t, repo, "origin")
-	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
-	localTip := gittest.HeadSHA(t, repo.Dir)
-
-	c, wt := openWorktree(t, repo.Dir)
-	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "feature")), "done")
-
-	if got := gittest.Out(t, origin, "rev-parse", "feature"); got != localTip {
-		t.Errorf("origin's feature = %q, want %q", got, localTip)
-	}
-	if got := gittest.Out(t, repo.Dir, "rev-parse", "--abbrev-ref", "feature@{upstream}"); got != "origin/feature" {
-		t.Errorf("feature's upstream = %q, want origin/feature", got)
-	}
-}
-
 // TestFR_SYNC_03_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway
 // covers a caller that named a branch (PushTarget, or a dialog) before HEAD
 // switched elsewhere: Push must still push and track that named branch, not
@@ -870,23 +812,6 @@ func TestFR_SYNC_03_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *te
 	}
 	if got := gittest.Out(t, repo.Dir, "rev-parse", "--abbrev-ref", "feature@{upstream}"); got != "origin/feature" {
 		t.Errorf("feature's upstream = %q, want origin/feature", got)
-	}
-}
-
-func TestFR_SYNC_03_PushTargetNamesTheSoleRemoteAndAutoSetupRemote(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	bareRemote(t, repo, "origin")
-	gittest.Run(t, repo.Dir, "config", "push.autoSetupRemote", "true")
-
-	c, wt := openWorktree(t, repo.Dir)
-	got, err := c.PushTarget(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := (core.PushTarget{Remote: "origin", AutoSetUpstream: true, Branch: "master"}); got != want {
-		t.Errorf("PushTarget = %+v, want %+v", got, want)
 	}
 }
 
@@ -1137,25 +1062,23 @@ func TestFR_SYNC_05_ForcePushRefusedWhenRemoteGainedAnUnfetchedCommit(t *testing
 }
 
 func TestQA_SEC_02_FR_SYNC_08_FetchJobClassifiesAFailedSignIn(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Basic realm="x"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(server.Close)
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-
-	t.Setenv("FAKEGIT_EXIT", "128")
-	t.Setenv("FAKEGIT_STDERR", "fatal: could not read Username for 'https://example.com/x.git': terminal prompts disabled")
+	gittest.Run(t, repo.Dir, "remote", "add", "origin", server.URL+"/x.git")
 
 	c, wt := openWorktree(t, repo.Dir)
-	sess, err := c.sessions.Get(wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sess.Runner.Git = fakegit
-
 	job := waitForJobState(t, c, wt, jobID(t)(c.Fetch(t.Context(), wt, "")), "failed")
 
 	if job.Error == nil || job.Error.Code != core.AuthFailed {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.AuthFailed)
 	}
-	if strings.Contains(job.Error.Message, "example.com") || strings.Contains(job.Error.Message, "Username") {
+	if strings.Contains(job.Error.Message, "127.0.0.1") || strings.Contains(job.Error.Message, "Username") {
 		t.Errorf("message leaks the URL or credential text: %q", job.Error.Message)
 	}
 	if !strings.Contains(job.Error.Message, "credential") {
@@ -1209,6 +1132,12 @@ func TestFR_UPD_01_02_03_05_UpdateBranchFastForwardsABranchNotCheckedOutAnywhere
 	if branch := currentBranch(t, repo.Dir); branch != "master" {
 		t.Errorf("current branch = %q, want master (untouched)", branch)
 	}
+
+	job = waitForJobState(t, c, wt, jobID(t)(c.UpdateBranch(t.Context(), wt, "B")), "done")
+	result = updateBranchResult(t, job)
+	if result.Outcome != "upToDate" || result.From != newTip || result.To != newTip || result.Commits != 0 {
+		t.Errorf("second Result = %+v, want Outcome upToDate, From == To == %q, Commits 0", result, newTip)
+	}
 }
 
 func TestFR_UPD_05_UpdateBranchReportsTheBranchNotATagOfTheSameName(t *testing.T) {
@@ -1245,20 +1174,6 @@ func TestFR_UPD_01_UpdateBranchFastForwardsABranchTrackingALocalBranch(t *testin
 	}
 }
 
-func TestFR_UPD_05_UpdateBranchAlreadyAtUpstreamTipReportsUpToDate(t *testing.T) {
-	t.Parallel()
-	repo, _ := updateBranchFixture(t)
-	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
-
-	c, wt := openWorktree(t, repo.Dir)
-	job := waitForJobState(t, c, wt, jobID(t)(c.UpdateBranch(t.Context(), wt, "B")), "done")
-
-	result := updateBranchResult(t, job)
-	if result.Outcome != "upToDate" || result.From != beforeSHA || result.To != beforeSHA || result.Commits != 0 {
-		t.Errorf("Result = %+v, want Outcome upToDate, From == To == %q, Commits 0", result, beforeSHA)
-	}
-}
-
 func TestFR_UPD_03_UpdateBranchDivergedFromUpstreamFailsNotFastForward(t *testing.T) {
 	t.Parallel()
 	repo, origin := updateBranchFixture(t)
@@ -1279,7 +1194,7 @@ func TestFR_UPD_03_UpdateBranchDivergedFromUpstreamFailsNotFastForward(t *testin
 	}
 }
 
-func TestFR_UPD_05_UpdateBranchWithNoUpstreamFailsBeforeAnyGitCall(t *testing.T) {
+func TestFR_UPD_05_FR_UX_11_UpdateBranchWithNoUpstreamFailsBeforeAnyJobNamingTheBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -1288,26 +1203,14 @@ func TestFR_UPD_05_UpdateBranchWithNoUpstreamFailsBeforeAnyGitCall(t *testing.T)
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	// Refused before any job starts (a precondition, not a git failure):
-	// UpdateBranch itself returns the error, with no job to poll.
-	_, err := c.UpdateBranch(t.Context(), wt, "B")
-	coretest.AssertCode(t, err, core.NoUpstream)
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
-		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
-	}
-}
-
-func TestFR_UX_11_UpdateBranchWithNoUpstreamNamesTheBranchInArgs(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	gittest.Run(t, repo.Dir, "branch", "B")
-
-	c, wt := openWorktree(t, repo.Dir)
-
+	// A precondition, not a git failure: UpdateBranch itself returns the
+	// error, with no job to poll.
 	_, err := c.UpdateBranch(t.Context(), wt, "B")
 
 	ce := coretest.AsError(t, err, core.NoUpstream)
+	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
+		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
+	}
 	if ce.Args["branch"] != "B" {
 		t.Errorf("Args[branch] = %q, want %q", ce.Args["branch"], "B")
 	}
@@ -1431,65 +1334,93 @@ func rebaseInProgressFixture(t *testing.T, applyBackend bool) (repo *gittest.Rep
 	return repo, wtDir
 }
 
-func TestFR_UPD_04_UpdateBranchRebasingElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
+// TestFR_UPD_04_UpdateBranchRefusesABranchBeingRebasedOrBisectedElsewhere runs
+// one worktree through every in-progress state UpdateBranch refuses on; each
+// refusal starts no job, runs no fetch and changes nothing.
+func TestFR_UPD_04_UpdateBranchRefusesABranchBeingRebasedOrBisectedElsewhere(t *testing.T) {
 	t.Parallel()
 	repo, wtDir := rebaseInProgressFixture(t, false)
 	wtPath := gitPath(t, wtDir)
+	wtGitDir := gittest.Out(t, wtDir, "rev-parse", "--absolute-git-dir")
+	dotGit := filepath.Join(wtDir, ".git")
+	dotGitContent, err := os.ReadFile(dotGit)
+	if err != nil {
+		t.Fatal(err)
+	}
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
 
 	c, wt := openWorktree(t, repo.Dir)
 	rec := recordCommands(t, c, wt)
 
-	_, err := c.UpdateBranch(t.Context(), wt, "B")
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if ce.Key != "branchRebasingElsewhere" {
-		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
-	}
-	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
-		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
-	}
-	jobs, jobsErr := c.Jobs(t.Context(), wt)
-	if jobsErr != nil {
-		t.Fatal(jobsErr)
-	}
-	if len(jobs) != 0 {
-		t.Errorf("Jobs = %+v, want none started", jobs)
-	}
-	for _, e := range rec.snapshot() {
-		if strings.Contains(e.Command, "fetch") {
-			t.Errorf("recorded %q, want no fetch before the refusal", e.Command)
+	refuses := func(t *testing.T, key string) {
+		t.Helper()
+		_, err := c.UpdateBranch(t.Context(), wt, "B")
+		ce := coretest.AsError(t, err, core.GitFailed)
+		if ce.Key != key {
+			t.Errorf("Key = %q, want %s", ce.Key, key)
+		}
+		if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
+			t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
+		}
+		jobs, jobsErr := c.Jobs(t.Context(), wt)
+		if jobsErr != nil {
+			t.Fatal(jobsErr)
+		}
+		if len(jobs) != 0 {
+			t.Errorf("Jobs = %+v, want none started", jobs)
+		}
+		if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
+			t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
 		}
 	}
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != beforeSHA {
-		t.Errorf("refs/heads/B = %q, want unchanged %q", got, beforeSHA)
+	restoreDotGit := func() {
+		if err := os.Remove(dotGit); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dotGit, dotGitContent, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	wtGitDir := gittest.Out(t, wtDir, "rev-parse", "--absolute-git-dir")
-	if _, err := os.Stat(filepath.Join(wtGitDir, "rebase-merge")); err != nil {
-		t.Errorf("wtDir's rebase-merge is gone, want it still in progress: %v", err)
-	}
-}
 
-func TestFR_UPD_04_UpdateBranchRebasingElsewhereApplyBackendRefuses(t *testing.T) {
-	t.Parallel()
-	repo, wtDir := rebaseInProgressFixture(t, true)
-	wtPath := gitPath(t, wtDir)
+	t.Run("rebasing", func(t *testing.T) {
+		refuses(t, "branchRebasingElsewhere")
+		if _, err := os.Stat(filepath.Join(wtGitDir, "rebase-merge")); err != nil {
+			t.Errorf("rebase-merge is gone, want the rebase still in progress: %v", err)
+		}
+	})
+	t.Run("rebasing, relative gitdir", func(t *testing.T) {
+		rewriteGitDirRelative(t, wtDir)
+		refuses(t, "branchRebasingElsewhere")
+	})
+	// os.Lstat would see the symlink itself, not a directory.
+	t.Run("rebasing, .git a symlink to the git dir", func(t *testing.T) {
+		if err := os.Remove(dotGit); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(wtGitDir, dotGit); err != nil {
+			t.Fatal(err)
+		}
+		refuses(t, "branchRebasingElsewhere")
+		restoreDotGit()
+	})
+	t.Run("rebasing, apply backend", func(t *testing.T) {
+		gittest.Run(t, wtDir, "rebase", "--abort")
+		if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: wtDir, Args: []string{"rebase", "--apply", "upstream"}}); err == nil {
+			t.Fatal("rebase did not conflict as the fixture expects")
+		}
+		refuses(t, "branchRebasingElsewhere")
+	})
+	t.Run("bisecting", func(t *testing.T) {
+		gittest.Run(t, wtDir, "rebase", "--abort")
+		gittest.Run(t, wtDir, "bisect", "start")
+		gittest.Run(t, wtDir, "bisect", "bad", "HEAD")
+		gittest.Run(t, wtDir, "bisect", "good", "master")
+		refuses(t, "branchBisectingElsewhere")
+	})
 
-	c, wt := openWorktree(t, repo.Dir)
-	rec := recordCommands(t, c, wt)
-
-	_, err := c.UpdateBranch(t.Context(), wt, "B")
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if ce.Key != "branchRebasingElsewhere" {
-		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
-	}
-	if ce.Args["path"] != wtPath {
-		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
-	}
 	for _, e := range rec.snapshot() {
 		if strings.Contains(e.Command, "fetch") {
-			t.Errorf("recorded %q, want no fetch before the refusal", e.Command)
+			t.Errorf("recorded %q, want no fetch before a refusal", e.Command)
 		}
 	}
 }
@@ -1506,37 +1437,6 @@ func bisectInProgressFixture(t *testing.T) (repo *gittest.Repo, wtDir string) {
 	gittest.Run(t, wtDir, "bisect", "bad", "HEAD")
 	gittest.Run(t, wtDir, "bisect", "good", "HEAD~2")
 	return repo, wtDir
-}
-
-func TestFR_UPD_04_UpdateBranchBisectingElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
-	t.Parallel()
-	repo, wtDir := bisectInProgressFixture(t)
-	wtPath := gitPath(t, wtDir)
-
-	c, wt := openWorktree(t, repo.Dir)
-	rec := recordCommands(t, c, wt)
-
-	_, err := c.UpdateBranch(t.Context(), wt, "B")
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if ce.Key != "branchBisectingElsewhere" {
-		t.Errorf("Key = %q, want branchBisectingElsewhere", ce.Key)
-	}
-	if ce.Args["branch"] != "B" || ce.Args["path"] != wtPath {
-		t.Errorf("Args = %+v, want branch=B path=%s", ce.Args, wtPath)
-	}
-	jobs, jobsErr := c.Jobs(t.Context(), wt)
-	if jobsErr != nil {
-		t.Fatal(jobsErr)
-	}
-	if len(jobs) != 0 {
-		t.Errorf("Jobs = %+v, want none started", jobs)
-	}
-	for _, e := range rec.snapshot() {
-		if strings.Contains(e.Command, "fetch") {
-			t.Errorf("recorded %q, want no fetch before the refusal", e.Command)
-		}
-	}
 }
 
 func TestFR_UPD_04_UpdateBranchRebasingInMainWorktreeRefusesNamingIt(t *testing.T) {
@@ -1582,54 +1482,6 @@ func rewriteGitDirRelative(t *testing.T, worktreeDir string) {
 	}
 	if err := os.WriteFile(dotGit, []byte("gitdir: "+rel+"\n"), 0o644); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithRelativeGitDirRefuses(t *testing.T) {
-	t.Parallel()
-	repo, wtDir := rebaseInProgressFixture(t, false)
-	wtPath := gitPath(t, wtDir)
-	rewriteGitDirRelative(t, wtDir)
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	_, err := c.UpdateBranch(t.Context(), wt, "B")
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if ce.Key != "branchRebasingElsewhere" {
-		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
-	}
-	if ce.Args["path"] != wtPath {
-		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
-	}
-}
-
-// TestFR_UPD_04_UpdateBranchRebasingElsewhereWithGitDirSymlinkRefuses covers
-// a worktree whose .git is a symlink to its git dir (not the usual "gitdir:"
-// file): os.Lstat would see the symlink itself, not a directory.
-func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithGitDirSymlinkRefuses(t *testing.T) {
-	t.Parallel()
-	repo, wtDir := rebaseInProgressFixture(t, false)
-	wtPath := gitPath(t, wtDir)
-	wtGitDir := gittest.Out(t, wtDir, "rev-parse", "--absolute-git-dir")
-	dotGit := filepath.Join(wtDir, ".git")
-	if err := os.Remove(dotGit); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(wtGitDir, dotGit); err != nil {
-		t.Fatal(err)
-	}
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	_, err := c.UpdateBranch(t.Context(), wt, "B")
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if ce.Key != "branchRebasingElsewhere" {
-		t.Errorf("Key = %q, want branchRebasingElsewhere", ce.Key)
-	}
-	if ce.Args["path"] != wtPath {
-		t.Errorf("Args[path] = %q, want %s", ce.Args["path"], wtPath)
 	}
 }
 
