@@ -17,8 +17,8 @@ import (
 
 // stoppedRepo opens a fresh Core on a repo stopped mid-kind ("merge",
 // "rebase", "cherry-pick", "revert"), conflicted on files (conflictPath(kind)
-// if none given). Merge and rebase stop via Pull, cherry-pick and revert via
-// realConflictFixture. Returns HEAD before the operation.
+// if none given). Merge and rebase stop on a local diverged branch, cherry-pick
+// and revert via realConflictFixture. Returns HEAD before the operation.
 func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Core, wt core.WorktreeID, beforeHEAD string) {
 	t.Helper()
 	c = New(func(core.Event) {})
@@ -27,33 +27,7 @@ func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Cor
 		if len(files) == 0 {
 			files = []string{"seed.txt"}
 		}
-		repo, origin := pullMergeFixture(t)
-		for _, f := range files[1:] {
-			gittest.Commit(t, repo.Dir, f, "base\n", "add "+f)
-			gittest.Run(t, repo.Dir, "push", "origin", "master")
-		}
-
-		local, upstream := map[string]string{}, map[string]string{}
-		for _, f := range files {
-			local[f] = "local change\n"
-			upstream[f] = "upstream change\n"
-		}
-		for name, content := range local {
-			writeFile(t, repo.Dir, name, content)
-		}
-		gittest.Run(t, repo.Dir, "add", "-A")
-		gittest.CommitAll(t, repo.Dir, "local commit")
-		beforeHEAD = gittest.HeadSHA(t, repo.Dir)
-
-		remoteAppendCommitFiles(t, origin, "", upstream, "upstream commit")
-
-		info := openOn(t, c, repo.Dir)
-		mode := core.PullMerge
-		if kind == "rebase" {
-			mode = core.PullRebase
-		}
-		waitForJobState(t, c, info.ID, jobID(t)(c.Pull(t.Context(), info.ID, mode)), "failed")
-		return repo.Dir, c, info.ID, beforeHEAD
+		return stoppedByLocalOperation(t, c, kind, files)
 	}
 
 	repo := gittest.New(t)
@@ -70,6 +44,29 @@ func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Cor
 		t.Fatalf("%s: want a conflict, got nil error", kind)
 	}
 	return repo.Dir, c, info.ID, beforeHEAD
+}
+
+// stoppedByLocalOperation merges or rebases branch side into master, where
+// both changed every file.
+func stoppedByLocalOperation(t *testing.T, c *Core, kind string, files []string) (string, *Core, core.WorktreeID, string) {
+	t.Helper()
+	dir := gittest.New(t).Dir
+	contents := func(content string) map[string]string {
+		m := map[string]string{}
+		for _, f := range files {
+			m[f] = content
+		}
+		return m
+	}
+	gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: contents("base\n")},
+		gittest.Step{Branch: "side", From: "master", Message: "upstream commit", Files: contents("upstream change\n")},
+		gittest.Step{Message: "local commit", Files: contents("local change\n")},
+	)
+	beforeHEAD := gittest.HeadSHA(t, dir)
+	tryGit(t, dir, kind, "side")
+	info := openOn(t, c, dir)
+	return dir, c, info.ID, beforeHEAD
 }
 
 // conflictPath is the file stoppedRepo's own fixture conflicts on for kind.
