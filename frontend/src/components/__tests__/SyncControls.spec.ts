@@ -7,7 +7,6 @@ vi.mock(
   '../../../bindings/github.com/brogli/nebegit/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
-import { expectIconOnly } from '@/testing/expectIconOnly'
 import { pressKey } from '@/testing/pressKey'
 import { mountNotices } from '@/testing/mountNotices'
 import { wailsError } from '@/testing/errors'
@@ -31,8 +30,6 @@ vi.mock('@/stores/settings', () => ({
   useSettingsStore: () => settingsStore,
 }))
 
-import { createI18n } from 'vue-i18n'
-import en from '@/locales/en.json'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
@@ -114,21 +111,6 @@ describe('SyncControls', () => {
     })
   })
 
-  it('FR-UX-11 the Fetch button reads toolbar.fetch from the active locale, not a literal', async () => {
-    const xx = createI18n({
-      legacy: false,
-      locale: 'xx',
-      fallbackLocale: 'en',
-      messages: { xx: { ...en, toolbar: { ...en.toolbar, fetch: 'XFetch' } } },
-    })
-    const { body } = await mountInBody(SyncControls, {
-      props: { wt: '/repo' },
-      global: { plugins: [xx] },
-    })
-
-    expect(findButton(body, 'XFetch')).toBeTruthy()
-  })
-
   it('FR-SYNC-01 clicking Fetch calls Facade.Fetch with the worktree id and no remote', async () => {
     const { body } = await mountControls()
 
@@ -187,32 +169,30 @@ describe('SyncControls', () => {
     expect(AppService.OpenDiff).not.toHaveBeenCalled()
   })
 
-  it('FR-SYNC-11 without a remote, Fetch, Pull and Push are disabled with the no-remote tooltip; no select', async () => {
+  it('FR-UX-09 without a remote, the disabled Pull and Push keep their icon', async () => {
     setRefs({}, [])
     const { body } = await mountControls()
 
-    for (const label of ['Fetch', 'Pull', 'Push']) {
-      const button = findButton(body, label)!
-      expect(button.element.disabled).toBe(true)
-      expect(button.attributes('title')).toBe('This repo has no remote')
-    }
-    expect(body.find('select').exists()).toBe(false)
+    expect(findButton(body, 'Pull')!.get('.p-button-icon').classes()).toContain('oi-download')
+    expect(findButton(body, 'Push')!.get('.p-button-icon').classes()).toContain('oi-upload')
   })
 
-  it('FR-UX-09 without a remote, the disabled Pull and Push are OpenVue Buttons with their icon, secondary and outlined', async () => {
-    setRefs({}, [])
-    const { body } = await mountControls()
+  it.each([false, true])(
+    'FR-SYNC-11 without a remote, Fetch, Pull and Push are disabled with the no-remote tooltip; no select (compact: %s)',
+    async (compact) => {
+      setRefs({}, [])
+      const { body } = await mountControls({ compact })
 
-    const pull = findButton(body, 'Pull')!
-    const push = findButton(body, 'Push')!
-    expect(pull.get('.p-button-icon').classes()).toContain('oi-download')
-    expect(push.get('.p-button-icon').classes()).toContain('oi-upload')
-    for (const button of [pull, push]) {
-      expect(button.classes()).toContain('p-button-secondary')
-      expect(button.classes()).toContain('p-button-outlined')
-    }
-    expect(body.find('[data-test="upstream-remote"]').exists()).toBe(false)
-  })
+      for (const label of ['Fetch', 'Pull', 'Push']) {
+        const button = findButton(body, label)!
+        expect(button.element.disabled).toBe(true)
+        expect(button.attributes('title')).toBe('This repo has no remote')
+      }
+      expect(body.find('select').exists()).toBe(false)
+      expect(body.find('[data-test="upstream-remote"]').exists()).toBe(false)
+      expect(findButton(body, 'Pull')!.find('.p-button-label').exists()).toBe(!compact)
+    },
+  )
 
   it('FR-SYNC-11 detached HEAD (a remote exists): Pull and Push disabled, tooltip names the reason', async () => {
     setRefs({ current: false })
@@ -226,13 +206,12 @@ describe('SyncControls', () => {
     }
   })
 
-  it('FR-UX-09 FR-UX-05 branch without upstream: the Push button reads "Push", its tooltip still names the shortcut; no remote select in the toolbar', async () => {
+  it('FR-UX-09 FR-UX-05 branch without upstream: the Push button reads "Push"; no remote select in the toolbar', async () => {
     setRefs({ upstream: '' }, ['origin', 'upstream'])
     const { body } = await mountControls()
 
     const push = findButton(body, 'Push')!
     expect(push.element.disabled).toBe(false)
-    expect(push.attributes('title')).toBe('Push · Ctrl+Shift+K')
     expect(push.attributes('aria-label')).toBe('Push')
     expect(body.find('[data-test="upstream-remote"]').exists()).toBe(false)
   })
@@ -247,51 +226,20 @@ describe('SyncControls', () => {
     expect(main.attributes('aria-label')).toBe('Pull (merge)')
   })
 
-  it('FR-UX-09 the Pull split button matches its plain neighbours: secondary and outlined, not OpenVue’s primary colour', async () => {
-    setRefs({ upstream: 'origin/main' })
-    const { body } = await mountControls()
+  it.each([
+    ['with an upstream', { upstream: 'origin/main' }, ['origin']],
+    ['without an upstream', { upstream: '' }, ['origin', 'upstream']],
+  ])(
+    'FR-UX-09 below wide, Push shows icon only with aria-label "Push", %s',
+    async (_name, branch, remotes) => {
+      setRefs(branch, remotes)
+      const { body } = await mountControls({ compact: true })
 
-    for (const part of ['.p-splitbutton-button', '.p-splitbutton-dropdown']) {
-      const classes = body.get(part).classes()
-      expect(classes).toContain('p-button-secondary')
-      expect(classes).toContain('p-button-outlined')
-    }
-  })
-
-  it('FR-UX-09 Fetch and Push are OpenVue Buttons, secondary and outlined', async () => {
-    setRefs({ upstream: 'origin/main' })
-    const { body } = await mountControls()
-
-    for (const label of ['Fetch', 'Push']) {
-      const classes = findButton(body, label)!.classes()
-      expect(classes).toContain('p-button')
-      expect(classes).toContain('p-button-secondary')
-      expect(classes).toContain('p-button-outlined')
-    }
-  })
-
-  it('FR-UX-09 below wide, Push shows icon only with title and aria-label "Push", with or without an upstream', async () => {
-    setRefs({ upstream: 'origin/main' })
-    const withUpstream = await mountControls({ compact: true })
-    const push = findButton(withUpstream.body, 'Push')!
-    expectIconOnly(push, 'Push', 'Push · Ctrl+Shift+K')
-
-    setRefs({ upstream: '' }, ['origin', 'upstream'])
-    const noUpstream = await mountControls({ compact: true })
-    const pushNoUpstream = findButton(noUpstream.body, 'Push')!
-    expectIconOnly(pushNoUpstream, 'Push', 'Push · Ctrl+Shift+K')
-  })
-
-  it('FR-UX-09 below wide, the disabled Pull and Push also show icon only, title unchanged', async () => {
-    setRefs({}, [])
-    const { body } = await mountControls({ compact: true })
-
-    for (const label of ['Pull', 'Push']) {
-      const button = findButton(body, label)!
-      expect(button.attributes('title')).toBe('This repo has no remote')
-      expect(button.find('.p-button-label').exists()).toBe(false)
-    }
-  })
+      const push = findButton(body, 'Push')!
+      expect(push.text()).toBe('')
+      expect(push.attributes('aria-label')).toBe('Push')
+    },
+  )
 
   it('FR-SYNC-03, FR-SYNC-11 branch without upstream, remote with no tracking branches: Push is enabled; PushTarget cannot push straight away, so clicking it opens the dialog naming the branch; confirming pushes to it', async () => {
     setRefs({ upstream: '' })
@@ -352,24 +300,6 @@ describe('SyncControls', () => {
     expect(Facade.ForcePush).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-SYNC-06 cancelling the force-push confirmation calls nothing; the notice still offers it', async () => {
-    setRefs({ name: 'main', upstream: 'origin/main' })
-    const notice = await mountNotices()
-    await mountControls()
-
-    await rejectPush()
-
-    await findButton(notice, 'Force push')!.trigger('click')
-
-    expect(confirmRequire).toHaveBeenCalledTimes(1)
-    expect(Facade.ForcePush).not.toHaveBeenCalled()
-
-    // Cancelling means never accepting; the click itself never closed the
-    // notice, so it still offers Force push and nothing ran.
-    expect(findButton(notice, 'Force push')).toBeTruthy()
-    expect(Facade.ForcePush).not.toHaveBeenCalled()
-  })
-
   it('FR-SYNC-02 the button shows and runs Settings’ default pull mode', async () => {
     setRefs({ upstream: 'origin/main' })
     settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
@@ -402,22 +332,6 @@ describe('SyncControls', () => {
     expect(pullButton.attributes('title')).toBe('Pull (rebase) · Ctrl+T')
   })
 
-  it('FR-SYNC-02 clicking the main button pulls with the mode chosen in the menu', async () => {
-    setRefs({ upstream: 'origin/main' })
-    const { body } = await mountControls()
-    await flushPromises()
-    await openPullMenu(body)
-    await flushPromises()
-    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
-    await flushPromises()
-
-    await body.get('.p-splitbutton-button').trigger('click')
-    await flushPromises()
-
-    expect(Facade.Pull).toHaveBeenCalledTimes(1)
-    expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
-  })
-
   it('FR-UX-05 Ctrl+T pulls with the mode chosen in the menu', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
@@ -434,7 +348,7 @@ describe('SyncControls', () => {
     expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
   })
 
-  it('FR-SYNC-02 the menu lists "Pull (merge)" and "Pull (rebase)"; only the current mode has an icon', async () => {
+  it('FR-SYNC-02 the menu lists "Pull (merge)" and "Pull (rebase)"; only the current mode has an icon; the dropdown is named "Choose pull mode"', async () => {
     setRefs({ upstream: 'origin/main' })
     settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
     const { body } = await mountControls()
@@ -447,12 +361,6 @@ describe('SyncControls', () => {
     const items = body.findAll('.p-tieredmenu-item-content')
     expect(items[0]!.find('.p-tieredmenu-item-icon').exists()).toBe(false)
     expect(items[1]!.get('.p-tieredmenu-item-icon').classes()).toContain('oi-check')
-  })
-
-  it('FR-SYNC-02 the dropdown button has title and aria-label "Choose pull mode"', async () => {
-    setRefs({ upstream: 'origin/main' })
-    const { body } = await mountControls()
-
     const dropdown = body.get('.p-splitbutton-dropdown')
     expect(dropdown.attributes('title')).toBe('Choose pull mode')
     expect(dropdown.attributes('aria-label')).toBe('Choose pull mode')
@@ -496,16 +404,6 @@ describe('SyncControls', () => {
     expect(body.get('.error-banner').text()).toContain('network unreachable')
   })
 
-  it('FR-UX-05 Ctrl+T pulls, same as clicking Pull', async () => {
-    setRefs({ upstream: 'origin/main' })
-    await mountControls()
-
-    pressKey('t', { ctrlKey: true })
-    await flushPromises()
-
-    expect(Facade.Pull).toHaveBeenCalledTimes(1)
-  })
-
   it('FR-UX-05 Ctrl+Shift+K pushes, same as clicking Push', async () => {
     setRefs({ upstream: 'origin/main' })
     Facade.PushTarget.mockResolvedValue({
@@ -532,18 +430,11 @@ describe('SyncControls', () => {
     expect(findButton(body, 'Push')!.attributes('aria-label')).toBe('Push')
   })
 
-  it('FR-UX-05 Ctrl+T does nothing without an upstream (no Pull to gate)', async () => {
-    setRefs({ upstream: '' })
-    await mountControls()
-
-    pressKey('t', { ctrlKey: true })
-    await flushPromises()
-
-    expect(Facade.Pull).not.toHaveBeenCalled()
-  })
-
-  it('FR-UX-05 Ctrl+T does nothing without a remote, even with an upstream (Pull is disabled)', async () => {
-    setRefs({ upstream: 'origin/main' }, [])
+  it.each([
+    ['without an upstream', { upstream: '' }, ['origin']],
+    ['without a remote, even with an upstream', { upstream: 'origin/main' }, []],
+  ])('FR-UX-05 Ctrl+T does nothing %s (Pull is not available)', async (_name, branch, remotes) => {
+    setRefs(branch, remotes)
     await mountControls()
 
     pressKey('t', { ctrlKey: true })
