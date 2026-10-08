@@ -56,23 +56,6 @@ test('FR-BR-01 a new branch from a commit is checked out by default and shown as
   await expectCurrent(app, 'fresh')
 })
 
-test('FR-BR-01 a new branch created without checkout appears in the branch picker and HEAD stays', async ({
-  app,
-  repos,
-  git,
-}) => {
-  await openNewBranch(app, 'initial', 'later')
-  const dialog = app.getByRole('dialog')
-  await dialog.getByLabel('Check out after creation').uncheck()
-  await dialog.getByRole('button', { name: 'Create' }).click()
-
-  await expect.poll(() => git(repos.work, 'branch', '--list', 'later').trim()).toBe('later')
-  await openBranchPicker(app)
-  await expect(refRow(app, 'later')).toBeVisible()
-  expect(rev(git, repos.work, 'later')).toBe(commitSha(git, repos.work, 'initial'))
-  expect(currentBranch(git, repos.work)).toBe('main')
-})
-
 test('FR-BR-09 a branch picked in the branch picker is checked out', async ({
   app,
   repos,

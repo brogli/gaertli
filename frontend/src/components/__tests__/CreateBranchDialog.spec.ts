@@ -48,6 +48,15 @@ describe('CreateBranchDialog', () => {
     expect(Facade.CreateBranch).toHaveBeenCalledWith('/repo', 'feature', 'abc123456', true)
   })
 
+  it('FR-BR-01 unchecking "Check out after creation" submits checkout false', async () => {
+    const { body } = await mountDialog({ rev: 'abc123456', label: 'abc1234' })
+
+    await body.get('input[type=checkbox]').setValue(false)
+    await create(body, 'later')
+
+    expect(Facade.CreateBranch).toHaveBeenCalledWith('/repo', 'later', 'abc123456', false)
+  })
+
   it('FR-BR-01 a start is preselected in a list of the local branches, remote branches and tags; the one picked is sent by its full ref name', async () => {
     const { body } = await mountDialog({ ref: 'refs/heads/feat' })
 
