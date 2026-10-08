@@ -74,7 +74,7 @@ func waitFor(t *testing.T, cond func() bool) {
 	}
 }
 
-func TestFR_ED_01_ServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
+func TestTR_31_ServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
 	f := &fakeBrowser{}
 	hold := newTestHold(f)
 
@@ -103,7 +103,7 @@ func TestFR_ED_01_ServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
 	}
 }
 
-func TestFR_ED_01_ServerPageDropsHeldEventsOfAGonePage(t *testing.T) {
+func TestTR_31_ServerPageDropsHeldEventsOfAGonePage(t *testing.T) {
 	f := &fakeBrowser{}
 	hold := newTestHold(f)
 	hold.giveUp = 20 * time.Millisecond
