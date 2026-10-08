@@ -55,80 +55,27 @@ func TestFR_WT_01_ParseWorktreeRecordsParsesFieldsAndFlags(t *testing.T) {
 	}
 }
 
-func TestFR_WT_01_ListWorktreesListsMainAndLinkedWorktrees(t *testing.T) {
+func TestFR_WT_01_ListWorktreesReportsEveryWorktreeShape(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	gittest.Run(t, repo.Dir, "branch", "feature")
 	sha := gittest.HeadSHA(t, repo.Dir)
+	gittest.Run(t, repo.Dir, "branch", "feature")
+	gittest.Run(t, repo.Dir, "branch", "dirty")
 	linkedDir := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linkedDir, "feature")
 	detachedDir := filepath.Join(t.TempDir(), "detached")
 	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", detachedDir, sha)
-
-	c := New(func(core.Event) {})
-	got, err := c.ListWorktrees(t.Context(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(got) != 3 {
-		t.Fatalf("len(worktrees) = %d, want 3: %+v", len(got), got)
-	}
-	mainPath := gitPath(t, repo.Dir)
-	if !got[0].Main || got[0].Path != mainPath {
-		t.Errorf("worktrees[0] = %+v, want the main worktree at %s", got[0], mainPath)
-	}
-	for i := 1; i < len(got); i++ {
-		if got[i].Main {
-			t.Errorf("worktrees[%d].Main = true, want false", i)
-		}
-	}
-
-	linked := findWorktree(t, got, gitPath(t, linkedDir))
-	if linked.Branch != "feature" {
-		t.Errorf("linked worktree = %+v, want Branch \"feature\"", linked)
-	}
-	detached := findWorktree(t, got, gitPath(t, detachedDir))
-	if detached.Branch != "" {
-		t.Errorf("detached worktree = %+v, want Branch empty", detached)
-	}
-}
-
-func TestFR_WT_01_ListWorktreesReportsDirtyPerWorktree(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	sha := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "branch", "feature")
 	dirtyDir := filepath.Join(t.TempDir(), "dirty")
-	gittest.Run(t, repo.Dir, "worktree", "add", dirtyDir, "feature")
+	gittest.Run(t, repo.Dir, "worktree", "add", dirtyDir, "dirty")
 	writeFile(t, dirtyDir, "seed.txt", "changed")
-	cleanDir := filepath.Join(t.TempDir(), "clean")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", cleanDir, sha)
-
-	c := New(func(core.Event) {})
-	got, err := c.ListWorktrees(t.Context(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
+	missingDir := filepath.Join(t.TempDir(), "missing")
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", missingDir, sha)
+	paths := map[string]string{
+		"main": gitPath(t, repo.Dir), "linked": gitPath(t, linkedDir), "detached": gitPath(t, detachedDir),
+		"dirty": gitPath(t, dirtyDir), "missing": gitPath(t, missingDir),
 	}
-
-	if wt := findWorktree(t, got, gitPath(t, dirtyDir)); !wt.Dirty {
-		t.Errorf("dirty worktree Dirty = false, want true")
-	}
-	if wt := findWorktree(t, got, gitPath(t, cleanDir)); wt.Dirty {
-		t.Errorf("clean worktree Dirty = true, want false")
-	}
-}
-
-func TestFR_WT_01_ListWorktreesReportsAMissingDirectoryWithoutError(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	linkedDir := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", linkedDir, gittest.HeadSHA(t, repo.Dir))
-	wantPath := gitPath(t, linkedDir)
-	if err := os.RemoveAll(linkedDir); err != nil {
+	if err := os.RemoveAll(missingDir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -138,36 +85,53 @@ func TestFR_WT_01_ListWorktreesReportsAMissingDirectoryWithoutError(t *testing.T
 		t.Fatal(err)
 	}
 
-	wt := findWorktree(t, got, wantPath)
-	if !wt.Missing {
-		t.Errorf("Missing = false, want true")
-	}
-	if wt.Dirty {
-		t.Errorf("Dirty = true, want false (a missing worktree is never status-checked)")
-	}
-}
-
-func TestFR_WT_13_MainWorktreeFindsTheMainWorktreeFromTheCommonGitDir(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	linkedDir := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", linkedDir, gittest.HeadSHA(t, repo.Dir))
-	if err := os.RemoveAll(linkedDir); err != nil {
-		t.Fatal(err)
-	}
-	gitDir := filepath.Join(repo.Dir, ".git")
-
-	c := New(func(core.Event) {})
-	got, err := c.MainWorktree(t.Context(), core.RepoPath(gitDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mainPath := gitPath(t, repo.Dir)
-	if !got.Main || got.Path != mainPath {
-		t.Errorf("MainWorktree = %+v, want the main worktree at %s", got, mainPath)
-	}
+	t.Run("main first, linked ones not main", func(t *testing.T) {
+		if len(got) != len(paths) {
+			t.Fatalf("len(worktrees) = %d, want %d: %+v", len(got), len(paths), got)
+		}
+		if !got[0].Main || got[0].Path != paths["main"] {
+			t.Errorf("worktrees[0] = %+v, want the main worktree at %s", got[0], paths["main"])
+		}
+		for i := 1; i < len(got); i++ {
+			if got[i].Main {
+				t.Errorf("worktrees[%d].Main = true, want false", i)
+			}
+		}
+	})
+	t.Run("branch or detached", func(t *testing.T) {
+		if linked := findWorktree(t, got, paths["linked"]); linked.Branch != "feature" {
+			t.Errorf("linked worktree = %+v, want Branch \"feature\"", linked)
+		}
+		if detached := findWorktree(t, got, paths["detached"]); detached.Branch != "" {
+			t.Errorf("detached worktree = %+v, want Branch empty", detached)
+		}
+	})
+	t.Run("dirty per worktree", func(t *testing.T) {
+		if wt := findWorktree(t, got, paths["dirty"]); !wt.Dirty {
+			t.Error("dirty worktree Dirty = false, want true")
+		}
+		if wt := findWorktree(t, got, paths["detached"]); wt.Dirty {
+			t.Error("clean worktree Dirty = true, want false")
+		}
+	})
+	t.Run("missing directory without error", func(t *testing.T) {
+		wt := findWorktree(t, got, paths["missing"])
+		if !wt.Missing {
+			t.Error("Missing = false, want true")
+		}
+		if wt.Dirty {
+			t.Error("Dirty = true, want false (a missing worktree is never status-checked)")
+		}
+	})
+	t.Run("main worktree found from the common git dir", func(t *testing.T) {
+		main, err := c.MainWorktree(t.Context(), core.RepoPath(filepath.Join(repo.Dir, ".git")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !main.Main || main.Path != paths["main"] {
+			t.Errorf("MainWorktree = %+v, want the main worktree at %s", main, paths["main"])
+		}
+	})
 }
 
 func TestFR_WT_13_MainWorktreeErrorsForABareRepoWhoseOnlyWorktreeIsGone(t *testing.T) {
@@ -381,91 +345,59 @@ func TestFR_WT_02_AddWorktreeWithANewBranchAndNoStartBranchesFromHEAD(t *testing
 	}
 }
 
-func TestFR_WT_02_AddWorktreeIntoAFolderWithFilesCreatesNoBranch(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	target := t.TempDir()
-	writeFile(t, target, "existing.txt", "x")
-
-	c, _ := openWorktree(t, repo.Dir)
-	_, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "stray", "", true)
-
-	if err == nil || !strings.Contains(err.Error(), "already exists") {
-		t.Errorf("AddWorktree err = %v, want an \"already exists\" refusal", err)
-	}
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if ce.Args["path"] != target {
-		t.Errorf("Args[path] = %q, want %q", ce.Args["path"], target)
-	}
-	if ce.Key != "worktreeExists" {
-		t.Errorf("Key = %q, want worktreeExists", ce.Key)
-	}
-	if out := gittest.Out(t, repo.Dir, "branch", "--list", "stray"); out != "" {
-		t.Errorf("branch list = %q, want no stray branch", out)
-	}
-}
-
-func TestFR_WT_02_AddWorktreeRejectsAnInvalidNewBranchNameBeforeTouchingGit(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	target := filepath.Join(t.TempDir(), "wt")
-
-	c, _ := openWorktree(t, repo.Dir)
-	_, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "-weird", "", true)
-
-	coretest.AssertCode(t, err, core.InvalidName)
-	if branchExists(t, repo.Dir, "-weird") {
-		t.Error("branch -weird was created, want none")
-	}
-	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
-		t.Errorf("target %s exists, want none created", target)
-	}
-}
-
-func TestFR_WT_02_AddWorktreeRejectsADuplicateBranchNameAsGitFailed(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	gittest.Run(t, repo.Dir, "branch", "dup")
-	originalTip := branchTip(t, repo.Dir, "dup")
-	sha := gittest.HeadSHA(t, repo.Dir)
-	target := filepath.Join(t.TempDir(), "wt")
-
-	c, _ := openWorktree(t, repo.Dir)
-	_, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "dup", sha, true)
-
-	coretest.AssertCode(t, err, core.GitFailed)
-	if got := branchTip(t, repo.Dir, "dup"); got != originalTip {
-		t.Errorf("dup = %s, want unchanged %s", got, originalTip)
-	}
-	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
-		t.Errorf("target %s exists, want none created", target)
-	}
-}
-
-func TestFR_WT_03_AddWorktreeRefusesAnExistingNonEmptyTargetAsGitFailed(t *testing.T) {
+func TestFR_WT_02_AddWorktreeRefusalsCreateNeitherBranchNorFolder(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	gittest.Run(t, repo.Dir, "branch", "feature")
-	target := t.TempDir()
-	writeFile(t, target, "existing.txt", "x")
+	gittest.Run(t, repo.Dir, "branch", "dup")
+	sha := gittest.HeadSHA(t, repo.Dir)
+	dupTip := branchTip(t, repo.Dir, "dup")
+	branchesBefore := gittest.Out(t, repo.Dir, "branch", "--list")
+	occupied := t.TempDir()
+	writeFile(t, occupied, "existing.txt", "x")
+	free := filepath.Join(t.TempDir(), "wt")
 
 	c, _ := openWorktree(t, repo.Dir)
-	_, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "feature", "", false)
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "already exists") {
-		t.Errorf("GitStderr = %q, want it to say %s already exists", ce.GitStderr, target)
+	add := func(target, branch, start string, create bool) error {
+		_, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, branch, start, create)
+		return err
 	}
-	entries, err := os.ReadDir(target)
+
+	t.Run("non-empty target with an existing branch", func(t *testing.T) {
+		ce := coretest.AsError(t, add(occupied, "feature", "", false), core.GitFailed)
+		if !strings.Contains(ce.GitStderr, "already exists") {
+			t.Errorf("GitStderr = %q, want it to say %s already exists", ce.GitStderr, occupied)
+		}
+	})
+	t.Run("non-empty target with a new branch", func(t *testing.T) {
+		ce := coretest.AsError(t, add(occupied, "stray", "", true), core.GitFailed)
+		if ce.Args["path"] != occupied || ce.Key != "worktreeExists" {
+			t.Errorf("Key, Args = %q, %v; want worktreeExists, path=%s", ce.Key, ce.Args, occupied)
+		}
+	})
+	t.Run("invalid new branch name", func(t *testing.T) {
+		coretest.AssertCode(t, add(free, "-weird", "", true), core.InvalidName)
+	})
+	t.Run("duplicate new branch name", func(t *testing.T) {
+		coretest.AssertCode(t, add(free, "dup", sha, true), core.GitFailed)
+	})
+
+	entries, err := os.ReadDir(occupied)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(entries) != 1 || entries[0].Name() != "existing.txt" {
-		t.Errorf("target dir = %v, want unchanged (only existing.txt)", entries)
+		t.Errorf("occupied dir = %v, want unchanged (only existing.txt)", entries)
+	}
+	if _, statErr := os.Stat(free); !os.IsNotExist(statErr) {
+		t.Errorf("target %s exists, want none created", free)
+	}
+	if got := gittest.Out(t, repo.Dir, "branch", "--list"); got != branchesBefore {
+		t.Errorf("branches = %q, want unchanged %q", got, branchesBefore)
+	}
+	if got := branchTip(t, repo.Dir, "dup"); got != dupTip {
+		t.Errorf("dup = %s, want unchanged %s", got, dupTip)
 	}
 }
 
@@ -490,146 +422,109 @@ func TestFR_WT_03_AddWorktreeCreatesTheTargetsMissingParentDirectory(t *testing.
 	}
 }
 
-func TestFR_WT_07_RemoveWorktreeRemovesACleanLinkedWorktree(t *testing.T) {
+func TestFR_WT_07_RemoveWorktreeRefusesLockedAndDirtyThenForceRemovesDirty(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	gittest.Run(t, repo.Dir, "branch", "feature")
-	target := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
+	gittest.Run(t, repo.Dir, "branch", "locked")
+	gittest.Run(t, repo.Dir, "branch", "dirty")
+	locked := filepath.Join(t.TempDir(), "locked")
+	gittest.Run(t, repo.Dir, "worktree", "add", locked, "locked")
+	gittest.Run(t, repo.Dir, "worktree", "lock", locked)
+	dirty := filepath.Join(t.TempDir(), "dirty")
+	gittest.Run(t, repo.Dir, "worktree", "add", dirty, "dirty")
+	writeFile(t, dirty, "seed.txt", "changed")
 
 	c, _ := openWorktree(t, repo.Dir)
-	if err := c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), target, false); err != nil {
-		t.Fatal(err)
+	remove := func(target string, force bool) error {
+		return c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), target, force)
 	}
 
-	got, err := c.ListWorktrees(t.Context(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
+	ce := coretest.AsError(t, remove(locked, true), core.GitFailed)
+	if !strings.Contains(ce.GitStderr, "cannot remove a locked working tree") {
+		t.Errorf("GitStderr = %q, want git's own locked-worktree message", ce.GitStderr)
 	}
-	if slices.ContainsFunc(got, func(wt core.Worktree) bool { return wt.Path == target }) {
-		t.Errorf("worktrees = %+v, want %s gone", got, target)
+	if _, statErr := os.Stat(locked); statErr != nil {
+		t.Errorf("worktree %s missing: %v, want still present", locked, statErr)
 	}
-}
 
-func TestFR_WT_07_RemoveWorktreeRefusesADirtyWorktreeAsCodeDirtyWorktree(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	gittest.Run(t, repo.Dir, "branch", "feature")
-	target := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
-	writeFile(t, target, "seed.txt", "changed")
-
-	c, _ := openWorktree(t, repo.Dir)
-	err := c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), target, false)
-
-	ce := coretest.AsError(t, err, core.DirtyWorktree)
-	if ce.Key != "worktreeDirty" || ce.Args["path"] != target {
-		t.Errorf("key, args = %q, %v; want worktreeDirty, path=%s", ce.Key, ce.Args, target)
+	ce = coretest.AsError(t, remove(dirty, false), core.DirtyWorktree)
+	if ce.Key != "worktreeDirty" || ce.Args["path"] != dirty {
+		t.Errorf("key, args = %q, %v; want worktreeDirty, path=%s", ce.Key, ce.Args, dirty)
 	}
 	if !strings.Contains(ce.GitStderr, "contains modified or untracked files") {
 		t.Errorf("GitStderr = %q, want git's own dirty-worktree message", ce.GitStderr)
 	}
-	if _, statErr := os.Stat(target); statErr != nil {
-		t.Errorf("worktree %s missing: %v, want still present", target, statErr)
-	}
-	if got := readFile(t, target, "seed.txt"); got != "changed" {
+	if got := readFile(t, dirty, "seed.txt"); got != "changed" {
 		t.Errorf("seed.txt = %q, want unchanged %q", got, "changed")
 	}
-}
 
-func TestFR_WT_07_RemoveWorktreeForcedRemovesADirtyWorktree(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	gittest.Run(t, repo.Dir, "branch", "feature")
-	target := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
-	writeFile(t, target, "seed.txt", "changed")
-
-	c, _ := openWorktree(t, repo.Dir)
-	if err := c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), target, true); err != nil {
+	if err := remove(dirty, true); err != nil {
 		t.Fatal(err)
 	}
-
-	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
-		t.Errorf("worktree %s = %v, want removed", target, statErr)
+	if _, statErr := os.Stat(dirty); !os.IsNotExist(statErr) {
+		t.Errorf("worktree %s = %v, want removed", dirty, statErr)
 	}
 }
 
-func TestFR_WT_07_RemoveWorktreeRefusesALockedWorktreeEvenForced(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	gittest.Run(t, repo.Dir, "branch", "feature")
-	target := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", target, "feature")
-	gittest.Run(t, repo.Dir, "worktree", "lock", target)
-
-	c, _ := openWorktree(t, repo.Dir)
-	err := c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), target, true)
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "cannot remove a locked working tree") {
-		t.Errorf("GitStderr = %q, want git's own locked-worktree message", ce.GitStderr)
-	}
-	if _, statErr := os.Stat(target); statErr != nil {
-		t.Errorf("worktree %s missing: %v, want still present", target, statErr)
-	}
-}
-
-func TestFR_WT_07_RemoveWorktreeRemovesAMissingWorktreeWithNoForce(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-	target := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", target, gittest.HeadSHA(t, repo.Dir))
-	if err := os.RemoveAll(target); err != nil {
-		t.Fatal(err)
-	}
-
-	c, _ := openWorktree(t, repo.Dir)
-	if err := c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), target, false); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := c.ListWorktrees(t.Context(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if slices.ContainsFunc(got, func(wt core.Worktree) bool { return wt.Path == target }) {
-		t.Errorf("worktrees = %+v, want %s gone", got, target)
-	}
-}
-
-func TestFR_WT_07_PruneWorktreesRemovesOnlyMissingEntries(t *testing.T) {
+func TestFR_WT_07_RemoveWorktreeRemovesCleanAndMissingOnesAndPruneKeepsTheRest(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	sha := gittest.HeadSHA(t, repo.Dir)
-	missing := filepath.Join(t.TempDir(), "missing")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", missing, sha)
-	if err := os.RemoveAll(missing); err != nil {
-		t.Fatal(err)
-	}
+	gittest.Run(t, repo.Dir, "branch", "feature")
 	clean := filepath.Join(t.TempDir(), "clean")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", clean, sha)
-	cleanPath := gitPath(t, clean)
+	gittest.Run(t, repo.Dir, "worktree", "add", clean, "feature")
+	keep := filepath.Join(t.TempDir(), "keep")
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", keep, sha)
+	missingRemoved := filepath.Join(t.TempDir(), "missing-removed")
+	missingPruned := filepath.Join(t.TempDir(), "missing-pruned")
+	for _, dir := range []string{missingRemoved, missingPruned} {
+		gittest.Run(t, repo.Dir, "worktree", "add", "--detach", dir, sha)
+	}
+	cleanPath, keepPath := gitPath(t, clean), gitPath(t, keep)
+	removedPath, prunedPath := gitPath(t, missingRemoved), gitPath(t, missingPruned)
+	for _, dir := range []string{missingRemoved, missingPruned} {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	c, _ := openWorktree(t, repo.Dir)
+	listed := func() []core.Worktree {
+		got, err := c.ListWorktrees(t.Context(), core.RepoPath(repo.Dir))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	has := func(path string) bool {
+		return slices.ContainsFunc(listed(), func(wt core.Worktree) bool { return wt.Path == path })
+	}
+
+	if err := c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), clean, false); err != nil {
+		t.Fatal(err)
+	}
+	if has(cleanPath) {
+		t.Errorf("worktrees = %+v, want the clean one gone", listed())
+	}
+
+	if err := c.RemoveWorktree(t.Context(), core.RepoPath(repo.Dir), missingRemoved, false); err != nil {
+		t.Fatal(err)
+	}
+	if has(removedPath) {
+		t.Errorf("worktrees = %+v, want the missing one removed without force", listed())
+	}
+
 	if err := c.PruneWorktrees(t.Context(), core.RepoPath(repo.Dir)); err != nil {
 		t.Fatal(err)
 	}
-
-	got, err := c.ListWorktrees(t.Context(), core.RepoPath(repo.Dir))
-	if err != nil {
-		t.Fatal(err)
+	if has(prunedPath) {
+		t.Errorf("worktrees = %+v, want the missing one pruned away", listed())
 	}
-	if slices.ContainsFunc(got, func(wt core.Worktree) bool { return wt.Path == missing }) {
-		t.Errorf("worktrees = %+v, want %s pruned away", got, missing)
+	if !has(keepPath) {
+		t.Errorf("worktrees = %+v, want the present one kept by prune", listed())
 	}
-	findWorktree(t, got, cleanPath) // still present, fails the test if not
 }
 
 // findWorktree returns the row of worktrees whose Path is path, failing t
