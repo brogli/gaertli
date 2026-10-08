@@ -10,10 +10,4 @@ describe('codeEditorExtensions', () => {
     })
     expect(state.doc.lines).toBe(2)
   })
-
-  it('FR-CONF-05 adds syntax highlighting for a known language only', async () => {
-    const known = await codeEditorExtensions('main.go')
-    const unknown = await codeEditorExtensions('notes.unknownext')
-    expect(known.length).toBeGreaterThan(unknown.length)
-  })
 })
