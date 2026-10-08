@@ -51,6 +51,7 @@ func echoArgv(args []string) {
 
 func run(isLog bool) {
 	if hb := os.Getenv("FAKEGIT_HEARTBEAT"); hb != "" {
+		_ = os.WriteFile(hb, nil, 0o644) // the first beat lands before any output does
 		go heartbeat(hb)
 	}
 	if ms, err := strconv.Atoi(os.Getenv("FAKEGIT_SLEEP_MS")); err == nil {

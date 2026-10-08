@@ -31,7 +31,7 @@ func TestFR_SYNC_07_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T)
 	}
 	heartbeat := filepath.Join(t.TempDir(), "heartbeat")
 	t.Setenv("FAKEGIT_STDERR_FILE", file)
-	t.Setenv("FAKEGIT_STDERR_DELAY_MS", "50")
+	t.Setenv("FAKEGIT_STDERR_DELAY_MS", "200")
 	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
 
 	sess.Repo.Jobs().Start(t.Context(), "fetch", func(ctx context.Context, progress jobs.Progress) (any, error) {

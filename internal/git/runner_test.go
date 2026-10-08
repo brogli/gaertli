@@ -327,6 +327,7 @@ func TestQA_SAFE_04_AGitIgnoringTheInterruptIsKilledAfterTheGracePeriod(t *testi
 // The kill after the grace period reaches git alone; a hook or transport
 // that ignores the interrupt must not outlive the cancel.
 func TestQA_SAFE_04_CancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	err := runCancelledAfter(t, 100*time.Millisecond,
@@ -342,6 +343,7 @@ func TestQA_SAFE_04_CancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) 
 // A hook or transport that ends its own way on the interrupt, after its
 // output left git's pipes, gets the grace period to do so.
 func TestQA_SAFE_04_AChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	err := runCancelledAfter(t, 200*time.Millisecond,
@@ -356,6 +358,7 @@ func TestQA_SAFE_04_AChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
 // git that ended before the cancel was never interrupted, so nothing of
 // its group is killed either, though a child still held its output.
 func TestQA_SAFE_04_NothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	err := runCancelledAfter(t, 100*time.Millisecond, `(sleep 5 & echo $! >`+dir+`/pid; wait) &`)
@@ -363,7 +366,7 @@ func TestQA_SAFE_04_NothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 	coretest.AssertCode(t, err, core.Cancelled)
 	pid := readTrimmed(t, dir+"/pid")
 	t.Cleanup(func() { _ = exec.Command("kill", pid).Run() })
-	time.Sleep(testGrace) // Run returned when the pipes closed, a grace period after the cancel
+	time.Sleep(testGrace) // Run returned when the pipes closed, a grace period after git exited
 	if processGone(pid) {
 		t.Error("the child of a git that ended before the cancel was killed")
 	}
@@ -373,7 +376,6 @@ func TestQA_SAFE_04_NothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 // ends after delay.
 func runCancelledAfter(t *testing.T, delay time.Duration, script string) error {
 	t.Helper()
-	t.Parallel()
 	if runtime.GOOS != "linux" {
 		t.Skip("reads /proc")
 	}

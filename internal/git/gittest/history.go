@@ -48,13 +48,13 @@ func fastImportStream(steps []Step, start int64) []byte {
 	for i, c := range steps {
 		branch := orDefault(c.Branch, "master")
 		when := start + int64(i)
-		author := "nebegit test <test@nebegit.invalid>"
+		author := identityName + " <" + identityEmail + ">"
 		if c.Author != "" {
 			author = fmt.Sprintf("%s <%s@nebegit.invalid>", c.Author, strings.ToLower(c.Author))
 		}
 		msg := strings.TrimRight(c.Message, "\n") + "\n"
-		fmt.Fprintf(&s, "commit refs/heads/%s\nmark :%d\nauthor %s %d +0000\ncommitter nebegit test <test@nebegit.invalid> %d +0000\ndata %d\n%s",
-			branch, i+1, author, when, when, len(msg), msg)
+		fmt.Fprintf(&s, "commit refs/heads/%s\nmark :%d\nauthor %s %d +0000\ncommitter %s %d +0000\ndata %d\n%s",
+			branch, i+1, author, when, identityName+" <"+identityEmail+">", when, len(msg), msg)
 		if c.From != "" {
 			fmt.Fprintf(&s, "from refs/heads/%s\n", c.From)
 		}
@@ -106,5 +106,8 @@ func Copy(t *testing.T, src string) *Repo {
 	if err := os.CopyFS(dir, os.DirFS(src)); err != nil {
 		t.Fatal(err)
 	}
+	// The copy has new mtimes and inodes; without a refresh, plumbing such as
+	// diff-files reports every tracked file modified.
+	Run(t, dir, "update-index", "-q", "--unmerged", "--refresh")
 	return &Repo{Dir: dir}
 }

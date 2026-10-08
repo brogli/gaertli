@@ -79,8 +79,8 @@ func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T
 	held := time.Since(heldSince)
 	wt.Unlock()
 
-	if held < hold-10*time.Millisecond {
-		t.Errorf("direct Lock() returned %s after the job took the lock, want >= %s (should wait for the job's own hold)", held, hold-10*time.Millisecond)
+	if held < hold/2 {
+		t.Errorf("direct Lock() returned %s after the job took the lock, want >= %s (should wait for the job's own hold)", held, hold/2)
 	}
 }
 

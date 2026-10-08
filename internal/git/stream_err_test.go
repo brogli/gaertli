@@ -62,7 +62,7 @@ func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
 
 	coretest.AssertCode(t, err, core.Cancelled)
 	if elapsed > time.Second {
-		t.Errorf("StreamErr() took %s, want well under 5s", elapsed)
+		t.Errorf("StreamErr() took %s, want it back soon after the grace period", elapsed)
 	}
 	assertStopped(t, heartbeat)
 }
@@ -70,18 +70,19 @@ func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
 // A grandchild that inherited git's stderr and outlives the interrupt,
 // e.g. a stalled ssh transport, keeps the pipe open after git itself is gone.
 func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsStderr(t *testing.T) {
+	t.Parallel()
 	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6) & wait")
 }
 
 // The shape of a delayed transport: the grandchild holds git's stderr but
 // not its stdout, so stdout ends as soon as git is gone.
 func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsOnlyStderr(t *testing.T) {
+	t.Parallel()
 	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6 >/dev/null) & wait")
 }
 
 func assertCancelReturnsDespiteGrandchild(t *testing.T, script string) {
 	t.Helper()
-	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("needs a POSIX shell")
 	}

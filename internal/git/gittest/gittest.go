@@ -19,6 +19,12 @@ type Repo struct {
 	Dir string // the repo's working directory
 }
 
+// The test identity git commits with: Main configures it, History writes it.
+const (
+	identityName  = "nebegit test"
+	identityEmail = "test@nebegit.invalid"
+)
+
 // Main is the TestMain of every package whose tests call New. It builds bins
 // with the developer's own environment (go build needs its module and build
 // caches), then isolates git for the rest of the process: HOME and a global
@@ -45,8 +51,8 @@ func Main(m *testing.M, bins ...testbin.Bin) {
 	}
 
 	for _, args := range [][]string{
-		{"config", "--global", "user.name", "nebegit test"},
-		{"config", "--global", "user.email", "test@nebegit.invalid"},
+		{"config", "--global", "user.name", identityName},
+		{"config", "--global", "user.email", identityEmail},
 		// git commit and others start a detached maintenance run that may
 		// still write the repo while t.TempDir removes it.
 		{"config", "--global", "maintenance.auto", "false"},

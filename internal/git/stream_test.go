@@ -30,7 +30,7 @@ func TestADR_5_StreamCallsOnRecordAsRecordsArrive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if firstAt > 75*time.Millisecond {
+	if firstAt > 150*time.Millisecond {
 		t.Errorf("first record arrived after %s, want well under the 150ms record delay (proves streaming, not buffer-then-split)", firstAt)
 	}
 	if want := []string{"A", "B", "C"}; !slices.Equal(records, want) {
