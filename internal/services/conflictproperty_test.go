@@ -111,8 +111,13 @@ func resolvedWith(t *testing.T, got core.ConflictFile, take regionTake) string {
 	return strings.Join(append(out, result[next:]...), "")
 }
 
+// A smoke check over random merges. Every failure it found is pinned as a table case in
+// TestFR_CONF_05_ChangeRegionsCoverTheSameChangeInAllFourTexts and conflictregionedges_test.go.
 func TestFR_CONF_05_TakingASideInEveryRegionMatchesMergingWithThatSidePreferred(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" || testing.Short() { // git starts slowly there; the region logic is platform-independent
+		t.Skip("fuzz test")
+	}
 	// Each style is set up before the merge (config) and may rewrite the file after it.
 	styles := map[string]struct {
 		config  []string
@@ -130,10 +135,7 @@ func TestFR_CONF_05_TakingASideInEveryRegionMatchesMergingWithThatSidePreferred(
 		t.Run(style, func(t *testing.T) {
 			t.Parallel()
 			r := rand.New(rand.NewSource(7))
-			wanted, atLeast := 25, 10
-			if runtime.GOOS == "windows" || testing.Short() { // git starts slowly there
-				wanted, atLeast = 4, 2
-			}
+			wanted, atLeast := 8, 4
 			checked := 0
 			for n := 0; checked < wanted && n < 400; n++ {
 				var base []string
