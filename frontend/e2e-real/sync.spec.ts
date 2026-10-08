@@ -59,6 +59,11 @@ const syncButton = (page: Page, name: string) =>
 const pullButton = (page: Page) => page.locator('.sync-controls .p-splitbutton-button')
 const aheadBehind = (page: Page) => page.locator('[data-test=ahead-behind]')
 
+// slowUploadPack makes the remote side of a fetch from work take 30 s; its
+// delay is a child that holds git's stderr, which cancelling must not wait
+// for.
+const slowUploadPack = 'sleep 30; exec git-upload-pack'
+
 // remoteAheadAndLocalAhead leaves main diverged: other pushed a commit that
 // work lacks, and work has a commit of its own.
 function remoteAheadAndLocalAhead(git: Git, work: string, other: string): void {
@@ -91,9 +96,7 @@ test('FR-SYNC-07 a running fetch shows its progress and can be cancelled', async
   repos,
   git,
 }) => {
-  // The upload pack's delay is a child that holds git's stderr: cancelling
-  // must not wait for it.
-  git(repos.work, 'config', 'remote.origin.uploadpack', 'sleep 30; exec git-upload-pack')
+  git(repos.work, 'config', 'remote.origin.uploadpack', slowUploadPack)
   git(repos.other, 'push', '-q', 'origin', 'main:refs/heads/newremote')
 
   await syncButton(app, 'Fetch').click()
@@ -129,7 +132,7 @@ test.describe('with work and other open', () => {
     sandbox,
   }) => {
     const other = await openApp(repos.other)
-    git(repos.work, 'config', 'remote.origin.uploadpack', 'sleep 30; exec git-upload-pack')
+    git(repos.work, 'config', 'remote.origin.uploadpack', slowUploadPack)
 
     await syncButton(app, 'Fetch').click()
     await expect(jobsMenuButton(app)).toHaveAttribute('title', '1 running job')

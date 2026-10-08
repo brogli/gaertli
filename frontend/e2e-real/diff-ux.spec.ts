@@ -54,15 +54,16 @@ test('FR-DIFF-02 FR-ED-09 next/previous change jump between far changes; "Open i
     sha: commitSha(git, repos.work, 'two far changes'),
     file: 'long.txt',
   })
+  const nextChange = diff.locator('[data-test=next-change]')
   await expect(diffLine(diff, 'row 5 CHANGED')).toBeInViewport()
 
-  await diff.locator('[data-test=next-change]').click()
-  await diff.locator('[data-test=next-change]').click()
+  await nextChange.click()
+  await nextChange.click()
   await expect(diffLine(diff, 'row 180 CHANGED')).toBeInViewport()
   await expect(diffLine(diff, 'row 5 CHANGED')).not.toBeInViewport()
   await diff.locator('[data-test=prev-change]').click()
   await expect(diffLine(diff, 'row 5 CHANGED')).toBeInViewport()
-  await diff.locator('[data-test=next-change]').click()
+  await nextChange.click()
   await expect(diffLine(diff, 'row 180 CHANGED')).toBeInViewport()
 
   await diffLine(diff, 'row 180 CHANGED').click()
@@ -79,10 +80,11 @@ test('FR-DIFF-06 "ignore whitespace" hides a whitespace-only change', async ({
   fs.writeFileSync(path.join(repos.work, 'hunks.txt'), hunksText({ 7: 'line 7   ' }))
   const diff = await openDiff(repos.work, { kind: 'working', file: 'hunks.txt' })
   const changed = diffPane(diff).locator('.cm-changedLine, .cm-deletedChunk')
+  const ignoreWhitespace = diff.locator('[data-test=ignore-whitespace-toggle]')
   await expect(changed.first()).toBeVisible()
 
-  await diff.locator('[data-test=ignore-whitespace-toggle]').click()
+  await ignoreWhitespace.click()
   await expect(changed).toHaveCount(0)
-  await diff.locator('[data-test=ignore-whitespace-toggle]').click()
+  await ignoreWhitespace.click()
   await expect(changed.first()).toBeVisible()
 })

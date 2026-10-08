@@ -29,14 +29,6 @@ function worktreeRow(page: Page, branch: string): Locator {
   return worktreeLi(page, branch).locator('[data-test=worktree-row]')
 }
 
-function removeButton(page: Page, branch: string): Locator {
-  return worktreeLi(page, branch).locator('[data-test=remove-worktree]')
-}
-
-function newWorktreeDialog(page: Page): Locator {
-  return page.getByRole('dialog', { name: 'New worktree' })
-}
-
 // createOnNewBranch submits the picker's New worktree dialog for a new
 // branch at target, starting at the branch start picked from the list.
 async function createOnNewBranch(
@@ -45,7 +37,7 @@ async function createOnNewBranch(
 ): Promise<void> {
   await openWorktreePicker(page)
   await pickerAction(page, 'New worktree…').click()
-  const dialog = newWorktreeDialog(page)
+  const dialog = page.getByRole('dialog', { name: 'New worktree' })
   await dialog.getByLabel('New branch').check()
   await dialog.getByLabel('Branch name').fill(branch)
   await dialog.locator('[data-test=start-branch]').click()
@@ -65,10 +57,6 @@ function worktreePaths(git: Git, repo: string): string[] {
 // branchTip is branch's commit, "" when there is no such branch.
 function branchTip(git: Git, repo: string, branch: string): string {
   return git(repo, 'for-each-ref', '--format=%(objectname)', `refs/heads/${branch}`).trim()
-}
-
-function addWorktree(git: Git, repo: string, dir: string, branch: string): void {
-  git(repo, 'worktree', 'add', '-q', dir, '-b', branch)
 }
 
 test("FR-WT-04 Open in editor on another worktree's row opens that folder in one click", async ({
@@ -104,13 +92,13 @@ test('FR-WT-07 a worktree changed after the picker listed it is refused by git, 
   git,
 }) => {
   const late = path.join(sandbox.dir, 'late')
-  addWorktree(git, repos.work, late, 'late')
+  git(repos.work, 'worktree', 'add', '-q', late, '-b', 'late')
   const app = await openApp(repos.work)
   await openWorktreePicker(app)
   await expect(worktreeRow(app, 'late').locator('[data-test=dirty-marker]')).toHaveCount(0)
   fs.writeFileSync(path.join(late, 'unsaved.txt'), 'work in progress\n')
 
-  await removeButton(app, 'late').click()
+  await worktreeLi(app, 'late').locator('[data-test=remove-worktree]').click()
   await expect(confirmDialog(app)).not.toContainText('will be lost')
   await clickConfirm(app)
   await expect(confirmDialog(app)).toContainText(

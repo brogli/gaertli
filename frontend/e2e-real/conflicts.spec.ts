@@ -62,8 +62,9 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
     stopOnConflicts(git, repos.work, 'merge', 'feature')
 
     const banner = conflictBanner(app)
+    const continueButton = banner.getByRole('button', { name: 'Continue' })
     await expect(banner).toContainText('merge stopped on conflicts')
-    await expect(banner.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await expect(continueButton).toBeDisabled()
     await expect(banner.getByRole('button', { name: 'Abort…' })).toBeVisible()
     await expect(fileGroup(app, 'Conflicted').locator('.path')).toHaveText([
       'conflict.txt',
@@ -75,10 +76,10 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
     expect(git(repos.work, 'diff', '--cached', '--name-only', '--diff-filter=U').trim()).toBe(
       'hunks.txt',
     )
-    await expect(banner.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    await expect(continueButton).toBeDisabled()
 
     await markResolved(app, 'hunks.txt', hunksText({ 1: 'resolved' }), repos)
-    await banner.getByRole('button', { name: 'Continue' }).click()
+    await continueButton.click()
 
     await expect(banner).toBeHidden()
     expect(parents(git, repos.work)).toBe(2)

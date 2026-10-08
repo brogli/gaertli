@@ -34,8 +34,6 @@ async function refNames(row: Locator): Promise<string[]> {
   return row.locator('.ref-label').allTextContents()
 }
 
-const graphs = (page: Page) => page.locator('.row .graph-cell')
-
 test('FR-LOG-05 a search combines with an active filter: a hash outside it is "No match", one inside is highlighted and the filtered history still shows in full', async ({
   app,
   git,
@@ -72,7 +70,7 @@ test('FR-LOG-06 FR-LOG-07 FR-LOG-08 branch and path filters narrow the log, comb
     'feature: change conflict.txt',
     'feature: add feature.txt',
   ])
-  await expect(graphs(app).first()).toBeVisible()
+  await expect(app.locator('.row .graph-cell').first()).toBeVisible()
 
   await path.fill('conflict.txt')
   await expectSubjects(app, ['initial: add base files', 'feature: change conflict.txt'])

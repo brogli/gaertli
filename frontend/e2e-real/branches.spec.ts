@@ -21,12 +21,8 @@ import {
 
 type ResetMode = 'Soft' | 'Mixed' | 'Hard' | 'Keep'
 
-async function openReset(page: Page, subject: string): Promise<void> {
-  await pickFromContextMenu(page, logRow(page, subject), 'Reset current branch to here…')
-}
-
 async function resetTo(page: Page, subject: string, mode: ResetMode): Promise<void> {
-  await openReset(page, subject)
+  await pickFromContextMenu(page, logRow(page, subject), 'Reset current branch to here…')
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('radio', { name: new RegExp(`^${mode}\\b`) }).check()
   await dialog.getByRole('button', { name: 'Reset', exact: true }).click()
@@ -37,13 +33,9 @@ async function openNewBranch(page: Page, subject: string, name: string): Promise
   await page.getByRole('dialog').getByLabel('Branch name').fill(name)
 }
 
-function branchButton(page: Page) {
-  return page.locator('[data-test=branch-picker]')
-}
-
 // expectCurrent: the branch picker marks name as the current branch.
 async function expectCurrent(page: Page, name: string): Promise<void> {
-  await expect(branchButton(page)).toContainText(name)
+  await expect(page.locator('[data-test=branch-picker]')).toContainText(name)
   await openBranchPicker(page)
   await expect(refRow(page, name).locator('[data-test=current-marker]')).toBeVisible()
   await page.keyboard.press('Escape')

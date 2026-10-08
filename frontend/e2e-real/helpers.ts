@@ -1,10 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
-import { openBranchPicker, openWorktreePicker, refLi } from '../e2e/helpers'
+import { openBranchPicker, openWorktreePicker } from '../e2e/helpers'
 import type { Git } from './repos'
 
-export { openBranchPicker, openWorktreePicker, refLi }
+export { openBranchPicker, openWorktreePicker }
 
 // Locators and actions the area specs share; an area-only helper stays in
 // its spec file.
