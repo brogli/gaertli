@@ -269,7 +269,7 @@ describe('SyncControls', () => {
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'main')
   })
 
-  it('FR-SYNC-03 Ctrl+Shift+K pushes without an upstream too, when PushTarget can push straight away (old: nothing)', async () => {
+  it('FR-SYNC-03 Ctrl+Shift+K pushes without an upstream too, when PushTarget can push straight away', async () => {
     setRefs({ upstream: '' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
