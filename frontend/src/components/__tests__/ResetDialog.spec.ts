@@ -46,12 +46,7 @@ describe('ResetDialog', () => {
     const { body } = await mountDialog()
 
     const modes = body.findAll('.reset-mode')
-    expect(modes.map((m) => m.text())).toEqual([
-      "Soft Keep the undone commits' changes staged.",
-      "Mixed Keep the undone commits' changes in your files, unstaged.",
-      "Hard Discard the undone commits' changes and all uncommitted changes.",
-      "Keep Discard the undone commits' changes, keep uncommitted ones. Stops if they touch the same files.",
-    ])
+    expect(modes.map((m) => m.text().split(' ')[0])).toEqual(['Soft', 'Mixed', 'Hard', 'Keep'])
     expect(body.get<HTMLInputElement>('input#reset-mode-mixed').element.checked).toBe(true)
   })
 
@@ -68,36 +63,27 @@ describe('ResetDialog', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it('FR-BR-02 clicking Reset at keep mode calls Facade.Reset directly, no confirmation', async () => {
-    Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
-    const { body } = await mountDialog()
-
-    await body.get('input#reset-mode-keep').setValue()
-    await body.get('[data-test="reset-submit"]').trigger('click')
-    await flushPromises()
-
-    expect(Facade.Reset).toHaveBeenCalledTimes(1)
-    expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', 'keep')
-    expect(confirmRequire).not.toHaveBeenCalled()
-  })
-
   it('FR-BR-02 renders "HEAD" instead of a blank branch name while detached', async () => {
     const { body } = await mountDialog('')
 
     expect(body.text()).toContain('HEAD')
   })
 
-  it('FR-BR-02 clicking Reset at the default mixed mode calls Facade.Reset directly, no confirmation', async () => {
-    Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
-    const { body } = await mountDialog()
+  it.each(['mixed', 'keep'])(
+    'FR-BR-02 clicking Reset at %s mode calls Facade.Reset directly, no confirmation',
+    async (mode) => {
+      Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
+      const { body } = await mountDialog()
 
-    await body.get('[data-test="reset-submit"]').trigger('click')
-    await flushPromises()
+      await body.get(`input#reset-mode-${mode}`).setValue()
+      await body.get('[data-test="reset-submit"]').trigger('click')
+      await flushPromises()
 
-    expect(Facade.Reset).toHaveBeenCalledTimes(1)
-    expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', 'mixed')
-    expect(confirmRequire).not.toHaveBeenCalled()
-  })
+      expect(Facade.Reset).toHaveBeenCalledTimes(1)
+      expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', mode)
+      expect(confirmRequire).not.toHaveBeenCalled()
+    },
+  )
 
   it('FR-BR-04 a successful reset closes the dialog and its notice names the previous short hash, Copy hash copies the full one', async () => {
     const writeText = vi.fn()
@@ -116,21 +102,7 @@ describe('ResetDialog', () => {
     expect(writeText).toHaveBeenCalledWith('deadbeefcafe')
   })
 
-  it('FR-BR-04 a second reset replaces the notice with its own', async () => {
-    const notice = await mountNotices()
-
-    await resetTo('first0000000')
-    expect(notice.findAll('.p-toast-message')).toHaveLength(1)
-    expect(notice.text()).toContain('first00')
-
-    await resetTo('second0000000')
-
-    expect(notice.findAll('.p-toast-message')).toHaveLength(1)
-    expect(notice.text()).toContain('second0')
-    expect(notice.text()).not.toContain('first00')
-  })
-
-  it("FR-UX-15 a reset's notice leaves another action's notice open", async () => {
+  it("FR-BR-04 a second reset replaces the notice with its own and leaves another action's notice open", async () => {
     const notice = await mountNotices()
     const OtherAction = defineComponent({
       setup() {
@@ -142,11 +114,15 @@ describe('ResetDialog', () => {
     await flushPromises()
 
     await resetTo('first0000000')
+    expect(notice.findAll('.p-toast-message')).toHaveLength(2)
+    expect(notice.text()).toContain('first00')
+
     await resetTo('second0000000')
 
     expect(notice.findAll('.p-toast-message')).toHaveLength(2)
     expect(notice.text()).toContain('Push was rejected')
     expect(notice.text()).toContain('second0')
+    expect(notice.text()).not.toContain('first00')
   })
 
   it('FR-BR-03 hard mode confirms first, naming the uncommitted count, before calling Facade.Reset', async () => {

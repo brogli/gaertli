@@ -21,45 +21,41 @@ describe('BranchInWorktreeDialog', () => {
       props: { branch: 'side', path: '/home/u/r-side' },
     })
 
-    const text = body.get('.p-dialog').text()
-    expect(text).toContain('side')
-    expect(text).toContain('r-side')
     expect(body.get('.p-dialog').text()).toContain('/home/u/r-side')
     expect(footerButtons(body)).toEqual(['Cancel', 'Switch to worktree'])
   })
 
-  it('FR-BR-05 names the branch being rebased in the other worktree', async () => {
-    const { body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side', inUse: BranchInUse.BranchRebasing },
-    })
+  it.each([
+    {
+      state: 'checked out',
+      inUse: undefined,
+      title: 'Branch checked out elsewhere',
+      sentence: 'side is checked out in the worktree r-side',
+    },
+    {
+      state: 'rebased',
+      inUse: BranchInUse.BranchRebasing,
+      title: 'Branch in use elsewhere',
+      sentence: 'side is being rebased in the worktree r-side',
+    },
+    {
+      state: 'bisected',
+      inUse: BranchInUse.BranchBisecting,
+      title: 'Branch in use elsewhere',
+      sentence: 'side is being bisected in the worktree r-side',
+    },
+  ])(
+    'FR-BR-05 names the branch $state in the other worktree',
+    async ({ inUse, title, sentence }) => {
+      const { body } = await mountInBody(BranchInWorktreeDialog, {
+        props: { branch: 'side', path: '/home/u/r-side', inUse },
+      })
 
-    const text = body.get('.p-dialog').text()
-    expect(text).toContain('Branch in use elsewhere')
-    expect(text).toContain('side is being rebased in the worktree r-side')
-    expect(footerButtons(body)).toEqual(['Cancel', 'Switch to worktree'])
-  })
-
-  it('FR-BR-05 names the branch being bisected in the other worktree', async () => {
-    const { body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side', inUse: BranchInUse.BranchBisecting },
-    })
-
-    const text = body.get('.p-dialog').text()
-    expect(text).toContain('Branch in use elsewhere')
-    expect(text).toContain('side is being bisected in the worktree r-side')
-    expect(footerButtons(body)).toEqual(['Cancel', 'Switch to worktree'])
-  })
-
-  it('FR-BR-05 a plainly checked-out branch keeps the checked-out wording, no operation named', async () => {
-    const { body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side' },
-    })
-
-    const text = body.get('.p-dialog').text()
-    expect(text).toContain('Branch checked out elsewhere')
-    expect(text).toContain('side is checked out in the worktree r-side')
-    expect(footerButtons(body)).toEqual(['Cancel', 'Switch to worktree'])
-  })
+      const text = body.get('.p-dialog').text()
+      expect(text).toContain(title)
+      expect(text).toContain(sentence)
+    },
+  )
 
   it('FR-BR-05 switches to the worktree and closes', async () => {
     const { wrapper, body } = await mountInBody(BranchInWorktreeDialog, {

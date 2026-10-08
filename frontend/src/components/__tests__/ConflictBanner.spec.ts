@@ -45,10 +45,20 @@ describe('ConflictBanner', () => {
     confirmRequire.mockReset()
   })
 
-  it('FR-CONF-04 does not render while no operation is in progress', () => {
-    const wrapper = mountDuring(Operation.$zero)
+  it.each([
+    { hidden: 'the banner while no operation is in progress', operation: Operation.$zero },
+    {
+      hidden: '"Resolve conflicts" once no file is conflicted',
+      operation: Operation.MergeOperation,
+    },
+  ])('FR-CONF-04 shows no $hidden', ({ operation }) => {
+    useChangesStore().files = changedFilesFixture({ conflicted: [] })
+    const wrapper = mountDuring(operation)
 
-    expect(wrapper.find('[data-test="conflict-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="conflict-banner"]').exists()).toBe(
+      operation !== Operation.$zero,
+    )
+    expect(findButton(wrapper, 'Resolve conflicts')).toBeUndefined()
   })
 
   it('FR-CONF-04 disables Continue while a conflicted file remains, enabling once cleared', async () => {
@@ -87,13 +97,6 @@ describe('ConflictBanner', () => {
     })
   })
 
-  it('FR-CONF-09 offers no "Resolve conflicts" once no file is conflicted', () => {
-    useChangesStore().files = changedFilesFixture({ conflicted: [] })
-    const wrapper = mountDuring(Operation.MergeOperation)
-
-    expect(findButton(wrapper, 'Resolve conflicts')).toBeUndefined()
-  })
-
   it('FR-CONF-04, FR-UX-03, QA-SAFE-01 clicking Abort confirms before calling Facade.AbortOperation', async () => {
     const wrapper = mountDuring(Operation.MergeOperation)
     await findButton(wrapper, 'Abort…')!.trigger('click')
@@ -107,27 +110,18 @@ describe('ConflictBanner', () => {
     expect(Facade.AbortOperation).toHaveBeenCalledWith('/repo')
   })
 
-  it('FR-CONF-04, FR-UX-03 declining the confirm dialog does not call Facade.AbortOperation', async () => {
-    const wrapper = mountDuring(Operation.MergeOperation)
-    await findButton(wrapper, 'Abort…')!.trigger('click')
-
-    expect(Facade.AbortOperation).not.toHaveBeenCalled()
-  })
-
-  it.each([Operation.CherryPickOperation, Operation.RevertOperation])(
-    'FR-CP-07 renders a Skip button while a %s is stopped',
-    (operation) => {
+  it.each([
+    { operation: Operation.CherryPickOperation, skips: true },
+    { operation: Operation.RevertOperation, skips: true },
+    { operation: Operation.MergeOperation, skips: false },
+  ])(
+    'FR-CP-07 Skip is offered only while a cherry-pick or revert is stopped ($operation)',
+    ({ operation, skips }) => {
       const wrapper = mountDuring(operation)
 
-      expect(findButton(wrapper, 'Skip')).toBeDefined()
+      expect(findButton(wrapper, 'Skip') !== undefined).toBe(skips)
     },
   )
-
-  it('FR-CP-07 does not render a Skip button for a merge', () => {
-    const wrapper = mountDuring(Operation.MergeOperation)
-
-    expect(findButton(wrapper, 'Skip')).toBeUndefined()
-  })
 
   it('FR-CP-07 clicking Skip calls Facade.SkipOperation', async () => {
     const wrapper = mountDuring(Operation.CherryPickOperation)

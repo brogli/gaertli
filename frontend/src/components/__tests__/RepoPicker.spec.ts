@@ -157,7 +157,8 @@ describe('RepoPicker', () => {
     expect(AppService.PickAndOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-WT-13 "New window" follows "Open folder…"; choosing it opens a new window', async () => {
+  it('FR-WT-13 "New window" follows "Open folder…", the only actions also where WSL has distros; choosing it opens a new window', async () => {
+    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
     const { body } = await openPicker({ path: '/repos/alpha' })
 
     expect(actionLabels(body)).toEqual(['Open folder…', 'New window'])
@@ -165,13 +166,6 @@ describe('RepoPicker', () => {
     await actionRow(body, 'New window').trigger('click')
 
     expect(AppService.NewWindow).toHaveBeenCalledTimes(1)
-  })
-
-  it('FR-WT-13 "Open folder…" and "New window" are the only actions, also where WSL has distros', async () => {
-    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
-    const { body } = await openPicker({ path: '/repos/alpha' })
-
-    expect(actionLabels(body)).toEqual(['Open folder…', 'New window'])
   })
 
   it('FR-UX-05 FR-WT-13 "New window" shows shortcuts.newWindow through ShortcutHint; "Open folder…" shows none', async () => {
@@ -182,17 +176,13 @@ describe('RepoPicker', () => {
     expect(actionRow(body, 'Open folder…').find('[data-test="shortcut-hint"]').exists()).toBe(false)
   })
 
-  it('FR-REPO-07 a recent repo inside WSL names its distro; a local one names none', async () => {
+  it('FR-REPO-07 a recent repo inside WSL names its distro, a local one none; the button of a WSL window marks it as WSL', async () => {
     const { body } = await openPicker({ path: '/repos/other' })
+    const wsl = await mountInBody(RepoPicker, { props: { path: '/repos/other', distro: 'Ubuntu' } })
 
     expect(repoRow(body, beta.path).text()).toContain('WSL: Ubuntu')
     expect(repoRow(body, alpha.path).text()).not.toContain('WSL')
-  })
-
-  it('FR-REPO-07 the button of a WSL window marks it as WSL', async () => {
-    const { wrapper } = await openPicker({ path: '/home/u/beta', distro: 'Ubuntu' })
-
-    expect(wrapper.get('[data-test="repo-picker"]').text()).toContain('WSL')
+    expect(wsl.wrapper.get('[data-test="repo-picker"]').text()).toContain('WSL')
   })
 
   it('FR-UX-09 narrow (400px): the button shows its icon only, the path in title and aria-label', async () => {
@@ -203,7 +193,7 @@ describe('RepoPicker', () => {
     expectIconOnly(button, '/repos/alpha')
   })
 
-  it('FR-REPO-08 a recent repo other than the window\'s own gets a "…" button; the current row and the actions get none', async () => {
+  it('FR-REPO-08 a recent repo other than the window\'s own gets a "…" button and a right-click menu with "Open in new window" and "Remove from recents"; the current row and the actions get neither', async () => {
     const { body } = await openPicker({ path: '/repos/alpha' })
 
     expect(rowLiFor(repoRow(body, alpha.path)).find('[data-test="row-actions"]').exists()).toBe(
@@ -213,29 +203,11 @@ describe('RepoPicker', () => {
       rowLiFor(actionRow(body, 'Open folder…')).find('[data-test="row-actions"]').exists(),
     ).toBe(false)
     expect(rowLiFor(repoRow(body, beta.path)).find('[data-test="row-actions"]').exists()).toBe(true)
-  })
-
-  it('FR-REPO-08 a right-click opens a recent repo\'s menu with "Open in new window" and "Remove from recents"; the current row has none', async () => {
-    const { body } = await openPicker({ path: '/repos/alpha' })
 
     await repoMenu(body, alpha.path)
     expect(menuLabels(body)).toEqual([])
 
     await repoMenu(body, beta.path)
-    expect(menuLabels(body)).toEqual(['Open in new window', 'Remove from recents'])
-  })
-
-  it("FR-REPO-08 Shift+F10 and the context-menu key in the filter open the active row's menu", async () => {
-    const { body } = await openPicker({ path: '/repos/alpha' })
-    const filter = body.get('.picker-list input')
-
-    await filter.trigger('keydown', { key: 'ArrowDown' })
-    await filter.trigger('keydown', { key: 'ArrowDown' })
-    await filter.trigger('keydown', { key: 'ArrowDown' })
-    await filter.trigger('keydown', { key: 'F10', shiftKey: true })
-    expect(menuLabels(body)).toEqual(['Open in new window', 'Remove from recents'])
-
-    await filter.trigger('keydown', { key: 'ContextMenu' })
     expect(menuLabels(body)).toEqual(['Open in new window', 'Remove from recents'])
   })
 

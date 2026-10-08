@@ -35,24 +35,25 @@ describe('StashBanner', () => {
     confirmRequire.mockReset()
   })
 
-  it('FR-SYNC-09 does not render with no waiting stash', () => {
-    const wrapper = mountWithStash('')
+  it.each([
+    { state: 'no waiting stash', stash: '', conflicted: [], shown: false },
+    {
+      state: 'a waiting stash and nothing conflicted',
+      stash: 'stash@{0}',
+      conflicted: [],
+      shown: true,
+    },
+    {
+      state: 'a waiting stash while a conflicted file remains',
+      stash: 'stash@{0}',
+      conflicted: [{ path: 'a.txt', status: 'UU' }],
+      shown: false,
+    },
+  ])('FR-SYNC-09 with $state the banner shows: $shown', ({ stash, conflicted, shown }) => {
+    const wrapper = mountWithStash(stash, conflicted)
 
-    expect(wrapper.find('[data-test="stash-banner"]').exists()).toBe(false)
-  })
-
-  it('FR-SYNC-09 renders while a waiting stash is set and nothing is conflicted', () => {
-    const wrapper = mountWithStash('stash@{0}')
-
-    expect(wrapper.get('[data-test="stash-banner"]').text()).toContain(
-      'Local changes from before a pull, merge or rebase are stashed.',
-    )
-  })
-
-  it('FR-SYNC-09 is hidden while a conflicted file remains', () => {
-    const wrapper = mountWithStash('stash@{0}', [{ path: 'a.txt', status: 'UU' }])
-
-    expect(wrapper.find('[data-test="stash-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="stash-banner"]').exists()).toBe(shown)
+    expect(wrapper.text().includes('Local changes from before a pull, merge or rebase')).toBe(shown)
   })
 
   it('FR-SYNC-09 clicking Restore calls Facade.PopStash with the stash ref', async () => {

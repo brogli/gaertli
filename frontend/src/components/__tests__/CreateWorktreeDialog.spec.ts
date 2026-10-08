@@ -65,53 +65,70 @@ describe('CreateWorktreeDialog', () => {
     return submitExisting({ repoPath: '/repo' }, '/repo-wt')
   }
 
-  it('FR-WT-02 an existing branch chosen submits with an empty start and newBranch false', async () => {
+  it.each([
+    { env: 'local', props: { repoPath: '/repo' }, repo: '/repo', target: '/repo-wt' },
+    {
+      env: 'WSL',
+      props: wslRepo,
+      repo: '\\\\wsl.localhost\\Ubuntu\\home\\u\\r',
+      target: '\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt',
+    },
+  ])(
+    'FR-WT-02 an existing branch chosen submits with an empty start and newBranch false ($env repo, WSL paths as UNC)',
+    async ({ props, repo, target }) => {
+      Facade.AddWorktree.mockResolvedValue({})
+
+      await submitExisting(props, props === wslRepo ? '/home/u/r/wt' : '/repo-wt')
+
+      expect(Facade.AddWorktree).toHaveBeenCalledTimes(1)
+      expect(Facade.AddWorktree).toHaveBeenCalledWith(repo, target, 'feature', '', false)
+    },
+  )
+
+  // fillNew checks "New branch" unless the dialog was opened on a new-branch
+  // start, names the branch feature-x, picks the start branch pickStart if
+  // given, then submits with the default location.
+  async function fillNew(body: DOMWrapper<Element>, pickStart?: string, checkNew = true) {
     Facade.AddWorktree.mockResolvedValue({})
-
-    await submitExisting({ repoPath: '/repo' }, '/repo-wt')
-
-    expect(Facade.AddWorktree).toHaveBeenCalledTimes(1)
-    expect(Facade.AddWorktree).toHaveBeenCalledWith('/repo', '/repo-wt', 'feature', '', false)
-  })
-
-  // submitNew mounts the dialog on start, checks "New branch" unless start
-  // already did, names the branch feature-x, picks the start branch
-  // pickStart if given, then submits.
-  async function submitNew(start?: WorktreeStart, pickStart?: string) {
-    Facade.AddWorktree.mockResolvedValue({})
-    const { body } = await mountDialog({ repoPath: '/repo', ...(start && { start }) })
-    if (!start) await body.get('input[type="checkbox"]').setValue(true)
+    if (checkNew) await body.get('input[type="checkbox"]').setValue(true)
     await field(body, 'Branch name').setValue('feature-x')
     if (pickStart) await chooseOption(body, 'start-branch', pickStart)
-    await field(body, 'Location').setValue('/repo-wt2')
     await body.get('[data-test="create-worktree-submit"]').trigger('click')
     await flushPromises()
-    return body
   }
 
-  it('FR-WT-02 a new branch starts at the current branch unless a branch or tag is picked from the list, each sent by its full ref name', async () => {
-    await submitNew()
-    await submitNew(undefined, 'origin/x')
-    await submitNew(undefined, 'v1')
+  it.each([
+    { start: undefined, ref: 'refs/heads/main' },
+    { start: 'origin/x', ref: 'refs/remotes/origin/x' },
+    { start: 'v1', ref: 'refs/tags/v1' },
+  ])(
+    'FR-WT-02 a new branch starts at the current branch unless a branch or tag is picked, sent by its full ref name; the location defaults to the base folder ($start)',
+    async ({ start, ref }) => {
+      const { body } = await mountDialog({ repoPath: '/repos/alpha' })
 
-    expect(Facade.AddWorktree.mock.calls).toEqual([
-      ['/repo', '/repo-wt2', 'feature-x', 'refs/heads/main', true],
-      ['/repo', '/repo-wt2', 'feature-x', 'refs/remotes/origin/x', true],
-      ['/repo', '/repo-wt2', 'feature-x', 'refs/tags/v1', true],
-    ])
-  })
+      await fillNew(body, start)
+
+      expect(Facade.AddWorktree).toHaveBeenCalledWith(
+        '/repos/alpha',
+        '/repos/alpha-feature-x',
+        'feature-x',
+        ref,
+        true,
+      )
+    },
+  )
 
   it('FR-WT-02 a new branch from the log view starts at that commit, shown fixed', async () => {
     const start: WorktreeStart = { newBranch: true, start: { rev: 'abc123456', label: 'abc1234' } }
-    const { body } = await mountDialog({ repoPath: '/repo', start })
+    const { body } = await mountDialog({ repoPath: '/repos/alpha', start })
     expect(field(body, 'Start point').element.value).toBe('abc1234')
     expect(field(body, 'Start point').element.disabled).toBe(true)
 
-    await submitNew(start)
+    await fillNew(body, undefined, false)
 
     expect(Facade.AddWorktree).toHaveBeenCalledWith(
-      '/repo',
-      '/repo-wt2',
+      '/repos/alpha',
+      '/repos/alpha-feature-x',
       'feature-x',
       'abc123456',
       true,
@@ -198,24 +215,6 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'z', location: '/picked/z' })
   })
 
-  it("FR-WT-02 with only a new branch's name typed, Create sends the default location", async () => {
-    Facade.AddWorktree.mockResolvedValue({})
-    const { body } = await mountDialog({ repoPath: '/repos/alpha' })
-    await body.get('input[type="checkbox"]').setValue(true)
-
-    await field(body, 'Branch name').setValue('feature-x')
-    await body.get('[data-test="create-worktree-submit"]').trigger('click')
-    await flushPromises()
-
-    expect(Facade.AddWorktree).toHaveBeenCalledWith(
-      '/repos/alpha',
-      '/repos/alpha-feature-x',
-      'feature-x',
-      'refs/heads/main',
-      true,
-    )
-  })
-
   it('FR-UX-17 a new branch adds its own labelled fields; Browse sits beside Location', async () => {
     const { body } = await mountDialog({ repoPath: '/repo' })
 
@@ -224,52 +223,12 @@ describe('CreateWorktreeDialog', () => {
     expect(body.find('.p-inputgroup [data-test="browse-target"]').exists()).toBe(true)
   })
 
-  it('FR-REPO-07 a WSL repo submits AddWorktree with the UNC repo and target paths', async () => {
-    Facade.AddWorktree.mockResolvedValue({})
-
-    await submitExisting(wslRepo, '/home/u/r/wt')
-
-    expect(Facade.AddWorktree).toHaveBeenCalledWith(
-      '\\\\wsl.localhost\\Ubuntu\\home\\u\\r',
-      '\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt',
-      'feature',
-      '',
-      false,
-    )
-  })
-
   it("FR-REPO-07 Browse seeds PickFolder at the distro's UNC root for a WSL repo", async () => {
     const { body } = await mountDialog(wslRepo)
 
     await body.get('[data-test="browse-target"]').trigger('click')
 
     expect(AppService.PickFolder).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu')
-  })
-
-  // wslFollowUp submits a WSL repo's dialog to its "open the result" follow-up.
-  function wslFollowUp() {
-    Facade.AddWorktree.mockResolvedValue({ path: '/home/u/r/wt' })
-    return submitExisting(wslRepo, '/home/u/r/wt')
-  }
-
-  it('FR-REPO-07 "Open in app window" for a WSL repo calls OpenPath with the UNC form of the created path', async () => {
-    const { body } = await wslFollowUp()
-
-    await body.get('[data-test="open-window"]').trigger('click')
-    await flushPromises()
-
-    expect(AppService.OpenPath).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt')
-    expect(Facade.OpenFolderAt).not.toHaveBeenCalled()
-  })
-
-  it('FR-REPO-07 "Open in editor" for a WSL repo calls OpenFolderAt with the UNC form of the created path', async () => {
-    const { body } = await wslFollowUp()
-
-    await body.get('[data-test="open-editor"]').trigger('click')
-    await flushPromises()
-
-    expect(Facade.OpenFolderAt).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt')
-    expect(AppService.OpenPath).not.toHaveBeenCalled()
   })
 
   it('FR-WT-03 a rejected InvalidName shows the error and keeps the dialog open', async () => {
@@ -309,29 +268,34 @@ describe('CreateWorktreeDialog', () => {
     expect(wrapper.emitted('close')).toBeUndefined()
   })
 
-  it('FR-WT-12 "Open in app window" calls OpenPath with the new path, then closes', async () => {
-    const { wrapper, body } = await createFollowUp()
+  const followUps = [
+    { env: 'local', props: { repoPath: '/repo' }, created: '/repo-wt', opened: '/repo-wt' },
+    {
+      env: 'WSL',
+      props: wslRepo,
+      created: '/home/u/r/wt',
+      opened: '\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt',
+    },
+  ].flatMap((repo) => [
+    { ...repo, button: 'open-window', called: AppService.OpenPath, other: Facade.OpenFolderAt },
+    { ...repo, button: 'open-editor', called: Facade.OpenFolderAt, other: AppService.OpenPath },
+  ])
 
-    await body.get('[data-test="open-window"]').trigger('click')
-    await flushPromises()
+  it.each(followUps)(
+    'FR-WT-12 $button opens the created path, as its UNC form in a WSL repo, then closes ($env)',
+    async ({ props, created, opened, button, called, other }) => {
+      Facade.AddWorktree.mockResolvedValue({ path: created })
+      const { wrapper, body } = await submitExisting(props, created)
 
-    expect(AppService.OpenPath).toHaveBeenCalledTimes(1)
-    expect(AppService.OpenPath).toHaveBeenCalledWith('/repo-wt')
-    expect(Facade.OpenFolderAt).not.toHaveBeenCalled()
-    expect(wrapper.emitted('close')).toHaveLength(1)
-  })
+      await body.get(`[data-test="${button}"]`).trigger('click')
+      await flushPromises()
 
-  it('FR-WT-12 "Open in editor" calls OpenFolderAt with the new path, then closes', async () => {
-    const { wrapper, body } = await createFollowUp()
-
-    await body.get('[data-test="open-editor"]').trigger('click')
-    await flushPromises()
-
-    expect(Facade.OpenFolderAt).toHaveBeenCalledTimes(1)
-    expect(Facade.OpenFolderAt).toHaveBeenCalledWith('/repo-wt')
-    expect(AppService.OpenPath).not.toHaveBeenCalled()
-    expect(wrapper.emitted('close')).toHaveLength(1)
-  })
+      expect(called).toHaveBeenCalledTimes(1)
+      expect(called).toHaveBeenCalledWith(opened)
+      expect(other).not.toHaveBeenCalled()
+      expect(wrapper.emitted('close')).toHaveLength(1)
+    },
+  )
 
   it('FR-WT-12 "Both" calls OpenPath then OpenFolderAt, then closes', async () => {
     const { wrapper, body } = await createFollowUp()

@@ -17,7 +17,6 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import SquashDialog from '../SquashDialog.vue'
-import { DiffKind } from '@/lib/diffTarget'
 import { mountNotices } from '@/testing/mountNotices'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
@@ -52,10 +51,13 @@ describe('SquashDialog', () => {
     AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-LOG-14 squash shows the combined message for editing and squashes with the edited one', async () => {
+  it('FR-LOG-14 squash shows the combined message for editing and squashes with the edited one; a blank message disables Squash', async () => {
     const { wrapper, body } = await mountDialog()
     const field = body.get<HTMLTextAreaElement>('[data-test="squash-message"]')
     expect(field.element.value).toBe('A\n\nB')
+
+    await field.setValue('  \n')
+    expect(body.get('[data-test="squash-submit"]').attributes('disabled')).toBeDefined()
 
     await field.setValue('Edited')
     await body.get('[data-test="squash-submit"]').trigger('click')
@@ -63,14 +65,6 @@ describe('SquashDialog', () => {
 
     expect(Facade.Squash).toHaveBeenCalledWith('/repo', shas, 'Edited')
     expect(wrapper.emitted('done')).toHaveLength(1)
-  })
-
-  it('FR-LOG-14 a blank message disables Squash', async () => {
-    const { body } = await mountDialog()
-
-    await body.get('[data-test="squash-message"]').setValue('  \n')
-
-    expect(body.get('[data-test="squash-submit"]').attributes('disabled')).toBeDefined()
   })
 
   it('FR-LOG-14 fixup asks first, with no message field, and keeps the oldest message', async () => {
@@ -109,43 +103,35 @@ describe('SquashDialog', () => {
     expect(notice.text()).toContain('Squashed 3 commits on feature. Previous commit: deadbee')
   })
 
-  it("FR-LOG-14 a stop that is no conflict closes the dialog and names git's reason in a notice", async () => {
-    const stop = {
-      code: Code.Stopped,
-      message: 'untracked working tree files would be overwritten by merge',
-    }
-    Facade.Squash.mockRejectedValueOnce(new Error('x', { cause: stop }))
+  it.each([
+    {
+      outcome: "a stop that is no conflict closes the dialog and names git's reason in a notice",
+      error: { code: Code.Stopped, message: 'untracked working tree files would be overwritten' },
+      closes: true,
+      shows: 'untracked working tree files would be overwritten',
+    },
+    {
+      outcome: 'a conflict stop closes the dialog and opens the conflicted file',
+      error: { code: Code.Conflicts, message: 'could not apply' },
+      closes: true,
+      shows: '',
+    },
+    {
+      outcome: 'another error stays in the dialog',
+      error: { code: Code.GitFailed, message: 'hook said no' },
+      closes: false,
+      shows: 'hook said no',
+    },
+  ] as const)('FR-LOG-14 $outcome', async ({ error, closes, shows }) => {
+    Facade.Squash.mockRejectedValueOnce(new Error('x', { cause: error }))
     const notice = await mountNotices()
     const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="squash-submit"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.emitted('done')).toHaveLength(1)
-    expect(notice.text()).toContain('untracked working tree files would be overwritten by merge')
-  })
-
-  it('FR-LOG-14 a conflict stop closes the dialog for the conflict banner; another error stays in it', async () => {
-    const conflict = { code: Code.Conflicts, message: 'could not apply' }
-    Facade.Squash.mockRejectedValueOnce(new Error('x', { cause: conflict }))
-    const first = await mountDialog()
-    await first.body.get('[data-test="squash-submit"]').trigger('click')
-    await flushPromises()
-    expect(first.wrapper.emitted('done')).toHaveLength(1)
-    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
-      kind: DiffKind.WorkingDiff,
-      conflicted: true,
-      path: 'a.txt',
-      oldPath: '',
-    })
-    first.wrapper.unmount()
-
-    const refused = { code: Code.GitFailed, message: 'hook said no' }
-    Facade.Squash.mockRejectedValueOnce(new Error('x', { cause: refused }))
-    const second = await mountDialog()
-    await second.body.get('[data-test="squash-submit"]').trigger('click')
-    await flushPromises()
-    expect(second.wrapper.emitted('done')).toBeUndefined()
-    expect(second.body.text()).toContain('hook said no')
+    expect(wrapper.emitted('done')?.length).toBe(closes ? 1 : undefined)
+    expect(notice.text() + body.text()).toContain(shows)
+    expect(AppService.OpenDiff).toHaveBeenCalledTimes(error.code === Code.Conflicts ? 1 : 0)
   })
 })
