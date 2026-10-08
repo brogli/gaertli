@@ -338,7 +338,7 @@ func TestFR_RV_01_RevertUndoesACommitLeavingItInHistory(t *testing.T) {
 func TestFR_RV_03_RevertRefusesWithADirtyFileInTheWay(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	revertSHA, beforeHEAD := revertConflictFixture(t, repo.Dir)
+	revertSHA := revertConflictFixture(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
 
@@ -351,8 +351,8 @@ func TestFR_RV_03_RevertRefusesWithADirtyFileInTheWay(t *testing.T) {
 	if fileExists(filepath.Join(repo.Dir, ".git", "REVERT_HEAD")) {
 		t.Error("REVERT_HEAD present, want none")
 	}
-	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
-		t.Errorf("HEAD = %s, want unchanged %s", got, beforeHEAD)
+	if got := gittest.HeadSHA(t, repo.Dir); got != revertSHA {
+		t.Errorf("HEAD = %s, want unchanged %s", got, revertSHA)
 	}
 }
 
@@ -539,18 +539,18 @@ func realConflictFixture(t *testing.T, dir, verb string, files ...string) (sha s
 	return shas[1]
 }
 
-// revertConflictFixture builds linear history where HEAD's commit changed
-// conflict.txt, with an uncommitted, differing edit to the same file on
-// top, so reverting HEAD's commit is refused as "would be overwritten"
+// revertConflictFixture builds linear history where HEAD's commit (returned)
+// changed conflict.txt, with an uncommitted, differing edit to the same file
+// on top, so reverting HEAD's commit is refused as "would be overwritten"
 // (exit 128).
-func revertConflictFixture(t *testing.T, dir string) (revertSHA, beforeHEAD string) {
+func revertConflictFixture(t *testing.T, dir string) (headSHA string) {
 	t.Helper()
-	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")
-	gittest.Commit(t, dir, "conflict.txt", "applied\n", "applies the change")
-	revertSHA = gittest.HeadSHA(t, dir)
-	beforeHEAD = revertSHA
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: map[string]string{"conflict.txt": "base\n"}},
+		gittest.Step{Message: "applies the change", Files: map[string]string{"conflict.txt": "applied\n"}},
+	)
 	writeFile(t, dir, "conflict.txt", "dirty")
-	return revertSHA, beforeHEAD
+	return shas[1]
 }
 
 // cherryPickConflictFixture builds a commit on branch "feature" that
@@ -559,15 +559,12 @@ func revertConflictFixture(t *testing.T, dir string) (revertSHA, beforeHEAD stri
 // be overwritten" (exit 128).
 func cherryPickConflictFixture(t *testing.T, dir string) (pickSHA, beforeHEAD string) {
 	t.Helper()
-	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")
-	gittest.Run(t, dir, "branch", "feature")
-	gittest.Run(t, dir, "checkout", "feature")
-	gittest.Commit(t, dir, "conflict.txt", "feature\n", "feature change")
-	pickSHA = gittest.HeadSHA(t, dir)
-	gittest.Run(t, dir, "checkout", "master")
-	beforeHEAD = gittest.HeadSHA(t, dir)
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: map[string]string{"conflict.txt": "base\n"}},
+		gittest.Step{Branch: "feature", From: "master", Message: "feature change", Files: map[string]string{"conflict.txt": "feature\n"}},
+	)
 	writeFile(t, dir, "conflict.txt", "dirty")
-	return pickSHA, beforeHEAD
+	return shas[1], shas[0]
 }
 
 // commitExists reports whether sha still resolves to a real commit object.

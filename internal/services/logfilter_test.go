@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -92,9 +91,11 @@ func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *te
 func TestFR_LOG_05_SearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	commitAs(t, repo.Dir, "a.txt", "a", "ann's change", "Ann", "ann@example.com")
-	commitAs(t, repo.Dir, "b.txt", "b", "bob's change", "Bob", "bob@example.com")
-	commitAs(t, repo.Dir, "c.txt", "c", "ann again, unrelated", "Ann", "ann@example.com")
+	gittest.History(t, repo.Dir,
+		gittest.Step{Message: "ann's change", Author: "Ann", Files: map[string]string{"a.txt": "a"}},
+		gittest.Step{Message: "bob's change", Author: "Bob", Files: map[string]string{"b.txt": "b"}},
+		gittest.Step{Message: "ann again, unrelated", Author: "Ann", Files: map[string]string{"c.txt": "c"}},
+	)
 
 	c, wt := openWorktree(t, repo.Dir)
 	if err := c.SetLogFilter(t.Context(), wt, core.LogFilter{Author: "Ann"}); err != nil {
@@ -238,14 +239,13 @@ func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *test
 func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "root.txt", "r", "root") // shared ancestor
-	gittest.Run(t, repo.Dir, "branch", "feature")
-	commitAs(t, repo.Dir, "target.txt", "1", "on main by alice", "Alice", "alice@example.com") // wrong branch
-	gittest.Run(t, repo.Dir, "switch", "feature")
-	commitAs(t, repo.Dir, "other.txt", "1", "on feature by alice wrong path", "Alice", "alice@example.com")
-	commitAs(t, repo.Dir, "target.txt", "2", "on feature by bob wrong author", "Bob", "bob@example.com")
-	commitAs(t, repo.Dir, "target.txt", "3", "on feature by alice matches all", "Alice", "alice@example.com")
-	gittest.Run(t, repo.Dir, "switch", "master")
+	gittest.History(t, repo.Dir,
+		gittest.Step{Message: "root", Files: map[string]string{"root.txt": "r"}},
+		gittest.Step{Branch: "feature", From: "master", Message: "on feature by alice wrong path", Author: "Alice", Files: map[string]string{"other.txt": "1"}},
+		gittest.Step{Branch: "feature", Message: "on feature by bob wrong author", Author: "Bob", Files: map[string]string{"target.txt": "2"}},
+		gittest.Step{Branch: "feature", Message: "on feature by alice matches all", Author: "Alice", Files: map[string]string{"target.txt": "3"}},
+		gittest.Step{Message: "on main by alice", Author: "Alice", Files: map[string]string{"target.txt": "1"}},
+	)
 
 	c, wt := openWorktree(t, repo.Dir)
 
@@ -361,12 +361,4 @@ func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *tes
 	}
 
 	waitForLogRows(t, c, id) // drain the background stream so it doesn't leak noise into later tests
-}
-
-// commitAs commits content to file with an explicit author.
-func commitAs(t *testing.T, dir, file, content, msg, authorName, authorEmail string) {
-	t.Helper()
-	writeFile(t, dir, file, content)
-	gittest.Run(t, dir, "add", "--", file)
-	gittest.Run(t, dir, "commit", fmt.Sprintf("--author=%s <%s>", authorName, authorEmail), "-m", msg)
 }
