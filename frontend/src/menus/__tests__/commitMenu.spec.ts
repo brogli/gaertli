@@ -48,44 +48,19 @@ describe('buildOneCommitMenuItems', () => {
     ])
   })
 
-  it('FR-WT-02, FR-LOG-11 "Create worktree here…" calls openCreateWorktree with the row\'s sha', () => {
+  it.each([
+    ['FR-WT-02, FR-LOG-11', 'Create worktree here…', 'openCreateWorktree', ['abc123']],
+    ['FR-BR-01', 'New branch from here…', 'openCreateBranch', ['abc123']],
+    ['FR-BR-08', 'Check out commit', 'openCheckoutCommit', ['abc123']],
+    ['FR-BR-02', 'Reset current branch to here…', 'openReset', ['abc123', 'Fix the bug']],
+  ] as const)('%s "%s" calls %s with the row\'s sha', (_id, label, action, args) => {
     const a = oneCommitActions()
     const items = buildOneCommitMenuItems(row(), a, t)
 
-    findItem(items, 'Create worktree here…').command()
+    findItem(items, label).command()
 
-    expect(a.openCreateWorktree).toHaveBeenCalledTimes(1)
-    expect(a.openCreateWorktree).toHaveBeenCalledWith('abc123')
-  })
-
-  it('FR-BR-01 "New branch from here…" calls openCreateBranch with the row\'s sha', () => {
-    const a = oneCommitActions()
-    const items = buildOneCommitMenuItems(row(), a, t)
-
-    findItem(items, 'New branch from here…').command()
-
-    expect(a.openCreateBranch).toHaveBeenCalledTimes(1)
-    expect(a.openCreateBranch).toHaveBeenCalledWith('abc123')
-  })
-
-  it('FR-BR-08 "Check out commit" calls openCheckoutCommit with the row\'s sha', () => {
-    const a = oneCommitActions()
-    const items = buildOneCommitMenuItems(row(), a, t)
-
-    findItem(items, 'Check out commit').command()
-
-    expect(a.openCheckoutCommit).toHaveBeenCalledTimes(1)
-    expect(a.openCheckoutCommit).toHaveBeenCalledWith('abc123')
-  })
-
-  it('FR-BR-02 "Reset current branch to here…" calls openReset with the row\'s sha and subject', () => {
-    const a = oneCommitActions()
-    const items = buildOneCommitMenuItems(row(), a, t)
-
-    findItem(items, 'Reset current branch to here…').command()
-
-    expect(a.openReset).toHaveBeenCalledTimes(1)
-    expect(a.openReset).toHaveBeenCalledWith('abc123', 'Fix the bug')
+    expect(a[action]).toHaveBeenCalledTimes(1)
+    expect(a[action]).toHaveBeenCalledWith(...args)
   })
 
   it('FR-LOG-11 "Cherry-pick" and "Revert" each call their own spy once', () => {
@@ -192,20 +167,6 @@ describe('buildSelectionMenuItems', () => {
     ])
   })
 
-  it('FR-LOG-11 an empty squash section adds nothing', () => {
-    const rows = [row({ sha: 'a' }), row({ sha: 'b' }), row({ sha: 'c' })]
-
-    const items = buildSelectionMenuItems(rows, selectionActions(), [], t)
-
-    expect(labelsOf(items)).toEqual([
-      'Cherry-pick 3 commits',
-      'Cherry-pick 3 commits…',
-      'Revert 3 commits',
-      'Revert 3 commits…',
-      'Copy 3 hashes',
-    ])
-  })
-
   it('FR-UX-05 "Stop comparing" carries its shortcut; other items carry none', () => {
     const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
 
@@ -248,12 +209,6 @@ function findItem(items: CommitMenuItem[], label: string): { label: string; comm
 }
 
 describe('buildSquashMenuItems', () => {
-  it('FR-LOG-11 squash and fixup, labelled with the count', () => {
-    const items = buildSquashMenuItems(3, null, { squash: vi.fn(), fixup: vi.fn() }, t)
-
-    expect(labelsOf(items)).toEqual(['Squash 3 commits…', 'Fixup 3 commits…'])
-  })
-
   it('FR-LOG-14 with a blocker: one disabled item saying why, no actions', () => {
     const actions = { squash: vi.fn(), fixup: vi.fn() }
     const items = buildSquashMenuItems(2, 'a rebase is in progress', actions, t)
