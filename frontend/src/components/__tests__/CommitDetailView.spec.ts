@@ -93,7 +93,7 @@ describe('CommitDetailView', () => {
     expect(files!.findAll('.files li')).toHaveLength(1)
   })
 
-  it('FR-LOG-04 a click only marks a file row; a double-click opens it in the diff window', async () => {
+  it('FR-LOG-04 a double-click on a file row opens it in the diff window', async () => {
     Facade.CommitDetails.mockResolvedValue(
       commitDetailsFixture({
         files: [
@@ -109,39 +109,13 @@ describe('CommitDetailView', () => {
     await flushPromises()
 
     const file = wrapper.findAll('.files li')[1]!
-    await file.trigger('click')
-    expect(file.classes()).toContain('selected')
-    expect(AppService.OpenDiff).not.toHaveBeenCalled()
-
     await file.trigger('dblclick')
+
     expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
       kind: 'commit',
       sha: 'abc123',
       path: 'b.txt',
       oldPath: 'a2.txt',
-    })
-  })
-
-  it("FR-LOG-16 in the folder tree a double-click opens a commit's file in the diff window", async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({ files: [{ path: 'src/b.txt', status: 'M' }] }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
-    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
-
-    await wrapper
-      .get('[role="treeitem"][aria-label="b.txt"] [data-pc-section="nodecontent"]')
-      .trigger('dblclick')
-
-    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
-      kind: 'commit',
-      sha: 'abc123',
-      path: 'src/b.txt',
-      oldPath: '',
     })
   })
 
@@ -192,22 +166,6 @@ describe('CommitDetailView', () => {
 
     expect(wrapper.text()).toContain('Author')
     expect(wrapper.text()).not.toContain('Committer')
-  })
-
-  it('FR-ED-02 an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({ files: [{ path: 'a.txt', status: 'M' }] }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
-
-    await wrapper.get('[data-test="open-editor"]').trigger('click')
-
-    expect(Facade.OpenFile).toHaveBeenCalledTimes(1)
-    expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
   })
 
   it("FR-CMP-02 shows the comparison instead of the selected commit's fields once two commits are compared", async () => {

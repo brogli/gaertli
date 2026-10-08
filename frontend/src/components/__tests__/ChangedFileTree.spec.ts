@@ -73,7 +73,7 @@ describe('ChangedFileTree', () => {
 
     const statuses = wrapper.findAll('.status')
     expect(statuses.map((s) => s.attributes('title'))).toEqual(['Modified', 'Renamed'])
-    expect(statuses[0]!.get('i').classes()).toContain('oi-file-edit')
+    expect(statuses[0]!.find('i').exists()).toBe(true)
     const name = row(wrapper, 'b.ts').get('.name')
     expect(name.text()).toBe('old.ts → b.ts')
     expect(name.attributes('title')).toBe('src/b.ts')

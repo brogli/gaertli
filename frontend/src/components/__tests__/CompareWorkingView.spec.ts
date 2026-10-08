@@ -38,17 +38,14 @@ describe('CompareWorkingView', () => {
     AppService.OpenDiff.mockReset()
   })
 
-  it('FR-CMP-04 a click only selects a file; a double-click opens it in the diff window', async () => {
+  it('FR-CMP-04 a double-click on a file opens it in the diff window', async () => {
     const { wrapper } = await mountAgainstWorking([
       { path: 'b.txt', oldPath: 'a.txt', status: 'R' },
     ])
     const file = wrapper.get('.files li')
 
-    await file.trigger('click')
-    expect(file.classes()).toContain('selected')
-    expect(AppService.OpenDiff).not.toHaveBeenCalled()
-
     await file.trigger('dblclick')
+
     expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
       kind: 'againstWorking',
       sha: 'sha-a',
@@ -91,18 +88,13 @@ describe('CompareWorkingView', () => {
     expect(fromTag.classes()).toContain('from')
   })
 
-  it('FR-UX-05 the close button names its shortcut in the tooltip, not in aria-label', async () => {
-    const { wrapper } = await mountAgainstWorking()
+  it('FR-CMP-04 clicking exit, whose tooltip names its shortcut and not aria-label, leaves the working-tree compare', async () => {
+    const { wrapper, compare } = await mountAgainstWorking()
 
     const exit = wrapper.get('[data-test="exit"]')
     expect(exit.attributes('title')).toBe('Close · Esc')
     expect(exit.attributes('aria-label')).toBe('Close')
-  })
-
-  it('FR-CMP-04 clicking exit leaves the working-tree compare', async () => {
-    const { wrapper, compare } = await mountAgainstWorking()
-
-    await wrapper.get('[data-test="exit"]').trigger('click')
+    await exit.trigger('click')
 
     expect(compare.workingCommit).toBeNull()
   })

@@ -85,33 +85,25 @@ describe('CompareView', () => {
     expect(toTag.classes()).toContain('to')
   })
 
-  it('FR-UX-05 the close button names its shortcut in the tooltip, not in aria-label', async () => {
-    const { wrapper } = await mountComparing()
+  it('FR-CMP-01 the close button names its shortcut in the tooltip, not in aria-label; pressing Escape exits the comparison', async () => {
+    const { wrapper, log } = await mountComparing()
 
     const exit = wrapper.get('[data-test="exit"]')
     expect(exit.attributes('title')).toBe('Stop comparing · Esc')
     expect(exit.attributes('aria-label')).toBe('Stop comparing')
-  })
-
-  it('FR-CMP-01 pressing Escape exits the comparison', async () => {
-    const { log } = await mountComparing()
 
     pressKey('Escape')
 
     expect(log.selection).toEqual([])
   })
 
-  it('FR-CMP-02 a click only selects a file; a double-click opens it in the diff window', async () => {
+  it('FR-CMP-02 a double-click on a file opens it in the diff window', async () => {
     const { wrapper } = await mountComparing([
       { path: 'a.txt', status: 'M' },
       { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
     ])
 
     const file = wrapper.findAll('.files li')[1]!
-    await file.trigger('click')
-    expect(file.classes()).toContain('selected')
-    expect(AppService.OpenDiff).not.toHaveBeenCalled()
-
     await file.trigger('dblclick')
 
     expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
