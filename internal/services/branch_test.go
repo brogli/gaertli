@@ -155,7 +155,7 @@ func TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree(t *testi
 
 func TestFR_BR_10_RenameBranchRefusesABranchBeingRebasedElsewhere(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	repo, wtDir := rebaseInProgressFixture(t, false)
 	wtPath := gitPath(t, wtDir)
 
 	c, wt := openWorktree(t, repo.Dir)
@@ -189,7 +189,7 @@ func TestFR_BR_10_RenameBranchRefusesABranchBeingRebasedElsewhere(t *testing.T) 
 // already does.
 func TestFR_BR_10_RenameBranchRefusesABranchBeingBisectedInThisWorktree(t *testing.T) {
 	t.Parallel()
-	_, _, wtDir := bisectInProgressFixture(t)
+	_, wtDir := bisectInProgressFixture(t)
 	wtPath := gitPath(t, wtDir)
 
 	c, wt := openWorktree(t, wtDir)
@@ -311,7 +311,7 @@ func TestFR_BR_10_DeleteBranchRefusesABranchCheckedOutInAnotherWorktree(t *testi
 
 func TestFR_BR_10_DeleteBranchRefusesABranchBeingRebasedElsewhere(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	repo, wtDir := rebaseInProgressFixture(t, false)
 	wtPath := gitPath(t, wtDir)
 	beforeSHA := branchTip(t, repo.Dir, "B")
 
@@ -339,7 +339,7 @@ func TestFR_BR_10_DeleteBranchRefusesABranchBeingRebasedElsewhere(t *testing.T) 
 
 func TestFR_BR_10_DeleteBranchRefusesABranchBeingBisectedElsewhere(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := bisectInProgressFixture(t)
+	repo, wtDir := bisectInProgressFixture(t)
 	wtPath := gitPath(t, wtDir)
 
 	c, wt := openWorktree(t, repo.Dir)

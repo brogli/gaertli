@@ -1394,33 +1394,46 @@ func TestFR_UPD_01_UpdateBranchCheckedOutInThisWindowRefusesNamingItsOwnPath(t *
 	}
 }
 
-// rebaseInProgressFixture is updateBranchFixture with "B" checked out in a
-// second linked worktree (wtDir), stopped mid-rebase on a conflict: a local
-// commit and an upstream commit both add conflict.txt with different
-// content. applyBackend selects `rebase --apply` over the default merge
-// backend.
-func rebaseInProgressFixture(t *testing.T, applyBackend bool) (repo *gittest.Repo, origin, wtDir string) {
+// branchCheckedOutElsewhere is a repo on "master" with branch "B" checked out
+// in a second linked worktree (wtDir). B tracks the local master, which is
+// all the update-branch checks need of an upstream.
+func branchCheckedOutElsewhere(t *testing.T, steps ...gittest.Step) (repo *gittest.Repo, wtDir string) {
 	t.Helper()
-	repo, origin = updateBranchFixture(t)
+	repo = gittest.New(t)
+	gittest.History(t, repo.Dir, append([]gittest.Step{
+		{Message: "seed", Files: map[string]string{"seed.txt": "x"}},
+		{Branch: "B", From: "master", Message: "B"},
+	}, steps...)...)
+	gittest.Run(t, repo.Dir, "branch", "--set-upstream-to=master", "B")
 	wtDir = filepath.Join(t.TempDir(), "wt")
 	gittest.Run(t, repo.Dir, "worktree", "add", wtDir, "B")
-	gittest.Commit(t, wtDir, "conflict.txt", "local\n", "local change")
-	remoteAppendCommitOnBranch(t, origin, "B", "conflict.txt", "remote\n", "remote change")
-	gittest.Run(t, wtDir, "fetch", "origin")
+	return repo, wtDir
+}
+
+// rebaseInProgressFixture is branchCheckedOutElsewhere with "B" stopped
+// mid-rebase on a conflict: B and branch "upstream" both add conflict.txt
+// with different content. applyBackend selects `rebase --apply` over the
+// default merge backend.
+func rebaseInProgressFixture(t *testing.T, applyBackend bool) (repo *gittest.Repo, wtDir string) {
+	t.Helper()
+	repo, wtDir = branchCheckedOutElsewhere(t,
+		gittest.Step{Branch: "B", Message: "local change", Files: map[string]string{"conflict.txt": "local\n"}},
+		gittest.Step{Branch: "upstream", From: "master", Message: "remote change", Files: map[string]string{"conflict.txt": "remote\n"}},
+	)
 	args := []string{"rebase"}
 	if applyBackend {
 		args = append(args, "--apply")
 	}
-	args = append(args, "origin/B")
+	args = append(args, "upstream")
 	if _, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: wtDir, Args: args}); err == nil {
 		t.Fatal("rebase did not conflict as the fixture expects")
 	}
-	return repo, origin, wtDir
+	return repo, wtDir
 }
 
 func TestFR_UPD_04_UpdateBranchRebasingElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	repo, wtDir := rebaseInProgressFixture(t, false)
 	wtPath := gitPath(t, wtDir)
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
 
@@ -1459,7 +1472,7 @@ func TestFR_UPD_04_UpdateBranchRebasingElsewhereRefusesBeforeAnyGitCall(t *testi
 
 func TestFR_UPD_04_UpdateBranchRebasingElsewhereApplyBackendRefuses(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := rebaseInProgressFixture(t, true)
+	repo, wtDir := rebaseInProgressFixture(t, true)
 	wtPath := gitPath(t, wtDir)
 
 	c, wt := openWorktree(t, repo.Dir)
@@ -1481,24 +1494,23 @@ func TestFR_UPD_04_UpdateBranchRebasingElsewhereApplyBackendRefuses(t *testing.T
 	}
 }
 
-// bisectInProgressFixture is updateBranchFixture with "B" checked out in a
-// second linked worktree (wtDir), mid-bisect from a two-commit history on B.
-func bisectInProgressFixture(t *testing.T) (repo *gittest.Repo, origin, wtDir string) {
+// bisectInProgressFixture is branchCheckedOutElsewhere with "B" mid-bisect
+// from a two-commit history.
+func bisectInProgressFixture(t *testing.T) (repo *gittest.Repo, wtDir string) {
 	t.Helper()
-	repo, origin = updateBranchFixture(t)
-	wtDir = filepath.Join(t.TempDir(), "wt")
-	gittest.Run(t, repo.Dir, "worktree", "add", wtDir, "B")
-	gittest.Commit(t, wtDir, "c1.txt", "1", "c1")
-	gittest.Commit(t, wtDir, "c2.txt", "2", "c2")
+	repo, wtDir = branchCheckedOutElsewhere(t,
+		gittest.Step{Branch: "B", Message: "c1", Files: map[string]string{"c1.txt": "1"}},
+		gittest.Step{Branch: "B", Message: "c2", Files: map[string]string{"c2.txt": "2"}},
+	)
 	gittest.Run(t, wtDir, "bisect", "start")
 	gittest.Run(t, wtDir, "bisect", "bad", "HEAD")
 	gittest.Run(t, wtDir, "bisect", "good", "HEAD~2")
-	return repo, origin, wtDir
+	return repo, wtDir
 }
 
 func TestFR_UPD_04_UpdateBranchBisectingElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := bisectInProgressFixture(t)
+	repo, wtDir := bisectInProgressFixture(t)
 	wtPath := gitPath(t, wtDir)
 
 	c, wt := openWorktree(t, repo.Dir)
@@ -1575,7 +1587,7 @@ func rewriteGitDirRelative(t *testing.T, worktreeDir string) {
 
 func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithRelativeGitDirRefuses(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	repo, wtDir := rebaseInProgressFixture(t, false)
 	wtPath := gitPath(t, wtDir)
 	rewriteGitDirRelative(t, wtDir)
 
@@ -1597,7 +1609,7 @@ func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithRelativeGitDirRefuses(t *tes
 // file): os.Lstat would see the symlink itself, not a directory.
 func TestFR_UPD_04_UpdateBranchRebasingElsewhereWithGitDirSymlinkRefuses(t *testing.T) {
 	t.Parallel()
-	repo, _, wtDir := rebaseInProgressFixture(t, false)
+	repo, wtDir := rebaseInProgressFixture(t, false)
 	wtPath := gitPath(t, wtDir)
 	wtGitDir := gittest.Out(t, wtDir, "rev-parse", "--absolute-git-dir")
 	dotGit := filepath.Join(wtDir, ".git")
