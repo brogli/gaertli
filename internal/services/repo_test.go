@@ -144,24 +144,6 @@ func TestFR_REPO_03_SummaryReportsTheBranchByItsNameWhenATagSharesIt(t *testing.
 	}
 }
 
-func TestFR_REPO_03_SummaryReportsDetachedHEAD(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	sha := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "switch", "--detach", sha)
-	c, id := openWorktree(t, repo.Dir)
-
-	got, err := c.Summary(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !got.Detached || got.Branch != "" {
-		t.Errorf("Summary = %+v, want Detached true, Branch \"\"", got)
-	}
-}
-
 func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -192,15 +174,11 @@ func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "file.txt", "base\n", "base")
-	gittest.Run(t, repo.Dir, "branch", "other")
-	gittest.Commit(t, repo.Dir, "file.txt", "main change\n", "on main")
-
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	linked := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", linked, "other")
-	gittest.Commit(t, linked, "file.txt", "other change\n", "on other")
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{Dir: linked, Args: []string{"merge", "master"}})
-	if _, err := os.Stat(filepath.Join(linked, "file.txt")); err != nil {
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", linked)
+	gitDir := gittest.Out(t, linked, "rev-parse", "--absolute-git-dir")
+	if err := os.WriteFile(filepath.Join(gitDir, "MERGE_HEAD"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -265,7 +243,7 @@ func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
 	}
 }
 
-func TestQA_REL_02_SummaryReportsSHAWhenDetached(t *testing.T) {
+func TestFR_REPO_03_SummaryReportsDetachedHEADWithItsSHA(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -280,8 +258,8 @@ func TestQA_REL_02_SummaryReportsSHAWhenDetached(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !got.Detached {
-		t.Error("Detached = false, want true")
+	if !got.Detached || got.Branch != "" {
+		t.Errorf("Summary = %+v, want Detached true, Branch \"\"", got)
 	}
 	if got.SHA != sha {
 		t.Errorf("SHA = %q, want %q", got.SHA, sha)
