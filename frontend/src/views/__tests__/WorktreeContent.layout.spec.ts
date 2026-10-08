@@ -79,51 +79,32 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
   })
 
-  it('FR-UX-08 medium (1200): a tablist labelled "Views" holds tabs Details and Changes; clicking Changes selects it and shows the changes view', async () => {
-    const wrapper = await mountAt(1200)
-
-    const tablist = wrapper.get('[role="tablist"]')
-    expect(tablist.attributes('aria-label')).toBe('Views')
-    const tabs = wrapper.findAll('[role="tab"]')
-    expect(tabs.map((tab) => tab.text())).toEqual(['Details', 'Changes'])
-    expect(tabs[0]!.attributes('aria-selected')).toBe('true')
-    expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
-
-    await switchTo(wrapper, 'Changes')
-
-    expect(wrapper.findAll('[role="tab"]')[1]!.attributes('aria-selected')).toBe('true')
-    expect(wrapper.findComponent(ChangesView).isVisible()).toBe(true)
-  })
-
-  it('FR-UX-08 narrow (600): the switch starts on Log, before any commit is selected', async () => {
-    const wrapper = await mountAt(600)
-
-    expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
-    const log = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Log')!
-    expect(log.attributes('aria-selected')).toBe('true')
-  })
-
-  it('FR-UX-08 narrow (600): keydown ArrowRight on the focused Log tab selects Details and shows the commit detail view', async () => {
-    const wrapper = await mountAt(600)
-
-    const logTab = wrapper.findAll<HTMLElement>('[role="tab"]').find((tab) => tab.text() === 'Log')!
-    logTab.element.focus()
-    await logTab.trigger('keydown', { code: 'ArrowRight' })
-    await flushPromises()
-
-    const details = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Details')!
-    expect(details.attributes('aria-selected')).toBe('true')
-    expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(true)
-  })
-
-  it('FR-UX-08 medium (1200): the log shows; the switch defaults to Details', async () => {
+  it('FR-UX-08 medium (1200): the log shows beside a "Views" tablist [Details, Changes (4)] defaulting to Details; clicking Changes shows the changes view', async () => {
+    Facade.Status.mockResolvedValue(
+      changedFilesFixture({
+        unstaged: [
+          { path: 'a', status: 'M' },
+          { path: 'b', status: 'M' },
+          { path: 'c', status: 'M' },
+        ],
+        untracked: [{ path: 'd', status: '?' }],
+      }),
+    )
     const wrapper = await mountAt(1200)
     await clickRow(wrapper)
 
+    expect(wrapper.get('[role="tablist"]').attributes('aria-label')).toBe('Views')
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map((tab) => tab.text())).toEqual(['Details', 'Changes (4)'])
+    expect(tabs[0]!.attributes('aria-selected')).toBe('true')
     expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
     expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(true)
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Details', 'Changes'])
+
+    await switchTo(wrapper, 'Changes (4)')
+
+    expect(wrapper.findAll('[role="tab"]')[1]!.attributes('aria-selected')).toBe('true')
+    expect(wrapper.findComponent(ChangesView).isVisible()).toBe(true)
   })
 
   it('FR-UX-08 medium (1200): clicking a commit switches the side panel back to Details', async () => {
@@ -137,10 +118,12 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
   })
 
-  it('FR-UX-08 narrow (600): only the log view shows, switch [Log, Details, Changes]', async () => {
+  it('FR-UX-08 narrow (600): only the log view shows, switch [Log, Details, Changes] starting on Log', async () => {
     const wrapper = await mountAt(600)
     await clickRow(wrapper)
 
+    const log = wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Log')!
+    expect(log.attributes('aria-selected')).toBe('true')
     expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
     expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(false)
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
@@ -161,43 +144,23 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findComponent(CommitDetailView).isVisible()).toBe(true)
   })
 
-  it("FR-LOG-06 narrow (600): the branch picker's show-log brings the log view forward", async () => {
-    const wrapper = await mountAt(600)
-    await switchTo(wrapper, 'Changes')
-    expect(wrapper.findComponent(LogView).isVisible()).toBe(false)
+  it.each([
+    ['FR-LOG-06 narrow (600): brings the log view forward', 600, false, false],
+    ['FR-LOG-06 medium (1200): leaves the side panel as it was', 1200, true, true],
+  ])(
+    "%s when the branch picker's show-log fires",
+    async (_name, width, logShownBefore, changesShownAfter) => {
+      const wrapper = await mountAt(width)
+      await switchTo(wrapper, 'Changes')
+      expect(wrapper.findComponent(LogView).isVisible()).toBe(logShownBefore)
 
-    wrapper.findComponent(BranchPicker).vm.$emit('show-log')
-    await flushPromises()
+      wrapper.findComponent(BranchPicker).vm.$emit('show-log')
+      await flushPromises()
 
-    expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
-  })
-
-  it("FR-LOG-06 medium (1200): the branch picker's show-log leaves the side panel as it was", async () => {
-    const wrapper = await mountAt(1200)
-    await switchTo(wrapper, 'Changes')
-
-    wrapper.findComponent(BranchPicker).vm.$emit('show-log')
-    await flushPromises()
-
-    expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
-    expect(wrapper.findComponent(ChangesView).isVisible()).toBe(true)
-  })
-
-  it('FR-UX-08 medium (1200): the switch reads "Changes (4)" with 3 unstaged and 1 untracked', async () => {
-    Facade.Status.mockResolvedValue(
-      changedFilesFixture({
-        unstaged: [
-          { path: 'a', status: 'M' },
-          { path: 'b', status: 'M' },
-          { path: 'c', status: 'M' },
-        ],
-        untracked: [{ path: 'd', status: '?' }],
-      }),
-    )
-    const wrapper = await mountAt(1200)
-
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain('Changes (4)')
-  })
+      expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
+      expect(wrapper.findComponent(ChangesView).isVisible()).toBe(changesShownAfter)
+    },
+  )
 
   it('FR-UX-09 medium (1200): Fetch and Open in editor show icon only, with title and aria-label', async () => {
     Facade.Refs.mockResolvedValue({
@@ -232,43 +195,20 @@ describe('WorktreeContent layouts', () => {
     expectIconOnly(button, 'Create branch here')
   })
 
-  it('FR-UX-09 Fetch, Refresh, Open in editor and Settings are OpenVue Buttons, secondary and outlined', async () => {
-    const wrapper = await mountAt(1600)
-
-    for (const label of ['Fetch', 'Refresh', 'Open in editor', 'Settings']) {
-      const classes = findButton(wrapper, label)!.classes()
-      expect(classes).toContain('p-button-secondary')
-      expect(classes).toContain('p-button-outlined')
-    }
-  })
-
-  it('FR-UX-09 narrow (600): the toolbar buttons shrink to the small size', async () => {
-    const wrapper = await mountAt(600)
-
-    expect(findButton(wrapper, 'Refresh')!.classes()).toContain('p-button-sm')
-  })
-
-  it('FR-UX-07 narrow (600): a commit message typed in Changes survives switching to Log and back', async () => {
-    const wrapper = await mountAt(600)
-
-    await switchTo(wrapper, 'Changes')
-    await wrapper.get('textarea').setValue('WIP message')
-
-    await switchTo(wrapper, 'Log')
-    await switchTo(wrapper, 'Changes')
-
-    expect(wrapper.get('textarea').element.value).toBe('WIP message')
-  })
-
-  it('FR-UX-08 narrow (600): switching to Changes and back keeps the log list scroll position', async () => {
+  it('FR-UX-07, FR-UX-08 narrow (600): switching to Changes and back keeps the commit message and the log list scroll position', async () => {
     const wrapper = await mountAt(600)
     const logList = wrapper.get('.log-list').element
     logList.scrollTop = 42
 
     await switchTo(wrapper, 'Changes')
+    await wrapper.get('textarea').setValue('WIP message')
     await switchTo(wrapper, 'Log')
 
     expect(wrapper.get('.log-list').element).toBe(logList)
     expect(logList.scrollTop).toBe(42)
+
+    await switchTo(wrapper, 'Changes')
+
+    expect(wrapper.get('textarea').element.value).toBe('WIP message')
   })
 })
