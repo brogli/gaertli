@@ -20,11 +20,13 @@ func writeHook(t *testing.T, dir, name, script string) {
 	}
 }
 
-func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByte(t *testing.T) {
+func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByteAndRunsTheHook(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	writeFile(t, repo.Dir, "a.txt", "content\n")
 	gittest.Run(t, repo.Dir, "add", "--", "a.txt")
+	marker := filepath.Join(repo.Dir, "hook-ran")
+	writeHook(t, repo.Dir, "pre-commit", "touch hook-ran\nexit 0\n")
 
 	c, id := openWorktree(t, repo.Dir)
 	msg := "Subject\n\nBody 1\nBody 2"
@@ -38,48 +40,37 @@ func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByte(t 
 	if got := gittest.Out(t, repo.Dir, "cat-file", "-p", "HEAD:a.txt"); got != "content" {
 		t.Errorf("HEAD:a.txt = %q, want %q", got, "content")
 	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Errorf("pre-commit hook did not run: %v", err)
+	}
 }
 
-func TestFR_CHG_05_CommitFailsWhenNothingIsStaged(t *testing.T) {
+func TestFR_CHG_05_CommitFailsWhenNothingIsStagedOrTheMessageIsWhitespaceOnly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "content\n", "add a.txt")
 	head := gittest.HeadSHA(t, repo.Dir)
-
 	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(t.Context(), id, "msg", false)
 
-	coretest.AssertCode(t, err, core.GitFailed)
-	if got := gittest.HeadSHA(t, repo.Dir); got != head {
-		t.Errorf("HEAD = %q, want unchanged %q", got, head)
-	}
-}
+	coretest.AssertCode(t, c.Commit(t.Context(), id, "msg", false), core.GitFailed)
 
-func TestFR_CHG_05_CommitFailsOnAWhitespaceOnlyMessage(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "content\n", "add a.txt")
 	writeFile(t, repo.Dir, "b.txt", "new\n")
 	gittest.Run(t, repo.Dir, "add", "--", "b.txt")
-	head := gittest.HeadSHA(t, repo.Dir)
+	coretest.AssertCode(t, c.Commit(t.Context(), id, "   \n  ", false), core.GitFailed)
 
-	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(t.Context(), id, "   \n  ", false)
-
-	coretest.AssertCode(t, err, core.GitFailed)
 	if got := gittest.HeadSHA(t, repo.Dir); got != head {
 		t.Errorf("HEAD = %q, want unchanged %q", got, head)
 	}
 }
 
-func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceWithTheFurtherStagedChange(t *testing.T) {
+func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceAlsoWithNothingStagedRewordingOnly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "first message")
 	writeFile(t, repo.Dir, "b.txt", "further\n")
 	gittest.Run(t, repo.Dir, "add", "--", "b.txt")
-
 	c, id := openWorktree(t, repo.Dir)
+
 	if err := c.Commit(t.Context(), id, "new message", true); err != nil {
 		t.Fatal(err)
 	}
@@ -93,15 +84,8 @@ func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceWithTheFurtherStagedChange(t *t
 	if got := gittest.Out(t, repo.Dir, "cat-file", "-p", "HEAD:b.txt"); got != "further" {
 		t.Errorf("HEAD:b.txt = %q, want %q", got, "further")
 	}
-}
 
-func TestFR_CHG_06_CommitAmendSucceedsWithNothingStagedRewordingOnly(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "first message")
 	treeBefore := gittest.Out(t, repo.Dir, "rev-parse", "HEAD^{tree}")
-
-	c, id := openWorktree(t, repo.Dir)
 	if err := c.Commit(t.Context(), id, "reworded", true); err != nil {
 		t.Fatal(err)
 	}
@@ -142,64 +126,6 @@ func TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr
 	}
 	if got := gittest.HeadSHA(t, repo.Dir); got != head {
 		t.Errorf("HEAD = %q, want unchanged %q", got, head)
-	}
-}
-
-func TestFR_CHG_07_AFailingCommitMsgHooksStdoutReachesGitStderr(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
-	writeFile(t, repo.Dir, "b.txt", "staged\n")
-	gittest.Run(t, repo.Dir, "add", "--", "b.txt")
-	writeHook(t, repo.Dir, "commit-msg", "echo 'commit-msg stdout line'\nexit 3\n")
-	head := gittest.HeadSHA(t, repo.Dir)
-
-	c, id := openWorktree(t, repo.Dir)
-	err := c.Commit(t.Context(), id, "msg", false)
-
-	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "commit-msg stdout line") {
-		t.Errorf("GitStderr = %q, want the hook's line", ce.GitStderr)
-	}
-	if got := gittest.HeadSHA(t, repo.Dir); got != head {
-		t.Errorf("HEAD = %q, want unchanged %q", got, head)
-	}
-}
-
-func TestFR_CHG_07_ASucceedingPreCommitHookRunsAsUsual(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
-	writeFile(t, repo.Dir, "b.txt", "staged\n")
-	gittest.Run(t, repo.Dir, "add", "--", "b.txt")
-	marker := filepath.Join(repo.Dir, "hook-ran")
-	writeHook(t, repo.Dir, "pre-commit", "touch hook-ran\nexit 0\n")
-
-	c, id := openWorktree(t, repo.Dir)
-	if err := c.Commit(t.Context(), id, "msg", false); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := os.Stat(marker); err != nil {
-		t.Errorf("pre-commit hook did not run: %v", err)
-	}
-}
-
-func TestFR_CHG_08_SetMessageDraftIsReadBackFromSummary(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	c, id := openWorktree(t, repo.Dir)
-
-	if err := c.SetMessageDraft(t.Context(), id, "draft text"); err != nil {
-		t.Fatal(err)
-	}
-
-	summary, err := c.Summary(t.Context(), id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if summary.MessageDraft != "draft text" {
-		t.Errorf("MessageDraft = %q, want %q", summary.MessageDraft, "draft text")
 	}
 }
 

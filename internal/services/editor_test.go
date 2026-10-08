@@ -96,16 +96,16 @@ func TestFR_WT_04_OpenFolderAtRejectsANonRepoPathStartingNoEditor(t *testing.T) 
 	assertNoEditorStarted(t, outFile)
 }
 
-func TestFR_ED_02_OpenFileJoinsThePathAgainstTheWorktreeToplevel(t *testing.T) {
+func TestFR_ED_02_OpenFileJoinsThePathAgainstTheToplevelLogsTheStartAndRefusesMissingOrEscapingPaths(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	if err := os.MkdirAll(filepath.Join(repo.Dir, "sub"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	writeFile(t, repo.Dir, "sub/foo.txt", "x")
 
-	c := New(func(core.Event) {})
+	var events []core.Event
+	c := New(func(ev core.Event) { events = append(events, ev) })
 	outFile := pushArgvWriter(t, c)
 	wt := openOn(t, c, repo.Dir)
 
@@ -117,44 +117,25 @@ func TestFR_ED_02_OpenFileJoinsThePathAgainstTheWorktreeToplevel(t *testing.T) {
 	if got := waitForFile(t, outFile); got != want {
 		t.Errorf("helper argv = %q, want %q", got, want)
 	}
-}
-
-func TestFR_ED_02_OpenFileReturnsFileNotFoundForAMissingPathStartingNoEditor(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-
-	c := New(func(core.Event) {})
-	outFile := pushArgvWriter(t, c)
-	wt := openOn(t, c, repo.Dir)
-
-	err := c.OpenFile(t.Context(), wt.ID, "gone.txt", 0)
-
-	coretest.AssertCode(t, err, core.FileNotFound)
-	assertNoEditorStarted(t, outFile)
-}
-
-func TestFR_UX_02_OpenFileLogsTheEditorStart(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-
-	var events []core.Event
-	c := New(func(ev core.Event) { events = append(events, ev) })
-	outFile := pushArgvWriter(t, c)
-	wt := openOn(t, c, repo.Dir)
-
-	if err := c.OpenFile(t.Context(), wt.ID, "seed.txt", 0); err != nil {
-		t.Fatal(err)
-	}
-
 	record := onlyEditorRecord(t, events)
-	if want := []string{argvWriterBin, outFile, filepath.Join(gitPath(t, repo.Dir), "seed.txt")}; !slices.Equal(record.Argv, want) {
-		t.Errorf("argv = %v, want %v", record.Argv, want)
+	if wantArgv := []string{argvWriterBin, outFile, want}; !slices.Equal(record.Argv, wantArgv) {
+		t.Errorf("logged argv = %v, want %v", record.Argv, wantArgv)
 	}
 	if record.Error != "" {
-		t.Errorf("error = %q, want none", record.Error)
+		t.Errorf("logged error = %q, want none", record.Error)
 	}
+
+	outFile = pushArgvWriter(t, c)
+	err := c.OpenFile(t.Context(), wt.ID, "gone.txt", 0)
+	ce := coretest.AsError(t, err, core.FileNotFound)
+	if ce.Args["path"] != "gone.txt" {
+		t.Errorf("Args[path] = %q, want %q", ce.Args["path"], "gone.txt")
+	}
+	if ce.Key != "fileNotFound" {
+		t.Errorf("Key = %q, want fileNotFound", ce.Key)
+	}
+	coretest.AssertCode(t, c.OpenFile(t.Context(), wt.ID, "../../etc/passwd", 0), core.Internal)
+	assertNoEditorStarted(t, outFile)
 }
 
 func TestFR_UX_02_OpenFileWithACommandNotOnPathLogsTheArgvAndTheError(t *testing.T) {
@@ -181,39 +162,4 @@ func TestFR_UX_02_OpenFileWithACommandNotOnPathLogsTheArgvAndTheError(t *testing
 	if record.Error == "" {
 		t.Error("error = \"\", want the start failure")
 	}
-}
-
-func TestFR_UX_11_OpenFileNamesTheMissingPathInArgs(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-
-	c := New(func(core.Event) {})
-	pushArgvWriter(t, c)
-	wt := openOn(t, c, repo.Dir)
-
-	err := c.OpenFile(t.Context(), wt.ID, "gone.txt", 0)
-
-	ce := coretest.AsError(t, err, core.FileNotFound)
-	if ce.Args["path"] != "gone.txt" {
-		t.Errorf("Args[path] = %q, want %q", ce.Args["path"], "gone.txt")
-	}
-	if ce.Key != "fileNotFound" {
-		t.Errorf("Key = %q, want fileNotFound", ce.Key)
-	}
-}
-
-func TestFR_ED_02_OpenFileRejectsAPathEscapingTheWorktreeStartingNoEditor(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
-
-	c := New(func(core.Event) {})
-	outFile := pushArgvWriter(t, c)
-	wt := openOn(t, c, repo.Dir)
-
-	err := c.OpenFile(t.Context(), wt.ID, "../../etc/passwd", 0)
-
-	coretest.AssertCode(t, err, core.Internal)
-	assertNoEditorStarted(t, outFile)
 }
