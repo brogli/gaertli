@@ -41,9 +41,13 @@ async function submitExisting(props: { repoPath: string; distro?: string }, targ
   const mounted = await mountDialog(props)
   await chooseOption(mounted.body, 'existing-branch', 'feature')
   await field(mounted.body, 'Location').setValue(target)
-  await mounted.body.get('[data-test="create-worktree-submit"]').trigger('click')
-  await flushPromises()
+  await submit(mounted.body)
   return mounted
+}
+
+async function submit(body: DOMWrapper<Element>): Promise<void> {
+  await body.get('[data-test="create-worktree-submit"]').trigger('click')
+  await flushPromises()
 }
 
 describe('CreateWorktreeDialog', () => {
@@ -67,19 +71,26 @@ describe('CreateWorktreeDialog', () => {
   }
 
   it.each([
-    { env: 'local', props: { repoPath: '/repo' }, repo: '/repo', target: '/repo-wt' },
+    {
+      env: 'local',
+      props: { repoPath: '/repo' },
+      location: '/repo-wt',
+      repo: '/repo',
+      target: '/repo-wt',
+    },
     {
       env: 'WSL',
       props: wslRepo,
+      location: '/home/u/r/wt',
       repo: '\\\\wsl.localhost\\Ubuntu\\home\\u\\r',
       target: '\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt',
     },
   ])(
     'FR-WT-02 an existing branch chosen submits with an empty start and newBranch false ($env repo, WSL paths as UNC)',
-    async ({ props, repo, target }) => {
+    async ({ props, location, repo, target }) => {
       Facade.AddWorktree.mockResolvedValue({})
 
-      await submitExisting(props, props === wslRepo ? '/home/u/r/wt' : '/repo-wt')
+      await submitExisting(props, location)
 
       expect(Facade.AddWorktree).toHaveBeenCalledTimes(1)
       expect(Facade.AddWorktree).toHaveBeenCalledWith(repo, target, 'feature', '', false)
@@ -94,8 +105,7 @@ describe('CreateWorktreeDialog', () => {
     if (checkNew) await body.get('input[type="checkbox"]').setValue(true)
     await field(body, 'Branch name').setValue('feature-x')
     if (pickStart) await chooseOption(body, 'start-branch', pickStart)
-    await body.get('[data-test="create-worktree-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
   }
 
   it.each([
@@ -241,8 +251,7 @@ describe('CreateWorktreeDialog', () => {
     await body.get('input[type="checkbox"]').setValue(true)
     await field(body, 'Branch name').setValue('-bad')
     await field(body, 'Location').setValue('/repo-wt3')
-    await body.get('[data-test="create-worktree-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
 
     expect(body.text()).toContain('is not a valid branch name')
     expect(wrapper.emitted('close')).toBeUndefined()

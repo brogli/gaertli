@@ -1,5 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import type { DOMWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountNotices } from '@/testing/mountNotices'
@@ -160,8 +159,7 @@ describe('ChangesView', () => {
 
   it('FR-CHG-02 "Stage all" calls Facade.StageAll once and leaves reloading the list to the index event', async () => {
     const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
-    const stageAll = findButton(wrapper, 'Stage all')
-    await stageAll?.trigger('click')
+    await findButton(wrapper, 'Stage all')!.trigger('click')
     await flushPromises()
 
     expect(Facade.StageAll).toHaveBeenCalledWith('/repo')
@@ -187,6 +185,7 @@ describe('ChangesView', () => {
       expect(Facade.OpenFile).not.toHaveBeenCalled()
     },
   )
+
   it('FR-CONF-08 only a staged row of a resolved file has "Reopen conflict"; it confirms, then reopens', async () => {
     const wrapper = mountWith({
       staged: [
@@ -313,8 +312,9 @@ describe('ChangesView', () => {
 
   it('FR-CHG-13 the changes view shares its choice with ChangedFiles, and a fresh mount starts from the remembered choice', async () => {
     const wrapper = mountWith({ staged: [{ path: 'a.txt', status: 'M' }] })
-    const otherFiles = [{ path: 'x.txt', status: 'M' }]
-    const other = mount(ChangedFiles, { props: { files: otherFiles, selected: null } })
+    const other = mount(ChangedFiles, {
+      props: { files: [{ path: 'x.txt', status: 'M' }], selected: null },
+    })
 
     await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
 

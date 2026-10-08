@@ -31,6 +31,16 @@ import { commitRow } from '@/testing/fixtures/log-rows'
 import { commitDetailsFixture } from '@/testing/fixtures/commitDetails'
 import { exactDate } from '@/lib/format'
 
+// mountSelected mounts the view with commitRow() selected, details being its
+// CommitDetails.
+async function mountSelected(details: Parameters<typeof commitDetailsFixture>[0] = {}) {
+  Facade.CommitDetails.mockResolvedValue(commitDetailsFixture(details))
+  const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
+  await useLogStore().select(commitRow())
+  await flushPromises()
+  return wrapper
+}
+
 describe('CommitDetailView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -49,21 +59,14 @@ describe('CommitDetailView', () => {
   })
 
   it('FR-LOG-03 renders the message, author/committer, parents, and changed files once selected', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({
-        parents: ['parent1', 'parent2'],
-        body: 'Fix the bug\n\nSome more detail.',
-        files: [
-          { path: 'a.txt', status: 'M' },
-          { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
-        ],
-      }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
+    const wrapper = await mountSelected({
+      parents: ['parent1', 'parent2'],
+      body: 'Fix the bug\n\nSome more detail.',
+      files: [
+        { path: 'a.txt', status: 'M' },
+        { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
+      ],
+    })
 
     expect(wrapper.text()).toContain('Fix the bug')
     expect(wrapper.text()).toContain('Some more detail.')
@@ -76,14 +79,7 @@ describe('CommitDetailView', () => {
   })
 
   it('FR-LOG-15 splits a commit, starting in the middle: message and fields above, changed files below', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({ files: [{ path: 'a.txt', status: 'M' }] }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
+    const wrapper = await mountSelected({ files: [{ path: 'a.txt', status: 'M' }] })
 
     const splitter = wrapper.getComponent(Splitter)
     const [message, files] = splitter.findAllComponents(SplitterPanel)
@@ -95,19 +91,12 @@ describe('CommitDetailView', () => {
   })
 
   it('FR-LOG-04 a double-click on a file row opens it in the diff window', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({
-        files: [
-          { path: 'a.txt', status: 'M' },
-          { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
-        ],
-      }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
+    const wrapper = await mountSelected({
+      files: [
+        { path: 'a.txt', status: 'M' },
+        { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
+      ],
+    })
 
     const file = wrapper.findAll('.files li')[1]!
     await file.trigger('dblclick')
@@ -121,25 +110,15 @@ describe('CommitDetailView', () => {
   })
 
   it('FR-LOG-03 selecting a file lists it as selected and opens no diff in the main window', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({ files: [{ path: 'a.txt', status: 'M' }] }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
+    const wrapper = await mountSelected({ files: [{ path: 'a.txt', status: 'M' }] })
     await wrapper.get('.files li').trigger('click')
 
-    expect(log.selectedFile?.path).toBe('a.txt')
+    expect(useLogStore().selectedFile?.path).toBe('a.txt')
     expect(wrapper.findComponent(DiffView).exists()).toBe(false)
     expect(AppService.OpenDiff).not.toHaveBeenCalled()
   })
 
   it('FR-ED-02 opening a file that is gone from the worktree shows the banner naming it', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({ files: [{ path: 'docs/readme.md', status: 'M' }] }),
-    )
     Facade.OpenFile.mockRejectedValue(
       new Error('boom', {
         cause: {
@@ -150,10 +129,7 @@ describe('CommitDetailView', () => {
         },
       }),
     )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    await useLogStore().select(commitRow())
-    await flushPromises()
+    const wrapper = await mountSelected({ files: [{ path: 'docs/readme.md', status: 'M' }] })
     await wrapper.get('.files [data-test="open-editor"]').trigger('click')
     await flushPromises()
 
@@ -163,19 +139,12 @@ describe('CommitDetailView', () => {
   })
 
   it('FR-UX-10 labels Author and Committer with dates when they differ, and shows short-hash parents with the full SHA in title', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({
-        sha: 'a'.repeat(40),
-        parents: ['b'.repeat(40), 'c'.repeat(40)],
-        authorAt: 1_700_000_000,
-        committerAt: 1_700_000_100,
-      }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
+    const wrapper = await mountSelected({
+      sha: 'a'.repeat(40),
+      parents: ['b'.repeat(40), 'c'.repeat(40)],
+      authorAt: 1_700_000_000,
+      committerAt: 1_700_000_100,
+    })
 
     expect(wrapper.text()).toContain('Author')
     expect(wrapper.text()).toContain('Committer')
@@ -192,20 +161,13 @@ describe('CommitDetailView', () => {
   })
 
   it('FR-UX-10 hides the Committer field when author and committer match', async () => {
-    Facade.CommitDetails.mockResolvedValue(
-      commitDetailsFixture({
-        sha: 'a'.repeat(40),
-        authorAt: 1_700_000_000,
-        committer: 'Alice',
-        committerEmail: 'alice@example.com',
-        committerAt: 1_700_000_000,
-      }),
-    )
-
-    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
-    const log = useLogStore()
-    await log.select(commitRow())
-    await flushPromises()
+    const wrapper = await mountSelected({
+      sha: 'a'.repeat(40),
+      authorAt: 1_700_000_000,
+      committer: 'Alice',
+      committerEmail: 'alice@example.com',
+      committerAt: 1_700_000_000,
+    })
 
     expect(wrapper.text()).toContain('Author')
     expect(wrapper.text()).not.toContain('Committer')

@@ -19,7 +19,7 @@ function mountShow(message: AppNotice): void {
   )
 }
 
-// showNotice mounts the notice area and shows message under kind.
+// showNotice mounts the notice area and shows message.
 async function showNotice(message: AppNotice) {
   const body = await mountNotices()
   mountShow(message)

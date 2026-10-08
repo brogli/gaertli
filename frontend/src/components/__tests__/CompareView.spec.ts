@@ -13,25 +13,22 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import CompareView from '../CompareView.vue'
 import { useLogStore } from '@/stores/log'
-import { useCompareStore } from '@/stores/compare'
 import { pressKey } from '@/testing/pressKey'
 import { commitRow } from '@/testing/fixtures/log-rows'
 import type { ChangedFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
-
-const row = (sha: string, shortSha: string) => commitRow({ sha, shortSha })
-
-const props = { wt: '/repo' }
 
 // mountComparing mounts CompareView comparing sha-a (selected first: from)
 // with sha-b (selected second: to), CompareCommits answering files.
 async function mountComparing(files: ChangedFile[] = []) {
   Facade.CompareCommits.mockResolvedValue(files)
   const log = useLogStore()
-  const compare = useCompareStore()
-  log.selection = [row('sha-a', 'aaa1111'), row('sha-b', 'bbb2222')]
-  const wrapper = mount(CompareView, { props })
+  log.selection = [
+    commitRow({ sha: 'sha-a', shortSha: 'aaa1111' }),
+    commitRow({ sha: 'sha-b', shortSha: 'bbb2222' }),
+  ]
+  const wrapper = mount(CompareView, { props: { wt: '/repo' } })
   await flushPromises()
-  return { wrapper, log, compare }
+  return { wrapper, log }
 }
 
 describe('CompareView', () => {

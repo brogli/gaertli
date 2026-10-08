@@ -70,6 +70,28 @@ async function stepFile(wrapper: VueWrapper, step: 1 | -1): Promise<void> {
   await flushPromises()
 }
 
+const commitA: DiffTarget = { kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' }
+const stagedA: DiffTarget = { kind: DiffKind.WorkingDiff, staged: true, path: 'a.txt', oldPath: '' }
+const unstagedB: DiffTarget = {
+  kind: DiffKind.WorkingDiff,
+  staged: false,
+  path: 'b.txt',
+  oldPath: '',
+}
+const oneOfTwo: DiffTarget = {
+  kind: DiffKind.WorkingDiff,
+  conflicted: true,
+  path: 'one.txt',
+  oldPath: '',
+}
+const twoConflicted = () =>
+  changedFilesFixture({
+    conflicted: [
+      { path: 'one.txt', status: 'UU' },
+      { path: 'two.txt', status: 'UU' },
+    ],
+  })
+
 const rows = (wrapper: VueWrapper) => wrapper.findAll('.files li')
 const selectedRow = (wrapper: VueWrapper) => wrapper.get('.files li.selected .path').text()
 
@@ -132,12 +154,7 @@ describe('DiffWindowView', () => {
   })
 
   it("FR-DIFF-07 the working tree's window lists the changes in their groups; a conflicted file shows its conflict", async () => {
-    const wrapper = await mountWindow({
-      kind: DiffKind.WorkingDiff,
-      staged: false,
-      path: 'b.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountWindow(unstagedB)
 
     expect(wrapper.findAll('h3').map((h) => h.text())).toEqual([
       'Staged',
@@ -156,12 +173,7 @@ describe('DiffWindowView', () => {
   })
 
   it('FR-CONF-02 selecting a conflicted file shows its conflict, not a diff', async () => {
-    const wrapper = await mountWindow({
-      kind: DiffKind.WorkingDiff,
-      staged: false,
-      path: 'b.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountWindow(unstagedB)
 
     await rows(wrapper)[3]!.trigger('click')
     await flushPromises()
@@ -172,60 +184,30 @@ describe('DiffWindowView', () => {
   })
 
   it("FR-DIFF-02 FR-CONF-02 in the working tree's window, next file goes on from the staged group to the unstaged one, then to the conflicted files", async () => {
-    const wrapper = await mountWindow({
-      kind: DiffKind.WorkingDiff,
-      staged: true,
-      path: 'a.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountWindow(stagedA)
 
     await stepFile(wrapper, 1)
-    await flushPromises()
     expect(diffProps(wrapper)).toMatchObject({ target: { path: 'b.txt', staged: false } })
 
     await stepFile(wrapper, 1)
     await stepFile(wrapper, 1)
-    await flushPromises()
     expect(wrapper.getComponent(ConflictView).props('path')).toBe('both.txt')
   })
 
   it("FR-CONF-02 the conflict view's next and previous file step through the conflicted files", async () => {
-    Facade.Status.mockResolvedValue(
-      changedFilesFixture({
-        conflicted: [
-          { path: 'one.txt', status: 'UU' },
-          { path: 'two.txt', status: 'UU' },
-        ],
-      }),
-    )
-    const wrapper = await mountWindow({
-      kind: DiffKind.WorkingDiff,
-      conflicted: true,
-      path: 'one.txt',
-      oldPath: '',
-    })
+    Facade.Status.mockResolvedValue(twoConflicted())
+    const wrapper = await mountWindow(oneOfTwo)
 
     await stepFile(wrapper, 1)
-    await flushPromises()
     expect(wrapper.getComponent(ConflictView).props('path')).toBe('two.txt')
 
     await stepFile(wrapper, -1)
-    await flushPromises()
     expect(wrapper.getComponent(ConflictView).props('path')).toBe('one.txt')
   })
 
   describe('a conflicted target', () => {
-    const oneOfTwo = { kind: DiffKind.WorkingDiff, conflicted: true, path: 'one.txt', oldPath: '' }
-
     beforeEach(() => {
-      Facade.Status.mockResolvedValue(
-        changedFilesFixture({
-          conflicted: [
-            { path: 'one.txt', status: 'UU' },
-            { path: 'two.txt', status: 'UU' },
-          ],
-        }),
-      )
+      Facade.Status.mockResolvedValue(twoConflicted())
     })
 
     async function indexChanges(status: ReturnType<typeof changedFilesFixture>): Promise<void> {
@@ -267,12 +249,7 @@ describe('DiffWindowView', () => {
   })
 
   it("FR-DIFF-07 the diff gets the window's target, with the chosen working-tree file's side and status; clicking a file in the list shows its diff", async () => {
-    const wrapper = await mountRealWindow({
-      kind: DiffKind.WorkingDiff,
-      staged: true,
-      path: 'a.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountRealWindow(stagedA)
 
     expect(diffProps(wrapper)).toMatchObject({
       wt: '/repo',
@@ -301,29 +278,21 @@ describe('DiffWindowView', () => {
     })
 
     await stepFile(wrapper, 1)
-    await flushPromises()
     expect(selectedRow(wrapper)).toBe('c.txt')
     expect(diffProps(wrapper)).toMatchObject({
       target: { kind: DiffKind.RangeDiff, path: 'c.txt' },
     })
 
     await stepFile(wrapper, 1)
-    await flushPromises()
     expect(selectedRow(wrapper)).toBe('c.txt')
 
     await stepFile(wrapper, -1)
     await stepFile(wrapper, -1)
-    await flushPromises()
     expect(selectedRow(wrapper)).toBe('a.txt')
   })
 
   it('FR-DIFF-07 diff:show retargets the window, to another worktree too', async () => {
-    const wrapper = await mountWindow({
-      kind: DiffKind.CommitDiff,
-      sha: 'abc',
-      path: 'a.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountWindow(commitA)
 
     emit('diff:show', {
       data: {
@@ -342,12 +311,7 @@ describe('DiffWindowView', () => {
   })
 
   it("FR-DIFF-07 a diff:show for another main window's diff window is ignored", async () => {
-    const wrapper = await mountWindow({
-      kind: DiffKind.CommitDiff,
-      sha: 'abc',
-      path: 'a.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountWindow(commitA)
 
     emit('diff:show', {
       sender: 'window-2',
@@ -359,12 +323,7 @@ describe('DiffWindowView', () => {
   })
 
   it('FR-CHG-03 staging a hunk from the window stages it; after repo:changed the list and the diff reload', async () => {
-    const wrapper = await mountRealWindow({
-      kind: DiffKind.WorkingDiff,
-      staged: false,
-      path: 'b.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountRealWindow(unstagedB)
 
     await wrapper.get('[data-test="stage-hunk"]').trigger('click')
     await flushPromises()
@@ -385,20 +344,8 @@ describe('DiffWindowView', () => {
   })
 
   it('FR-CONF-06 a draft of a file that is no longer conflicted is dropped', async () => {
-    Facade.Status.mockResolvedValue(
-      changedFilesFixture({
-        conflicted: [
-          { path: 'one.txt', status: 'UU' },
-          { path: 'two.txt', status: 'UU' },
-        ],
-      }),
-    )
-    await mountWindow({
-      kind: DiffKind.WorkingDiff,
-      conflicted: true,
-      path: 'one.txt',
-      oldPath: '',
-    })
+    Facade.Status.mockResolvedValue(twoConflicted())
+    await mountWindow(oneOfTwo)
     const drafts = useMergeDrafts()
     drafts.set('/repo', 'one.txt', '', () => ({ text: 'x', fingerprint: 'fp', regions: [] }))
     drafts.set('/repo', 'two.txt', '', () => ({ text: 'y', fingerprint: 'fp', regions: [] }))
@@ -414,7 +361,7 @@ describe('DiffWindowView', () => {
   })
 
   it('FR-DIFF-07 Escape closes the window, unless it closes an open dialog first', async () => {
-    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+    await mountWindow(commitA)
     const dialog = document.createElement('div')
     dialog.setAttribute('role', 'alertdialog')
     document.body.append(dialog)
@@ -430,7 +377,7 @@ describe('DiffWindowView', () => {
 
   it('FR-CONF-06 Escape with an unsaved merge result closes the window without asking', async () => {
     confirmRequire.mockReset()
-    await mountWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+    await mountWindow(commitA)
     useMergeDrafts().set('/repo', 'a.txt', '', () => ({
       text: 'x',
       fingerprint: 'fp',
@@ -445,12 +392,7 @@ describe('DiffWindowView', () => {
   })
 
   it('FR-ED-02 a file of the list opens in the editor', async () => {
-    const wrapper = await mountWindow({
-      kind: DiffKind.CommitDiff,
-      sha: 'abc',
-      path: 'a.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountWindow(commitA)
 
     await rows(wrapper)[1]!.get('[data-test="open-editor"]').trigger('click')
 
@@ -486,12 +428,7 @@ describe('DiffWindowView', () => {
   it('FR-DIFF-10 a choice already stored (by the commit detail view) shows the files as trees, the toggle pressed', async () => {
     localStorage.setItem('nebegit.changedFiles.tree', 'true')
 
-    const wrapper = await mountWindow({
-      kind: DiffKind.CommitDiff,
-      sha: 'abc',
-      path: 'a.txt',
-      oldPath: '',
-    })
+    const wrapper = await mountWindow(commitA)
 
     expect(wrapper.find('[role="tree"]').exists()).toBe(true)
     expect(wrapper.find('.files').exists()).toBe(false)
@@ -499,7 +436,7 @@ describe('DiffWindowView', () => {
   })
 
   it('ADR-4 after a WSL core restart the window reloads its file list and its diff', async () => {
-    await mountRealWindow({ kind: DiffKind.CommitDiff, sha: 'abc', path: 'a.txt', oldPath: '' })
+    await mountRealWindow(commitA)
 
     emit('core:reconnected')
     await flushPromises()

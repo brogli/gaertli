@@ -62,12 +62,10 @@ describe('ConflictBanner', () => {
   })
 
   it('FR-CONF-04 disables Continue while a conflicted file remains, enabling once cleared', async () => {
-    const repo = useRepoStore()
     const changes = useChangesStore()
-    repo.summary = summaryFixture({ operation: Operation.MergeOperation })
     changes.files = changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] })
 
-    const wrapper = mount(ConflictBanner, { props: { wt: '/repo' } })
+    const wrapper = mountDuring(Operation.MergeOperation)
     expect(findButton(wrapper, 'Continue')!.attributes('disabled')).not.toBeUndefined()
 
     changes.files = changedFilesFixture({ conflicted: [] })
@@ -82,8 +80,7 @@ describe('ConflictBanner', () => {
       { path: 'b.txt', status: 'UU' },
     ]
     Facade.Status.mockResolvedValue(changedFilesFixture({ conflicted }))
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ conflicted })
+    useChangesStore().files = changedFilesFixture({ conflicted })
     const wrapper = mountDuring(Operation.MergeOperation)
 
     await findButton(wrapper, 'Resolve conflicts')!.trigger('click')

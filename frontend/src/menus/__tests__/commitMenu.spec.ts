@@ -15,6 +15,14 @@ function labelsOf(items: CommitMenuItem[]): string[] {
   return items.flatMap((i) => ('label' in i ? [i.label] : []))
 }
 
+function findItem(items: CommitMenuItem[], label: string): { label: string; command: () => void } {
+  const item = items.find(
+    (i): i is { label: string; command: () => void } => 'label' in i && i.label === label,
+  )
+  if (!item) throw new Error(`menu item not found: ${label}`)
+  return item
+}
+
 function oneCommitActions() {
   return {
     openCreateBranch: vi.fn(),
@@ -26,6 +34,18 @@ function oneCommitActions() {
     revertOptions: vi.fn(),
     openCreateWorktree: vi.fn(),
     compareWithWorking: vi.fn(),
+  }
+}
+
+function selectionActions() {
+  return {
+    cherryPick: vi.fn(),
+    cherryPickOptions: vi.fn(),
+    revert: vi.fn(),
+    revertOptions: vi.fn(),
+    copyHashes: vi.fn(),
+    swap: vi.fn(),
+    stopComparing: vi.fn(),
   }
 }
 
@@ -121,19 +141,9 @@ describe('buildOneCommitMenuItems', () => {
   })
 })
 
-function selectionActions() {
-  return {
-    cherryPick: vi.fn(),
-    cherryPickOptions: vi.fn(),
-    revert: vi.fn(),
-    revertOptions: vi.fn(),
-    copyHashes: vi.fn(),
-    swap: vi.fn(),
-    stopComparing: vi.fn(),
-  }
-}
-
 describe('buildSelectionMenuItems', () => {
+  const twoRows = [row({ sha: 'a' }), row({ sha: 'b' })]
+
   it('FR-LOG-11 three commits: pick, revert, squash, fixup, copy hashes, no swap', () => {
     const rows = [row({ sha: 'a' }), row({ sha: 'b' }), row({ sha: 'c' })]
     const squash = buildSquashMenuItems(3, null, { squash: vi.fn(), fixup: vi.fn() }, t)
@@ -152,9 +162,7 @@ describe('buildSelectionMenuItems', () => {
   })
 
   it('FR-LOG-11 two commits: the same shape, plus swap and stop comparing last', () => {
-    const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
-
-    const items = buildSelectionMenuItems(rows, selectionActions(), [], t)
+    const items = buildSelectionMenuItems(twoRows, selectionActions(), [], t)
 
     expect(labelsOf(items)).toEqual([
       'Cherry-pick 2 commits',
@@ -168,9 +176,7 @@ describe('buildSelectionMenuItems', () => {
   })
 
   it('FR-UX-05 "Stop comparing" carries its shortcut; other items carry none', () => {
-    const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
-
-    const items = buildSelectionMenuItems(rows, selectionActions(), [], t)
+    const items = buildSelectionMenuItems(twoRows, selectionActions(), [], t)
 
     expect(findItem(items, 'Stop comparing')).toMatchObject({ shortcut: 'Esc' })
     expect(findItem(items, 'Swap')).not.toHaveProperty('shortcut')
@@ -178,9 +184,8 @@ describe('buildSelectionMenuItems', () => {
   })
 
   it('FR-LOG-11 each item calls its own action', () => {
-    const rows = [row({ sha: 'a' }), row({ sha: 'b' })]
     const actions = selectionActions()
-    const items = buildSelectionMenuItems(rows, actions, [], t)
+    const items = buildSelectionMenuItems(twoRows, actions, [], t)
 
     findItem(items, 'Cherry-pick 2 commits').command()
     findItem(items, 'Cherry-pick 2 commits…').command()
@@ -199,14 +204,6 @@ describe('buildSelectionMenuItems', () => {
     expect(actions.stopComparing).toHaveBeenCalledTimes(1)
   })
 })
-
-function findItem(items: CommitMenuItem[], label: string): { label: string; command: () => void } {
-  const item = items.find(
-    (i): i is { label: string; command: () => void } => 'label' in i && i.label === label,
-  )
-  if (!item) throw new Error(`menu item not found: ${label}`)
-  return item
-}
 
 describe('buildSquashMenuItems', () => {
   it('FR-LOG-14 with a blocker: one disabled item saying why, no actions', () => {

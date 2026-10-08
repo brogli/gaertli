@@ -37,11 +37,13 @@ import {
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
-async function mountView(file: Partial<ConflictFile>) {
+async function mountView(file: Partial<ConflictFile> = {}) {
   Facade.Conflict.mockResolvedValue(conflictFileFixture(file))
   const { wrapper } = await mountInBody(ConflictView, { props: { wt: '/repo', path: 'a.txt' } })
   return wrapper
 }
+
+const resultView = (wrapper: VueWrapper) => editorViews(wrapper)[1]!
 
 describe('ConflictView', () => {
   beforeEach(() => {
@@ -177,10 +179,9 @@ describe('ConflictView', () => {
         cause: { message: 'changed', key: 'fileChangedSinceOpened', args: { path: 'a.txt' } },
       }),
     )
-    const wrapper = await mountView({})
+    const wrapper = await mountView()
     await resolveBothConflicts(wrapper)
-    const resultView = () => editorViews(wrapper)[1]!
-    resultView().dispatch({ changes: { from: 0, insert: 'typed ' } })
+    resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
     await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
     Facade.Conflict.mockResolvedValue(
       conflictFileFixture({ result: 'on disk', regions: [], fingerprint: 'fp2' }),
@@ -190,13 +191,11 @@ describe('ConflictView', () => {
     await findButton(wrapper, 'Reload')!.trigger('click')
     await flushPromises()
 
-    expect(resultView().state.doc.toString()).toBe('on disk')
+    expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
     expect(findButton(wrapper, 'Reload')).toBeUndefined()
   })
 
   describe('reading the conflict again', () => {
-    const resultView = (wrapper: VueWrapper) => editorViews(wrapper)[1]!
-
     async function reread(file: Partial<ConflictFile>): Promise<void> {
       Facade.Conflict.mockResolvedValue(conflictFileFixture(file))
       emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
@@ -204,7 +203,7 @@ describe('ConflictView', () => {
     }
 
     it('FR-CONF-06 the same fingerprint keeps the editor as it is', async () => {
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' } })
 
@@ -217,7 +216,7 @@ describe('ConflictView', () => {
 
     it('FR-CONF-06 a save keeps the editor, its edits and undo through the reload it causes', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       await resolveBothConflicts(wrapper)
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
@@ -234,7 +233,7 @@ describe('ConflictView', () => {
 
     it('FR-CONF-06 a read that started before a save does not undo the save', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       await resolveBothConflicts(wrapper)
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
@@ -254,7 +253,7 @@ describe('ConflictView', () => {
     })
 
     it('FR-CONF-06 a read that fails after a newer read started shows no error', async () => {
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       let failStaleRead: (e: Error) => void = () => undefined
       Facade.Conflict.mockReturnValueOnce(
         new Promise<ConflictFile>((_, reject) => (failStaleRead = reject)),
@@ -271,7 +270,7 @@ describe('ConflictView', () => {
     })
 
     it('FR-CONF-06 a read of a file that is no longer conflicted shows no error', async () => {
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       Facade.Conflict.mockRejectedValue(
         Object.assign(new Error('rejected'), {
           cause: { message: 'not conflicted', key: 'notConflicted', args: { path: 'a.txt' } },
@@ -288,7 +287,7 @@ describe('ConflictView', () => {
       Facade.SaveConflict.mockReturnValueOnce(
         new Promise<string>((resolve) => (finishSave = resolve)),
       )
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       await resolveBothConflicts(wrapper)
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
@@ -307,7 +306,7 @@ describe('ConflictView', () => {
     })
 
     it('FR-CONF-06 a changed file shows as it is now, but keeps unsaved edits and says so; Reload drops them', async () => {
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
 
@@ -342,7 +341,7 @@ describe('ConflictView', () => {
     )
 
     it('FR-CONF-06 Reload reads the draft only after the core dropped it', async () => {
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       const [, , stored] = Facade.SetMergeDraft.mock.lastCall!
       await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
@@ -368,7 +367,7 @@ describe('ConflictView', () => {
     })
 
     it('FR-CONF-06 a taken region and the edits survive a new page: the core returns them', async () => {
-      const wrapper = await mountView({})
+      const wrapper = await mountView()
       await findButton(wrapper, 'Take left')!.trigger('click')
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       const text = resultView(wrapper).state.doc.toString()
@@ -378,7 +377,7 @@ describe('ConflictView', () => {
 
       useMergeDrafts().keepOnly('/repo', [])
       Facade.MergeDraft.mockResolvedValue(stored)
-      const reopened = await mountView({})
+      const reopened = await mountView()
 
       expect(Facade.MergeDraft).toHaveBeenCalledWith('/repo', 'a.txt')
       expect(resultView(reopened).state.doc.toString()).toBe(text)
@@ -388,7 +387,7 @@ describe('ConflictView', () => {
     it('FR-CONF-06 edits reach the core while typing: the first at once, a burst after a pause', async () => {
       vi.useFakeTimers()
       try {
-        const wrapper = await mountView({})
+        const wrapper = await mountView()
         resultView(wrapper).dispatch({ changes: { from: 0, insert: 'one ' } })
         expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(1)
         resultView(wrapper).dispatch({ changes: { from: 0, insert: 'two ' } })
@@ -406,7 +405,7 @@ describe('ConflictView', () => {
     it('FR-CONF-06 edits still waiting reach the core when the window closes', async () => {
       vi.useFakeTimers()
       try {
-        const wrapper = await mountView({})
+        const wrapper = await mountView()
         resultView(wrapper).dispatch({ changes: { from: 0, insert: 'one ' } })
         resultView(wrapper).dispatch({ changes: { from: 0, insert: 'two ' } })
 

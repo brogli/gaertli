@@ -61,8 +61,7 @@ describe('ChangedFileList', () => {
   it("FR-CHG-02 clicking a row's action button emits action with that file, not select", async () => {
     const wrapper = mount(ChangedFileList, { props: { files, action: 'stage' } })
 
-    const button = wrapper.findAll('[data-test="action"]')[1]!
-    await button.trigger('click')
+    await wrapper.findAll('[data-test="action"]')[1]!.trigger('click')
 
     expect(wrapper.emitted('action')?.[0]).toEqual([files[1]])
     expect(wrapper.emitted('select')).toBeUndefined()
@@ -79,8 +78,7 @@ describe('ChangedFileList', () => {
       props: { files, action: 'stage', secondAction: () => 'discard' },
     })
 
-    const button = wrapper.findAll('[data-test="second-action"]')[1]!
-    await button.trigger('click')
+    await wrapper.findAll('[data-test="second-action"]')[1]!.trigger('click')
 
     expect(wrapper.emitted('second-action')?.[0]).toEqual([files[1]])
     expect(wrapper.emitted('select')).toBeUndefined()

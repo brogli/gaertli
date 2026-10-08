@@ -11,15 +11,21 @@ import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { footerButtons } from '@/testing/dialog'
 
+// mountDialog mounts the dialog for the branch side, checked out in
+// /home/u/r-side.
+function mountDialog(props: { inUse?: BranchInUse | undefined; distro?: string } = {}) {
+  return mountInBody(BranchInWorktreeDialog, {
+    props: { branch: 'side', path: '/home/u/r-side', ...props },
+  })
+}
+
 describe('BranchInWorktreeDialog', () => {
   beforeEach(() => {
     AppService.SelectWorktree.mockReset().mockResolvedValue(undefined)
   })
 
   it('FR-BR-05 names the branch and the worktree, and shows the full path', async () => {
-    const { body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side' },
-    })
+    const { body } = await mountDialog()
 
     expect(body.get('.p-dialog').text()).toContain('/home/u/r-side')
     expect(footerButtons(body)).toEqual(['Cancel', 'Switch to worktree'])
@@ -47,9 +53,7 @@ describe('BranchInWorktreeDialog', () => {
   ])(
     'FR-BR-05 names the branch $state in the other worktree',
     async ({ inUse, title, sentence }) => {
-      const { body } = await mountInBody(BranchInWorktreeDialog, {
-        props: { branch: 'side', path: '/home/u/r-side', inUse },
-      })
+      const { body } = await mountDialog({ inUse })
 
       const text = body.get('.p-dialog').text()
       expect(text).toContain(title)
@@ -58,9 +62,7 @@ describe('BranchInWorktreeDialog', () => {
   )
 
   it('FR-BR-05 switches to the worktree and closes', async () => {
-    const { wrapper, body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side' },
-    })
+    const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="branch-in-worktree-confirm"]').trigger('click')
     await flushPromises()
@@ -70,9 +72,7 @@ describe('BranchInWorktreeDialog', () => {
   })
 
   it("FR-BR-05 a WSL window switches by the branch's worktree UNC path", async () => {
-    const { body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side', distro: 'Ubuntu' },
-    })
+    const { body } = await mountDialog({ distro: 'Ubuntu' })
 
     await body.get('[data-test="branch-in-worktree-confirm"]').trigger('click')
     await flushPromises()
@@ -84,9 +84,7 @@ describe('BranchInWorktreeDialog', () => {
 
   it('FR-BR-05 a rejection shows in the banner and keeps the dialog open', async () => {
     AppService.SelectWorktree.mockRejectedValueOnce(wailsError('worktree is gone'))
-    const { wrapper, body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side' },
-    })
+    const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="branch-in-worktree-confirm"]').trigger('click')
     await flushPromises()
@@ -96,9 +94,7 @@ describe('BranchInWorktreeDialog', () => {
   })
 
   it('FR-BR-05 Cancel closes without calling SelectWorktree', async () => {
-    const { wrapper, body } = await mountInBody(BranchInWorktreeDialog, {
-      props: { branch: 'side', path: '/home/u/r-side' },
-    })
+    const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="branch-in-worktree-cancel"]').trigger('click')
 

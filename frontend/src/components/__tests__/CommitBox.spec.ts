@@ -34,6 +34,15 @@ function submitButton(wrapper: VueWrapper) {
   return wrapper.get<HTMLButtonElement>('[data-test="commit-submit"]')
 }
 
+function pushAfterCommit(wrapper: VueWrapper) {
+  return wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input')
+}
+
+// stageAFile puts a.txt among the staged changes.
+function stageAFile(): void {
+  useChangesStore().files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+}
+
 describe('CommitBox', () => {
   // Fake timers throughout: a real 300ms draft-save debounce started in one
   // test would otherwise fire during a later one.
@@ -70,7 +79,7 @@ describe('CommitBox', () => {
   )
 
   it("FR-CHG-07 a rejected commit shows the hook's output and keeps the message", async () => {
-    useChangesStore().files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    stageAFile()
     useRepoStore().summary = summaryFixture({ sha: 'abc123' })
     Facade.Commit.mockRejectedValue(wailsError('hook says no', 'STOPPED'))
 
@@ -84,8 +93,7 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-05 clicking Commit calls Facade.Commit with the message, amend false', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    stageAFile()
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
@@ -96,10 +104,8 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-05 a successful commit clears the message and resets amend', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
+    stageAFile()
+    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
@@ -112,8 +118,7 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-05 the Commit button is disabled while a commit is in flight, so a double-click cannot amend twice', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    stageAFile()
     let resolveCommit: () => void = () => {}
     Facade.Commit.mockReturnValue(new Promise<void>((resolve) => (resolveCommit = resolve)))
 
@@ -144,8 +149,7 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-06 checking Amend with an empty message pre-fills it from CommitDetails', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
+    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
     Facade.CommitDetails.mockResolvedValue({ body: 'last msg' })
 
     const wrapper = mount(CommitBox, { props })
@@ -158,8 +162,7 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-06 checking Amend never clobbers a message already typed', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
+    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('typed draft')
@@ -193,8 +196,7 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-08 initializes the message field from the restored draft', () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ messageDraft: 'restored' })
+    useRepoStore().summary = summaryFixture({ messageDraft: 'restored' })
 
     const wrapper = mount(CommitBox, { props })
 
@@ -211,11 +213,10 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-08 does not re-save a restored draft that was never edited', async () => {
-    const repo = useRepoStore()
     const wrapper = mount(CommitBox, { props })
     // Summary (and its draft) arrives asynchronously, after CommitBox has
     // already mounted and is watching `message` for edits to save.
-    repo.summary = summaryFixture({ messageDraft: 'restored' })
+    useRepoStore().summary = summaryFixture({ messageDraft: 'restored' })
     await wrapper.vm.$nextTick()
     await vi.advanceTimersByTimeAsync(300)
 
@@ -239,8 +240,7 @@ describe('CommitBox', () => {
   })
 
   it('FR-UX-05 FR-CHG-05 the Commit button shows a Ctrl+K hint at its right; its aria-label stays the label alone', () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({
+    useChangesStore().files = changedFilesFixture({
       staged: [
         { path: 'a.txt', status: 'M' },
         { path: 'b.txt', status: 'M' },
@@ -256,10 +256,8 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-09 with an upstream, checking "Push after commit" then clicking Commit calls Facade.Commit then Facade.Push', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
+    stageAFile()
+    useRefsStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
       autoSetUpstream: false,
@@ -269,7 +267,7 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
-    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
+    await pushAfterCommit(wrapper).setValue(true)
     await submitButton(wrapper).trigger('click')
     await flushPromises()
 
@@ -287,23 +285,17 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
 
-    expect(
-      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
-    ).toBe(false)
+    expect(pushAfterCommit(wrapper).element.disabled).toBe(false)
 
     refs.refs = refsFixture({ upstream: '' }, [])
     await wrapper.vm.$nextTick()
 
-    expect(
-      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
-    ).toBe(true)
+    expect(pushAfterCommit(wrapper).element.disabled).toBe(true)
   })
 
   it('FR-CHG-09 without an upstream, checking "Push after commit" and committing pushes the way PushTarget says', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: '' }, ['origin'])
+    stageAFile()
+    useRefsStore().refs = refsFixture({ upstream: '' }, ['origin'])
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
       autoSetUpstream: true,
@@ -313,7 +305,7 @@ describe('CommitBox', () => {
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
-    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
+    await pushAfterCommit(wrapper).setValue(true)
     await submitButton(wrapper).trigger('click')
     await flushPromises()
 
@@ -323,10 +315,8 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-09 without an upstream, committing while PushTarget cannot decide opens the dialog; Cancel leaves the commit made, unpushed', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: '' }, ['origin'])
+    stageAFile()
+    useRefsStore().refs = refsFixture({ upstream: '' }, ['origin'])
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
       autoSetUpstream: false,
@@ -336,7 +326,7 @@ describe('CommitBox', () => {
 
     const { wrapper, body } = await mountInBody(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
-    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
+    await pushAfterCommit(wrapper).setValue(true)
     await submitButton(wrapper).trigger('click')
     await flushPromises()
 
@@ -350,18 +340,14 @@ describe('CommitBox', () => {
   })
 
   it('FR-CHG-09 Push after commit is disabled once Amend is checked; checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
+    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useRefsStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
-    await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
-    await amendCheckbox(wrapper).setValue(true) // Amend, ticked after Push after commit
-    expect(
-      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
-    ).toBe(true)
+    await pushAfterCommit(wrapper).setValue(true)
+    await amendCheckbox(wrapper).setValue(true)
+    expect(pushAfterCommit(wrapper).element.disabled).toBe(true)
     await submitButton(wrapper).trigger('click')
     await flushPromises()
 

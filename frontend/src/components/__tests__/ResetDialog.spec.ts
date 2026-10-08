@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { useToast } from 'openvue/usetoast'
@@ -21,12 +21,15 @@ function mountDialog(branch = 'main') {
   })
 }
 
+async function submit(dialog: DOMWrapper<Element>): Promise<void> {
+  await dialog.get('[data-test="reset-submit"]').trigger('click')
+  await flushPromises()
+}
+
 // resetTo runs one successful reset whose previous commit is previousHead.
 async function resetTo(previousHead: string): Promise<void> {
   Facade.Reset.mockResolvedValueOnce({ previousHead })
-  const { body } = await mountDialog()
-  await body.get('[data-test="reset-submit"]').trigger('click')
-  await flushPromises()
+  await submit((await mountDialog()).body)
 }
 
 describe('ResetDialog', () => {
@@ -55,8 +58,7 @@ describe('ResetDialog', () => {
     const { wrapper, body: dialog } = await mountDialog()
     const notice = await mountNotices()
 
-    await dialog.get('[data-test="reset-submit"]').trigger('click')
-    await flushPromises()
+    await submit(dialog)
 
     expect(dialog.find('.error-banner').exists()).toBe(true)
     expect(wrapper.emitted('close')).toBeUndefined()
@@ -76,8 +78,7 @@ describe('ResetDialog', () => {
       const { body } = await mountDialog()
 
       await body.get(`input#reset-mode-${mode}`).setValue()
-      await body.get('[data-test="reset-submit"]').trigger('click')
-      await flushPromises()
+      await submit(body)
 
       expect(Facade.Reset).toHaveBeenCalledTimes(1)
       expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', mode)
@@ -92,8 +93,7 @@ describe('ResetDialog', () => {
     const { wrapper, body: dialog } = await mountDialog()
     const notice = await mountNotices()
 
-    await dialog.get('[data-test="reset-submit"]').trigger('click')
-    await flushPromises()
+    await submit(dialog)
 
     expect(wrapper.emitted('close')).toHaveLength(1)
     expect(notice.text()).toContain('deadbee') // the previous commit's short hash
@@ -131,8 +131,7 @@ describe('ResetDialog', () => {
     const { body } = await mountDialog()
 
     await body.get('input#reset-mode-hard').setValue()
-    await body.get('[data-test="reset-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
 
     expect(Facade.Reset).not.toHaveBeenCalled()
     expect(confirmRequire).toHaveBeenCalledTimes(1)
@@ -150,8 +149,7 @@ describe('ResetDialog', () => {
     const { body } = await mountDialog()
 
     await body.get('input#reset-mode-hard').setValue()
-    await body.get('[data-test="reset-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
 
     expect(confirmRequire).toHaveBeenCalledTimes(1)
     expect(Facade.Reset).not.toHaveBeenCalled()

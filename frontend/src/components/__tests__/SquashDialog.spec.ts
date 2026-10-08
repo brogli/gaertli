@@ -1,4 +1,4 @@
-import { flushPromises } from '@vue/test-utils'
+import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -20,6 +20,7 @@ import SquashDialog from '../SquashDialog.vue'
 import { mountNotices } from '@/testing/mountNotices'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
+import { wailsError } from '@/testing/errors'
 import { useRepoStore } from '@/stores/repo'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
@@ -32,6 +33,11 @@ function mountDialog(check: Partial<SquashCheck> = {}, fixup = false) {
   return mountInBody(SquashDialog, {
     props: { wt: '/repo', shas, check: { pushed: false, message: 'A\n\nB', ...check }, fixup },
   })
+}
+
+async function submit(body: DOMWrapper<Element>): Promise<void> {
+  await body.get('[data-test="squash-submit"]').trigger('click')
+  await flushPromises()
 }
 
 function onBranch(branch: string, protectedBranches: string[] = []): void {
@@ -60,8 +66,7 @@ describe('SquashDialog', () => {
     expect(body.get('[data-test="squash-submit"]').attributes('disabled')).toBeDefined()
 
     await field.setValue('Edited')
-    await body.get('[data-test="squash-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
 
     expect(Facade.Squash).toHaveBeenCalledWith('/repo', shas, 'Edited')
     expect(wrapper.emitted('done')).toHaveLength(1)
@@ -75,8 +80,7 @@ describe('SquashDialog', () => {
     expect(body.text()).toContain('with the message of the oldest')
     expect(Facade.Fixup).not.toHaveBeenCalled()
 
-    await body.get('[data-test="squash-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
 
     expect(Facade.Fixup).toHaveBeenCalledWith('/repo', shas)
   })
@@ -97,8 +101,7 @@ describe('SquashDialog', () => {
     const notice = await mountNotices()
     const { body } = await mountDialog()
 
-    await body.get('[data-test="squash-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
 
     expect(notice.text()).toContain('Squashed 3 commits on feature. Previous commit: deadbee')
   })
@@ -123,12 +126,11 @@ describe('SquashDialog', () => {
       shows: 'hook said no',
     },
   ] as const)('FR-LOG-14 $outcome', async ({ error, closes, shows }) => {
-    Facade.Squash.mockRejectedValueOnce(new Error('x', { cause: error }))
+    Facade.Squash.mockRejectedValueOnce(wailsError(error.message, error.code))
     const notice = await mountNotices()
     const { wrapper, body } = await mountDialog()
 
-    await body.get('[data-test="squash-submit"]').trigger('click')
-    await flushPromises()
+    await submit(body)
 
     expect(wrapper.emitted('done')?.length).toBe(closes ? 1 : undefined)
     expect(notice.text() + body.text()).toContain(shows)
