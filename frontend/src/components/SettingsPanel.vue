@@ -11,6 +11,7 @@ import Select from 'openvue/select'
 import SelectButton from 'openvue/selectbutton'
 import { useI18n } from '@/i18n'
 import { SECONDARY_BUTTON } from '@/lib/layout'
+import { branchSuggestions } from '@/lib/refOptions'
 import { useRefsStore } from '@/stores/refs'
 import { useSettingsStore } from '@/stores/settings'
 import { useCoreCall } from '@/composables/useCoreCall'
@@ -207,18 +208,11 @@ function nonEmptyFolders(): Record<string, string> {
 
 const protectedBranchSuggestions = ref<string[]>([])
 
-// completeProtectedBranches suggests the repo's branch names (local and
-// remote, short names, deduplicated) containing the typed query, then the
-// typed query itself, so Enter (which picks the first, focused suggestion)
-// always turns the typed text into a chip. A name already chosen is never
-// suggested.
 function completeProtectedBranches(event: { query: string }): void {
-  const local = (refs.refs?.branches ?? []).map((b) => b.name)
-  const remote = (refs.refs?.remotes ?? []).flatMap((r) => (r.branches ?? []).map((b) => b.name))
-  const query = event.query.toLowerCase()
-  const matches = [...local, ...remote].filter((name) => name.toLowerCase().includes(query))
-  protectedBranchSuggestions.value = [...new Set([...matches, event.query])].filter(
-    (name) => !form.protectedBranches.includes(name),
+  protectedBranchSuggestions.value = branchSuggestions(
+    refs.refs,
+    event.query,
+    form.protectedBranches,
   )
 }
 
