@@ -3,7 +3,6 @@ package services
 import (
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -33,9 +32,9 @@ func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInDiff3Style(t *testing.T
 			dir := divergedRepo(t, "a.txt", version(texts[0]), version(texts[1]), version(texts[2]))
 			gittest.Run(t, dir, "config", "merge.conflictStyle", "diff3")
 			tryGit(t, dir, "merge", "side")
-			c := New(func(core.Event) {})
+			c, wt := openWorktree(t, dir)
 
-			got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+			got := readConflict(t, c, wt, "a.txt")
 
 			if len(conflictRegionsOf(got)) == 0 {
 				t.Fatalf("no regions; result:\n%s", got.Result)
@@ -54,9 +53,9 @@ func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInAFileRewrittenInDiff3St
 	tryGit(t, dir, "merge", "side")
 	gittest.Run(t, dir, "checkout", "--conflict=diff3", "--", "a.txt")
 	gittest.Run(t, dir, "config", "diff.algorithm", "histogram")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+	got := readConflict(t, c, wt, "a.txt")
 
 	if len(conflictRegionsOf(got)) == 0 {
 		t.Fatalf("no regions; result:\n%s", got.Result)
@@ -74,9 +73,9 @@ func TestFR_CONF_05_ConflictRegionBaseOfASharedChangeOfAnotherLengthIsTheReplace
 			dir := divergedRepo(t, "a.txt", version("a\nX\nb\n"), version("a\nP\nQ\nR\nC\nb\n"), version("a\nP\nQ\nR\nI\nb\n"))
 			gittest.Run(t, dir, "config", "merge.conflictStyle", style)
 			tryGit(t, dir, "merge", "side")
-			c := New(func(core.Event) {})
+			c, wt := openWorktree(t, dir)
 
-			got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+			got := readConflict(t, c, wt, "a.txt")
 
 			if len(conflictRegionsOf(got)) != 1 {
 				t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
@@ -118,9 +117,9 @@ func TestFR_CONF_05_ConflictRegionBaseExcludesLinesBothSidesChangedTheSameWay(t 
 			t.Parallel()
 			dir := divergedRepo(t, "a.txt", version("a\nb\nc\nx\n"), version("A\nB\nC\nx\n"), version("A\nY\nC\nx\n"))
 			way.write(t, dir)
-			c := New(func(core.Event) {})
+			c, wt := openWorktree(t, dir)
 
-			got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+			got := readConflict(t, c, wt, "a.txt")
 
 			if len(conflictRegionsOf(got)) != 1 {
 				t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)

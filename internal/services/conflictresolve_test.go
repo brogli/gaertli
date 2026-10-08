@@ -62,8 +62,7 @@ func TestFR_CONF_08_ReopenConflictRestoresASymlinkAsGitLeftIt(t *testing.T) {
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	link("current", "current")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 	if err := c.ResolveConflict(t.Context(), wt, "l", core.ChooseIncoming); err != nil {
 		t.Fatal(err)
 	}
@@ -129,11 +128,7 @@ func stoppedOn(t *testing.T, op, path string, base, current, incoming version) (
 func stoppedDir(t *testing.T, op, path string, base, current, incoming version) string {
 	t.Helper()
 	dir := divergedRepo(t, path, base, current, incoming)
-	if op == "merge" {
-		tryGit(t, dir, "merge", "side")
-	} else {
-		tryGit(t, dir, "rebase", "side")
-	}
+	tryGit(t, dir, op, "side")
 	return dir
 }
 
@@ -222,8 +217,8 @@ func twoConflictsStopped(t *testing.T) (*Core, core.WorktreeID, string) {
 	gittest.Run(t, dir, "rm", "-q", "--", "d.txt")
 	gittest.CommitAll(t, dir, "current")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	return c, openOn(t, c, dir).ID, dir
+	c, wt := openWorktree(t, dir)
+	return c, wt, dir
 }
 
 func TestFR_CONF_08_StatusListsResolvedFilesAndReopenConflictRestoresThem(t *testing.T) {

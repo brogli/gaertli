@@ -12,7 +12,6 @@ import (
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -109,9 +108,7 @@ func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflictAndAFileChanged
 
 	// Real merge conflict, set up directly via the runner: leaves MERGE_HEAD
 	// and an unmerged conflict.txt.
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
-		Dir: repo.Dir, Args: []string{"merge", "--end-of-options", "feature"},
-	})
+	tryGit(t, repo.Dir, "merge", "--end-of-options", "feature")
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Fatal("fixture did not leave MERGE_HEAD")
 	}

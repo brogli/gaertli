@@ -53,8 +53,7 @@ func TestFR_CONF_06_SaveConflictStagesLFBlobsUnderAutocrlf(t *testing.T) {
 	dir := divergedRepo(t, "a.txt", version("a\nbase\nz\n"), version("a\ncur\nz\n"), version("a\ninc\nz\n"))
 	gittest.Run(t, dir, "config", "core.autocrlf", "true")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 	got := readConflict(t, c, wt, "a.txt")
 
 	if _, err := c.SaveConflict(t.Context(), wt, "a.txt", "a\nmerged\nz\n", got.Fingerprint, true); err != nil {
@@ -137,8 +136,7 @@ func TestFR_CONF_06_SaveConflictFollowsTheMarkerSizeAttribute(t *testing.T) {
 	dir := divergedRepo(t, "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 	writeFile(t, dir, ".gitattributes", "a.txt conflict-marker-size=10\n")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 	got := readConflict(t, c, wt, "a.txt")
 
 	if _, err := c.SaveConflict(t.Context(), wt, "a.txt", "<<<<<<<\n", got.Fingerprint, true); err != nil {
@@ -151,8 +149,7 @@ func TestFR_CONF_06_SaveConflictWithTheAttributeSizeMarkerIsRefused(t *testing.T
 	dir := divergedRepo(t, "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 	writeFile(t, dir, ".gitattributes", "a.txt conflict-marker-size=10\n")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 	got := readConflict(t, c, wt, "a.txt")
 
 	_, err := c.SaveConflict(t.Context(), wt, "a.txt", "<<<<<<<<<< x\n", got.Fingerprint, true)
@@ -170,8 +167,7 @@ func TestFR_CONF_06_SaveConflictKeepsTheLineEndsOfAMixedFile(t *testing.T) {
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	commitVersion(t, dir, "a.txt", version("l1\r\nl2\ncur\nl4\n"), "current change")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 	got := readConflict(t, c, wt, "a.txt")
 	if !strings.HasPrefix(got.Result, "l1\r\nl2\n") {
 		t.Fatalf("Result = %q, want the CR of line 1 kept", got.Result)
@@ -201,8 +197,7 @@ func TestFR_CONF_06_ConflictFindsTheMarkersOfAMixedLineEndingFile(t *testing.T) 
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	commitVersion(t, dir, "a.txt", version("one\r\ncur\nthree\r\nfour\n"), "current change")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 
 	got := readConflict(t, c, wt, "a.txt")
 

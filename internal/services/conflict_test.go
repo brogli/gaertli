@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,11 +16,20 @@ import (
 // on a conflict does.
 func tryGit(t *testing.T, dir string, args ...string) []byte {
 	t.Helper()
-	result, err := (git.Runner{}).Run(context.Background(), git.Call{Dir: dir, Args: args})
+	result, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: dir, Args: args})
 	if err != nil {
 		return nil
 	}
 	return result.Stdout
+}
+
+// gitStops runs git with args in dir and fails the test unless git fails,
+// as a merge, rebase or pick that stops on a conflict does.
+func gitStops(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: dir, Args: args}); err == nil {
+		t.Fatalf("git %s did not stop on a conflict", strings.Join(args, " "))
+	}
 }
 
 // version is one side's file in stoppedOn; nil deletes the file.
@@ -169,9 +177,9 @@ func TestFR_CONF_07_ConflictKindBinaryByAttribute(t *testing.T) {
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	gittest.Commit(t, dir, "a.txt", "current\n", "current")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+	got := readConflict(t, c, wt, "a.txt")
 
 	if got.Kind != core.ConflictBinary {
 		t.Errorf("Kind = %q", got.Kind)
@@ -196,9 +204,9 @@ func TestFR_CONF_07_ConflictKindSymlink(t *testing.T) {
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	link("current", "current")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "l")
+	got := readConflict(t, c, wt, "l")
 
 	if got.Kind != core.ConflictSymlink {
 		t.Errorf("Kind = %q", got.Kind)
@@ -217,8 +225,7 @@ func TestFR_CONF_07_ConflictKindRenameOnEachPathOfARenameRename(t *testing.T) {
 	gittest.Run(t, dir, "mv", "a.txt", "c.txt")
 	gittest.CommitAll(t, dir, "rename to c")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 
 	for _, path := range []string{"a.txt", "b.txt", "c.txt"} {
 		if got := readConflict(t, c, wt, path); got.Kind != core.ConflictRename {
@@ -242,9 +249,9 @@ func TestFR_CONF_07_ConflictKindSubmodule(t *testing.T) {
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	pointer(strings.Repeat("3", 40), "current")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "sub")
+	got := readConflict(t, c, wt, "sub")
 
 	if got.Kind != core.ConflictSubmodule {
 		t.Errorf("Kind = %q", got.Kind)
@@ -390,8 +397,7 @@ func TestFR_CONF_05_ConflictLabelsTheSidesByOperation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := tc.start(t)
-			c := New(func(core.Event) {})
-			wt := openOn(t, c, dir).ID
+			c, wt := openWorktree(t, dir)
 			sha := func(rev string) string { return gittest.Out(t, dir, "rev-parse", rev) }
 
 			got := readConflict(t, c, wt, "a.txt")
@@ -415,9 +421,9 @@ func TestFR_CONF_05_ConflictRefPrefersLocalBranchThenRemoteThenTagFirstByName(t 
 	gittest.Run(t, dir, "branch", "a-extra", "side")
 	gittest.Run(t, dir, "update-ref", "refs/remotes/origin/aaa", "side")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+	got := readConflict(t, c, wt, "a.txt")
 
 	if got.Incoming.Ref != "a-extra" {
 		t.Errorf("Incoming.Ref = %q, want a-extra", got.Incoming.Ref)
@@ -431,8 +437,7 @@ func TestFR_CONF_05_ConflictRefFallsBackToRemoteBranchThenTag(t *testing.T) {
 	gittest.Run(t, dir, "update-ref", "refs/remotes/origin/zzz", "side")
 	gittest.Run(t, dir, "branch", "-D", "side")
 	tryGit(t, dir, "merge", "origin/zzz")
-	c := New(func(core.Event) {})
-	wt := openOn(t, c, dir).ID
+	c, wt := openWorktree(t, dir)
 
 	if got := readConflict(t, c, wt, "a.txt"); got.Incoming.Ref != "origin/zzz" {
 		t.Errorf("Incoming.Ref = %q, want origin/zzz", got.Incoming.Ref)

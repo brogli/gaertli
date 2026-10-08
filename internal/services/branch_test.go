@@ -102,7 +102,7 @@ func TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree(t *testi
 
 func TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingRebasedElsewhere(t *testing.T) {
 	t.Parallel()
-	repo, wtDir := rebaseInProgressFixture(t, false)
+	repo, wtDir := rebaseInProgressFixture(t)
 	wtPath := gitPath(t, wtDir)
 	beforeSHA := branchTip(t, repo.Dir, "B")
 
@@ -463,7 +463,7 @@ func TestFR_BR_01_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t
 		t.Errorf("PushTarget = %+v, want %+v", target, want)
 	}
 
-	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "topic")), "done")
+	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "topic")), core.JobDone)
 
 	if got := gittest.Out(t, origin, "rev-parse", "topic"); got != localTip {
 		t.Errorf("origin's topic = %q, want %q", got, localTip)
@@ -902,7 +902,7 @@ func mergeConflictFixture(t *testing.T, dir string) (baseSHA string) {
 	gittest.Run(t, dir, "checkout", "other")
 	gittest.Commit(t, dir, "conflict.txt", "other-side", "other change")
 	gittest.Run(t, dir, "checkout", "master")
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{Dir: dir, Args: []string{"merge", "other"}}) // conflict expected
+	tryGit(t, dir, "merge", "other") // conflict expected
 	return baseSHA
 }
 

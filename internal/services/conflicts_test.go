@@ -11,7 +11,6 @@ import (
 
 	"github.com/brogli/nebegit/internal/core"
 	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -64,9 +63,7 @@ func stoppedByLocalOperation(t *testing.T, c *Core, kind string, files []string)
 		gittest.Step{Message: "local commit", Files: contents("local change\n")},
 	)
 	beforeHEAD := gittest.HeadSHA(t, dir)
-	if tryGit(t, dir, kind, "side") != nil {
-		t.Fatalf("%s did not stop on a conflict", kind)
-	}
+	gitStops(t, dir, kind, "side")
 	info := openOn(t, c, dir)
 	return dir, c, info.ID, beforeHEAD
 }
@@ -202,7 +199,7 @@ func TestTR_09_SkipOperationNeverWaitsOnAnEditorTheSequenceAsksFor(t *testing.T)
 	gittest.Commit(t, dir, "three.txt", "3\n", "three")
 	three := gittest.HeadSHA(t, dir)
 	// Newest first: reverting c2 conflicts with c3.
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{Dir: dir, Args: []string{"-c", "core.editor=true", "revert", "--edit", three, conflicting, one}})
+	tryGit(t, dir, "-c", "core.editor=true", "revert", "--edit", three, conflicting, one)
 	if !fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
 		t.Fatal("fixture did not stop on the conflicting revert")
 	}
@@ -335,9 +332,7 @@ func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *t
 	c, wt := openWorktree(t, repo.Dir)
 	// Real merge conflict, direct via the runner: leaves MERGE_HEAD and an
 	// unmerged conflict.txt (UU, both modified).
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
-		Dir: repo.Dir, Args: []string{"merge", "--end-of-options", "feature"},
-	})
+	tryGit(t, repo.Dir, "merge", "--end-of-options", "feature")
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Fatal("fixture did not leave MERGE_HEAD")
 	}
@@ -378,9 +373,7 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 	gittest.Commit(t, repo.Dir, "shared.txt", "master change\n", "master change") // ours modifies; theirs (feature) deletes
 
 	c, wt := openWorktree(t, repo.Dir)
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
-		Dir: repo.Dir, Args: []string{"merge", "--end-of-options", "feature"},
-	})
+	tryGit(t, repo.Dir, "merge", "--end-of-options", "feature")
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Fatal("fixture did not leave MERGE_HEAD")
 	}

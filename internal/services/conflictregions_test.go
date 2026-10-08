@@ -106,9 +106,9 @@ func TestFR_CONF_05_ConflictRegionsWithZdiff3AndAnIncomingOnlyChangeBetween(t *t
 	dir := divergedRepo(t, "a.txt", version(twoConflictsBase), version(twoConflictsCurrent), version(twoConflictsIncoming))
 	gittest.Run(t, dir, "config", "merge.conflictStyle", "zdiff3")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+	got := readConflict(t, c, wt, "a.txt")
 
 	if len(conflictRegionsOf(got)) != 2 {
 		t.Fatalf("regions = %d, want 2; result:\n%s", len(conflictRegionsOf(got)), got.Result)
@@ -150,9 +150,9 @@ func TestFR_CONF_05_ConflictRegionsUseTheMarkerSizeAttribute(t *testing.T) {
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	commitVersion(t, dir, "a.txt", version("one\ncurrent\ntwo\n"), "current change")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+	got := readConflict(t, c, wt, "a.txt")
 
 	if got.MarkerSize != 10 || len(conflictRegionsOf(got)) != 1 {
 		t.Fatalf("MarkerSize, regions = %d, %d; result:\n%s", got.MarkerSize, len(conflictRegionsOf(got)), got.Result)
@@ -170,9 +170,9 @@ func TestFR_CONF_05_ConflictRegionsIgnoreTheDiffAttribute(t *testing.T) {
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	commitVersion(t, dir, "a.txt", version("one\ncurrent\ntwo\n"), "current change")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+	got := readConflict(t, c, wt, "a.txt")
 
 	if len(conflictRegionsOf(got)) != 1 {
 		t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)

@@ -51,9 +51,9 @@ func TestFR_CONF_05_ConflictSideChangesWithoutABaseAreTheWholeSide(t *testing.T)
 	gittest.Run(t, dir, "checkout", "-q", "master")
 	commitVersion(t, dir, "a.txt", version("c1\nc2\nc3\n"), "current add")
 	tryGit(t, dir, "merge", "side")
-	c := New(func(core.Event) {})
+	c, wt := openWorktree(t, dir)
 
-	got := readConflict(t, c, openOn(t, c, dir).ID, "a.txt")
+	got := readConflict(t, c, wt, "a.txt")
 
 	if got.Base.Present {
 		t.Fatal("base present, want an add/add conflict")

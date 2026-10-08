@@ -163,9 +163,7 @@ func TestFR_CP_04_CherryPickFailsWhenAnotherPickIsAlreadyStuck(t *testing.T) {
 
 	// A conflict made with git directly, not CherryPick: leaves
 	// CHERRY_PICK_HEAD.
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{
-		Dir: repo.Dir, Args: []string{"cherry-pick", "--end-of-options", conflSHA},
-	})
+	tryGit(t, repo.Dir, "cherry-pick", "--end-of-options", conflSHA)
 	stuckHead, err := os.ReadFile(filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD"))
 	if err != nil {
 		t.Fatalf("fixture did not leave CHERRY_PICK_HEAD: %v", err)

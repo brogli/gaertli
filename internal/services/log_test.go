@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 	"github.com/brogli/nebegit/internal/testbin"
 )
@@ -631,7 +630,7 @@ func waitForLogRows(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsResul
 func commitOrphan(t *testing.T, dir, branch, file, msg string) {
 	t.Helper()
 	gittest.Run(t, dir, "checkout", "--orphan", branch)
-	_, _ = (git.Runner{}).Run(t.Context(), git.Call{Dir: dir, Args: []string{"rm", "-rf", "--cached", "."}})
+	tryGit(t, dir, "rm", "-rf", "--cached", ".")
 	writeFile(t, dir, file, "x")
 	gittest.Run(t, dir, "add", "--", file)
 	gittest.CommitAll(t, dir, msg)

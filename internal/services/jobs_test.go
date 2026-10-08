@@ -49,7 +49,7 @@ func TestFR_SYNC_07_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T)
 	if err := c.CancelJob(t.Context(), wt, job.ID); err != nil {
 		t.Fatal(err)
 	}
-	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.State == "cancelled" })
+	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.State == core.JobCancelled })
 
 	stopped := mtime(t, heartbeat)
 	time.Sleep(100 * time.Millisecond)
@@ -83,6 +83,18 @@ func waitForJob(t *testing.T, c *Core, id core.WorktreeID, want func(core.JobInf
 func waitForJobState(t *testing.T, c *Core, wt core.WorktreeID, id string, state core.JobState) core.JobInfo {
 	t.Helper()
 	return waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.ID == id && j.State == state })
+}
+
+// waitForJobDone waits for job id to end and fails the test unless it ended
+// done.
+func waitForJobDone(t *testing.T, c *Core, wt core.WorktreeID, id string) {
+	t.Helper()
+	job := waitForJob(t, c, wt, func(j core.JobInfo) bool {
+		return j.ID == id && (j.State == core.JobDone || j.State == core.JobFailed)
+	})
+	if job.State != core.JobDone {
+		t.Fatalf("job failed: %+v, want done", job.Error)
+	}
 }
 
 // jobID returns a func taking a job start's results: the job's id, or the

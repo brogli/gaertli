@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
@@ -227,9 +226,7 @@ func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T)
 	gittest.Run(t, repo.Dir, "worktree", "add", xDir, "B")
 	gittest.Commit(t, xDir, "conflict.txt", "b-side\n", "b change")
 	gittest.Commit(t, repo.Dir, "conflict.txt", "master-side\n", "master change")
-	if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: xDir, Args: []string{"rebase", "master"}}); err == nil {
-		t.Fatal("X's rebase did not conflict as the fixture expects")
-	}
+	gitStops(t, xDir, "rebase", "master")
 
 	yDir := filepath.Join(t.TempDir(), "y")
 	gittest.Run(t, repo.Dir, "worktree", "add", yDir, "C")
@@ -246,9 +243,7 @@ func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T)
 	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", zDir, seedSHA)
 	gittest.Commit(t, zDir, "conflict2.txt", "z-side\n", "z change")
 	gittest.Commit(t, wDir, "conflict2.txt", "d-side\n", "d change")
-	if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: zDir, Args: []string{"rebase", "D"}}); err == nil {
-		t.Fatal("Z's rebase did not conflict as the fixture expects")
-	}
+	gitStops(t, zDir, "rebase", "D")
 
 	c, wt := openWorktree(t, repo.Dir)
 
@@ -318,9 +313,7 @@ func TestFR_BR_05_RefsMarksBothARebaseAndAStaleBisectFromOneWorktree(t *testing.
 	}
 
 	gittest.Commit(t, wtDir, "conflict.txt", "wt-side\n", "wt change")
-	if _, err := (git.Runner{}).Run(t.Context(), git.Call{Dir: wtDir, Args: []string{"rebase", "master"}}); err == nil {
-		t.Fatal("wt's rebase did not conflict as the fixture expects")
-	}
+	gitStops(t, wtDir, "rebase", "master")
 
 	refs, err = c.Refs(t.Context(), wt)
 	if err != nil {
