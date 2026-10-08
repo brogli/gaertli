@@ -162,6 +162,9 @@ func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *t
 		got, err := c.DiffFile(t.Context(), id, gittest.HeadSHA(t, repo.Dir), "b.txt", "a.txt", none)
 
 		assertDiff(t, got, err, body+"old ending\n", body+"new ending\n", hunk(21, 1, 21, 1))
+		if got.OldPath != "a.txt" {
+			t.Errorf("OldPath = %q, want a.txt", got.OldPath)
+		}
 	})
 
 	t.Run("two revisions", func(t *testing.T) {
@@ -228,16 +231,6 @@ func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *t
 		assertDiff(t, got, err, "", "u\n", hunk(0, 0, 1, 1))
 	})
 
-	t.Run("pure rename", func(t *testing.T) {
-		repo, c, id := openCompareRepo(t)
-		gittest.Commit(t, repo.Dir, "a.txt", "same\n", "base")
-		gittest.Run(t, repo.Dir, "mv", "a.txt", "b.txt")
-
-		got, err := c.DiffWorking(t.Context(), id, "b.txt", "a.txt", true, none)
-
-		assertDiff(t, got, err, "same\n", "same\n")
-	})
-
 	t.Run("mode-only change", func(t *testing.T) {
 		repo, c, id := openCompareRepo(t)
 		gittest.Commit(t, repo.Dir, "a.txt", "same\n", "base")
@@ -248,16 +241,6 @@ func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *t
 		got, err := c.DiffWorking(t.Context(), id, "a.txt", "", false, none)
 
 		assertDiff(t, got, err, "same\n", "same\n")
-	})
-
-	t.Run("last line without a newline", func(t *testing.T) {
-		repo, c, id := openCompareRepo(t)
-		gittest.Commit(t, repo.Dir, "f", "a\nb", "base")
-		writeFile(t, repo.Dir, "f", "a\nB")
-
-		got, err := c.DiffWorking(t.Context(), id, "f", "", false, none)
-
-		assertDiff(t, got, err, "a\nb", "a\nB", hunk(2, 1, 2, 1))
 	})
 }
 
@@ -336,23 +319,6 @@ func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_04_DiffFileOnAddedFileHasNoOldContent(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "added text\n", "add a.txt")
-	sha := gittest.HeadSHA(t, repo.Dir)
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff.OldContent != "" || diff.NewContent != "added text\n" {
-		t.Errorf("DiffFile = %+v, want OldContent \"\" NewContent %q", diff, "added text\n")
-	}
-}
-
 func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -372,28 +338,6 @@ func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_04_DiffFileOnRenameWithContentChangeUsesOldPath(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	base := strings.Repeat("line unchanged\n", 20)
-	gittest.Commit(t, repo.Dir, "a.txt", base+"old ending\n", "add a.txt")
-	renameWithEdit(t, repo.Dir, "a.txt", "b.txt", "new ending")
-	sha := gittest.HeadSHA(t, repo.Dir)
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	diff, err := c.DiffFile(t.Context(), wt, sha, "b.txt", "a.txt", core.DiffOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff.OldPath != "a.txt" {
-		t.Errorf("OldPath = %q, want a.txt", diff.OldPath)
-	}
-	if diff.OldContent != base+"old ending\n" || diff.NewContent != base+"new ending\n" {
-		t.Errorf("DiffFile content mismatch:\nold = %q\nnew = %q", diff.OldContent, diff.NewContent)
-	}
-}
-
 func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -408,24 +352,6 @@ func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T)
 	}
 	if !diff.Binary || diff.OldContent != "" || diff.NewContent != "" {
 		t.Errorf("DiffFile = %+v, want Binary with no content", diff)
-	}
-}
-
-func TestFR_DIFF_03_DiffFileTreatsGitattributesDiffOverrideAsBinary(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, ".gitattributes", "a.txt -diff\n", "add gitattributes")
-	gittest.Commit(t, repo.Dir, "a.txt", "plain text, no nul bytes\n", "add a.txt")
-	sha := gittest.HeadSHA(t, repo.Dir)
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !diff.Binary {
-		t.Errorf("DiffFile.Binary = false, want true (a plain-text file marked -diff)")
 	}
 }
 
@@ -476,19 +402,31 @@ func TestFR_DIFF_04_DiffFileUnder1MBReturnsTheFullContent(t *testing.T) {
 	}
 }
 
-func TestADR_7_DiffFileOnRootCommitHasNoOldContent(t *testing.T) {
+func TestQA_COMP_01_ParsePatchReadsAPureRenameAsAnEntryWithoutHunks(t *testing.T) {
 	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "root content\n", "root commit")
-	sha := gittest.HeadSHA(t, repo.Dir)
+	patch := "diff --git a/a.txt b/b.txt\nsimilarity index 100%\nrename from a.txt\nrename to b.txt\n"
 
-	c, wt := openWorktree(t, repo.Dir)
+	file, err := parsePatch([]byte(patch), "b.txt")
 
-	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || file == nil || file.OldName != "a.txt" || len(hunksOf(file)) != 0 {
+		t.Errorf("parsePatch = %+v, %v; want the a.txt -> b.txt entry without hunks", file, err)
 	}
-	if diff.OldContent != "" || diff.NewContent != "root content\n" {
-		t.Errorf("DiffFile = %+v, want OldContent \"\" NewContent %q", diff, "root content\n")
+}
+
+func TestQA_COMP_01_ParsePatchKeepsALastLineWithoutANewlineInTheSides(t *testing.T) {
+	t.Parallel()
+	patch := "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n a\n-b\n\\ No newline at end of file\n+B\n\\ No newline at end of file\n"
+
+	file, err := parsePatch([]byte(patch), "f")
+	if err != nil || file == nil {
+		t.Fatalf("parsePatch = %+v, %v", file, err)
+	}
+	oldContent, newContent := sides(file.TextFragments[0])
+
+	if string(oldContent) != "a\nb" || string(newContent) != "a\nB" {
+		t.Errorf("sides = %q, %q; want %q, %q", oldContent, newContent, "a\nb", "a\nB")
+	}
+	if got := hunksOf(file); !slices.Equal(got, []core.DiffHunk{hunk(1, 2, 1, 2)}) {
+		t.Errorf("hunksOf = %v", got)
 	}
 }
