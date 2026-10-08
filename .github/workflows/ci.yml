@@ -177,7 +177,10 @@ jobs:
           GOPROXY: off
           GOTOOLCHAIN: local
           GOFLAGS: -mod=readonly -count=1
-        run: go tool task test:go:core
+        run: |
+          where.exe git
+          git --version
+          go tool task test:go:core PARALLEL=4
 
   macos:
     # A build only (QA-PORT-04), billed at ten times the Linux rate: pull
