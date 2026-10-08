@@ -179,85 +179,93 @@ func TestFR_CHG_03_StageLinesOfAReplacementStagesItAsOneChange(t *testing.T) {
 	}
 }
 
-// Selecting X of a replacement removing lines sends the whole hunk (see
-// DiffView's selectedLines).
-func TestFR_CHG_03_StageLinesOfAReplacementRemovingLinesStagesTheWholeHunk(t *testing.T) {
+func TestFR_CHG_03_StageLinesStagesAHunkOnABlankLineExactly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "f.txt", "a\nx\ny\n", "base")
-	writeFile(t, repo.Dir, "f.txt", "a\nX")
+	gittest.Commit(t, repo.Dir, "f.txt", "a\n\nb\n", "base")
+	writeFile(t, repo.Dir, "f.txt", "a\nX\nb\n")
 	c, id := openWorktree(t, repo.Dir)
 
-	if err := c.StageLines(t.Context(), id, "f.txt", shown(t, c, id, "f.txt", false, []int{2, 3}, []int{2}), false); err != nil {
+	if err := c.StageLines(t.Context(), id, "f.txt", shown(t, c, id, "f.txt", false, []int{2}, []int{2}), false); err != nil {
 		t.Fatal(err)
 	}
 
-	if got := indexBytes(t, repo.Dir, "f.txt"); got != "a\nX" {
-		t.Errorf("index f.txt = %q, want %q", got, "a\nX")
+	if got := indexBlob(t, repo.Dir, "f.txt"); got != "a\nX\nb" {
+		t.Errorf("index f.txt = %q, want the blank line replaced", got)
 	}
 }
 
-func TestFR_CHG_03_StageLinesOfALineWithoutNewlineThatAKeptLineFollowsGivesItANewline(t *testing.T) {
-	t.Parallel()
-	for _, base := range []string{"a\nx\ny\n", "a\nx\ny"} {
-		t.Run(base, func(t *testing.T) {
-			repo := gittest.New(t)
-			gittest.Commit(t, repo.Dir, "f.txt", base, "base")
-			writeFile(t, repo.Dir, "f.txt", "a\nX")
-			c, id := openWorktree(t, repo.Dir)
-
-			if err := c.StageLines(t.Context(), id, "f.txt", shown(t, c, id, "f.txt", false, []int{2}, []int{2}), false); err != nil {
-				t.Fatal(err)
-			}
-
-			if got, want := indexBytes(t, repo.Dir, "f.txt"), strings.Replace(base, "x\n", "X\n", 1); got != want {
-				t.Errorf("index f.txt = %q, want %q: X on its own line before the kept y", got, want)
-			}
-		})
+// fragmentOf parses hunk, the text of one hunk, as a change to a file.
+func fragmentOf(t *testing.T, hunk string) *gitdiff.TextFragment {
+	t.Helper()
+	file, err := parsePatch([]byte("diff --git a/f b/f\n--- a/f\n+++ b/f\n"+hunk), "f")
+	if err != nil || file == nil || len(file.TextFragments) != 1 {
+		t.Fatalf("parse %q: file = %v, err = %v", hunk, file, err)
 	}
+	return file.TextFragments[0]
 }
 
-func TestFR_CHG_03_StageLinesStagesAHunkOnABlankLineExactly(t *testing.T) {
+func TestFR_CHG_03_BuildPartialPatchOfLastLinesWithoutNewlineBlankLinesAndEmptyFiles(t *testing.T) {
 	t.Parallel()
+	const noEOL = "\\ No newline at end of file\n"
 	tests := []struct {
-		name, base, now string
-		old, new        []int
+		name, hunk string
+		old, new   []int
+		want       string
 	}{
-		{"a blank line replaced", "a\n\nb\n", "a\nX\nb\n", []int{2}, []int{2}},
-		{"a line replaced by a blank one", "a\nX\nb\n", "a\n\nb\n", []int{2}, []int{2}},
-		{"a lone blank line deleted", "a\n\nb\n", "a\nb\n", []int{2}, nil},
+		{
+			"a replacement removing lines, selected whole, ending without newline",
+			"@@ -1,3 +1,2 @@\n a\n-x\n-y\n+X\n" + noEOL,
+			[]int{2, 3},
+			[]int{2},
+			"@@ -1,3 +1,2 @@\n a\n-x\n-y\n+X\n" + noEOL,
+		},
+		{
+			"a last line without newline that a kept line follows gets a newline",
+			"@@ -1,3 +1,2 @@\n a\n-x\n-y\n+X\n" + noEOL,
+			[]int{2},
+			[]int{2},
+			"@@ -1,3 +1,3 @@\n a\n-x\n+X\n y\n",
+		},
+		{
+			"the same where the removed last line had no newline either",
+			"@@ -1,3 +1,2 @@\n a\n-x\n-y\n" + noEOL + "+X\n" + noEOL,
+			[]int{2},
+			[]int{2},
+			"@@ -1,3 +1,3 @@\n a\n-x\n+X\n y\n" + noEOL,
+		},
+		{
+			"part of what an empty file gained",
+			"@@ -0,0 +1,2 @@\n+a\n+b\n",
+			nil,
+			[]int{1},
+			"@@ -0,0 +0,1 @@\n+a\n",
+		},
+		{
+			"a line replaced by a blank one",
+			"@@ -1,3 +1,3 @@\n a\n-X\n+\n b\n",
+			[]int{2},
+			[]int{2},
+			"@@ -1,3 +1,3 @@\n a\n-X\n+\n b\n",
+		},
+		{
+			"a lone blank line deleted",
+			"@@ -1,3 +1,2 @@\n a\n-\n b\n",
+			[]int{2},
+			nil,
+			"@@ -1,3 +1,2 @@\n a\n-\n b\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := gittest.New(t)
-			gittest.Commit(t, repo.Dir, "f.txt", tt.base, "base")
-			writeFile(t, repo.Dir, "f.txt", tt.now)
-			c, id := openWorktree(t, repo.Dir)
+			frag := fragmentOf(t, tt.hunk)
 
-			if err := c.StageLines(t.Context(), id, "f.txt", shown(t, c, id, "f.txt", false, tt.old, tt.new), false); err != nil {
-				t.Fatal(err)
-			}
+			got := partial(frag, selectLines(frag, core.LineSelection{Old: tt.old, New: tt.new}), false)
 
-			if got := indexBlob(t, repo.Dir, "f.txt"); got != strings.TrimSuffix(tt.now, "\n") {
-				t.Errorf("index f.txt = %q, want %q", got, tt.now)
+			if got != tt.want {
+				t.Errorf("buildPartialPatch =\n%q\nwant\n%q", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestFR_CHG_03_StageLinesStagesPartOfWhatAnEmptyFileGained(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "f.txt", "", "base")
-	writeFile(t, repo.Dir, "f.txt", "a\nb\n")
-	c, id := openWorktree(t, repo.Dir)
-
-	if err := c.StageLines(t.Context(), id, "f.txt", shown(t, c, id, "f.txt", false, nil, []int{1}), false); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := indexBlob(t, repo.Dir, "f.txt"); got != "a" {
-		t.Errorf("index f.txt = %q, want only line 1 staged", got)
 	}
 }
 
