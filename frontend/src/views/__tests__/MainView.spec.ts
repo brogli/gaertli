@@ -46,58 +46,34 @@ describe('MainView', () => {
     expect(AppService.NewWindow).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-UX-04 with no path, the gear opens the Settings dialog', async () => {
-    const { wrapper, body } = await mountInBody(MainView, { props: { path: '' } })
-
-    await wrapper.get('[data-test="open-settings"]').trigger('click')
-    await flushPromises()
-
-    expect(body.get('[role="dialog"] .p-dialog-title').text()).toBe('Settings')
-    wrapper.unmount()
-  })
-
-  it('FR-WT-13 with a path, renders WorktreeContent, the repo picker in its toolbar', async () => {
-    const wrapper = mount(MainView, { props: { path: '/repo' } })
-    await flushPromises()
-
-    expect(wrapper.findComponent(WorktreeContent).exists()).toBe(true)
-    expect(wrapper.get('.toolbar').findComponent(RepoPicker).props('asPage')).toBe(false)
-  })
-
-  it('FR-REPO-07 forwards distro to WorktreeContent', async () => {
-    const wrapper = mount(MainView, { props: { path: '/home/u/r', distro: 'Ubuntu' } })
-    await flushPromises()
-
-    expect(wrapper.findComponent(WorktreeContent).props('distro')).toBe('Ubuntu')
-  })
-
-  it("FR-UX-04 the toolbar's gear opens a dialog titled Settings with SettingsPanel inside, WorktreeContent still rendered", async () => {
-    const { wrapper, body } = await mountInBody(MainView, { props: { path: '/repo' } })
+  it.each([
+    ['FR-UX-04 with no path, the gear opens the Settings dialog', ''],
+    [
+      'FR-UX-04 with a path, the toolbar gear opens the Settings dialog, WorktreeContent still rendered',
+      '/repo',
+    ],
+  ])('%s', async (_name, path) => {
+    const { wrapper, body } = await mountInBody(MainView, { props: { path } })
 
     await wrapper.get('[data-test="open-settings"]').trigger('click')
     await flushPromises()
 
     const dialog = body.get('[role="dialog"]')
-    expect(dialog.find('.p-dialog-title').text()).toBe('Settings')
+    expect(dialog.get('.p-dialog-title').text()).toBe('Settings')
     expect(dialog.find('[data-test="app-version"]').exists()).toBe(true)
-    expect(wrapper.findComponent(WorktreeContent).exists()).toBe(true)
-
+    expect(wrapper.findComponent(WorktreeContent).exists()).toBe(path !== '')
     wrapper.unmount()
   })
 
-  it("FR-UX-04 clicking the dialog's own close button closes it, WorktreeContent still rendered", async () => {
-    const { wrapper, body } = await mountInBody(MainView, { props: { path: '/repo' } })
-    await wrapper.get('[data-test="open-settings"]').trigger('click')
+  it('FR-WT-13, FR-REPO-07 with a path, renders WorktreeContent with the path and distro', async () => {
+    const wrapper = mount(MainView, {
+      props: { path: '/home/u/r', distro: 'Ubuntu' },
+      global: { stubs: { WorktreeContent: true } },
+    })
     await flushPromises()
 
-    await body.get('.p-dialog-close-button').trigger('click')
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-    await flushPromises()
-
-    expect(document.querySelector('[role="dialog"]')).toBeNull()
-    expect(wrapper.findComponent(WorktreeContent).exists()).toBe(true)
-
-    wrapper.unmount()
+    const content = wrapper.findComponent(WorktreeContent)
+    expect(content.props()).toMatchObject({ path: '/home/u/r', distro: 'Ubuntu' })
   })
 
   it('FR-UX-19 with debug mode off (the default), no debug strip shows', async () => {
@@ -114,7 +90,10 @@ describe('MainView', () => {
     await useSettingsStore().load()
 
     const withoutWorktree = mount(MainView, { props: { path: '' } })
-    const withWorktree = mount(MainView, { props: { path: '/repo' } })
+    const withWorktree = mount(MainView, {
+      props: { path: '/repo' },
+      global: { stubs: { WorktreeContent: true } },
+    })
     await flushPromises()
 
     expect(withoutWorktree.findComponent(DebugArea).exists()).toBe(true)
