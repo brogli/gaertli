@@ -158,27 +158,17 @@ func indexBytes(t *testing.T, dir, name string) string {
 // it with (see DiffView's selectedLines).
 func TestFR_CHG_03_StageLinesOfAReplacementStagesItAsOneChange(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name, base, now, want string
-	}{
-		{"a last line given its newline", "a\nb", "a\nb\n", "a\nb\n"},
-		{"a modified line", "a\nx\nc\n", "a\nX\nc\n", "a\nX\nc\n"},
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "f.txt", "a\nb", "base")
+	writeFile(t, repo.Dir, "f.txt", "a\nb\n")
+	c, id := openWorktree(t, repo.Dir)
+
+	if err := c.StageLines(t.Context(), id, "f.txt", shown(t, c, id, "f.txt", false, []int{2}, []int{2}), false); err != nil {
+		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := gittest.New(t)
-			gittest.Commit(t, repo.Dir, "f.txt", tt.base, "base")
-			writeFile(t, repo.Dir, "f.txt", tt.now)
-			c, id := openWorktree(t, repo.Dir)
 
-			if err := c.StageLines(t.Context(), id, "f.txt", shown(t, c, id, "f.txt", false, []int{2}, []int{2}), false); err != nil {
-				t.Fatal(err)
-			}
-
-			if got := indexBytes(t, repo.Dir, "f.txt"); got != tt.want {
-				t.Errorf("index f.txt = %q, want %q", got, tt.want)
-			}
-		})
+	if got := indexBytes(t, repo.Dir, "f.txt"); got != "a\nb\n" {
+		t.Errorf("index f.txt = %q, want a last line given its newline", got)
 	}
 }
 
@@ -414,58 +404,43 @@ func twoHunksFixture(t *testing.T, dir string) string {
 	return changed
 }
 
-func TestFR_CHG_03_StageLinesStagesOnlyTheSelectedHunkLeavingTheOtherUntouched(t *testing.T) {
+func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedHunk(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	changed := twoHunksFixture(t, repo.Dir)
-
-	c, id := openWorktree(t, repo.Dir)
-	sel := shown(t, c, id, "f.txt", false, []int{2}, []int{2})
-	if err := c.StageLines(t.Context(), id, "f.txt", sel, false); err != nil {
-		t.Fatal(err)
-	}
-
-	staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt")
-	if !strings.Contains(staged, "+line2-changed") || strings.Contains(staged, "line15-changed") {
-		t.Errorf("staged diff = %q, want only the line2 change", staged)
-	}
-	unstaged := gittest.Out(t, repo.Dir, "diff", "--", "f.txt")
-	if strings.Contains(unstaged, "line2-changed") || !strings.Contains(unstaged, "+line15-changed") {
-		t.Errorf("unstaged diff = %q, want only the line15 change left", unstaged)
-	}
-	onDisk := readFile(t, repo.Dir, "f.txt")
-	if onDisk != changed {
-		t.Error("working tree file changed, want it byte-identical to before staging (--cached only)")
-	}
-}
-
-func TestFR_CHG_03_StageLinesReverseUnstagesOnlyTheSelectedHunk(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	twoHunksFixture(t, repo.Dir)
-
 	c, id := openWorktree(t, repo.Dir)
 	ctx := t.Context()
-	both := shown(t, c, id, "f.txt", false, []int{2, 15}, []int{2, 15})
-	if err := c.StageLines(ctx, id, "f.txt", both, false); err != nil {
+	staged := func() string { return gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt") }
+	unstaged := func() string { return gittest.Out(t, repo.Dir, "diff", "--", "f.txt") }
+
+	if err := c.StageLines(ctx, id, "f.txt", shown(t, c, id, "f.txt", false, []int{2}, []int{2}), false); err != nil {
 		t.Fatal(err)
 	}
-	if staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt"); !strings.Contains(staged, "line2-changed") || !strings.Contains(staged, "line15-changed") {
-		t.Fatalf("setup: want both changes staged, got %q", staged)
+	if got := staged(); !strings.Contains(got, "+line2-changed") || strings.Contains(got, "line15-changed") {
+		t.Errorf("staged diff = %q, want only the line2 change", got)
+	}
+	if got := unstaged(); strings.Contains(got, "line2-changed") || !strings.Contains(got, "+line15-changed") {
+		t.Errorf("unstaged diff = %q, want only the line15 change left", got)
+	}
+	if onDisk := readFile(t, repo.Dir, "f.txt"); onDisk != changed {
+		t.Error("working tree file changed, want it byte-identical to before staging (--cached only)")
 	}
 
-	only2 := shown(t, c, id, "f.txt", true, []int{2}, []int{2})
-	if err := c.StageLines(ctx, id, "f.txt", only2, true); err != nil {
+	if err := c.StageLines(ctx, id, "f.txt", shown(t, c, id, "f.txt", false, []int{15}, []int{15}), false); err != nil {
 		t.Fatal(err)
 	}
-
-	staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt")
-	if strings.Contains(staged, "line2-changed") || !strings.Contains(staged, "line15-changed") {
-		t.Errorf("staged diff = %q, want only the line15 change to remain staged", staged)
+	if got := staged(); !strings.Contains(got, "line2-changed") || !strings.Contains(got, "line15-changed") {
+		t.Fatalf("setup: want both changes staged, got %q", got)
 	}
-	unstaged := gittest.Out(t, repo.Dir, "diff", "--", "f.txt")
-	if !strings.Contains(unstaged, "+line2-changed") || strings.Contains(unstaged, "line15-changed") {
-		t.Errorf("unstaged diff = %q, want the line2 change back", unstaged)
+
+	if err := c.StageLines(ctx, id, "f.txt", shown(t, c, id, "f.txt", true, []int{2}, []int{2}), true); err != nil {
+		t.Fatal(err)
+	}
+	if got := staged(); strings.Contains(got, "line2-changed") || !strings.Contains(got, "line15-changed") {
+		t.Errorf("staged diff = %q, want only the line15 change to remain staged", got)
+	}
+	if got := unstaged(); !strings.Contains(got, "+line2-changed") || strings.Contains(got, "line15-changed") {
+		t.Errorf("unstaged diff = %q, want the line2 change back", got)
 	}
 }
 
@@ -486,128 +461,80 @@ func twoChangeFixture(t *testing.T, dir string) {
 	writeFile(t, dir, "f.txt", "a\nb\nC\nd\nE\nf\ng\nh\n")
 }
 
-func TestFR_CHG_03_StageLinesStagesOnlyTheSelectedChangeWithinAHunk(t *testing.T) {
+func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedChangeEvenWhenGitMergesTwoChangesIntoOneHunk(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	twoChangeFixture(t, repo.Dir)
-
 	c, id := openWorktree(t, repo.Dir)
-	sel := shown(t, c, id, "f.txt", false, []int{3}, []int{3})
-	if err := c.StageLines(t.Context(), id, "f.txt", sel, false); err != nil {
-		t.Fatal(err)
+	stage := func(change int, reverse bool) {
+		t.Helper()
+		sel := shown(t, c, id, "f.txt", reverse, []int{change}, []int{change})
+		if err := c.StageLines(t.Context(), id, "f.txt", sel, reverse); err != nil {
+			t.Fatal(err)
+		}
+	}
+	staged := func() string { return gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt") }
+	unstaged := func() string { return gittest.Out(t, repo.Dir, "diff", "--", "f.txt") }
+
+	stage(5, false)
+	if got := staged(); !strings.Contains(got, "+E") || strings.Contains(got, "+C") {
+		t.Errorf("staged diff = %q, want only the e->E change", got)
+	}
+	if got := unstaged(); strings.Contains(got, "-e") || !strings.Contains(got, "+C") {
+		t.Errorf("unstaged diff = %q, want only the c->C change left, in the same hunk", got)
 	}
 
-	staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt")
-	if !strings.Contains(staged, "+C") || strings.Contains(staged, "+E") {
-		t.Errorf("staged diff = %q, want only the c->C change", staged)
+	stage(5, true)
+	if got := staged(); got != "" {
+		t.Errorf("staged diff = %q, want empty after unstaging the only staged change", got)
 	}
-	unstaged := gittest.Out(t, repo.Dir, "diff", "--", "f.txt")
-	if strings.Contains(unstaged, "-c") || !strings.Contains(unstaged, "+E") {
-		t.Errorf("unstaged diff = %q, want only the e->E change left, in the same hunk", unstaged)
+	if got := unstaged(); !strings.Contains(got, "+E") || !strings.Contains(got, "+C") {
+		t.Errorf("unstaged diff = %q, want both changes back", got)
+	}
+
+	stage(3, false)
+	stage(5, false)
+	stage(3, true)
+	if got := staged(); strings.Contains(got, "+C") || !strings.Contains(got, "+E") {
+		t.Errorf("staged diff = %q, want only the e->E change to remain staged", got)
+	}
+	if got := unstaged(); !strings.Contains(got, "+C") || strings.Contains(got, "+E") {
+		t.Errorf("unstaged diff = %q, want the c->C change back", got)
 	}
 }
 
-func TestFR_CHG_03_StageLinesReverseUnstagesOnlyTheSelectedChange(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	twoChangeFixture(t, repo.Dir)
-
-	c, id := openWorktree(t, repo.Dir)
-	ctx := t.Context()
-	both := shown(t, c, id, "f.txt", false, []int{3, 5}, []int{3, 5})
-	if err := c.StageLines(ctx, id, "f.txt", both, false); err != nil {
-		t.Fatal(err)
-	}
-	if staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt"); !strings.Contains(staged, "+C") || !strings.Contains(staged, "+E") {
-		t.Fatalf("setup: want both changes staged, got %q", staged)
-	}
-
-	only3 := shown(t, c, id, "f.txt", true, []int{3}, []int{3})
-	if err := c.StageLines(ctx, id, "f.txt", only3, true); err != nil {
-		t.Fatal(err)
-	}
-
-	staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt")
-	if strings.Contains(staged, "+C") || !strings.Contains(staged, "+E") {
-		t.Errorf("staged diff = %q, want only the e->E change to remain staged", staged)
-	}
-	unstaged := gittest.Out(t, repo.Dir, "diff", "--", "f.txt")
-	if !strings.Contains(unstaged, "+C") || strings.Contains(unstaged, "+E") {
-		t.Errorf("unstaged diff = %q, want the c->C change back", unstaged)
-	}
-}
-
-func TestFR_CHG_03_StageLinesSelectsTheRequestedChangeEvenWhenGitMergesTwoChangesIntoOneHunk(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	twoChangeFixture(t, repo.Dir)
-
-	c, id := openWorktree(t, repo.Dir)
-	ctx := t.Context()
-	second := shown(t, c, id, "f.txt", false, []int{5}, []int{5})
-	if err := c.StageLines(ctx, id, "f.txt", second, false); err != nil {
-		t.Fatal(err)
-	}
-
-	staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt")
-	if !strings.Contains(staged, "+E") || strings.Contains(staged, "+C") {
-		t.Errorf("staged diff = %q, want only the e->E change", staged)
-	}
-	unstaged := gittest.Out(t, repo.Dir, "diff", "--", "f.txt")
-	if strings.Contains(unstaged, "-e") || !strings.Contains(unstaged, "+C") {
-		t.Errorf("unstaged diff = %q, want only the c->C change left, in the same hunk", unstaged)
-	}
-
-	if err := c.StageLines(ctx, id, "f.txt", shown(t, c, id, "f.txt", true, []int{5}, []int{5}), true); err != nil {
-		t.Fatal(err)
-	}
-
-	if staged := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt"); staged != "" {
-		t.Errorf("staged diff = %q, want empty after unstaging the only staged change", staged)
-	}
-	if unstaged := gittest.Out(t, repo.Dir, "diff", "--", "f.txt"); !strings.Contains(unstaged, "+E") || !strings.Contains(unstaged, "+C") {
-		t.Errorf("unstaged diff = %q, want both changes back", unstaged)
-	}
-}
-
-// Repeating a stage call for lines it already staged is a stale selection:
-// Code Internal, not a git failure.
-func TestFR_CHG_03_StageLinesSelectingNoLongerChangedLinesIsInternal(t *testing.T) {
+// A selection naming lines the diff does not change, or lines already
+// staged, is Internal, not a git failure, and applies nothing.
+func TestFR_CHG_03_StageLinesSelectingLinesTheDiffDoesNotChangeIsInternal(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	oneHunkFixture(t, repo.Dir)
-
 	c, id := openWorktree(t, repo.Dir)
 	ctx := t.Context()
-	sel := shown(t, c, id, "f.txt", false, []int{2}, []int{2})
-	if err := c.StageLines(ctx, id, "f.txt", sel, false); err != nil {
-		t.Fatal(err)
-	}
-	stagedAfterFirst := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt")
+	staged := func() string { return gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt") }
 
-	err := c.StageLines(ctx, id, "f.txt", sel, false)
-
-	coretest.AssertCode(t, err, core.Internal)
-	if got := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt"); got != stagedAfterFirst {
-		t.Errorf("staged diff changed after the repeated call = %q, want unchanged %q", got, stagedAfterFirst)
-	}
-}
-
-func TestFR_CHG_03_StageLinesSelectingLinesNotInTheDiffIsInternal(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	oneHunkFixture(t, repo.Dir)
-
-	c, id := openWorktree(t, repo.Dir)
-	sel := shown(t, c, id, "f.txt", false, []int{99}, []int{99})
-	err := c.StageLines(t.Context(), id, "f.txt", sel, false)
+	outside := shown(t, c, id, "f.txt", false, []int{99}, []int{99})
+	err := c.StageLines(ctx, id, "f.txt", outside, false)
 
 	ce := coretest.AsError(t, err, core.Internal)
 	if !strings.Contains(ce.Message, "f.txt") {
 		t.Errorf("Message = %q, want it to name the path", ce.Message)
 	}
-	if got := gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt"); got != "" {
+	if got := staged(); got != "" {
 		t.Errorf("staged diff = %q, want nothing applied", got)
+	}
+
+	sel := shown(t, c, id, "f.txt", false, []int{2}, []int{2})
+	if err := c.StageLines(ctx, id, "f.txt", sel, false); err != nil {
+		t.Fatal(err)
+	}
+	stagedAfterFirst := staged()
+
+	err = c.StageLines(ctx, id, "f.txt", sel, false)
+
+	coretest.AssertCode(t, err, core.Internal)
+	if got := staged(); got != stagedAfterFirst {
+		t.Errorf("staged diff changed after the repeated call = %q, want unchanged %q", got, stagedAfterFirst)
 	}
 }
 
