@@ -40,14 +40,14 @@ func Main(m *testing.M, bins ...testbin.Bin) {
 	if err != nil {
 		panic(err)
 	}
-	if err := os.Setenv("HOME", home); err != nil {
-		panic(err)
-	}
-	if err := os.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(home, ".gitconfig")); err != nil {
-		panic(err)
-	}
-	if err := os.Setenv("GIT_CONFIG_NOSYSTEM", "1"); err != nil {
-		panic(err)
+	for key, value := range map[string]string{
+		"HOME":                home,
+		"GIT_CONFIG_GLOBAL":   filepath.Join(home, ".gitconfig"),
+		"GIT_CONFIG_NOSYSTEM": "1",
+	} {
+		if err := os.Setenv(key, value); err != nil {
+			panic(err)
+		}
 	}
 
 	for _, args := range [][]string{

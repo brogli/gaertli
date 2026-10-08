@@ -2,6 +2,7 @@ package gittest
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -44,17 +45,17 @@ func History(t *testing.T, dir string, steps ...Step) []string {
 }
 
 func fastImportStream(steps []Step, start int64) []byte {
+	const identity = identityName + " <" + identityEmail + ">"
 	var s bytes.Buffer
 	for i, c := range steps {
-		branch := orDefault(c.Branch, "master")
 		when := start + int64(i)
-		author := identityName + " <" + identityEmail + ">"
+		author := identity
 		if c.Author != "" {
 			author = fmt.Sprintf("%s <%s@nebegit.invalid>", c.Author, strings.ToLower(c.Author))
 		}
 		msg := strings.TrimRight(c.Message, "\n") + "\n"
 		fmt.Fprintf(&s, "commit refs/heads/%s\nmark :%d\nauthor %s %d +0000\ncommitter %s %d +0000\ndata %d\n%s",
-			branch, i+1, author, when, identityName+" <"+identityEmail+">", when, len(msg), msg)
+			cmp.Or(c.Branch, "master"), i+1, author, when, identity, when, len(msg), msg)
 		if c.From != "" {
 			fmt.Fprintf(&s, "from refs/heads/%s\n", c.From)
 		}
@@ -70,13 +71,6 @@ func fastImportStream(steps []Step, start int64) []byte {
 		s.WriteString("\n")
 	}
 	return s.Bytes()
-}
-
-func orDefault(value, fallback string) string {
-	if value == "" {
-		return fallback
-	}
-	return value
 }
 
 // shasFromMarks reads fast-import's exported marks (":N sha" lines).
