@@ -5,6 +5,8 @@ package app
 import (
 	"context"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -29,18 +31,87 @@ func tagPage(next http.Handler) http.Handler {
 // its BrowserWindow itself, the name the page's Window.Name() returns.
 type browserPage struct{ clientID string }
 
-// EmitEvent does nothing before the page's websocket connects: the page
-// would not get the event anyway.
+// EmitEvent holds the event until the page's websocket connects.
 func (p browserPage) EmitEvent(name string, data ...any) bool {
-	w := application.GetBrowserWindow(p.clientID)
-	if w == nil {
-		return false
+	pageEvents.send(p.clientID, name, data)
+	return true
+}
+
+// pageEvents holds each page's events, because a page's first calls run
+// before its websocket connects and Wails drops events for a page it does
+// not know as a window yet.
+var pageEvents = &eventHold{
+	lookup: func(clientID string) (string, bool) {
+		w := application.GetBrowserWindow(clientID)
+		if w == nil {
+			return "", false
+		}
+		return w.Name(), true
+	},
+	emit: func(sender, name string, data []any) bool {
+		ev := &application.CustomEvent{Name: name, Sender: sender}
+		if len(data) == 1 {
+			ev.Data = data[0]
+		}
+		return application.Get().Event.EmitEvent(ev)
+	},
+	poll:    20 * time.Millisecond,
+	giveUp:  10 * time.Second,
+	pending: map[string][]heldEvent{},
+}
+
+type heldEvent struct {
+	name string
+	data []any
+}
+
+// eventHold queues a page's events from its first one until lookup finds
+// the page, then emits them in order. Events sent while the queue exists
+// join it, which keeps the order. A page not found within giveUp is gone
+// and its queue is dropped.
+type eventHold struct {
+	lookup  func(clientID string) (sender string, ok bool)
+	emit    func(sender, name string, data []any) bool
+	poll    time.Duration
+	giveUp  time.Duration
+	mu      sync.Mutex
+	pending map[string][]heldEvent
+}
+
+func (h *eventHold) send(clientID, name string, data []any) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if queue, held := h.pending[clientID]; held {
+		h.pending[clientID] = append(queue, heldEvent{name, data})
+		return
 	}
-	ev := &application.CustomEvent{Name: name, Sender: w.Name()}
-	if len(data) == 1 {
-		ev.Data = data[0]
+	sender, ok := h.lookup(clientID)
+	if !ok {
+		h.pending[clientID] = []heldEvent{{name, data}}
+		go h.drainWhenFound(clientID)
+		return
 	}
-	return application.Get().Event.EmitEvent(ev)
+	h.emit(sender, name, data)
+}
+
+func (h *eventHold) drainWhenFound(clientID string) {
+	deadline := time.Now().Add(h.giveUp)
+	for time.Now().Before(deadline) {
+		time.Sleep(h.poll)
+		h.mu.Lock()
+		if sender, ok := h.lookup(clientID); ok {
+			for _, ev := range h.pending[clientID] {
+				h.emit(sender, ev.name, ev.data)
+			}
+			delete(h.pending, clientID)
+			h.mu.Unlock()
+			return
+		}
+		h.mu.Unlock()
+	}
+	h.mu.Lock()
+	delete(h.pending, clientID)
+	h.mu.Unlock()
 }
 
 // A page has no OS window to focus, title or watch.
