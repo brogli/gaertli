@@ -13,65 +13,38 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_CHG_10_DiscardFileRestoresATrackedFilesWorkingTreeContent(t *testing.T) {
+func TestFR_CHG_10_DiscardFileRestoresATrackedFileAndRemovesAnUntrackedFileOrDirectory(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "changed\n")
-
-	c, id := openWorktree(t, repo.Dir)
-	if err := c.DiscardFile(t.Context(), id, "f.txt", false); err != nil {
-		t.Fatal(err)
-	}
-
-	content := readFile(t, repo.Dir, "f.txt")
-	if content != "base\n" {
-		t.Errorf("f.txt = %q, want restored to %q", content, "base\n")
-	}
-	status := statusOf(t, c, id)
-	if len(status.Unstaged) != 0 {
-		t.Errorf("Unstaged = %+v, want empty", status.Unstaged)
-	}
-}
-
-func TestFR_CHG_10_DiscardFileRemovesAnUntrackedFile(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	writeFile(t, repo.Dir, "new.txt", "new")
-
-	c, id := openWorktree(t, repo.Dir)
-	if err := c.DiscardFile(t.Context(), id, "new.txt", true); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := os.Stat(filepath.Join(repo.Dir, "new.txt")); !os.IsNotExist(err) {
-		t.Errorf("new.txt still exists, want removed (err = %v)", err)
-	}
-	status := statusOf(t, c, id)
-	if len(status.Untracked) != 0 {
-		t.Errorf("Untracked = %+v, want empty", status.Untracked)
-	}
-}
-
-// An untracked directory is one "?" record, its path ending in "/". git
-// clean -f removes it without -d: an explicit pathspec names it.
-func TestFR_CHG_10_DiscardFileRemovesAnUntrackedDirectory(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	if err := os.MkdirAll(filepath.Join(repo.Dir, "newdir"), 0o755); err != nil {
+	// An untracked directory is one "?" record, its path ending in "/". git
+	// clean -f removes it without -d: an explicit pathspec names it.
+	if err := os.Mkdir(filepath.Join(repo.Dir, "newdir"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	writeFile(t, repo.Dir, "newdir/inner.txt", "content")
-
 	c, id := openWorktree(t, repo.Dir)
-	if err := c.DiscardFile(t.Context(), id, "newdir", true); err != nil {
+	ctx := t.Context()
+
+	if err := c.DiscardFile(ctx, id, "f.txt", false); err != nil {
 		t.Fatal(err)
 	}
+	if got := readFile(t, repo.Dir, "f.txt"); got != "base\n" {
+		t.Errorf("f.txt = %q, want restored to %q", got, "base\n")
+	}
 
-	if _, err := os.Stat(filepath.Join(repo.Dir, "newdir")); !os.IsNotExist(err) {
-		t.Errorf("newdir still exists, want removed (err = %v)", err)
+	for _, name := range []string{"new.txt", "newdir"} {
+		if err := c.DiscardFile(ctx, id, name, true); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(repo.Dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s still exists, want removed (err = %v)", name, err)
+		}
+	}
+	if status := statusOf(t, c, id); len(status.Unstaged) != 0 || len(status.Untracked) != 0 {
+		t.Errorf("Unstaged = %+v, Untracked = %+v, want both empty", status.Unstaged, status.Untracked)
 	}
 }
 

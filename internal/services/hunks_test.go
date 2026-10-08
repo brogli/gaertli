@@ -47,23 +47,30 @@ func TestFR_CHG_03_StageLinesRefusesLinesThatChangedSinceTheyWereShown(t *testin
 		{"a line inserted above the shown hunk", "a\nb\nc\nd\ne\nf\ng\n", "a\nB\nc\nd\ne\nE\nf\ng\n", "z\na\nB\nc\nd\ne\nE\nf\ng\n", []int{2}, []int{2}},
 		{"an identical line added above the shown one", "1\n2\n3\n4\n5\n6\n", "1\n2\n3\n4\nX\n5\n6\n", "1\n2\n3\n4\nX\nY\nX\n5\n6\n", nil, []int{5}},
 	}
-	for _, tt := range tests {
+	repo := gittest.New(t)
+	files := map[string]string{}
+	for i, tt := range tests {
+		files[fmt.Sprintf("f%d.txt", i)] = tt.base
+	}
+	gittest.History(t, repo.Dir, gittest.Step{Message: "base", Files: files})
+	for i, tt := range tests {
+		writeFile(t, repo.Dir, fmt.Sprintf("f%d.txt", i), tt.displayed)
+	}
+	c, id := openWorktree(t, repo.Dir)
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := gittest.New(t)
-			gittest.Commit(t, repo.Dir, "f.txt", tt.base, "base")
-			writeFile(t, repo.Dir, "f.txt", tt.displayed)
-			c, id := openWorktree(t, repo.Dir)
-			sel := shown(t, c, id, "f.txt", false, tt.old, tt.new)
-			writeFile(t, repo.Dir, "f.txt", tt.now)
+			name := fmt.Sprintf("f%d.txt", i)
+			sel := shown(t, c, id, name, false, tt.old, tt.new)
+			writeFile(t, repo.Dir, name, tt.now)
 
-			err := c.StageLines(t.Context(), id, "f.txt", sel, false)
+			err := c.StageLines(t.Context(), id, name, sel, false)
 
 			ce := coretest.AsError(t, err, core.Internal)
 			if !strings.Contains(ce.Message, "changed since it was shown") {
 				t.Errorf("Message = %q, want it to say the file changed since it was shown", ce.Message)
 			}
-			if got := indexBlob(t, repo.Dir, "f.txt"); got != strings.TrimSuffix(tt.base, "\n") {
-				t.Errorf("index f.txt = %q, want it unchanged", got)
+			if got := indexBlob(t, repo.Dir, name); got != strings.TrimSuffix(tt.base, "\n") {
+				t.Errorf("index %s = %q, want it unchanged", name, got)
 			}
 		})
 	}
