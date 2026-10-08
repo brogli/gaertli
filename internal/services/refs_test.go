@@ -102,101 +102,87 @@ func buildForEachRefFixture(records []ref) []byte {
 	return []byte(b.String())
 }
 
-func TestFR_LOG_01_RefsListsBranchesRemotesAndTags(t *testing.T) {
+func TestFR_LOG_01_RefsListsEveryRefShape(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	sha := gittest.HeadSHA(t, repo.Dir)
+	bare := bareRemote(t, repo, "origin")
+	gittest.Run(t, repo.Dir, "push", "-u", "origin", "master")
 	gittest.Run(t, repo.Dir, "branch", "feature")
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/origin/master", sha)
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/origin/feature", sha)
-	gittest.Run(t, repo.Dir, "tag", "v1")
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	refs, err := c.Refs(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(refs.Branches) != 2 {
-		t.Fatalf("Branches = %+v, want 2 entries", refs.Branches)
-	}
-	current := findBranch(refs.Branches, "master")
-	if current == nil || !current.Current {
-		t.Errorf("Branches = %+v, want master marked Current", refs.Branches)
-	}
-	other := findBranch(refs.Branches, "feature")
-	if other == nil || other.Current {
-		t.Errorf("Branches = %+v, want feature not Current", refs.Branches)
-	}
-
-	if len(refs.Remotes) != 1 || refs.Remotes[0].Name != "origin" || len(refs.Remotes[0].Branches) != 2 {
-		t.Errorf("Remotes = %+v, want one origin group with 2 branches", refs.Remotes)
-	}
-	if len(refs.Tags) != 1 || refs.Tags[0].Name != "v1" {
-		t.Errorf("Tags = %+v, want [v1]", refs.Tags)
-	}
-}
-
-// TestFR_SYNC_03_RefsListsAConfiguredRemoteWithNoTrackingBranchYet covers a
-// remote added by `git remote add` before anything was ever fetched or
-// pushed to it: it must still appear (with no branches), and an existing
-// remote's own tracking branches stay listed alongside it.
-func TestFR_SYNC_03_RefsListsAConfiguredRemoteWithNoTrackingBranchYet(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	bareRemote(t, repo, "origin")
-	gittest.Run(t, repo.Dir, "push", "-u", "origin", "HEAD")
-	gittest.Run(t, repo.Dir, "remote", "add", "empty", "https://example.invalid/empty.git")
-
-	c, wt := openWorktree(t, repo.Dir)
-	refs, err := c.Refs(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	origin := findRemote(refs.Remotes, "origin")
-	if origin == nil || len(origin.Branches) != 1 {
-		t.Errorf("origin = %+v, want its one tracking branch kept", origin)
-	}
-	empty := findRemote(refs.Remotes, "empty")
-	if empty == nil || len(empty.Branches) != 0 {
-		t.Errorf("Remotes = %+v, want an empty entry with no branches", refs.Remotes)
-	}
-}
-
-func findRemote(remotes []core.Remote, name string) *core.Remote {
-	for i, r := range remotes {
-		if r.Name == name {
-			return &remotes[i]
-		}
-	}
-	return nil
-}
-
-func TestFR_LOG_01_RefsMarksTheWorktreeWithABranchCheckedOut(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	gittest.Run(t, repo.Dir, "branch", "feature")
+	gittest.Run(t, repo.Dir, "push", "-u", "origin", "feature")
 	linked := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
+	gittest.Commit(t, linked, "local.txt", "local", "local-only")
+	remoteAppendCommitOnBranch(t, bare, "feature", "remote.txt", "remote", "remote-only")
+	gittest.Run(t, bare, "update-ref", "-d", "refs/heads/master")
+	gittest.Run(t, repo.Dir, "fetch", "--prune", "origin")
+	gittest.Run(t, repo.Dir, "tag", "v1")
+	gittest.Run(t, repo.Dir, "remote", "add", "empty", "https://example.invalid/empty.git")
+	gittest.Run(t, repo.Dir, "remote", "add", "team", "https://example.invalid/team.git")
+	// A newer git's "remote add" refuses a name nested under an existing
+	// remote's; a repo set up by an older git or by hand still has both.
+	gittest.Run(t, repo.Dir, "config", "remote.team/x.url", "https://example.invalid/x.git")
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/main", sha)
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/x/master", sha)
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/gone/topic", sha) // a remote no longer configured
 
 	c, wt := openWorktree(t, repo.Dir)
-
 	refs, err := c.Refs(t.Context(), wt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := map[string]string{"master": gitPath(t, repo.Dir), "feature": gitPath(t, linked)}
-	for _, b := range refs.Branches {
-		if b.CheckedOutIn != want[b.Name] {
-			t.Errorf("branch %q CheckedOutIn = %q, want %q", b.Name, b.CheckedOutIn, want[b.Name])
+	t.Run("branches and the current one", func(t *testing.T) {
+		if len(refs.Branches) != 2 {
+			t.Fatalf("Branches = %+v, want 2 entries", refs.Branches)
 		}
-	}
+		if current := findBranch(refs.Branches, "master"); current == nil || !current.Current {
+			t.Errorf("Branches = %+v, want master marked Current", refs.Branches)
+		}
+		if other := findBranch(refs.Branches, "feature"); other == nil || other.Current {
+			t.Errorf("Branches = %+v, want feature not Current", refs.Branches)
+		}
+	})
+	t.Run("worktree holding a branch", func(t *testing.T) {
+		want := map[string]string{"master": gitPath(t, repo.Dir), "feature": gitPath(t, linked)}
+		for _, b := range refs.Branches {
+			if b.CheckedOutIn != want[b.Name] {
+				t.Errorf("branch %q CheckedOutIn = %q, want %q", b.Name, b.CheckedOutIn, want[b.Name])
+			}
+		}
+	})
+	t.Run("ahead and behind upstream", func(t *testing.T) {
+		feature := findBranch(refs.Branches, "feature")
+		if feature == nil || feature.Upstream != "origin/feature" || feature.Ahead != 1 || feature.Behind != 1 {
+			t.Errorf("feature = %+v, want Upstream origin/feature, Ahead 1, Behind 1", feature)
+		}
+	})
+	t.Run("upstream gone after prune", func(t *testing.T) {
+		if master := findBranch(refs.Branches, "master"); master == nil || !master.UpstreamGone {
+			t.Errorf("master = %+v, want UpstreamGone true", master)
+		}
+	})
+	t.Run("remotes, including empty, slashed and unconfigured ones", func(t *testing.T) {
+		got := map[string][]string{}
+		for _, r := range refs.Remotes {
+			got[r.Name] = []string{}
+			for _, b := range r.Branches {
+				got[r.Name] = append(got[r.Name], b.Name)
+			}
+		}
+		want := map[string][]string{
+			"origin": {"feature"}, "empty": {}, "gone": {"topic"}, "team": {"main"}, "team/x": {"master"},
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("remote branches = %v, want %v", got, want)
+		}
+	})
+	t.Run("tags", func(t *testing.T) {
+		if len(refs.Tags) != 1 || refs.Tags[0].Name != "v1" {
+			t.Errorf("Tags = %+v, want [v1]", refs.Tags)
+		}
+	})
 }
 
 func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
@@ -214,53 +200,6 @@ func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_03_RefsReportsAheadAndBehindUpstream(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
-	bare := bareRemote(t, repo, "origin")
-	gittest.Run(t, repo.Dir, "push", "-u", "origin", "feature")
-	gittest.Commit(t, repo.Dir, "local.txt", "local", "local-only")
-	remoteAppendCommitOnBranch(t, bare, "feature", "remote.txt", "remote", "remote-only")
-	gittest.Run(t, repo.Dir, "fetch", "origin")
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	refs, err := c.Refs(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	feature := findBranch(refs.Branches, "feature")
-	if feature == nil {
-		t.Fatalf("Branches = %+v, want a feature entry", refs.Branches)
-	}
-	if feature.Upstream != "origin/feature" || feature.Ahead != 1 || feature.Behind != 1 {
-		t.Errorf("feature = %+v, want Upstream origin/feature, Ahead 1, Behind 1", feature)
-	}
-}
-
-func TestFR_REPO_03_RefsReportsUpstreamGoneAfterPrune(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	bare := bareRemote(t, repo, "origin")
-	gittest.Run(t, repo.Dir, "push", "-u", "origin", "master")
-	gittest.Run(t, bare, "update-ref", "-d", "refs/heads/master")
-	gittest.Run(t, repo.Dir, "fetch", "--prune", "origin")
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	refs, err := c.Refs(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	branch := findBranch(refs.Branches, "master")
-	if branch == nil || !branch.UpstreamGone {
-		t.Errorf("master = %+v, want UpstreamGone true", branch)
-	}
-}
-
 func findBranch(branches []core.Branch, name string) *core.Branch {
 	for i, b := range branches {
 		if b.Name == name {
@@ -271,7 +210,7 @@ func findBranch(branches []core.Branch, name string) *core.Branch {
 }
 
 // TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere covers the
-// four linked worktrees a branch can be held by: X stopped mid-rebase of B,
+// four linked worktrees a branch can be held by (and Y asking about itself): X stopped mid-rebase of B,
 // Y mid-bisect of C, Z mid-rebase from a detached HEAD (not attributable to
 // any branch), and W with D plainly checked out.
 func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T) {
@@ -331,42 +270,15 @@ func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T)
 	if e == nil || e.CheckedOutIn != "" || e.InUse != "" {
 		t.Errorf("E = %+v, want CheckedOutIn and InUse empty", e)
 	}
-}
 
-// TestFR_BR_05_RefsDoesNotMarkItsOwnWorktreesBisectAsInUse covers worktree W,
-// bisecting B, asking Refs about itself: W is not "elsewhere" from its own
-// point of view. Asked from another worktree, B is still marked.
-func TestFR_BR_05_RefsDoesNotMarkItsOwnWorktreesBisectAsInUse(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	gittest.Run(t, repo.Dir, "branch", "B")
-
-	wDir := filepath.Join(t.TempDir(), "w")
-	gittest.Run(t, repo.Dir, "worktree", "add", wDir, "B")
-	gittest.Commit(t, wDir, "c1.txt", "1", "c1")
-	gittest.Commit(t, wDir, "c2.txt", "2", "c2")
-	gittest.Run(t, wDir, "bisect", "start")
-	gittest.Run(t, wDir, "bisect", "bad", "HEAD")
-	gittest.Run(t, wDir, "bisect", "good", "HEAD~2")
-	wPath := gitPath(t, wDir)
-
-	cW, wtW := openWorktree(t, wDir)
-	refsFromW, err := cW.Refs(t.Context(), wtW)
+	// Y's own bisect is not "elsewhere" from Y's point of view.
+	cY, wtY := openWorktree(t, yDir)
+	refsFromY, err := cY.Refs(t.Context(), wtY)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b := findBranch(refsFromW.Branches, "B"); b == nil || b.CheckedOutIn != "" || b.InUse != "" {
-		t.Errorf("B from W's own Refs = %+v, want CheckedOutIn and InUse empty", b)
-	}
-
-	cMain, wtMain := openWorktree(t, repo.Dir)
-	refsFromMain, err := cMain.Refs(t.Context(), wtMain)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if b := findBranch(refsFromMain.Branches, "B"); b == nil || b.CheckedOutIn != wPath || b.InUse != core.BranchBisecting {
-		t.Errorf("B from the main worktree's Refs = %+v, want CheckedOutIn %s, InUse bisect", b, wPath)
+	if cb := findBranch(refsFromY.Branches, "C"); cb == nil || cb.CheckedOutIn != "" || cb.InUse != "" {
+		t.Errorf("C from Y's own Refs = %+v, want CheckedOutIn and InUse empty", cb)
 	}
 }
 
@@ -420,36 +332,5 @@ func TestFR_BR_05_RefsMarksBothARebaseAndAStaleBisectFromOneWorktree(t *testing.
 	}
 	if d == nil || d.CheckedOutIn != wtPath || d.InUse != core.BranchRebasing {
 		t.Errorf("D (mid-rebase) = %+v, want CheckedOutIn %s, InUse rebase", d, wtPath)
-	}
-}
-
-func TestFR_LOG_01_RefsGroupsARemoteWhoseNameHasASlashUnderItsWholeName(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
-	sha := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "remote", "add", "team", "https://example.invalid/team.git")
-	// A newer git's "remote add" refuses a name nested under an existing
-	// remote's; a repo set up by an older git or by hand still has both.
-	gittest.Run(t, repo.Dir, "config", "remote.team/x.url", "https://example.invalid/x.git")
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/main", sha)
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/x/master", sha)
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/gone/topic", sha) // a remote no longer configured
-
-	c, wt := openWorktree(t, repo.Dir)
-	refs, err := c.Refs(t.Context(), wt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	got := map[string][]string{}
-	for _, r := range refs.Remotes {
-		for _, b := range r.Branches {
-			got[r.Name] = append(got[r.Name], b.Name)
-		}
-	}
-	want := map[string][]string{"gone": {"topic"}, "team": {"main"}, "team/x": {"master"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("remote branches = %v, want %v", got, want)
 	}
 }
