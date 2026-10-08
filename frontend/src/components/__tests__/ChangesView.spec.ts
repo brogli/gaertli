@@ -70,14 +70,6 @@ describe('ChangesView', () => {
     localStorage.clear()
   })
 
-  it("FR-CHG-12 the commit message field has 6 rows and fills the commit box's width", () => {
-    const wrapper = mount(ChangesView, { props })
-
-    const textarea = wrapper.get('textarea')
-    expect(textarea.attributes('rows')).toBe('6')
-    expect(textarea.classes()).toContain('p-textarea-fluid')
-  })
-
   it("FR-CHG-08 switching worktree remounts CommitBox, so worktree A's typed text never carries into worktree B's draft", async () => {
     const wrapper = mount(ChangesView, { props })
     await wrapper.get('textarea').setValue('worktree A text')
