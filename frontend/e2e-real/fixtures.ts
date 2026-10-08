@@ -83,6 +83,7 @@ export const test = base.extend<Options & Fixtures>({
     const url = `http://localhost:${port}`
     try {
       await waitUntilServing(url, proc)
+      expectNoGitEditor(proc.pid!)
       await use({ url, pid: proc.pid! })
     } finally {
       await stop(proc)
@@ -233,6 +234,13 @@ function freePort(): Promise<number> {
       probe.close(() => resolve(address.port))
     })
   })
+}
+
+// expectNoGitEditor: a GIT_EDITOR from the caller's shell would let tests
+// that commit without an editor pass for the wrong reason.
+function expectNoGitEditor(pid: number): void {
+  const environ = fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0')
+  expect(environ.filter((v) => v.startsWith('GIT_EDITOR='))).toEqual([])
 }
 
 async function waitUntilServing(url: string, proc: ChildProcess): Promise<void> {
