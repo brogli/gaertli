@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -1061,8 +1062,22 @@ func TestFR_SYNC_05_ForcePushRefusedWhenRemoteGainedAnUnfetchedCommit(t *testing
 	}
 }
 
+// requireHTTPTransport skips the test when git cannot talk to HTTP remotes:
+// CI's git 2.42 is built without libcurl.
+func requireHTTPTransport(t *testing.T) {
+	t.Helper()
+	execPath, err := exec.Command("git", "--exec-path").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := exec.LookPath(filepath.Join(strings.TrimSpace(string(execPath)), "git-remote-http")); err != nil {
+		t.Skip("git has no HTTP transport")
+	}
+}
+
 func TestQA_SEC_02_FR_SYNC_08_FetchJobClassifiesAFailedSignIn(t *testing.T) {
 	t.Parallel()
+	requireHTTPTransport(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("WWW-Authenticate", `Basic realm="x"`)
 		w.WriteHeader(http.StatusUnauthorized)
