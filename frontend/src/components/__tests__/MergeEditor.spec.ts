@@ -37,6 +37,47 @@ function headers(wrapper: VueWrapper): string[] {
   return wrapper.findAll('[data-test^="pane-header-"]').map((h) => h.text())
 }
 
+const CURRENT = 0
+const RESULT = 1
+const INCOMING = 2
+
+function viewAt(wrapper: VueWrapper, pane: 0 | 1 | 2): EditorView {
+  return editorViews(wrapper)[pane]!
+}
+
+function position(wrapper: VueWrapper): string {
+  return wrapper.get('[data-test="conflict-position"]').text()
+}
+
+async function click(wrapper: VueWrapper, label: string): Promise<void> {
+  await findButton(wrapper, label)?.trigger('click')
+}
+
+function press(view: EditorView, init: KeyboardEventInit): void {
+  view.contentDOM.dispatchEvent(
+    new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
+  )
+}
+
+// tintsOf is the tint class each line of the pane carries, if any.
+function tintsOf(view: EditorView): (string | undefined)[] {
+  const names = [
+    'cm-change-added',
+    'cm-change-changed',
+    'cm-conflict-unresolved',
+    'cm-conflict-resolved',
+  ]
+  return [...view.dom.querySelectorAll('.cm-line')].map((line) =>
+    names.find((name) => line.classList.contains(name)),
+  )
+}
+
+function markedLines(view: EditorView): number[] {
+  return [...view.dom.querySelectorAll('.cm-line')].flatMap((line, i) =>
+    line.classList.contains('cm-chunk-selected') ? [i + 1] : [],
+  )
+}
+
 describe('MergeEditor layout', () => {
   it('FR-CONF-05 shows the current side, the result holding the base text in each conflict with no marker line, and the incoming side', async () => {
     const file = conflictFileFixture()
@@ -48,8 +89,8 @@ describe('MergeEditor layout', () => {
       file.incoming.content,
     ])
     expect(headers(wrapper)).toEqual(['main · current branch', 'Result', 'side · merged branch'])
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 1 of 2 · 2 left')
-    const result = editorViews(wrapper)[1]!
+    expect(position(wrapper)).toBe('Change 1 of 2 · 2 left')
+    const result = viewAt(wrapper, RESULT)
     expect(result.state.doc.toString()).not.toMatch(/^[<>]{7}/m)
     expect(result.dom.querySelectorAll('.cm-conflict-unresolved')).toHaveLength(2)
   })
@@ -60,25 +101,15 @@ describe('MergeEditor layout', () => {
       incomingChanges: [{ lines: { start: 5, lines: 1 }, added: false }],
     })
     const wrapper = await mountEditor(file)
-    const [current, , incoming] = editorViews(wrapper)
-    const classes = (view: EditorView) =>
-      [...view.dom.querySelectorAll('.cm-line')].map((line) =>
-        [
-          'cm-change-added',
-          'cm-change-changed',
-          'cm-conflict-unresolved',
-          'cm-conflict-resolved',
-        ].find((name) => line.classList.contains(name)),
-      )
 
-    expect(classes(current!)).toEqual([
+    expect(tintsOf(viewAt(wrapper, CURRENT))).toEqual([
       'cm-conflict-resolved',
       'cm-conflict-unresolved',
       undefined,
       'cm-conflict-unresolved',
       undefined,
     ])
-    expect(classes(incoming!)).toEqual([
+    expect(tintsOf(viewAt(wrapper, INCOMING))).toEqual([
       undefined,
       'cm-conflict-unresolved',
       undefined,
@@ -95,14 +126,14 @@ describe('MergeEditor layout', () => {
       regions: base.regions!.map((region) => ({ ...region, base: { start: 0, lines: 0 } })),
     }
     const wrapper = await mountEditor(file)
-    const result = editorViews(wrapper)[1]!
+    const result = viewAt(wrapper, RESULT)
     const placeholders = () => result.dom.querySelectorAll('.cm-conflict-placeholder')
 
     expect(placeholders()).toHaveLength(2)
     expect(placeholders()[0]!.textContent).toBe('Unresolved change')
     placeholders()[1]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     await flushPromises()
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 2 of 2 · 2 left')
+    expect(position(wrapper)).toBe('Change 2 of 2 · 2 left')
 
     await click(wrapper, 'Take left')
 
@@ -131,7 +162,7 @@ describe('MergeEditor layout', () => {
       incomingChanges: [],
     }
     const wrapper = await mountEditor(file)
-    const result = editorViews(wrapper)[1]!
+    const result = viewAt(wrapper, RESULT)
 
     expect(result.state.doc.toString()).toBe('A\nb\nC\nx')
 
@@ -148,36 +179,14 @@ describe('MergeEditor layout', () => {
       regions: [base.regions![0]!, { ...base.regions![1]!, incoming: { start: 4, lines: 0 } }],
     }
     const wrapper = await mountEditor(file)
-    const placeholder = editorViews(wrapper)[2]!.dom.querySelector('.cm-conflict-placeholder')!
+    const placeholder = viewAt(wrapper, INCOMING).dom.querySelector('.cm-conflict-placeholder')!
 
     placeholder.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
     await flushPromises()
 
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 2 of 2 · 2 left')
+    expect(position(wrapper)).toBe('Change 2 of 2 · 2 left')
   })
 })
-
-const CURRENT = 0
-const RESULT = 1
-const INCOMING = 2
-
-function viewAt(wrapper: VueWrapper, pane: 0 | 1 | 2): EditorView {
-  return editorViews(wrapper)[pane]!
-}
-
-function position(wrapper: VueWrapper): string {
-  return wrapper.get('[data-test="conflict-position"]').text()
-}
-
-async function click(wrapper: VueWrapper, label: string): Promise<void> {
-  await findButton(wrapper, label)?.trigger('click')
-}
-
-function press(view: EditorView, init: KeyboardEventInit): void {
-  view.contentDOM.dispatchEvent(
-    new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
-  )
-}
 
 // threeRegionFile has one conflict region on each of the lines 2, 4 and 6 of
 // both sides.
@@ -397,9 +406,7 @@ describe('MergeEditor saving', () => {
 describe('MergeEditor toolbar and lifecycle', () => {
   it('FR-CONF-06 a stray marker line explains the disabled Save and mark resolved', async () => {
     const wrapper = await mountEditor()
-    await click(wrapper, 'Take left')
-    await click(wrapper, 'Next change · Alt+Down')
-    await click(wrapper, 'Take left')
+    await resolveBothConflicts(wrapper)
     const result = viewAt(wrapper, RESULT)
     result.dispatch({ changes: { from: 0, insert: '>>>>>>> stray\n' } })
     await flushPromises()
@@ -531,26 +538,6 @@ describe('MergeEditor unsaved results', () => {
     expect(wrapper.find('.error-banner').text()).toContain('no session')
   })
 })
-
-// lineClassesOf is the first tint or selection class each line of the pane
-// carries, by line.
-function tintsOf(view: EditorView): (string | undefined)[] {
-  const names = [
-    'cm-change-added',
-    'cm-change-changed',
-    'cm-conflict-unresolved',
-    'cm-conflict-resolved',
-  ]
-  return [...view.dom.querySelectorAll('.cm-line')].map((line) =>
-    names.find((name) => line.classList.contains(name)),
-  )
-}
-
-function markedLines(view: EditorView): number[] {
-  return [...view.dom.querySelectorAll('.cm-line')].flatMap((line, i) =>
-    line.classList.contains('cm-chunk-selected') ? [i + 1] : [],
-  )
-}
 
 describe('MergeEditor changes only one side made', () => {
   it('FR-CONF-05 the result starts as the base text with every change open, tinted on the sides', async () => {

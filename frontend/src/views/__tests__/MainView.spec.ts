@@ -62,7 +62,6 @@ describe('MainView', () => {
     expect(dialog.get('.p-dialog-title').text()).toBe('Settings')
     expect(dialog.find('[data-test="app-version"]').exists()).toBe(true)
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(path !== '')
-    wrapper.unmount()
   })
 
   it('FR-WT-13, FR-REPO-07 with a path, renders WorktreeContent with the path and distro', async () => {

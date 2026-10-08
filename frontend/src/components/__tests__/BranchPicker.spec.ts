@@ -56,22 +56,18 @@ const feat = branchFixture({
 })
 
 // mountPicker mounts the picker on refs and summary, its list closed.
-function mountPicker(
-  refs: Refs,
-  summary: Summary = summaryFixture({ sha: 'sha-main' }),
-  props: { wt: string; distro?: string } = { wt: '/repo' },
-) {
+function mountPicker(refs: Refs, summary: Summary = summaryFixture({ sha: 'sha-main' })) {
   useRefsStore().refs = refs
   useRepoStore().summary = summary
-  return mountInBody(BranchPicker, { props, global: { stubs: { transition: false } } })
+  return mountInBody(BranchPicker, {
+    props: { wt: '/repo' },
+    global: { stubs: { transition: false } },
+  })
 }
 
-// openPicker mounts the picker on refs and opens its list.
-async function openPicker(
-  refs: Refs = refsOfEveryKind([main, feat]),
-  props: { wt: string; distro?: string } = { wt: '/repo' },
-) {
-  const { wrapper, body } = await mountPicker(refs, undefined, props)
+// openPicker mounts the picker on refs and summary and opens its list.
+async function openPicker(refs: Refs = refsOfEveryKind([main, feat]), summary?: Summary) {
+  const { wrapper, body } = await mountPicker(refs, summary)
   await wrapper.get('[data-test="branch-picker"]').trigger('click')
   await flushPromises()
   return { wrapper, body }
@@ -305,9 +301,7 @@ describe('BranchPicker', () => {
 
   it('FR-BR-01 "New branch…" while detached starts the branch at HEAD, fixed', async () => {
     const detached = summaryFixture({ branch: '', detached: true, sha: 'abc1234567' })
-    const { wrapper, body } = await mountPicker(refsOfEveryKind([feat]), detached)
-    await wrapper.get('[data-test="branch-picker"]').trigger('click')
-    await flushPromises()
+    const { wrapper, body } = await openPicker(refsOfEveryKind([feat]), detached)
 
     await body.findAll('.picker-rows li')[0]!.get('[data-test="picker-action"]').trigger('click')
 
@@ -357,12 +351,10 @@ describe('BranchPicker', () => {
   })
 
   it('FR-BR-11 a detached HEAD names itself in the merge and rebase actions', async () => {
-    const { body } = await mountPicker(
+    const { body } = await openPicker(
       refsOfEveryKind([branchFixture({ current: false }), feat]),
       summaryFixture({ detached: true, sha: 'abcdef1234567' }),
     )
-    await body.get('[data-test="branch-picker"]').trigger('click')
-    await flushPromises()
 
     await openActions(body, 'feat')
 

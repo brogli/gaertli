@@ -1,4 +1,4 @@
-import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type BaseWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,6 +16,8 @@ import ErrorBanner from '../ErrorBanner.vue'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { Theme } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
 import { field } from '@/testing/dialog'
+import { mountInBody } from '@/testing/mountInBody'
+import { chooseOption } from '@/testing/select'
 import { System } from '@/testing/runtime'
 import { darkThemes } from '@/theme/themes'
 
@@ -25,6 +27,19 @@ async function mountPanel() {
   const wrapper = mount(SettingsPanel)
   await flushPromises()
   return wrapper
+}
+
+async function submit(wrapper: VueWrapper): Promise<void> {
+  await wrapper.find('form').trigger('submit')
+  await flushPromises()
+}
+
+// pickPreset clicks the editor preset button named name inside root.
+async function pickPreset(root: Pick<BaseWrapper<Node>, 'findAll'>, name: string): Promise<void> {
+  await root
+    .findAll('[data-test="editor-preset"]')
+    .find((b) => b.text() === name)!
+    .trigger('click')
 }
 
 describe('SettingsPanel', () => {
@@ -60,8 +75,7 @@ describe('SettingsPanel', () => {
       .findAll('.p-autocomplete-chip-item')
       .find((chip) => chip.text().includes('master'))!
     await masterChip.get('.p-chip-remove-icon').trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
 
     expect(SettingsService.Set).toHaveBeenCalledTimes(1)
     expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({
@@ -108,8 +122,7 @@ describe('SettingsPanel', () => {
   it('FR-UX-04 saving successfully emits close', async () => {
     const wrapper = await mountPanel()
 
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
 
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
@@ -136,8 +149,7 @@ describe('SettingsPanel', () => {
 
     await fieldsets[0]!.get('[data-test="folder-cmd"]').setValue('subl {path}')
 
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
 
     expect(SettingsService.Set).toHaveBeenCalledTimes(1)
     const sent = SettingsService.Set.mock.calls[0]?.[0]
@@ -165,12 +177,8 @@ describe('SettingsPanel', () => {
     const wrapper = await mountPanel()
 
     const fieldsets = wrapper.findAll('fieldset')
-    await fieldsets[1]!
-      .findAll('[data-test="editor-preset"]')
-      .find((b) => b.text() === 'VS Code')!
-      .trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await pickPreset(fieldsets[1]!, 'VS Code')
+    await submit(wrapper)
 
     const sent = SettingsService.Set.mock.calls[0]?.[0]
     expect(sent.editorProfiles['Ubuntu-22.04']).toMatchObject({
@@ -194,12 +202,8 @@ describe('SettingsPanel', () => {
     const wrapper = await mountPanel()
 
     const fieldsets = wrapper.findAll('fieldset')
-    await fieldsets[0]!
-      .findAll('[data-test="editor-preset"]')
-      .find((b) => b.text() === 'Zed')!
-      .trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await pickPreset(fieldsets[0]!, 'Zed')
+    await submit(wrapper)
 
     const sent = SettingsService.Set.mock.calls[0]?.[0]
     expect(sent.editorProfiles['']).toMatchObject({
@@ -213,12 +217,8 @@ describe('SettingsPanel', () => {
   it('FR-ED-13 on a Linux host the Zed preset opens files in the last used window', async () => {
     const wrapper = await mountPanel()
 
-    await wrapper
-      .findAll('[data-test="editor-preset"]')
-      .find((b) => b.text() === 'Zed')!
-      .trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await pickPreset(wrapper, 'Zed')
+    await submit(wrapper)
 
     expect(SettingsService.Set.mock.calls[0]?.[0].editorProfiles['']).toMatchObject({
       fileCmd: 'zed {path}',
@@ -246,8 +246,7 @@ describe('SettingsPanel', () => {
     ])
     expect(wrapper.findAll('button').map((b) => b.text())).not.toContain('Test')
 
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
 
     const sent = SettingsService.Set.mock.calls[0]?.[0]
     expect(sent.editorProfiles.Ubuntu).toMatchObject({ name: 'VS Code' })
@@ -273,8 +272,7 @@ describe('SettingsPanel', () => {
     SettingsService.Set.mockRejectedValueOnce(wailsError('settings write failed'))
     const wrapper = await mountPanel()
 
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
 
     const error = wrapper.findComponent(ErrorBanner)
     expect(error.exists()).toBe(true)
@@ -282,9 +280,7 @@ describe('SettingsPanel', () => {
   })
 
   it('FR-UX-06 the theme select lists the seven entries in order', async () => {
-    const wrapper = mount(SettingsPanel, { attachTo: document.body })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { wrapper, body } = await mountInBody(SettingsPanel)
 
     await wrapper.get('[data-test="theme-select"]').trigger('click')
     await flushPromises()
@@ -296,7 +292,6 @@ describe('SettingsPanel', () => {
       'Dark',
       ...darkThemes.map((t) => t.label),
     ])
-    wrapper.unmount()
   })
 
   it('FR-UX-06 the credits list the four dark themes by name, copyright and MIT licence, linking to their repo', async () => {
@@ -337,20 +332,14 @@ describe('SettingsPanel', () => {
   })
 
   it('FR-UX-06 picking Dark and saving persists it and applies the theme immediately', async () => {
-    const wrapper = mount(SettingsPanel, { attachTo: document.body })
-    await flushPromises()
-    const body = new DOMWrapper(document.body)
+    const { wrapper, body } = await mountInBody(SettingsPanel)
 
-    await wrapper.get('[data-test="theme-select"]').trigger('click')
-    await flushPromises()
-    await body.get('.p-select-overlay [role="option"][aria-label="Dark"]').trigger('mousedown')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await chooseOption(body, 'theme-select', 'Dark')
+    await submit(wrapper)
 
     expect(SettingsService.Set).toHaveBeenCalledTimes(1)
     expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({ theme: Theme.DarkTheme })
     expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
-    wrapper.unmount()
   })
 
   it('FR-ED-07 a preset fills all three commands, and the next preset fully overwrites rather than merges', async () => {
@@ -361,20 +350,15 @@ describe('SettingsPanel', () => {
       file: fieldset.findAll<HTMLInputElement>('input[type=text]')[2]!.element.value,
       line: fieldset.findAll<HTMLInputElement>('input[type=text]')[3]!.element.value,
     })
-    const pick = (name: string) =>
-      fieldset
-        .findAll('[data-test="editor-preset"]')
-        .find((b) => b.text() === name)!
-        .trigger('click')
 
-    await pick('VS Code')
+    await pickPreset(fieldset, 'VS Code')
     expect(fields()).toEqual({
       folder: 'code {path}',
       file: 'code {path}',
       line: 'code -g {path}:{line}',
     })
 
-    await pick('Neovim (terminal)')
+    await pickPreset(fieldset, 'Neovim (terminal)')
     expect(fields()).toEqual({
       folder: 'x-terminal-emulator -e nvim {path}',
       file: 'x-terminal-emulator -e nvim {path}',
@@ -397,8 +381,7 @@ describe('SettingsPanel', () => {
     await local.setValue(' /wt ')
     await field(wrapper, 'Base folder for new worktrees in WSL: Ubuntu').setValue('/home/u/wt')
     await field(wrapper, 'Base folder for new worktrees in WSL: Debian').setValue('')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submit(wrapper)
 
     expect(SettingsService.Set.mock.calls[0]?.[0].worktreeFolders).toEqual({
       '': '/wt',

@@ -83,6 +83,14 @@ function conflictedPull(id: string) {
 // openPullMenu opens the Pull SplitButton's mode menu.
 async function openPullMenu(body: DOMWrapper<Element>): Promise<void> {
   await body.get('.p-splitbutton-dropdown').trigger('click')
+  await flushPromises()
+}
+
+// choosePullMode picks mode in the Pull SplitButton's menu.
+async function choosePullMode(body: DOMWrapper<Element>, mode: string): Promise<void> {
+  await openPullMenu(body)
+  await clickMenuItem(body, mode, 'tieredmenu')
+  await flushPromises()
 }
 
 describe('SyncControls', () => {
@@ -313,10 +321,7 @@ describe('SyncControls', () => {
     const { body } = await mountControls()
     await flushPromises()
 
-    await openPullMenu(body)
-    await flushPromises()
-    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
-    await flushPromises()
+    await choosePullMode(body, 'Pull (rebase)')
 
     expect(Facade.Pull).not.toHaveBeenCalled()
     expect(settingsStore.save).toHaveBeenCalledTimes(1)
@@ -332,10 +337,7 @@ describe('SyncControls', () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
     await flushPromises()
-    await openPullMenu(body)
-    await flushPromises()
-    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
-    await flushPromises()
+    await choosePullMode(body, 'Pull (rebase)')
 
     pressKey('t', { ctrlKey: true })
     await flushPromises()
@@ -351,7 +353,6 @@ describe('SyncControls', () => {
     await flushPromises()
 
     await openPullMenu(body)
-    await flushPromises()
 
     expect(menuLabels(body, 'tieredmenu')).toEqual(['Pull (merge)', 'Pull (rebase)'])
     const items = body.findAll('.p-tieredmenu-item-content')
@@ -368,10 +369,7 @@ describe('SyncControls', () => {
     const { body } = await mountControls()
     await flushPromises()
 
-    await openPullMenu(body)
-    await flushPromises()
-    await clickMenuItem(body, 'Pull (rebase)', 'tieredmenu')
-    await flushPromises()
+    await choosePullMode(body, 'Pull (rebase)')
 
     expect(body.get('.error-banner').text()).toContain('disk full')
     expect(Facade.Pull).not.toHaveBeenCalled()

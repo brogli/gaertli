@@ -253,11 +253,6 @@ describe('LogList', () => {
     expect(wrapper.find('.row .hash').text()).toBe('abcdef0')
   })
 
-  async function mountWithRefs(names: string[]) {
-    const refs = names.map((name) => ({ name, kind: RefKind.BranchRef }))
-    return (await mountWithRows([commitRow({ refs })])).wrapper
-  }
-
   it.each([
     [['main', 'origin/main'], ['main', 'origin/main'], '', ''],
     [
@@ -269,7 +264,8 @@ describe('LogList', () => {
   ])(
     'FR-LOG-01 a row shows at most two ref labels, then "+N" with every label in its title (%j)',
     async (names, shown, more, allTitles) => {
-      const wrapper = await mountWithRefs(names)
+      const refs = names.map((name) => ({ name, kind: RefKind.BranchRef }))
+      const { wrapper } = await mountWithRows([commitRow({ refs })])
 
       const labels = wrapper.findAll('.ref-label')
       expect(labels.map((l) => l.text())).toEqual(shown)
@@ -342,9 +338,8 @@ describe('LogList', () => {
     await rowEls[7]!.trigger('click', { ctrlKey: true }) // clicked first, despite the higher row index
     await rowEls[2]!.trigger('click', { ctrlKey: true })
 
-    const classesOf = (i: number) => rowEls[i]!.classes()
-    expect(classesOf(7)).toContain('compare-from')
-    expect(classesOf(2)).toContain('compare-to')
+    expect(rowEls[7]!.classes()).toContain('compare-from')
+    expect(rowEls[2]!.classes()).toContain('compare-to')
     expect(wrapper.findAll('.row').some((r) => r.classes('selected'))).toBe(false)
   })
 
@@ -358,17 +353,9 @@ describe('LogList', () => {
     compare.swap()
     await wrapper.vm.$nextTick()
 
-    const classesOf = (i: number) => rowEls[i]!.classes()
-    expect(classesOf(0)).toContain('compare-to') // sha-a's mark moved
-    expect(classesOf(1)).toContain('compare-from') // sha-b's mark moved
+    expect(rowEls[0]!.classes()).toContain('compare-to') // sha-a's mark moved
+    expect(rowEls[1]!.classes()).toContain('compare-from') // sha-b's mark moved
   })
-
-  // confirmPick clicks PickDialog's own Confirm button (already open, from
-  // a prior "…" menu click, or a plain "Cherry-pick" on a single merge
-  // commit).
-  async function confirmPick(body: DOMWrapper<Element>): Promise<void> {
-    await body.get('[data-test="pick-submit"]').trigger('click')
-  }
 
   it('FR-CP-01, FR-LOG-11 click then shift-click then right-click acts directly on the whole range', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
@@ -489,7 +476,7 @@ describe('LogList', () => {
     await rowEls[2]!.trigger('click', { shiftKey: true })
     await openMenu(wrapper, rowEls[1]!)
     await clickMenuItem(body, 'Cherry-pick 3 commits…')
-    await confirmPick(body)
+    await body.get('[data-test="pick-submit"]').trigger('click')
 
     expect(Facade.CherryPick).toHaveBeenCalledTimes(1)
     expect(Facade.CherryPick).toHaveBeenCalledWith(
@@ -505,7 +492,7 @@ describe('LogList', () => {
     await rowEls[0]!.trigger('click')
     await openMenu(wrapper, rowEls[0]!)
     await clickMenuItem(body, 'Revert…')
-    await confirmPick(body)
+    await body.get('[data-test="pick-submit"]').trigger('click')
 
     expect(Facade.Revert).toHaveBeenCalledTimes(1)
     expect(Facade.Revert).toHaveBeenCalledWith('/repo', ['sha-a'], gitDefaults)
@@ -519,7 +506,7 @@ describe('LogList', () => {
     await rowEls[2]!.trigger('click', { shiftKey: true })
     await openMenu(wrapper, rowEls[1]!)
     await clickMenuItem(body, 'Cherry-pick 3 commits…')
-    await confirmPick(body)
+    await body.get('[data-test="pick-submit"]').trigger('click')
     await flushPromises()
 
     expect(log.selection).toEqual([])
@@ -532,8 +519,7 @@ describe('LogList', () => {
     await rowEls[0]!.trigger('click')
     await openMenu(wrapper, rowEls[1]!)
 
-    const labels = menuLabels(body)
-    expect(labels).toContain('Compare with sha-a')
+    expect(menuLabels(body)).toContain('Compare with sha-a')
     expect(log.selection.map((r) => r.sha)).toEqual(['sha-b'])
   })
 
@@ -571,9 +557,10 @@ describe('LogList', () => {
     if (selectFirst) await rowEls[0]!.trigger('click')
     await openMenu(wrapper, rowEls[0]!)
 
-    const labels = menuLabels(body)
     expect(
-      labels.some((l) => l !== 'Compare with working tree' && l.startsWith('Compare with ')),
+      menuLabels(body).some(
+        (l) => l !== 'Compare with working tree' && l.startsWith('Compare with '),
+      ),
     ).toBe(false)
   })
 
@@ -633,6 +620,16 @@ describe('LogList', () => {
     expect(log.details).toBeNull()
   })
 
+  const threeCommitsMenu = [
+    'Cherry-pick 3 commits',
+    'Cherry-pick 3 commits…',
+    'Revert 3 commits',
+    'Revert 3 commits…',
+    'Squash 3 commits…',
+    'Fixup 3 commits…',
+    'Copy 3 hashes',
+  ]
+
   it('FR-LOG-11 right-click inside three commits selected by shift-click opens the menu for three, no swap', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
 
@@ -640,15 +637,7 @@ describe('LogList', () => {
     await rowEls[2]!.trigger('click', { shiftKey: true })
     await openMenu(wrapper, rowEls[1]!)
 
-    expect(menuLabels(body)).toEqual([
-      'Cherry-pick 3 commits',
-      'Cherry-pick 3 commits…',
-      'Revert 3 commits',
-      'Revert 3 commits…',
-      'Squash 3 commits…',
-      'Fixup 3 commits…',
-      'Copy 3 hashes',
-    ])
+    expect(menuLabels(body)).toEqual(threeCommitsMenu)
     expect(Facade.SquashCheck).toHaveBeenCalledWith('/repo', ['sha-a', 'sha-b', 'sha-c'])
   })
 
@@ -660,15 +649,7 @@ describe('LogList', () => {
 
     await openMenu(wrapper, rowEls[3]!)
 
-    expect(menuLabels(body)).toEqual([
-      'Cherry-pick 3 commits',
-      'Cherry-pick 3 commits…',
-      'Revert 3 commits',
-      'Revert 3 commits…',
-      'Squash 3 commits…',
-      'Fixup 3 commits…',
-      'Copy 3 hashes',
-    ])
+    expect(menuLabels(body)).toEqual(threeCommitsMenu)
     expect(Facade.SquashCheck).toHaveBeenCalledWith('/repo', ['sha-a', 'sha-b', 'sha-d'])
   })
 
