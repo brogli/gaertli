@@ -12,16 +12,12 @@ function family(page: Page, selector: string): Promise<string> {
     .evaluate((el) => getComputedStyle(el).fontFamily)
 }
 
-async function openLog(page: Page): Promise<void> {
-  await openMockRepo(page)
-  await page.evaluate(() => document.fonts.ready)
-}
-
 test('FR-UX-18 the UI, OpenVue components included, uses the bundled font; hashes and diffs the bundled fixed-width font', async ({
   page,
 }) => {
   const fixedWidth = /^"JetBrains Mono Variable"/
-  await openLog(page)
+  await openMockRepo(page)
+  await page.evaluate(() => document.fonts.ready)
 
   expect(await family(page, 'body')).toMatch(/^"Inter Variable"/)
   expect(await family(page, '.p-button')).toMatch(/^"Inter Variable"/)

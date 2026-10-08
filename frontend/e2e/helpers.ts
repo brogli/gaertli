@@ -61,6 +61,13 @@ export function refLi(page: Page, name: string): Locator {
   })
 }
 
+// switchToChanges picks "Changes" in the medium layout's side-panel switch
+// and waits for the change list.
+export async function switchToChanges(page: Page): Promise<void> {
+  await page.getByRole('tab', { name: /^Changes/ }).click()
+  await page.locator('.changes-column .files li').first().waitFor()
+}
+
 // dragLogBorder drags the border right of the log view to x.
 export async function dragLogBorder(page: Page, x: number): Promise<void> {
   const gutter = (await page.locator('.worktree-body > .p-splitter-gutter').boundingBox())!

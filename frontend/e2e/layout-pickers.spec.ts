@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { openBranchPicker, openMockRepo, openWorktreePicker, overflows, refLi } from './helpers'
 
-// Layout at the 1200 x 800 window the fixtures open, with the mock's refs
+// Layout at a 1200 x 800 window, with the mock's refs
 // and worktrees in the pickers.
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })

@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { openMockRepo, settleAnimations } from './helpers'
+import { openBranchPicker, openMockRepo, openWorktreePicker, settleAnimations } from './helpers'
 
 // A click inside a popover that stops its own propagation never reaches the
 // document listener that resets OpenVue Popover's outside-click bookkeeping,
@@ -18,8 +18,7 @@ test('FR-UX-14 a worktree row button click still lets a later outside click clos
 }) => {
   await openMockRepo(page)
 
-  await page.locator('[data-test=worktree-picker]').click()
-  await page.locator('.p-popover .picker-list li').first().waitFor()
+  await openWorktreePicker(page)
   // Any row's button does: this click only needs to stop propagation inside
   // the popover.
   await page.locator('[data-test=open-in-editor]').first().click()
@@ -29,18 +28,11 @@ test('FR-UX-14 a worktree row button click still lets a later outside click clos
   await expect(page.locator('.p-popover')).toBeHidden()
 })
 
-// openBranchList opens the mock repo's branch picker list and waits until
-// it stands still.
-async function openBranchList(page: Page): Promise<void> {
-  await openMockRepo(page)
-  await page.locator('[data-test=branch-picker]').click()
-  await settledBox(page, page.locator('.p-popover .branch-list'))
-}
-
 test('FR-BR-09, FR-UX-14 a branch entry\'s context menu opens at the pointer and its "…" menu below its button; one outside click closes the menu and the list', async ({
   page,
 }) => {
-  await openBranchList(page)
+  await openMockRepo(page)
+  await openBranchPicker(page)
   const menu = page.locator('.p-contextmenu')
   const rows = page.locator('.p-popover .picker-rows > li').filter({
     has: page.locator('[data-test=ref-row]'),
@@ -65,8 +57,7 @@ test('FR-BR-09, FR-UX-14 a branch entry\'s context menu opens at the pointer and
   expect(Math.abs(atPointer.y - (rowBox.y + rowBox.height / 2))).toBeLessThanOrEqual(2)
   await expectOutsideClickClosesBoth()
 
-  await page.locator('[data-test=branch-picker]').click()
-  await settledBox(page, page.locator('.p-popover .branch-list'))
+  await openBranchPicker(page)
   const button = rows.nth(1).locator('[data-test=row-actions]')
   const buttonBox = (await button.boundingBox())!
   await button.click()
@@ -79,7 +70,8 @@ test('FR-BR-09, FR-UX-14 a branch entry\'s context menu opens at the pointer and
 test("FR-BR-09 Shift+F10 in the branch list opens the active entry's context menu below it; Escape closes both", async ({
   page,
 }) => {
-  await openBranchList(page)
+  await openMockRepo(page)
+  await openBranchPicker(page)
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Shift+F10')
   const menu = page.locator('.p-contextmenu')

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
 // alphaOf reads a computed background colour's alpha channel, from either
@@ -11,21 +11,15 @@ function alphaOf(color: string): number {
   return rgba ? Number(rgba[1]) : 1
 }
 
-// showSampleNotices opens debug mode's strip and clicks its three sample
-// buttons, so an error, a warning and a success notice all show at once.
-async function showSampleNotices(page: Page): Promise<void> {
+test('FR-UX-15 in the light and the dark theme an error, a warning and a success notice are each opaque', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' })
   await openMockRepo(page, '&debug=1')
   for (const label of ['Error', 'Warning', 'Success']) {
     await page.getByRole('button', { name: label }).click()
   }
   await page.locator('.p-toast-message-success').waitFor()
-}
-
-test('FR-UX-15 in the light and the dark theme an error, a warning and a success notice are each opaque', async ({
-  page,
-}) => {
-  await page.emulateMedia({ colorScheme: 'light' })
-  await showSampleNotices(page)
 
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme })

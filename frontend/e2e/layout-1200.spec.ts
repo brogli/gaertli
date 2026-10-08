@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { expectNoOverlap, mockDiffUrl, openMockRepo } from './helpers'
+import { expectNoOverlap, mockDiffUrl, openMockRepo, switchToChanges } from './helpers'
 
 // happy-dom computes no layout, so these checks (widths, wrapping, shared
 // rows) need a real browser, at 1200 x 800.
@@ -59,13 +59,6 @@ test('FR-UX-07 FR-UX-14 each picker opens inside the window, scrolls only vertic
     await expect(page.locator('.p-popover')).toBeHidden()
   }
 })
-
-// switchToChanges picks "Changes (n)" in the medium layout's side-panel
-// switch and waits for the change list.
-async function switchToChanges(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: /^Changes/ }).click()
-  await page.locator('.changes-column .files li').first().waitFor()
-}
 
 test('FR-UX-08 the log is the left column; a switch above it picks Details or Changes to its right', async ({
   page,

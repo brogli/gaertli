@@ -1,20 +1,12 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
-import { dragLogBorder, openMockRepo, overflows } from './helpers'
+import { test, expect, type Locator } from '@playwright/test'
+import { dragLogBorder, openMockRepo, overflows, switchToChanges } from './helpers'
 
-// Layout at the 1200 x 800 window the fixtures open, with the mock's
+// Layout at a 1200 x 800 window, with the mock's
 // default log rows: row 0 (HEAD) carries four ref labels, and the changes
 // view has a file in each group.
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
 })
-
-// switchToChanges picks "Changes" in the medium layout's side-panel switch,
-// so the changes view shows beside the log instead of the commit detail
-// view it defaults to.
-async function switchToChanges(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: /^Changes/ }).click()
-  await page.locator('.changes-body').waitFor()
-}
 
 test("FR-UX-09 the changes heading shows whole; Stage all and Unstage all share one row, each file row keeps its buttons on the name's line", async ({
   page,
