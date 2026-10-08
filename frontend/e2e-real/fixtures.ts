@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
-import { ChangeScope, PullMode } from '../bindings/github.com/brogli/nebegit/internal/core/models'
+import { PullMode } from '../bindings/github.com/brogli/nebegit/internal/core/models'
 import {
   DiffMode,
   type Preferences,
@@ -106,16 +106,16 @@ export const test = base.extend<Options & Fixtures>({
     expect(pageErrors, 'errors in the page').toEqual([])
   },
 
-  openApp: async ({ server, newPage, git }, use) => {
+  openApp: async ({ server, newPage }, use) => {
     await use(async (worktree) => {
       const page = await newPage()
-      await load(page, server.url, worktree, git)
+      await load(page, server.url, worktree)
       return page
     })
   },
 
-  // Server mode drops events emitted before the page's event websocket
-  // connects, so the page is ready once it has.
+  // Server mode holds a page's events until its event websocket connects,
+  // so the page is ready once it has.
   openDiff: async ({ server, newPage }, use) => {
     await use(async (worktree, target) => {
       const page = await newPage()
@@ -168,20 +168,15 @@ function seedSettings(
 }
 
 // load opens worktree's page and waits until its log shows. Server mode
-// drops events emitted before the page's event websocket connects, and the
-// log's first load can be among them. Once connected, load creates and
-// then deletes a tag, waiting each time for the log to reload; a reload
-// happens only when the refs differ, so both steps are needed.
-async function load(page: Page, url: string, worktree: string, git: Git): Promise<void> {
+// holds a page's events until its event websocket connects, so the page's
+// first full log load is announced to load.
+async function load(page: Page, url: string, worktree: string): Promise<void> {
   const events: WailsEvent[] = []
   page.on('websocket', (ws) =>
     ws.on('framereceived', ({ payload }) => events.push(JSON.parse(String(payload)))),
   )
-  const connected = waitForEvents(page)
   await page.goto(`${url}/?path=${encodeURIComponent(worktree)}`)
-  await connected
-  await changeRefsAndWaitForReload(events, () => git(worktree, 'tag', 'e2e-nudge'))
-  await changeRefsAndWaitForReload(events, () => git(worktree, 'tag', '-d', 'e2e-nudge'))
+  await expect.poll(() => events.some(isFullLogLoaded)).toBe(true)
   await expect(page.locator('.row').first()).toBeVisible()
   // The fixture's 1200 x 800 viewport is the medium layout: the switch
   // above the log's side panel defaults to Details. Most area specs work
@@ -198,27 +193,11 @@ async function waitForEvents(page: Page): Promise<void> {
 
 interface WailsEvent {
   name?: string
-  data?: { scope?: ChangeScope; done?: boolean; filtered?: boolean }
+  data?: { done?: boolean; filtered?: boolean }
 }
 
-async function changeRefsAndWaitForReload(events: WailsEvent[], change: () => void): Promise<void> {
-  const before = events.length
-  change()
-  await expect.poll(() => reloadedAfterRefsChange(events.slice(before))).toBe(true)
-}
-
-// reloadedAfterRefsChange: a refs change arrived, and after it the full
-// log finished loading.
-function reloadedAfterRefsChange(events: WailsEvent[]): boolean {
-  const changed = events.findIndex(
-    (e) => e.name === 'repo:changed' && e.data?.scope === ChangeScope.RefsChanged,
-  )
-  return (
-    changed >= 0 &&
-    events
-      .slice(changed + 1)
-      .some((e) => e.name === 'log:progress' && e.data?.done === true && !e.data.filtered)
-  )
+function isFullLogLoaded(e: WailsEvent): boolean {
+  return e.name === 'log:progress' && e.data?.done === true && !e.data.filtered
 }
 
 function freePort(): Promise<number> {
