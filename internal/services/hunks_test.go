@@ -459,27 +459,13 @@ func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedHunk(t *testing.T) 
 	}
 }
 
-// oneHunkFixture writes a base commit and an unstaged edit with exactly
-// one hunk, one changed line at line 2 on both diff sides.
-func oneHunkFixture(t *testing.T, dir string) {
-	t.Helper()
-	gittest.Commit(t, dir, "f.txt", "a\nb\nc\n", "base")
-	writeFile(t, dir, "f.txt", "a\nB\nc\n")
-}
-
-// twoChangeFixture writes a base commit and an unstaged edit of lines 3 and
-// 5, which git diff -U3 reports as one hunk. Each edit replaces one line,
-// so its line number is the same on both diff sides.
-func twoChangeFixture(t *testing.T, dir string) {
-	t.Helper()
-	gittest.Commit(t, dir, "f.txt", "a\nb\nc\nd\ne\nf\ng\nh\n", "base")
-	writeFile(t, dir, "f.txt", "a\nb\nC\nd\nE\nf\ng\nh\n")
-}
-
 func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedChangeEvenWhenGitMergesTwoChangesIntoOneHunk(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	twoChangeFixture(t, repo.Dir)
+	// Lines 3 and 5 replaced: git diff -U3 reports one hunk, each line at the
+	// same number on both diff sides.
+	gittest.Commit(t, repo.Dir, "f.txt", "a\nb\nc\nd\ne\nf\ng\nh\n", "base")
+	writeFile(t, repo.Dir, "f.txt", "a\nb\nC\nd\nE\nf\ng\nh\n")
 	c, id := openWorktree(t, repo.Dir)
 	stage := func(change int, reverse bool) {
 		t.Helper()
@@ -523,7 +509,8 @@ func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedChangeEvenWhenGitMe
 func TestFR_CHG_03_StageLinesSelectingLinesTheDiffDoesNotChangeIsInternal(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	oneHunkFixture(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f.txt", "a\nb\nc\n", "base")
+	writeFile(t, repo.Dir, "f.txt", "a\nB\nc\n")
 	c, id := openWorktree(t, repo.Dir)
 	ctx := t.Context()
 	staged := func() string { return gittest.Out(t, repo.Dir, "diff", "--cached", "--", "f.txt") }

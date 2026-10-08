@@ -168,16 +168,15 @@ func TestFR_LOG_14_TheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T)
 func TestFR_LOG_14_FixupKeepsTheOldestMessageExactly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "base.txt", "base\n", "base")
-	writeFile(t, repo.Dir, "b.txt", "b\n")
-	gittest.Run(t, repo.Dir, "add", "b.txt")
-	gittest.Run(t, repo.Dir, "commit", "--cleanup=verbatim", "-m", uncleanMessage)
-	b := gittest.HeadSHA(t, repo.Dir)
-	gittest.Commit(t, repo.Dir, "c.txt", "c\n", "C")
+	shas := gittest.History(t, repo.Dir,
+		gittest.Step{Message: "base", Files: map[string]string{"base.txt": "base\n"}},
+		gittest.Step{Message: uncleanMessage, Files: map[string]string{"b.txt": "b\n"}},
+		gittest.Step{Message: "C", Files: map[string]string{"c.txt": "c\n"}},
+	)
 	gittest.Run(t, repo.Dir, "config", "commit.cleanup", "strip")
 	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Fixup(t.Context(), wt, []string{gittest.HeadSHA(t, repo.Dir), b}); err != nil {
+	if _, err := c.Fixup(t.Context(), wt, []string{shas[2], shas[1]}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -190,14 +189,13 @@ func TestFR_LOG_14_FixupKeepsTheOldestMessageExactly(t *testing.T) {
 // both set f.txt: D no longer applies once moved up next to B.
 func conflictLine(t *testing.T, dir string) (b, d string) {
 	t.Helper()
-	gittest.Commit(t, dir, "f.txt", "base\n", "base")
-	writeFile(t, dir, "b.txt", "b\n")
-	gittest.Run(t, dir, "add", "b.txt")
-	gittest.Run(t, dir, "commit", "--cleanup=verbatim", "-m", uncleanMessage)
-	b = gittest.HeadSHA(t, dir)
-	gittest.Commit(t, dir, "f.txt", "c\n", "C")
-	gittest.Commit(t, dir, "f.txt", "d\n", "D")
-	return b, gittest.HeadSHA(t, dir)
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: map[string]string{"f.txt": "base\n"}},
+		gittest.Step{Message: uncleanMessage, Files: map[string]string{"b.txt": "b\n"}},
+		gittest.Step{Message: "C", Files: map[string]string{"f.txt": "c\n"}},
+		gittest.Step{Message: "D", Files: map[string]string{"f.txt": "d\n"}},
+	)
+	return shas[1], shas[3]
 }
 
 func TestFR_LOG_14_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {

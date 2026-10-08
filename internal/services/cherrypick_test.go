@@ -244,8 +244,8 @@ func TestFR_CP_02_CherryPickAppliesParentBeforeChildWhenCommitterDatesTie(t *tes
 		t.Fatal(err)
 	}
 
-	if got := commitSubjects(t, repo.Dir, "master", "fresh"); !slices.Equal(got, []string{"A", "B", "C", "D"}) {
-		t.Errorf("commit order on fresh = %v, want [A B C D] (parent before child)", got)
+	if got := gittest.Out(t, repo.Dir, "log", "--reverse", "--format=%s", "master..fresh"); got != "A\nB\nC\nD" {
+		t.Errorf("commit order on fresh = %q, want A, B, C, D (parent before child)", got)
 	}
 	content := readFile(t, repo.Dir, "chain.txt")
 	if content != "A\nB\nC\nD\n" {
@@ -609,11 +609,4 @@ func commitDated(t *testing.T, dir, name, content, msg string, at time.Time) {
 	if err != nil {
 		t.Fatalf("git commit: %v\n%s", err, result.Stderr)
 	}
-}
-
-// commitSubjects returns the subjects of the commits reachable from to but
-// not from, oldest first.
-func commitSubjects(t *testing.T, dir, from, to string) []string {
-	t.Helper()
-	return strings.Split(gittest.Out(t, dir, "log", "--reverse", "--format=%s", from+".."+to), "\n")
 }

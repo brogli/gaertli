@@ -56,14 +56,6 @@ func remoteAppendCommit(t *testing.T, remoteDir, file, content, msg string) stri
 // remote's default branch).
 func remoteAppendCommitOnBranch(t *testing.T, remoteDir, branch, file, content, msg string) string {
 	t.Helper()
-	return remoteAppendCommitFiles(t, remoteDir, branch, map[string]string{file: content}, msg)
-}
-
-// remoteAppendCommitFiles commits every file in files to branch ("" for the
-// remote's default branch) in a single commit, so a merge/rebase step
-// conflicts on all of them at once.
-func remoteAppendCommitFiles(t *testing.T, remoteDir, branch string, files map[string]string, msg string) string {
-	t.Helper()
 	parent := t.TempDir()
 	clone := filepath.Join(parent, "clone")
 	args := []string{"clone"}
@@ -71,11 +63,7 @@ func remoteAppendCommitFiles(t *testing.T, remoteDir, branch string, files map[s
 		args = append(args, "--branch", branch)
 	}
 	gittest.Run(t, parent, append(args, remoteDir, clone)...)
-	for name, content := range files {
-		writeFile(t, clone, name, content)
-	}
-	gittest.Run(t, clone, "add", "-A")
-	gittest.CommitAll(t, clone, msg)
+	gittest.Commit(t, clone, file, content, msg)
 	gittest.Run(t, clone, "push", "origin", "HEAD")
 	return gittest.HeadSHA(t, clone)
 }

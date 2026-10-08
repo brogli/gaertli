@@ -78,17 +78,6 @@ func conflictPath(kind string) string {
 
 var operationKinds = []string{"merge", "rebase", "cherry-pick", "revert"}
 
-// assertOperationCompleted asserts what every kind's own successful
-// continue leaves behind: HEAD advanced past beforeHEAD with the completed
-// operation's own commit, and Summary.Operation cleared.
-func assertOperationCompleted(t *testing.T, c *Core, wt core.WorktreeID, dir, beforeHEAD string) {
-	t.Helper()
-	if got := gittest.HeadSHA(t, dir); got == beforeHEAD {
-		t.Error("HEAD did not advance with the completed operation's own commit")
-	}
-	assertOperation(t, c, wt, "")
-}
-
 // assertOperation asserts that Summary names want as the operation in
 // progress, "" for none.
 func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.Operation) {
@@ -118,7 +107,10 @@ func TestFR_CONF_04_FR_CP_03_FR_RV_03_ContinueOperationSucceedsOnceTheOnlyConfli
 			if fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
 				t.Errorf("%s present, want gone once the operation completed", operationStateFile[kind])
 			}
-			assertOperationCompleted(t, c, wt, dir, beforeHEAD)
+			if got := gittest.HeadSHA(t, dir); got == beforeHEAD {
+				t.Error("HEAD did not advance with the completed operation's own commit")
+			}
+			assertOperation(t, c, wt, "")
 		})
 	}
 }

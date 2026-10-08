@@ -106,18 +106,11 @@ func TestQA_COMP_01_DiffWorkingShowsAFilteredWorkingFileInTheCleanForm(t *testin
 	assertDiff(t, got, err, "HELLO\nWORLD\n", "HELLO\nTHERE\n", hunk(2, 1, 2, 1))
 }
 
-// whitespaceFixture commits f.txt and edits line 2 by whitespace only and
-// line 3 for real.
-func whitespaceFixture(t *testing.T, dir string) {
-	t.Helper()
-	gittest.Commit(t, dir, "f.txt", "one\ntwo\nthree\n", "base")
-	writeFile(t, dir, "f.txt", "one\ntwo  \nTHREE\n")
-}
-
 func TestFR_DIFF_06_DiffWorkingIgnoringWhitespaceKeepsOnlyRealChangesInTheHunks(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	whitespaceFixture(t, repo.Dir)
+	gittest.Commit(t, repo.Dir, "f.txt", "one\ntwo\nthree\n", "base")
+	writeFile(t, repo.Dir, "f.txt", "one\ntwo  \nTHREE\n") // line 2 changed by whitespace only
 
 	full, fullErr := diffWorking(t, repo.Dir, "f.txt", core.DiffOptions{})
 	ignoring, ignoringErr := diffWorking(t, repo.Dir, "f.txt", core.DiffOptions{IgnoreWhitespace: true})
