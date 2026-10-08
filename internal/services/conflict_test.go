@@ -281,7 +281,7 @@ func TestFR_CONF_02_ConflictTextWithoutWorkingFileIsFileNotFound(t *testing.T) {
 
 	_, err := c.Conflict(t.Context(), wt, "a.txt")
 
-	_ = coretest.AsError(t, err, core.FileNotFound)
+	coretest.AssertCode(t, err, core.FileNotFound)
 }
 
 func TestFR_CONF_05_ConflictOnACleanPathIsNotConflicted(t *testing.T) {

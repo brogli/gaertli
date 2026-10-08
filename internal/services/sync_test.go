@@ -130,30 +130,20 @@ func TestFR_SYNC_04_ClassifyPushRejectionClassifiesByReason(t *testing.T) {
 
 func TestFR_UPD_03_ClassifyDivergedFetchReclassifiesNonFastForward(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name   string
-		stderr string
-		want   core.Code
-	}{
-		{"non-fast-forward", " ! [rejected]        B          -> B  (non-fast-forward)\n", core.NotFastForward},
-		{"unrelated refusal", "fatal: couldn't find remote ref B\n", core.GitFailed},
+	classify := func(stderr string) error {
+		return classifyDivergedFetch(&core.Error{Code: core.GitFailed}, git.Result{Stderr: []byte(stderr)}, "B")
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := &core.Error{Code: core.GitFailed}
-			got := classifyDivergedFetch(err, git.Result{Stderr: []byte(tt.stderr)}, "B")
-			ce := coretest.AsError(t, got, tt.want)
-			if tt.want == core.NotFastForward {
-				if !strings.Contains(ce.Message, `"B"`) {
-					t.Errorf("message = %q, want it to name the branch", ce.Message)
-				}
-				if ce.Key != "branchDiverged" || ce.Args["branch"] != "B" {
-					t.Errorf("Key/Args = %q/%+v, want branchDiverged/branch=B", ce.Key, ce.Args)
-				}
-			} else if ce.Key != "" {
-				t.Errorf("Key = %q, want empty (no remap happened)", ce.Key)
-			}
-		})
+
+	ce := coretest.AsError(t, classify(" ! [rejected]        B          -> B  (non-fast-forward)\n"), core.NotFastForward)
+	if !strings.Contains(ce.Message, `"B"`) {
+		t.Errorf("message = %q, want it to name the branch", ce.Message)
+	}
+	if ce.Key != "branchDiverged" || ce.Args["branch"] != "B" {
+		t.Errorf("Key/Args = %q/%+v, want branchDiverged/branch=B", ce.Key, ce.Args)
+	}
+
+	if ce := coretest.AsError(t, classify("fatal: couldn't find remote ref B\n"), core.GitFailed); ce.Key != "" {
+		t.Errorf("unrelated refusal: Key = %q, want empty (no remap happened)", ce.Key)
 	}
 }
 

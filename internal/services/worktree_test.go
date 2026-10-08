@@ -25,33 +25,22 @@ func TestFR_WT_01_ParseWorktreeRecordsParsesFieldsAndFlags(t *testing.T) {
 	if len(got) != 4 {
 		t.Fatalf("len(records) = %d, want 4", len(got))
 	}
-	if !got[0].Main {
-		t.Error("records[0].Main = false, want true (the main worktree, listed first)")
-	}
-	for i := 1; i < len(got); i++ {
-		if got[i].Main {
-			t.Errorf("records[%d].Main = true, want false", i)
+	for i, r := range got {
+		if r.Main != (i == 0) {
+			t.Errorf("records[%d].Main = %v, want only the first, the main worktree", i, r.Main)
 		}
 	}
-
-	branch := got[0]
-	if branch.Branch != "main" {
-		t.Errorf("branch worktree = %+v, want Branch \"main\"", branch)
+	if got[0].Branch != "main" {
+		t.Errorf("branch worktree = %+v, want Branch \"main\"", got[0])
 	}
-
-	detached := got[1]
-	if detached.Branch != "" {
-		t.Errorf("detached worktree = %+v, want Branch empty", detached)
+	if got[1].Branch != "" {
+		t.Errorf("detached worktree = %+v, want Branch empty", got[1])
 	}
-
-	locked := got[2]
-	if !locked.Locked {
-		t.Errorf("locked worktree = %+v, want Locked true", locked)
+	if !got[2].Locked {
+		t.Errorf("locked worktree = %+v, want Locked true", got[2])
 	}
-
-	prunable := got[3]
-	if !prunable.Missing {
-		t.Errorf("prunable worktree = %+v, want Missing true", prunable)
+	if !got[3].Missing {
+		t.Errorf("prunable worktree = %+v, want Missing true", got[3])
 	}
 }
 
@@ -136,13 +125,7 @@ func TestFR_WT_01_ListWorktreesReportsEveryWorktreeShape(t *testing.T) {
 
 func TestFR_WT_13_MainWorktreeErrorsForABareRepoWhoseOnlyWorktreeIsGone(t *testing.T) {
 	t.Parallel()
-	src := gittest.New(t)
-	gittest.Commit(t, src.Dir, "seed.txt", "a", "first")
-	branch := currentBranch(t, src.Dir)
-	bareDir := filepath.Join(t.TempDir(), "bare.git")
-	gittest.Run(t, src.Dir, "clone", "-q", "--bare", src.Dir, bareDir)
-	linkedDir := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, bareDir, "worktree", "add", "-q", linkedDir, branch)
+	bareDir, linkedDir, _ := bareRepoWithWorktree(t)
 	if err := os.RemoveAll(linkedDir); err != nil {
 		t.Fatal(err)
 	}
@@ -161,13 +144,7 @@ func TestFR_WT_13_MainWorktreeErrorsForABareRepoWhoseOnlyWorktreeIsGone(t *testi
 
 func TestFR_WT_01_ListWorktreesMarksABareRepoAndRunsNoStatusInIt(t *testing.T) {
 	t.Parallel()
-	src := gittest.New(t)
-	gittest.Commit(t, src.Dir, "seed.txt", "a", "first")
-	branch := currentBranch(t, src.Dir)
-	bareDir := filepath.Join(t.TempDir(), "bare.git")
-	gittest.Run(t, src.Dir, "clone", "-q", "--bare", src.Dir, bareDir)
-	linkedDir := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, bareDir, "worktree", "add", "-q", linkedDir, branch)
+	bareDir, linkedDir, _ := bareRepoWithWorktree(t)
 	c := New(func(core.Event) {})
 	rec := &commandRecorder{}
 	c.discover.Log = rec.record
@@ -241,6 +218,20 @@ func TestFR_WT_14_AddWorktreeFindsTheNewWorktreeGivenAnotherFormOfItsPath(t *tes
 	if want := gitPath(t, target); got.Path != want {
 		t.Errorf("AddWorktree Path = %q, want git's form %q", got.Path, want)
 	}
+}
+
+// bareRepoWithWorktree clones a one-commit repo bare, its HEAD naming
+// branch head, and adds a linked worktree on a new branch "other".
+func bareRepoWithWorktree(t *testing.T) (bareDir, linkedDir, head string) {
+	t.Helper()
+	src := gittest.New(t)
+	gittest.Commit(t, src.Dir, "seed.txt", "a", "first")
+	bareDir = filepath.Join(t.TempDir(), "bare.git")
+	gittest.Run(t, src.Dir, "clone", "-q", "--bare", src.Dir, bareDir)
+	gittest.Run(t, bareDir, "branch", "other")
+	linkedDir = filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, bareDir, "worktree", "add", "-q", linkedDir, "other")
+	return bareDir, linkedDir, currentBranch(t, src.Dir)
 }
 
 // anotherFormOfATempDir returns a temp folder that git resolves to a

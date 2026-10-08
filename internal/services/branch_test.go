@@ -247,14 +247,7 @@ func TestFR_BR_10_DeleteBranchRefusesABranchCheckedOutInAnotherWorktree(t *testi
 // worktree.
 func TestFR_BR_10_DeleteBranchSucceedsOnTheBareMainReposHEADBranch(t *testing.T) {
 	t.Parallel()
-	src := gittest.New(t)
-	gittest.Commit(t, src.Dir, "seed.txt", "a", "first")
-	head := currentBranch(t, src.Dir)
-	bareDir := filepath.Join(t.TempDir(), "bare.git")
-	gittest.Run(t, src.Dir, "clone", "-q", "--bare", src.Dir, bareDir)
-	gittest.Run(t, bareDir, "branch", "other")
-	linkedDir := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, bareDir, "worktree", "add", "-q", linkedDir, "other")
+	bareDir, linkedDir, head := bareRepoWithWorktree(t)
 
 	c, wt := openWorktree(t, linkedDir)
 
