@@ -18,11 +18,11 @@ type edit struct{ path, content string }
 func diverge(t *testing.T, base string, side, main edit) *gittest.Repo {
 	t.Helper()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "base.txt", base, "base")
-	gittest.Run(t, repo.Dir, "checkout", "-b", "side")
-	gittest.Commit(t, repo.Dir, side.path, side.content, "side commit")
-	gittest.Run(t, repo.Dir, "checkout", "master")
-	gittest.Commit(t, repo.Dir, main.path, main.content, "main commit")
+	gittest.History(t, repo.Dir,
+		gittest.Step{Message: "base", Files: map[string]string{"base.txt": base}},
+		gittest.Step{Branch: "side", From: "master", Message: "side commit", Files: map[string]string{side.path: side.content}},
+		gittest.Step{Message: "main commit", Files: map[string]string{main.path: main.content}},
+	)
 	return repo
 }
 
@@ -240,46 +240,40 @@ func TestFR_BR_11_MergeStopsAsConflictsOrStopped(t *testing.T) {
 func TestFR_BR_12_RebaseFlattensMergesAndMovesNoOtherBranch(t *testing.T) {
 	t.Parallel()
 	for _, backend := range []string{"apply", "merge"} {
-		t.Run(backend, func(t *testing.T) { rebaseFlattensWithBackend(t, backend) })
-	}
-}
+		t.Run(backend, func(t *testing.T) {
+			t.Parallel()
+			repo := gittest.New(t)
+			shas := gittest.History(t, repo.Dir,
+				gittest.Step{Message: "base", Files: map[string]string{"base.txt": "base\n"}},
+				gittest.Step{Branch: "other", From: "master", Message: "other commit", Files: map[string]string{"other.txt": "other\n"}},
+				gittest.Step{Branch: "feat", From: "master", Message: "feat 1", Files: map[string]string{"f1.txt": "1\n"}},
+				gittest.Step{Branch: "feat", Message: "feat 2", Files: map[string]string{"f2.txt": "2\n"}},
+				gittest.Step{Branch: "feat", Merge: "other", Message: "merge other", Files: map[string]string{"other.txt": "other\n"}},
+				gittest.Step{Message: "main commit", Files: map[string]string{"main.txt": "main\n"}},
+			)
+			midTip := shas[2]
+			gittest.Run(t, repo.Dir, "branch", "mid", midTip)
+			gittest.Run(t, repo.Dir, "checkout", "feat")
+			gittest.Run(t, repo.Dir, "config", "rebase.rebaseMerges", "true")
+			gittest.Run(t, repo.Dir, "config", "rebase.updateRefs", "true")
+			gittest.Run(t, repo.Dir, "config", "rebase.backend", backend)
 
-func rebaseFlattensWithBackend(t *testing.T, backend string) {
-	t.Helper()
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "base.txt", "base\n", "base")
-	gittest.Run(t, repo.Dir, "branch", "other")
-	gittest.Run(t, repo.Dir, "checkout", "-b", "feat")
-	gittest.Commit(t, repo.Dir, "f1.txt", "1\n", "feat 1")
-	gittest.Run(t, repo.Dir, "branch", "mid")
-	gittest.Commit(t, repo.Dir, "f2.txt", "2\n", "feat 2")
-	gittest.Run(t, repo.Dir, "checkout", "other")
-	gittest.Commit(t, repo.Dir, "other.txt", "other\n", "other commit")
-	gittest.Run(t, repo.Dir, "checkout", "feat")
-	gittest.Run(t, repo.Dir, "merge", "--no-ff", "-m", "merge other", "other")
-	gittest.Run(t, repo.Dir, "checkout", "master")
-	gittest.Commit(t, repo.Dir, "main.txt", "main\n", "main commit")
-	gittest.Run(t, repo.Dir, "checkout", "feat")
-	midTip := gittest.Out(t, repo.Dir, "rev-parse", "mid")
-	gittest.Run(t, repo.Dir, "config", "rebase.rebaseMerges", "true")
-	gittest.Run(t, repo.Dir, "config", "rebase.updateRefs", "true")
-	gittest.Run(t, repo.Dir, "config", "rebase.backend", backend)
-
-	c, wt := openWorktree(t, repo.Dir)
-	got, err := c.Rebase(t.Context(), wt, "refs/heads/master", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Outcome != core.IntegrateRebased {
-		t.Errorf("Outcome = %q, want %q", got.Outcome, core.IntegrateRebased)
-	}
-	gittest.Run(t, repo.Dir, "merge-base", "--is-ancestor", "master", "HEAD")
-	if merges := gittest.Out(t, repo.Dir, "rev-list", "--merges", "master..HEAD"); merges != "" {
-		t.Errorf("merge commits after the rebase = %q, want none", merges)
-	}
-	if mid := gittest.Out(t, repo.Dir, "rev-parse", "mid"); mid != midTip {
-		t.Errorf("mid = %q, want unchanged %q", mid, midTip)
+			c, wt := openWorktree(t, repo.Dir)
+			got, err := c.Rebase(t.Context(), wt, "refs/heads/master", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Outcome != core.IntegrateRebased {
+				t.Errorf("Outcome = %q, want %q", got.Outcome, core.IntegrateRebased)
+			}
+			gittest.Run(t, repo.Dir, "merge-base", "--is-ancestor", "master", "HEAD")
+			if merges := gittest.Out(t, repo.Dir, "rev-list", "--merges", "master..HEAD"); merges != "" {
+				t.Errorf("merge commits after the rebase = %q, want none", merges)
+			}
+			if mid := gittest.Out(t, repo.Dir, "rev-parse", "mid"); mid != midTip {
+				t.Errorf("mid = %q, want unchanged %q", mid, midTip)
+			}
+		})
 	}
 }
 

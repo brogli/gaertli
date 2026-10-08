@@ -71,10 +71,8 @@ func TestFR_BR_06_RenameBranchRefusesBadNewNamesThenRenamesANonCurrentBranch(t *
 	}
 }
 
-// TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree passes
-// on the old code too, by design: git's own rename of a branch checked out
-// elsewhere, moving that worktree's HEAD along, is kept (owner, 2026-09-28);
-// only the rebase/bisect cases below are refused up front.
+// git renames a branch checked out elsewhere and moves that worktree's HEAD
+// along; only a branch being rebased or bisected is refused up front.
 func TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -599,22 +597,12 @@ func TestQA_REL_02_BranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CreateBranch(t.Context(), wt, "feature", "HEAD", false); err == nil {
-		t.Error("CreateBranch on an empty repo = nil, want an error")
-	} else {
-		coretest.AssertCode(t, err, core.GitFailed)
-	}
-
-	if err := c.Checkout(t.Context(), wt, "anything"); err == nil {
-		t.Error("Checkout on an empty repo = nil, want an error")
-	} else {
-		coretest.AssertCode(t, err, core.GitFailed)
-	}
-
-	if err := c.CheckoutCommit(t.Context(), wt, "HEAD"); err == nil {
-		t.Error("CheckoutCommit on an empty repo = nil, want an error")
-	} else {
-		coretest.AssertCode(t, err, core.GitFailed)
+	for name, err := range map[string]error{
+		"CreateBranch":   c.CreateBranch(t.Context(), wt, "feature", "HEAD", false),
+		"Checkout":       c.Checkout(t.Context(), wt, "anything"),
+		"CheckoutCommit": c.CheckoutCommit(t.Context(), wt, "HEAD"),
+	} {
+		t.Run(name, func(t *testing.T) { coretest.AssertCode(t, err, core.GitFailed) })
 	}
 }
 
