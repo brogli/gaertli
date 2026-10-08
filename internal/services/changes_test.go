@@ -93,6 +93,22 @@ func writeFile(t *testing.T, dir, name, content string) {
 	}
 }
 
+// readFile returns name's working-tree content in dir.
+func readFile(t *testing.T, dir, name string) string {
+	t.Helper()
+	got, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(got)
+}
+
+// indexBlob returns name's staged content in dir.
+func indexBlob(t *testing.T, dir, name string) string {
+	t.Helper()
+	return gittest.Out(t, dir, "show", ":"+name)
+}
+
 func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflictAndAFileChangedBothWaysAndAStagedRename(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -184,7 +200,7 @@ func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T)
 	if want := (core.ChangedFile{Status: "M", Path: "a.txt"}); !reflect.DeepEqual(got.Unstaged, []core.ChangedFile{want}) {
 		t.Errorf("Unstaged = %+v, want [%+v]", got.Unstaged, want)
 	}
-	if got := gittest.Out(t, repo.Dir, "cat-file", "-p", ":a.txt"); got != "orig" {
+	if got := indexBlob(t, repo.Dir, "a.txt"); got != "orig" {
 		t.Errorf("index content = %q, want HEAD's %q", got, "orig")
 	}
 }

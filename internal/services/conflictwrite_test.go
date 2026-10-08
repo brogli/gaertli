@@ -37,7 +37,7 @@ func TestFR_CONF_06_SaveConflictWritesCRLFWhenTheFileUsesCRLF(t *testing.T) {
 	if fp != fingerprintOf([]byte(want)) {
 		t.Errorf("fingerprint = %s, want the written bytes'", fp)
 	}
-	if staged := gittest.Out(t, dir, "show", ":a.txt"); staged != strings.TrimSpace(want) {
+	if staged := indexBlob(t, dir, "a.txt"); staged != strings.TrimSpace(want) {
 		t.Errorf("staged blob = %q, want CRLF %q", staged, want)
 	}
 	if stat := gittest.Out(t, dir, "diff", "--cached", "--numstat", "HEAD"); stat != "1\t1\ta.txt" {
@@ -60,7 +60,7 @@ func TestFR_CONF_06_SaveConflictStagesLFBlobsUnderAutocrlf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if staged := gittest.Out(t, dir, "show", ":a.txt"); staged != "a\nmerged\nz" {
+	if staged := indexBlob(t, dir, "a.txt"); staged != "a\nmerged\nz" {
 		t.Errorf("staged blob = %q, want LF", staged)
 	}
 }
@@ -179,7 +179,7 @@ func TestFR_CONF_06_SaveConflictKeepsTheLineEndsOfAMixedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if staged := gittest.Out(t, dir, "show", ":a.txt"); staged != "l1\r\nl2\nRES\nl4" {
+	if staged := indexBlob(t, dir, "a.txt"); staged != "l1\r\nl2\nRES\nl4" {
 		t.Errorf("staged blob = %q, want only the conflict's line changed", staged)
 	}
 	if stat := gittest.Out(t, dir, "diff", "--cached", "--numstat", "HEAD"); stat != "1\t1\ta.txt" {

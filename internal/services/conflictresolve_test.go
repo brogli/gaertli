@@ -291,7 +291,7 @@ func TestFR_CONF_08_ReopenConflictRefusesAFileThatNeverConflicted(t *testing.T) 
 	err := c.ReopenConflict(t.Context(), wt, "new.txt")
 
 	requireGitFailedKey(t, err, "notReopenable")
-	if staged := gittest.Out(t, dir, "show", ":new.txt"); staged != "new" {
+	if staged := indexBlob(t, dir, "new.txt"); staged != "new" {
 		t.Errorf("staged = %q, want it untouched", staged)
 	}
 }

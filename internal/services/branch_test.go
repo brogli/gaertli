@@ -905,22 +905,6 @@ func resetFixture(t *testing.T, dir string) (firstSHA string) {
 	return firstSHA
 }
 
-// readFile returns name's working-tree content in dir.
-func readFile(t *testing.T, dir, name string) string {
-	t.Helper()
-	got, err := os.ReadFile(filepath.Join(dir, name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(got)
-}
-
-// indexBlob returns name's staged content in dir.
-func indexBlob(t *testing.T, dir, name string) string {
-	t.Helper()
-	return gittest.Out(t, dir, "show", ":"+name)
-}
-
 // trackedInIndex reports whether name is in dir's index right now.
 func trackedInIndex(t *testing.T, dir, name string) bool {
 	t.Helper()

@@ -88,7 +88,7 @@ func TestQA_COMP_01_DiffWorkingAndStageLinesIgnoreConfigThatChangesThePatchFrami
 			}
 
 			want := "ONE\n\nthree\nfour\nfive\nsix\nseven\neight"
-			if got := gittest.Out(t, repo.Dir, "cat-file", "-p", ":f.txt"); got != want {
+			if got := indexBlob(t, repo.Dir, "f.txt"); got != want {
 				t.Errorf("index f.txt = %q, want %q (only the first hunk staged)", got, want)
 			}
 		})
@@ -175,7 +175,7 @@ func TestQA_COMP_01_DiffWorkingAndStageLinesUseTheRealTextNotTheTextconvOutput(t
 		t.Fatal(err)
 	}
 
-	if got := gittest.Out(t, repo.Dir, "cat-file", "-p", ":f.txt"); got != "hello\nthere" {
+	if got := indexBlob(t, repo.Dir, "f.txt"); got != "hello\nthere" {
 		t.Errorf("index f.txt = %q, want %q", got, "hello\nthere")
 	}
 }
