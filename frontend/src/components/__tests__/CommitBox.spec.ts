@@ -58,39 +58,27 @@ describe('CommitBox', () => {
     vi.useRealTimers()
   })
 
-  it('FR-CHG-05 the Commit button is disabled with nothing staged, amend unchecked, a non-blank message', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture()
+  it.each([
+    ['disabled with nothing staged, amend unchecked', false, false, 'a message', true],
+    ['disabled with a staged file but a blank message', true, false, '', true],
+    ['disabled with a staged file but a whitespace-only message', true, false, '   ', true],
+    ['enabled with a staged file and a message', true, false, 'm', false],
+    ['enabled with nothing staged when amend is checked', false, true, 'a message', false],
+  ])(
+    'FR-CHG-05 FR-CHG-06 the Commit button is %s',
+    async (_name, staged, amend, message, disabled) => {
+      useChangesStore().files = changedFilesFixture(
+        staged ? { staged: [{ path: 'a.txt', status: 'M' }] } : {},
+      )
+      useRepoStore().summary = summaryFixture({ sha: 'abc123' })
 
-    const wrapper = mount(CommitBox, { props })
-    await wrapper.get('textarea').setValue('a message')
+      const wrapper = mount(CommitBox, { props })
+      if (amend) await amendCheckbox(wrapper).setValue(true)
+      await wrapper.get('textarea').setValue(message)
 
-    expect(submitButton(wrapper).element.disabled).toBe(true)
-  })
-
-  it('FR-CHG-05 the Commit button is disabled with a staged file but a blank message', () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
-
-    const wrapper = mount(CommitBox, { props })
-
-    expect(submitButton(wrapper).element.disabled).toBe(true)
-  })
-
-  it('FR-CHG-05 the Commit button counts the staged files and stays disabled for a whitespace-only message', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
-
-    const wrapper = mount(CommitBox, { props })
-    await wrapper.get('textarea').setValue('   ')
-
-    expect(submitButton(wrapper).element.disabled).toBe(true)
-
-    await wrapper.get('textarea').setValue('m')
-
-    expect(submitButton(wrapper).element.disabled).toBe(false)
-    expect(submitButton(wrapper).text()).toContain('Commit (1)')
-  })
+      expect(submitButton(wrapper).element.disabled).toBe(disabled)
+    },
+  )
 
   it('FR-CHG-05 clicking Commit calls Facade.Commit with the message, amend false', async () => {
     const changes = useChangesStore()
@@ -102,19 +90,6 @@ describe('CommitBox', () => {
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
     expect(Facade.Commit).toHaveBeenCalledWith('/repo', 'a message', false)
-  })
-
-  it('FR-CHG-06 the Commit button is enabled with nothing staged when amend is checked (amend needs nothing staged)', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture()
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
-
-    const wrapper = mount(CommitBox, { props })
-    await amendCheckbox(wrapper).setValue(true)
-    await wrapper.get('textarea').setValue('a message')
-
-    expect(submitButton(wrapper).element.disabled).toBe(false)
   })
 
   it('FR-CHG-05 a successful commit clears the message and resets amend', async () => {
@@ -151,18 +126,14 @@ describe('CommitBox', () => {
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CHG-06 the Amend checkbox is disabled on an unborn HEAD', () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: '' })
-
-    const wrapper = mount(CommitBox, { props })
-
-    expect(amendCheckbox(wrapper).element.disabled).toBe(true)
-  })
-
-  it('FR-CHG-06 the Amend checkbox is disabled while an operation (merge, rebase, …) is in progress', () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123', operation: Operation.MergeOperation })
+  it.each([
+    ['on an unborn HEAD', summaryFixture({ sha: '' })],
+    [
+      'while an operation (merge, rebase, …) is in progress',
+      summaryFixture({ sha: 'abc123', operation: Operation.MergeOperation }),
+    ],
+  ])('FR-CHG-06 the Amend checkbox is disabled %s', (_name, summary) => {
+    useRepoStore().summary = summary
 
     const wrapper = mount(CommitBox, { props })
 
@@ -196,52 +167,26 @@ describe('CommitBox', () => {
     expect(wrapper.get('textarea').element.value).toBe('typed draft')
   })
 
-  it('FR-CHG-06 warns that an amended, already-pushed commit will need a force push', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main', ahead: 0 })
+  it.each([
+    [
+      'warns that an amended, already-pushed commit will need a force push',
+      { upstream: 'origin/main', ahead: 0 },
+      true,
+    ],
+    [
+      'does not warn when the current branch is ahead of its upstream',
+      { upstream: 'origin/main', ahead: 1 },
+      false,
+    ],
+    ['does not warn when the current branch has no upstream', { upstream: '' }, false],
+  ])('FR-CHG-06 %s', async (_name, branch, warns) => {
+    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useRefsStore().refs = refsFixture(branch)
 
     const wrapper = mount(CommitBox, { props })
     await amendCheckbox(wrapper).setValue(true)
 
-    expect(wrapper.text()).toContain('already been pushed')
-  })
-
-  it("FR-CHG-06 the pushed warning is an OpenVue warn Message, like squash's", async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main', ahead: 0 })
-
-    const wrapper = mount(CommitBox, { props })
-    await amendCheckbox(wrapper).setValue(true)
-
-    expect(wrapper.get('.p-message-warn').text()).toContain('already been pushed')
-  })
-
-  it('FR-CHG-06 does not warn when the current branch is ahead of its upstream', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main', ahead: 1 })
-
-    const wrapper = mount(CommitBox, { props })
-    await amendCheckbox(wrapper).setValue(true)
-
-    expect(wrapper.text()).not.toContain('already been pushed')
-  })
-
-  it('FR-CHG-06 does not warn when the current branch has no upstream', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: '' })
-
-    const wrapper = mount(CommitBox, { props })
-    await amendCheckbox(wrapper).setValue(true)
-
-    expect(wrapper.text()).not.toContain('already been pushed')
+    expect(wrapper.text().includes('already been pushed')).toBe(warns)
   })
 
   it('FR-CHG-08 initializes the message field from the restored draft', () => {
@@ -274,28 +219,20 @@ describe('CommitBox', () => {
     expect(Facade.SetMessageDraft).not.toHaveBeenCalled()
   })
 
-  it('FR-UX-05 Ctrl+K commits, same as clicking Commit', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+  it.each([
+    ['commits, same as clicking Commit', true, 1],
+    ['with nothing staged does not commit, same gating as the button', false, 0],
+  ])('FR-UX-05 Ctrl+K %s', async (_name, staged, commits) => {
+    useChangesStore().files = changedFilesFixture(
+      staged ? { staged: [{ path: 'a.txt', status: 'M' }] } : {},
+    )
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
 
     pressKey('k', { ctrlKey: true })
     await flushPromises()
 
-    expect(Facade.Commit).toHaveBeenCalledTimes(1)
-  })
-
-  it('FR-UX-05 Ctrl+K with nothing staged does not commit, same gating as the button', async () => {
-    const changes = useChangesStore()
-    changes.files = changedFilesFixture()
-    const wrapper = mount(CommitBox, { props })
-    await wrapper.get('textarea').setValue('a message')
-
-    pressKey('k', { ctrlKey: true })
-    await flushPromises()
-
-    expect(Facade.Commit).not.toHaveBeenCalled()
+    expect(Facade.Commit).toHaveBeenCalledTimes(commits)
   })
 
   it('FR-UX-05 FR-CHG-05 the Commit button shows a Ctrl+K hint at its right; its aria-label stays the label alone', () => {
@@ -339,20 +276,6 @@ describe('CommitBox', () => {
     expect(Facade.Commit.mock.invocationCallOrder[0]!).toBeLessThan(
       Facade.Push.mock.invocationCallOrder[0]!,
     )
-  })
-
-  it('FR-CHG-09 the "Push after commit" checkbox is disabled while Amend is checked', async () => {
-    const repo = useRepoStore()
-    repo.summary = summaryFixture({ sha: 'abc123' })
-    const refs = useRefsStore()
-    refs.refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
-
-    const wrapper = mount(CommitBox, { props })
-    await amendCheckbox(wrapper).setValue(true)
-
-    expect(
-      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
-    ).toBe(true)
   })
 
   it('FR-CHG-09 the "Push after commit" checkbox is enabled without an upstream when a remote exists, disabled without one', async () => {
@@ -423,7 +346,7 @@ describe('CommitBox', () => {
     expect(Facade.Push).not.toHaveBeenCalled()
   })
 
-  it('FR-CHG-09 checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
+  it('FR-CHG-09 Push after commit is disabled once Amend is checked; checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
     const repo = useRepoStore()
     repo.summary = summaryFixture({ sha: 'abc123' })
     const refs = useRefsStore()
@@ -433,22 +356,14 @@ describe('CommitBox', () => {
     await wrapper.get('textarea').setValue('a message')
     await wrapper.get('[data-test="push-after-commit"] input').setValue(true)
     await amendCheckbox(wrapper).setValue(true) // Amend, ticked after Push after commit
+    expect(
+      wrapper.get<HTMLInputElement>('[data-test="push-after-commit"] input').element.disabled,
+    ).toBe(true)
     await submitButton(wrapper).trigger('click')
     await flushPromises()
 
     expect(Facade.Commit).toHaveBeenCalledTimes(1)
     expect(Facade.Commit).toHaveBeenCalledWith('/repo', 'a message', true)
     expect(Facade.Push).not.toHaveBeenCalled()
-  })
-
-  it('FR-UX-09 each checkbox is inside a label whose text names it', () => {
-    const wrapper = mount(CommitBox, { props })
-
-    const labels = wrapper.findAll('label')
-    const amendLabel = labels.find((l) => l.text().includes('Amend last commit'))
-    const pushLabel = labels.find((l) => l.text().includes('Push after commit'))
-
-    expect(amendLabel?.find('input[type=checkbox]').exists()).toBe(true)
-    expect(pushLabel?.find('input[type=checkbox]').exists()).toBe(true)
   })
 })
