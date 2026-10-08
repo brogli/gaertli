@@ -3,6 +3,7 @@ package services
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func (r *commandRecorder) record(e git.Entry) {
 func (r *commandRecorder) snapshot() []git.Entry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return append([]git.Entry(nil), r.entries...)
+	return slices.Clone(r.entries)
 }
 
 // recordCommands wraps wt's session Runner.Log to also feed a

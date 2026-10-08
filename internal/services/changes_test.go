@@ -351,10 +351,7 @@ func TestFR_CHG_04_DiffWorkingShowsAFileWhoseNameHoldsANewline(t *testing.T) {
 func globRepo(t *testing.T) string {
 	t.Helper()
 	dir := gittest.New(t).Dir
-	writeFile(t, dir, "a.txt", "a\n")
-	writeFile(t, dir, "[ab].txt", "ab\n")
-	gittest.Run(t, dir, "add", "--", ":(literal)a.txt", ":(literal)[ab].txt")
-	gittest.CommitAll(t, dir, "base")
+	gittest.History(t, dir, gittest.Step{Message: "base", Files: map[string]string{"a.txt": "a\n", "[ab].txt": "ab\n"}})
 	return dir
 }
 

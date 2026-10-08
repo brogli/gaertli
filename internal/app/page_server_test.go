@@ -38,7 +38,7 @@ func (f *fakeBrowser) emit(sender, name string, _ []any) {
 func (f *fakeBrowser) senders() []sentEvent {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]sentEvent(nil), f.sent...)
+	return slices.Clone(f.sent)
 }
 
 func (f *fakeBrowser) names() []string {
