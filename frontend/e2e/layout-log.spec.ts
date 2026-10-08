@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { dragLogBorder, openMockRepo, overflows } from './helpers'
 
 // Layout at the 1200 x 800 window the fixtures open, with the mock's
@@ -16,7 +16,7 @@ async function switchToChanges(page: Page): Promise<void> {
   await page.locator('.changes-body').waitFor()
 }
 
-test('FR-UX-09 the changes heading shows whole; Stage all and Unstage all share one row', async ({
+test("FR-UX-09 the changes heading shows whole; Stage all and Unstage all share one row, each file row keeps its buttons on the name's line", async ({
   page,
 }) => {
   await openMockRepo(page)
@@ -29,6 +29,22 @@ test('FR-UX-09 the changes heading shows whole; Stage all and Unstage all share 
     .getByRole('button', { name: 'Unstage all', exact: true })
     .boundingBox()
   expect(Math.abs(stageAll!.y - unstageAll!.y)).toBeLessThan(4)
+  // A wrapped two-line label roughly doubles the button's height; a single
+  // line stays well under that at this app's compact 13px root font.
+  expect(stageAll!.height).toBeLessThanOrEqual(30)
+
+  const centre = async (locator: Locator) => {
+    const box = (await locator.boundingBox())!
+    return box.y + box.height / 2
+  }
+  const rows = await page.locator('.changes-column .files li').all()
+  expect(rows.length).toBeGreaterThan(0)
+  for (const row of rows) {
+    const nameY = await centre(row.locator('.path'))
+    for (const button of await row.locator('.p-button').all()) {
+      expect(Math.abs((await centre(button)) - nameY)).toBeLessThanOrEqual(4)
+    }
+  }
 })
 
 test('FR-LOG-01 a crowded log row shows two whole ref labels and "+N" naming them all', async ({
@@ -63,6 +79,11 @@ test('FR-UX-09 in a narrow log view the ref labels shrink to an ellipsis; "+N" a
     const box = (await row.boundingBox())!
     return box.x + box.width
   }
+  const message = (await row.locator('.message').boundingBox())!
+  const more = (await row.locator('.ref-more').boundingBox())!
+  expect(more.x + more.width, '.ref-more within .message').toBeLessThanOrEqual(
+    message.x + message.width,
+  )
   for (const part of ['.ref-more', '.hash']) {
     const box = (await row.locator(part).boundingBox())!
     expect(box.x + box.width, part).toBeLessThanOrEqual(await rowRight())

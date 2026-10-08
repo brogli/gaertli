@@ -17,18 +17,15 @@ async function openLog(page: Page): Promise<void> {
   await page.evaluate(() => document.fonts.ready)
 }
 
-test('FR-UX-18 the UI uses the bundled font, OpenVue components included', async ({ page }) => {
+test('FR-UX-18 the UI, OpenVue components included, uses the bundled font; hashes and diffs the bundled fixed-width font', async ({
+  page,
+}) => {
+  const fixedWidth = /^"JetBrains Mono Variable"/
   await openLog(page)
 
   expect(await family(page, 'body')).toMatch(/^"Inter Variable"/)
   expect(await family(page, '.p-button')).toMatch(/^"Inter Variable"/)
   expect(await page.evaluate(() => document.fonts.check('13px "Inter Variable"'))).toBe(true)
-})
-
-test('FR-UX-18 hashes and diffs use the bundled fixed-width font', async ({ page }) => {
-  const fixedWidth = /^"JetBrains Mono Variable"/
-  await openLog(page)
-
   expect(await family(page, '.row .hash')).toMatch(fixedWidth)
   expect(await page.evaluate(() => document.fonts.check('13px "JetBrains Mono Variable"'))).toBe(
     true,

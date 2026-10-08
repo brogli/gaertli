@@ -26,19 +26,6 @@ async function expectColumnsLineUp(page: Page, parts: string[] = PARTS): Promise
   lefts.forEach((xs, i) => expect(new Set(xs), parts[i]).toHaveProperty('size', 1))
 }
 
-test('FR-LOG-01 at 1200 px the subject, author, date and hash start at the same x on every row, a selected row included', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1200, height: 800 })
-  await openMockRepo(page)
-  await page.locator('.row .hash').first().waitFor()
-
-  await page.locator('.row').nth(3).click()
-  await expect(page.locator('.row.selected')).toHaveCount(1)
-
-  await expectColumnsLineUp(page)
-})
-
 test('FR-UX-09 at 420 px the author column hides instead of shrinking to a sliver; the rest still line up', async ({
   page,
 }) => {
@@ -50,33 +37,27 @@ test('FR-UX-09 at 420 px the author column hides instead of shrinking to a slive
   await expectColumnsLineUp(page, ['.message', '.subject', '.date', '.hash'])
 })
 
-test('FR-LOG-01 FR-CMP-05 compared rows keep their content where it is', async ({ page }) => {
+test('FR-LOG-01 FR-CMP-05 the columns line up at 1200 px, a selected or compared row included, and compared rows keep their content where it is', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1200, height: 800 })
   await openMockRepo(page)
   await page.locator('.row .hash').first().waitFor()
   const rows = page.locator('.row')
+
+  await rows.nth(3).click()
+  await expect(page.locator('.row.selected')).toHaveCount(1)
+  await expectColumnsLineUp(page)
+
   const subjectX = async () => (await rows.nth(1).locator('.subject').boundingBox())!.x
 
   const before = await subjectX()
-  await rows.nth(1).click({ modifiers: ['Control'] })
+  await rows.nth(1).click()
   await rows.nth(4).click({ modifiers: ['Control'] })
   await expect(page.locator('.row.compare-from, .row.compare-to')).toHaveCount(2)
 
   expect(await subjectX()).toBe(before)
   await expectColumnsLineUp(page)
-})
-
-test('FR-LOG-01 in a narrow window the HEAD row\'s "+N" stays inside its message column', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 400, height: 800 })
-  await openMockRepo(page)
-  const head = page.locator('.row', { has: page.locator('.ref-label.head') })
-  await expect(head.locator('.ref-more')).toBeVisible()
-
-  const message = (await head.locator('.message').boundingBox())!
-  const more = (await head.locator('.ref-more').boundingBox())!
-  expect(more.x + more.width).toBeLessThanOrEqual(message.x + message.width)
 })
 
 test('FR-LOG-02 the graph draws its branch lines in more than one colour, none in the text colour', async ({

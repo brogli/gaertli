@@ -21,18 +21,22 @@ async function showSampleNotices(page: Page): Promise<void> {
   await page.locator('.p-toast-message-success').waitFor()
 }
 
-for (const scheme of ['light', 'dark'] as const) {
-  test(`FR-UX-15 ${scheme} theme: an error, a warning and a success notice are each opaque`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme: scheme })
-    await showSampleNotices(page)
+test('FR-UX-15 in the light and the dark theme an error, a warning and a success notice are each opaque', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' })
+  await showSampleNotices(page)
 
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
     for (const severity of ['error', 'warn', 'success']) {
-      const background = await page
-        .locator(`.p-toast-message-${severity}`)
-        .evaluate((el) => getComputedStyle(el).backgroundColor)
-      expect(alphaOf(background)).toBe(1)
+      const toast = page.locator(`.p-toast-message-${severity}`)
+      await expect
+        .poll(
+          async () => alphaOf(await toast.evaluate((el) => getComputedStyle(el).backgroundColor)),
+          { message: scheme },
+        )
+        .toBe(1)
     }
-  })
-}
+  }
+})

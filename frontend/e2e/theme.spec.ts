@@ -44,15 +44,11 @@ function isDarkNotBlack(c: RGB | null): boolean {
   return !!c && c.r < 200 && c.g < 200 && c.b < 200 && (c.r > 8 || c.g > 8 || c.b > 8)
 }
 
-// openDiffBackgrounds opens the mock diff and reads the background the page
-// paints in its code area and below its file list's last row.
-async function openDiffBackgrounds(
+// readDiffBackgrounds reads the background the open mock diff paints in its
+// code area and below its file list's last row.
+async function readDiffBackgrounds(
   page: Page,
 ): Promise<{ codeArea: RGB | null; fileList: RGB | null }> {
-  await page.goto(mockDiffUrl)
-  await page.locator('.cm-scroller').first().waitFor()
-  await page.locator('.file-list li').first().waitFor()
-
   // The diff's content is taller than the window, so any point inside the
   // scroller is the code area; a glyph or blank space makes no difference.
   const scroller = await page.locator('.cm-scroller').first().boundingBox()
@@ -69,25 +65,23 @@ async function openDiffBackgrounds(
   return { codeArea, fileList }
 }
 
-test('FR-UX-06 light theme: the page paints the code area and the empty file list area light', async ({
+test('FR-UX-06 the page paints the code area and the empty file list area light in the light theme, and the code area dark itself, not black, in the dark theme', async ({
   page,
 }) => {
   await page.emulateMedia({ colorScheme: 'light' })
+  await page.goto(mockDiffUrl)
+  await page.locator('.cm-scroller').first().waitFor()
+  await page.locator('.file-list li').first().waitFor()
 
-  const { codeArea, fileList } = await openDiffBackgrounds(page)
+  const light = await readDiffBackgrounds(page)
+  expect(isLight(light.codeArea)).toBe(true)
+  expect(isLight(light.fileList)).toBe(true)
 
-  expect(isLight(codeArea)).toBe(true)
-  expect(isLight(fileList)).toBe(true)
-})
-
-test('FR-UX-06 dark theme: the page paints the code area dark itself, not black', async ({
-  page,
-}) => {
   await page.emulateMedia({ colorScheme: 'dark' })
 
-  const { codeArea } = await openDiffBackgrounds(page)
-
-  expect(isDarkNotBlack(codeArea)).toBe(true)
+  await expect
+    .poll(async () => isDarkNotBlack((await readDiffBackgrounds(page)).codeArea))
+    .toBe(true)
 })
 
 test('FR-UX-06 choosing Dracula in Settings and saving paints the main window in its colours at once', async ({

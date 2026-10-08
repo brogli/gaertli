@@ -37,50 +37,43 @@ async function openBranchList(page: Page): Promise<void> {
   await settledBox(page, page.locator('.p-popover .branch-list'))
 }
 
-test("FR-BR-09, FR-UX-14 a branch entry's context menu opens at the pointer; one outside click closes the menu and the list", async ({
+test('FR-BR-09, FR-UX-14 a branch entry\'s context menu opens at the pointer and its "…" menu below its button; one outside click closes the menu and the list', async ({
   page,
 }) => {
   await openBranchList(page)
+  const menu = page.locator('.p-contextmenu')
+  const rows = page.locator('.p-popover .picker-rows > li').filter({
+    has: page.locator('[data-test=ref-row]'),
+  })
+
+  async function expectOutsideClickClosesBoth(): Promise<void> {
+    // Outside both: the log column's lower left, clear of the menu.
+    const logColumn = (await page.locator('.log-column').boundingBox())!
+    await page.mouse.click(logColumn.x + 10, logColumn.y + logColumn.height - 10)
+    await expect(menu).toBeHidden()
+    await expect(page.locator('.p-popover')).toBeHidden()
+  }
+
   const row = page.locator('.p-popover [data-test=ref-row]').nth(1)
-  const box = (await row.boundingBox())!
-  await row.click({ button: 'right', position: { x: 20, y: box.height / 2 } })
-  const menu = page.locator('.p-contextmenu')
+  const rowBox = (await row.boundingBox())!
+  await row.click({
+    button: 'right',
+    position: { x: 20, y: rowBox.height / 2 },
+  })
+  const atPointer = await settledBox(page, menu)
+  expect(Math.abs(atPointer.x - (rowBox.x + 20))).toBeLessThanOrEqual(2)
+  expect(Math.abs(atPointer.y - (rowBox.y + rowBox.height / 2))).toBeLessThanOrEqual(2)
+  await expectOutsideClickClosesBoth()
 
-  const corner = await settledBox(page, menu)
-  expect(Math.abs(corner.x - (box.x + 20))).toBeLessThanOrEqual(2)
-  expect(Math.abs(corner.y - (box.y + box.height / 2))).toBeLessThanOrEqual(2)
-
-  // Outside both: the log column's lower left, clear of the menu.
-  const logColumn = (await page.locator('.log-column').boundingBox())!
-  await page.mouse.click(logColumn.x + 10, logColumn.y + logColumn.height - 10)
-
-  await expect(menu).toBeHidden()
-  await expect(page.locator('.p-popover')).toBeHidden()
-})
-
-test('FR-BR-09, FR-UX-14 a branch entry\'s "…" menu opens below its button; one outside click closes the menu and the list', async ({
-  page,
-}) => {
-  await openBranchList(page)
-  const row = page
-    .locator('.p-popover .picker-rows > li')
-    .filter({ has: page.locator('[data-test=ref-row]') })
-    .nth(1)
-  const button = row.locator('[data-test=row-actions]')
-  const box = (await button.boundingBox())!
+  await page.locator('[data-test=branch-picker]').click()
+  await settledBox(page, page.locator('.p-popover .branch-list'))
+  const button = rows.nth(1).locator('[data-test=row-actions]')
+  const buttonBox = (await button.boundingBox())!
   await button.click()
-  const menu = page.locator('.p-contextmenu')
-
-  const corner = await settledBox(page, menu)
-  expect(Math.abs(corner.x - box.x)).toBeLessThanOrEqual(2)
-  expect(Math.abs(corner.y - (box.y + box.height))).toBeLessThanOrEqual(2)
-
-  // Outside both: the log column's lower left, clear of the menu.
-  const logColumn = (await page.locator('.log-column').boundingBox())!
-  await page.mouse.click(logColumn.x + 10, logColumn.y + logColumn.height - 10)
-
-  await expect(menu).toBeHidden()
-  await expect(page.locator('.p-popover')).toBeHidden()
+  const belowButton = await settledBox(page, menu)
+  expect(Math.abs(belowButton.x - buttonBox.x)).toBeLessThanOrEqual(2)
+  expect(Math.abs(belowButton.y - (buttonBox.y + buttonBox.height))).toBeLessThanOrEqual(2)
+  await expectOutsideClickClosesBoth()
 })
 
 test("FR-BR-09 Shift+F10 in the branch list opens the active entry's context menu below it; Escape closes both", async ({

@@ -1,34 +1,10 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { openBranchPicker, openMockRepo, openWorktreePicker, overflows, refLi } from './helpers'
 
 // Layout at the 1200 x 800 window the fixtures open, with the mock's refs
 // and worktrees in the pickers.
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
-})
-
-// expectRowsFit: no row of the open picker list is wider than the list, and
-// the list does not scroll sideways.
-async function expectRowsFit(page: Page, list: string): Promise<void> {
-  // A sideways-scrolling list gets an overlay scrollbar under WebKitGTK that
-  // covers its last row and swallows clicks on that row.
-  const scroller = page.locator(`.p-popover ${list} .picker-scroll`)
-  expect(await scroller.evaluate((el) => getComputedStyle(el).overflowX)).toBe('hidden')
-  expect(await overflows(scroller)).toBe(false)
-  for (const row of await scroller.locator('li').all()) {
-    expect(await overflows(row)).toBe(false)
-  }
-}
-
-test('FR-UX-09 no picker list scrolls sideways; every row fits the list', async ({ page }) => {
-  await openMockRepo(page)
-
-  await openWorktreePicker(page)
-  await expectRowsFit(page, '.worktree-list')
-  await page.keyboard.press('Escape')
-
-  await openBranchPicker(page)
-  await expectRowsFit(page, '.branch-list')
 })
 
 test('FR-UX-09 a long branch name ends in an ellipsis and shows whole on hover', async ({

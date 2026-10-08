@@ -36,7 +36,7 @@ function expectInWindow(box: { x: number; y: number; width: number; height: numb
   expect(box.y + box.height).toBeLessThanOrEqual(800)
 }
 
-test('FR-UX-07 FR-UX-14 each picker opens inside the window, its rows on one line each, and Escape closes it', async ({
+test('FR-UX-07 FR-UX-14 each picker opens inside the window, scrolls only vertically, its rows on one line each, and Escape closes it', async ({
   page,
 }) => {
   await openMockRepo(page)
@@ -46,6 +46,11 @@ test('FR-UX-07 FR-UX-14 each picker opens inside the window, its rows on one lin
     const list = page.locator('.p-popover .picker-list')
     await expect(list.locator('li').first()).toBeVisible()
     expectInWindow(await stableBox(page.locator('.p-popover')))
+    // A sideways-scrolling list gets an overlay scrollbar under WebKitGTK
+    // that covers its last row and swallows clicks on that row.
+    const scroller = list.locator('.picker-scroll')
+    expect(await scroller.evaluate((el) => getComputedStyle(el).overflowX)).toBe('hidden')
+    expect(await scroller.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
     for (const row of await list.locator('li').all()) {
       expect((await stableBox(row)).height).toBeLessThanOrEqual(30)
       expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
@@ -76,27 +81,6 @@ test('FR-UX-08 the log is the left column; a switch above it picks Details or Ch
   const changes = await stableBox(page.locator('.changes-column'))
   expect(Math.abs(changes.x - details.x)).toBeLessThanOrEqual(1)
   expect(changes.y + changes.height).toBeLessThanOrEqual(800)
-})
-
-test('FR-UX-09 a file row keeps its buttons on the name\'s line; "Stage all" stays one line', async ({
-  page,
-}) => {
-  await openMockRepo(page)
-  await switchToChanges(page)
-
-  const rows = await page.locator('.changes-column .files li').all()
-  expect(rows.length).toBeGreaterThan(0)
-  for (const row of rows) {
-    const nameY = await middle(row.locator('.path'))
-    for (const button of await row.locator('.p-button').all()) {
-      expect(Math.abs((await middle(button)) - nameY)).toBeLessThanOrEqual(4)
-    }
-  }
-
-  const stageAll = page.getByRole('button', { name: 'Stage all', exact: true })
-  // A wrapped two-line label roughly doubles the button's height; a single
-  // line stays well under that at this app's compact 13px root font.
-  expect((await stableBox(stageAll)).height).toBeLessThanOrEqual(30)
 })
 
 test('FR-UX-09 the diff toolbar shares one row', async ({ page }) => {

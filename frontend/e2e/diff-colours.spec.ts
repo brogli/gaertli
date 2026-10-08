@@ -94,10 +94,10 @@ async function measure(
 }
 
 for (const theme of THEMES) {
-  for (const mode of MODES) {
-    test(`FR-DIFF-11 ${theme} theme, ${mode}: added and removed lines are visibly distinct`, async ({
-      page,
-    }) => {
+  test(`FR-DIFF-11 ${theme} theme: added and removed lines are visibly distinct, unified and side-by-side`, async ({
+    page,
+  }) => {
+    for (const mode of MODES) {
       const m = await measure(page, theme, mode)
 
       const addedVsBg = deltaEOK(m.addedBg, m.editorBg)
@@ -107,13 +107,13 @@ for (const theme of THEMES) {
         `${theme} ${mode}: ΔEOK added/bg=${addedVsBg.toFixed(4)} removed/bg=${removedVsBg.toFixed(4)} added/removed=${addedVsRemoved.toFixed(4)}`,
       )
 
-      expect(addedVsBg).toBeGreaterThanOrEqual(0.08)
-      expect(removedVsBg).toBeGreaterThanOrEqual(0.08)
-      expect(addedVsRemoved).toBeGreaterThanOrEqual(0.08)
-      expect(contrastRatio(m.addedText, m.addedBg)).toBeGreaterThanOrEqual(4.5)
-      expect(contrastRatio(m.removedText, m.removedBg)).toBeGreaterThanOrEqual(4.5)
-      expect(contrastRatio(m.addedMarker, m.editorBg)).toBeGreaterThanOrEqual(3)
-      expect(contrastRatio(m.removedMarker, m.editorBg)).toBeGreaterThanOrEqual(3)
-    })
-  }
+      expect(addedVsBg, mode).toBeGreaterThanOrEqual(0.08)
+      expect(removedVsBg, mode).toBeGreaterThanOrEqual(0.08)
+      expect(addedVsRemoved, mode).toBeGreaterThanOrEqual(0.08)
+      expect(contrastRatio(m.addedText, m.addedBg), mode).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(m.removedText, m.removedBg), mode).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(m.addedMarker, m.editorBg), mode).toBeGreaterThanOrEqual(3)
+      expect(contrastRatio(m.removedMarker, m.editorBg), mode).toBeGreaterThanOrEqual(3)
+    }
+  })
 }
