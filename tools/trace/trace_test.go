@@ -166,6 +166,14 @@ func TestQA_MNT_02_VitestCoversRequiredID(t *testing.T) {
 	assertReport(t, cfg, "")
 }
 
+func TestQA_MNT_02_VitestEachRowCoversRequiredID(t *testing.T) {
+	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
+	writeFile(t, filepath.Join(cfg.FrontendRoot, "src/components/__tests__/foo.spec.ts"),
+		"import { it } from 'vitest'\n\nit.each([\n  { name: 'a' },\n  { name: 'b' },\n])(`FR-AB-01 does a thing with $name`, () => {})\n")
+
+	assertReport(t, cfg, "")
+}
+
 func TestQA_MNT_02_PlaywrightSpecCoversRequiredID(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, filepath.Join(cfg.FrontendRoot, "e2e-real", "foo.spec.ts"),

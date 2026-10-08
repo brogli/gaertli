@@ -32,7 +32,7 @@ var (
 	separatorCell = regexp.MustCompile(`^:?-+:?$`)
 	goTestFunc    = regexp.MustCompile(`(?m)^func (Test[A-Za-z0-9_]*)\(`)
 	goTestID      = regexp.MustCompile(`^Test([A-Z]+)(?:_([A-Z]+))?_([0-9]+)(?:_|$)`)
-	vitestCall    = regexp.MustCompile(`\b(?:it|test)\(\s*['"]([^'"]*)['"]`)
+	vitestCall    = regexp.MustCompile("\\b(?:it|test)(?:\\.each\\([\\s\\S]*?\\))?\\(\\s*['\"`]([^'\"`]*)['\"`]")
 	vitestID      = regexp.MustCompile(`^(` + idExpr + `)(?:\s|$)`)
 )
 
@@ -157,8 +157,8 @@ func idFromGoTestName(name string) (string, bool) {
 }
 
 // frontendCoverage returns the requirement IDs named by the first string
-// argument of an it(...) or test(...) call in Vitest and Playwright files
-// (both *.spec.ts) below root.
+// argument of an it(...), test(...), it.each(...)(...) or test.each(...)(...)
+// call in Vitest and Playwright files (both *.spec.ts) below root.
 func frontendCoverage(root string) (map[string]bool, error) {
 	return coverageInFiles(root, []string{".spec.ts"}, func(src string, covered map[string]bool) {
 		for _, m := range vitestCall.FindAllStringSubmatch(src, -1) {
