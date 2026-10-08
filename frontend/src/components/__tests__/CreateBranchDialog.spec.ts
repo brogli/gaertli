@@ -13,15 +13,15 @@ import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { field } from '@/testing/dialog'
 import { branchFixture } from '@/testing/fixtures/branch'
+import { refsOfEveryKind } from '@/testing/fixtures/refs'
 import { useRefsStore } from '@/stores/refs'
 import type { StartPoint } from '../startPoint'
 
 function mountDialog(start: StartPoint) {
-  useRefsStore().refs = {
-    branches: [branchFixture(), branchFixture({ name: 'feat', current: false })],
-    remotes: [{ name: 'origin', branches: [{ name: 'x', sha: 'sha-x' }] }],
-    tags: [{ name: 'v1', sha: 'sha-v1' }],
-  }
+  useRefsStore().refs = refsOfEveryKind([
+    branchFixture(),
+    branchFixture({ name: 'feat', current: false }),
+  ])
   return mountInBody(CreateBranchDialog, { props: { wt: '/repo', start } })
 }
 

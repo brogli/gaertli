@@ -26,7 +26,7 @@ vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { mountNotices } from '@/testing/mountNotices'
-import { editorNotFound } from '@/testing/errors'
+import { editorNotFound, wailsError } from '@/testing/errors'
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
@@ -520,7 +520,7 @@ describe('DiffView', () => {
       newContent: 'a\nnew\nb\n',
       hunks: [hunk(2, 1, 2, 1)],
     })
-    Facade.StageLines.mockRejectedValueOnce({ cause: { code: Code.Locked, message: 'locked' } })
+    Facade.StageLines.mockRejectedValueOnce(wailsError('locked', Code.Locked))
     await wrapper.get('[data-test="stage-hunk"]').trigger('click')
     await flushPromises()
     expect(findButton(wrapper, 'Try again')).toBeTruthy()
@@ -538,9 +538,9 @@ describe('DiffView', () => {
       newContent: 'a\nnew\nb\n',
       hunks: [hunk(2, 1, 2, 1)],
     })
-    Facade.StageLines.mockRejectedValueOnce({
-      cause: { code: Code.Internal, message: 'a.txt changed since it was shown' },
-    })
+    Facade.StageLines.mockRejectedValueOnce(
+      wailsError('a.txt changed since it was shown', Code.Internal),
+    )
     await wrapper.get('[data-test="stage-hunk"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[data-test="stage-hunk"]').exists()).toBe(false)

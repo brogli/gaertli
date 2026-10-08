@@ -5,6 +5,7 @@ import { expectIconOnly } from '@/testing/expectIconOnly'
 import { mountNotices } from '@/testing/mountNotices'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
+import { popoverShows } from '@/testing/popover'
 
 const { AppService, Facade } = vi.hoisted(() => ({
   AppService: { SelectWorktree: vi.fn(), OpenDiff: vi.fn() },
@@ -34,13 +35,13 @@ import { useLogStore } from '@/stores/log'
 import {
   BranchInUse,
   Operation,
-  type Branch,
   type Refs,
   type Summary,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 import { DiffKind } from '@/lib/diffTarget'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { branchFixture } from '@/testing/fixtures/branch'
+import { refsOfEveryKind } from '@/testing/fixtures/refs'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 import { findButton } from '@/testing/findButton'
@@ -53,14 +54,6 @@ const feat = branchFixture({
   upstream: 'origin/feat',
   ahead: 2,
 })
-
-function refsWith(branches: Branch[] = [main, feat]): Refs {
-  return {
-    branches,
-    remotes: [{ name: 'origin', branches: [{ name: 'x', sha: 'sha-x' }] }],
-    tags: [{ name: 'v1', sha: 'sha-v1' }],
-  }
-}
 
 // mountPicker mounts the picker on refs and summary, its list closed.
 function mountPicker(
@@ -75,7 +68,7 @@ function mountPicker(
 
 // openPicker mounts the picker on refs and opens its list.
 async function openPicker(
-  refs: Refs = refsWith(),
+  refs: Refs = refsOfEveryKind([main, feat]),
   props: { wt: string; distro?: string } = { wt: '/repo' },
 ) {
   const { wrapper, body } = await mountPicker(refs, undefined, props)
@@ -111,11 +104,8 @@ async function pickAction(body: DOMWrapper<Element>, name: string, action: strin
 }
 
 // listOpen tells whether the branch list is showing.
-async function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
-  await flushPromises()
-  await new Promise((resolve) => requestAnimationFrame(resolve))
-  await flushPromises()
-  return body.find('.branch-list').exists()
+function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
+  return popoverShows(body, '.branch-list')
 }
 
 describe('BranchPicker', () => {
@@ -157,7 +147,7 @@ describe('BranchPicker', () => {
 
   it('FR-REPO-03 the button shows ahead/behind while the branch tracks an upstream, and the operation in progress', async () => {
     const { wrapper } = await mountPicker(
-      refsWith([branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })]),
+      refsOfEveryKind([branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })]),
       summaryFixture({ operation: Operation.MergeOperation }),
     )
 
@@ -167,7 +157,7 @@ describe('BranchPicker', () => {
   })
 
   it('FR-REPO-03 the button shows no ahead/behind without an upstream', async () => {
-    const { wrapper } = await mountPicker(refsWith([main]), summaryFixture())
+    const { wrapper } = await mountPicker(refsOfEveryKind([main]), summaryFixture())
 
     expect(wrapper.find('[data-test="ahead-behind"]').exists()).toBe(false)
   })
@@ -175,7 +165,7 @@ describe('BranchPicker', () => {
   it('FR-UX-09 narrow (400px): the button shows its icon only, the branch name in title and aria-label, and no ahead/behind even with an upstream', async () => {
     window.innerWidth = 400
     const { wrapper } = await mountPicker(
-      refsWith([branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })]),
+      refsOfEveryKind([branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })]),
       summaryFixture(),
     )
 
@@ -186,7 +176,7 @@ describe('BranchPicker', () => {
 
   it('FR-BR-08 while detached the button shows the short hash and says so', async () => {
     const { wrapper } = await mountPicker(
-      refsWith([]),
+      refsOfEveryKind([]),
       summaryFixture({ branch: '', detached: true, sha: 'abc1234def' }),
     )
 
@@ -219,7 +209,7 @@ describe('BranchPicker', () => {
 
   it('FR-BR-09 a remote branch whose short name a local branch has checks out that local branch', async () => {
     const x = branchFixture({ name: 'x', sha: 'sha-local-x', current: false })
-    const { body } = await openPicker(refsWith([main, x]))
+    const { body } = await openPicker(refsOfEveryKind([main, x]))
 
     await checkoutRow(body, 'origin/x')
     await flushPromises()
@@ -315,7 +305,7 @@ describe('BranchPicker', () => {
 
   it('FR-BR-01 "New branch…" while detached starts the branch at HEAD, fixed', async () => {
     const detached = summaryFixture({ branch: '', detached: true, sha: 'abc1234567' })
-    const { wrapper, body } = await mountPicker(refsWith([feat]), detached)
+    const { wrapper, body } = await mountPicker(refsOfEveryKind([feat]), detached)
     await wrapper.get('[data-test="branch-picker"]').trigger('click')
     await flushPromises()
 
@@ -368,7 +358,7 @@ describe('BranchPicker', () => {
 
   it('FR-BR-11 a detached HEAD names itself in the merge and rebase actions', async () => {
     const { body } = await mountPicker(
-      refsWith([branchFixture({ current: false }), feat]),
+      refsOfEveryKind([branchFixture({ current: false }), feat]),
       summaryFixture({ detached: true, sha: 'abcdef1234567' }),
     )
     await body.get('[data-test="branch-picker"]').trigger('click')
@@ -545,7 +535,7 @@ describe('BranchPicker', () => {
 
   it('FR-UPD-01 a local branch without an upstream offers no "Update from upstream"', async () => {
     const local = branchFixture({ name: 'local', current: false })
-    const { body } = await openPicker(refsWith([main, feat, local]))
+    const { body } = await openPicker(refsOfEveryKind([main, feat, local]))
 
     await openActions(body, 'feat')
     expect(menuLabels(body)).toContain('Update from upstream')
@@ -626,11 +616,9 @@ describe('BranchPicker', () => {
     const applyFilter = vi.spyOn(log, 'applyFilter').mockResolvedValue(undefined)
 
     await pickAction(body, 'v1', 'Show history')
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-    await flushPromises()
 
+    expect(await listOpen(body)).toBe(false)
     expect(applyFilter).toHaveBeenCalledWith({ path: 'src/', branches: ['refs/tags/v1'] })
     expect(wrapper.emitted('show-log')).toHaveLength(1)
-    expect(body.find('.branch-list').exists()).toBe(false)
   })
 })

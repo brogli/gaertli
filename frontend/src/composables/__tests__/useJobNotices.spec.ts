@@ -21,15 +21,11 @@ import {
 import { mountNotices } from '@/testing/mountNotices'
 import { findButton } from '@/testing/findButton'
 import { jobFixture } from '@/testing/fixtures/job'
-import { branchFixture } from '@/testing/fixtures/branch'
+import { refsFixture } from '@/testing/fixtures/refs'
 
 // setUpstream gives the repo one current branch with an upstream.
 function setUpstream(): void {
-  useRefsStore().refs = {
-    branches: [branchFixture({ upstream: 'origin/main' })],
-    remotes: [{ name: 'origin', branches: [] }],
-    tags: [],
-  }
+  useRefsStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 }
 
 function rejectedPushJob(code: Code): JobInfo {
@@ -127,7 +123,7 @@ describe('useJobNotices', () => {
 
   it('FR-SYNC-04 a rejected push on a branch without upstream shows the error and no Pull or Force push', async () => {
     const notice = await mountWithNotices()
-    useRefsStore().refs = { branches: [branchFixture()], remotes: [], tags: [] }
+    useRefsStore().refs = refsFixture()
 
     useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
     await nextTick()

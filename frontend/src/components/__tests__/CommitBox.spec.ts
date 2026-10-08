@@ -17,24 +17,12 @@ import { useRepoStore } from '@/stores/repo'
 import { useRefsStore } from '@/stores/refs'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { summaryFixture } from '@/testing/fixtures/summary'
-import {
-  Operation,
-  type Branch,
-  type Refs,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
-import { branchFixture } from '@/testing/fixtures/branch'
+import { Operation } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { refsFixture } from '@/testing/fixtures/refs'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 
 const props = { wt: '/repo' }
-
-function refsFixture(overrides: Partial<Branch> = {}, remotes: string[] = []): Refs {
-  return {
-    branches: [branchFixture(overrides)],
-    remotes: remotes.map((name) => ({ name, branches: [] })),
-    tags: [],
-  }
-}
 
 // amendCheckbox is the Amend checkbox's <input>, the first of the box's
 // two checkboxes.

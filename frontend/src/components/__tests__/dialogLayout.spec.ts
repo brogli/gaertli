@@ -15,7 +15,7 @@ import RenameBranchDialog from '../RenameBranchDialog.vue'
 import ResetDialog from '../ResetDialog.vue'
 import SetUpstreamDialog from '../SetUpstreamDialog.vue'
 import SquashDialog from '../SquashDialog.vue'
-import { expectDialogFooter, fieldLabels } from '@/testing/dialog'
+import { fieldLabels, footerButtons } from '@/testing/dialog'
 import { mountInBody } from '@/testing/mountInBody'
 
 const dialogs = [
@@ -89,7 +89,9 @@ describe('dialog layout', () => {
     async ({ mount, buttons }) => {
       const { wrapper, body } = await mount()
 
-      await expectDialogFooter(wrapper, body, buttons)
+      expect(footerButtons(body)).toEqual(buttons)
+      await body.get('[data-test="dialog-cancel"]').trigger('click')
+      expect(wrapper.emitted('close')).toHaveLength(1)
     },
   )
 

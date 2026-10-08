@@ -3,6 +3,7 @@ import { undo } from '@codemirror/commands'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '@/testing/mountInBody'
+import { wailsError } from '@/testing/errors'
 
 const { Facade } = vi.hoisted(() => ({
   Facade: {
@@ -24,11 +25,12 @@ import ConflictView from '../ConflictView.vue'
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { emit } from '@/testing/runtime'
-import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 import { findButton } from '@/testing/findButton'
 import { editorViews } from '@/testing/editorView'
 import { conflictFileFixture } from '@/testing/fixtures/conflicts'
+import { resolveBothConflicts } from '@/testing/resolveConflicts'
 import {
+  ChangeScope,
   ConflictChoice,
   ConflictKind,
   Operation,
@@ -39,13 +41,6 @@ async function mountView(file: Partial<ConflictFile>) {
   Facade.Conflict.mockResolvedValue(conflictFileFixture(file))
   const { wrapper } = await mountInBody(ConflictView, { props: { wt: '/repo', path: 'a.txt' } })
   return wrapper
-}
-
-// resolveAll takes the current side in both conflicts of the fixture.
-async function resolveAll(wrapper: VueWrapper): Promise<void> {
-  for (const label of ['Take left', 'Next change · Alt+Down', 'Take left']) {
-    await findButton(wrapper, label)!.trigger('click')
-  }
 }
 
 describe('ConflictView', () => {
@@ -183,7 +178,7 @@ describe('ConflictView', () => {
       }),
     )
     const wrapper = await mountView({})
-    await resolveAll(wrapper)
+    await resolveBothConflicts(wrapper)
     const resultView = () => editorViews(wrapper)[1]!
     resultView().dispatch({ changes: { from: 0, insert: 'typed ' } })
     await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
@@ -223,7 +218,7 @@ describe('ConflictView', () => {
     it('FR-CONF-06 a save keeps the editor, its edits and undo through the reload it causes', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView({})
-      await resolveAll(wrapper)
+      await resolveBothConflicts(wrapper)
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
       await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
@@ -240,7 +235,7 @@ describe('ConflictView', () => {
     it('FR-CONF-06 a read that started before a save does not undo the save', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView({})
-      await resolveAll(wrapper)
+      await resolveBothConflicts(wrapper)
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' }, userEvent: 'input.type' })
       let answerStaleRead: (file: ConflictFile) => void = () => undefined
@@ -269,7 +264,7 @@ describe('ConflictView', () => {
       Facade.Conflict.mockResolvedValue(conflictFileFixture({}))
       emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
       await flushPromises()
-      failStaleRead(Object.assign(new Error('boom'), { cause: { message: 'boom' } }))
+      failStaleRead(wailsError('boom'))
       await flushPromises()
 
       expect(wrapper.find('.error-banner').exists()).toBe(false)
@@ -294,7 +289,7 @@ describe('ConflictView', () => {
         new Promise<string>((resolve) => (finishSave = resolve)),
       )
       const wrapper = await mountView({})
-      await resolveAll(wrapper)
+      await resolveBothConflicts(wrapper)
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
       let answerRead: (file: ConflictFile) => void = () => undefined

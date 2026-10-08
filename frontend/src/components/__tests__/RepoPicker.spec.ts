@@ -5,6 +5,7 @@ import { expectIconOnly } from '@/testing/expectIconOnly'
 import { mountNotices } from '@/testing/mountNotices'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
+import { popoverShows } from '@/testing/popover'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 
 const { AppService, Facade } = vi.hoisted(() => ({
@@ -85,11 +86,8 @@ async function pickRepoMenuAction(
 }
 
 // listOpen tells whether the repo list is showing.
-async function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
-  await flushPromises()
-  await new Promise((resolve) => requestAnimationFrame(resolve))
-  await flushPromises()
-  return body.find('.repo-list').exists()
+function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
+  return popoverShows(body, '.repo-list')
 }
 
 describe('RepoPicker', () => {

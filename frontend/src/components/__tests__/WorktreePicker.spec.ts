@@ -5,6 +5,7 @@ import { expectIconOnly } from '@/testing/expectIconOnly'
 import { mountNotices } from '@/testing/mountNotices'
 import { editorNotFound, wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
+import { popoverShows } from '@/testing/popover'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
 vi.mock(
@@ -66,11 +67,8 @@ async function pickWorktreeMenuAction(
 }
 
 // listOpen tells whether the worktree list is showing.
-async function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
-  await flushPromises()
-  await new Promise((resolve) => requestAnimationFrame(resolve))
-  await flushPromises()
-  return body.find('.worktree-list').exists()
+function listOpen(body: DOMWrapper<Element>): Promise<boolean> {
+  return popoverShows(body, '.worktree-list')
 }
 
 describe('WorktreePicker', () => {

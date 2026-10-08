@@ -16,6 +16,7 @@ import { mountInBody } from '@/testing/mountInBody'
 import { findButton } from '@/testing/findButton'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
+import { resolveBothConflicts } from '@/testing/resolveConflicts'
 import {
   RegionKind,
   type ConflictFile,
@@ -335,13 +336,6 @@ describe('MergeEditor actions and navigation', () => {
 
 const SAVE_AND_RESOLVE = 'Save and mark resolved'
 
-// resolveAll takes the current side in every conflict of the two-region file.
-async function resolveAll(wrapper: VueWrapper): Promise<void> {
-  await click(wrapper, 'Take left')
-  await click(wrapper, 'Next change · Alt+Down')
-  await click(wrapper, 'Take left')
-}
-
 describe('MergeEditor saving', () => {
   beforeEach(() => {
     Facade.SaveConflict.mockReset().mockResolvedValue('fp2')
@@ -391,7 +385,7 @@ describe('MergeEditor saving', () => {
   it('FR-CONF-06 any other save error shows as an error', async () => {
     Facade.SaveConflict.mockRejectedValue(new Error('disk full'))
     const wrapper = await mountEditor()
-    await resolveAll(wrapper)
+    await resolveBothConflicts(wrapper)
 
     await click(wrapper, SAVE_AND_RESOLVE)
 
@@ -447,7 +441,7 @@ describe('MergeEditor saving while typing', () => {
       new Promise<string>((resolve) => (finish = resolve)),
     )
     const wrapper = await mountEditor()
-    await resolveAll(wrapper)
+    await resolveBothConflicts(wrapper)
     const result = viewAt(wrapper, RESULT)
     result.dispatch({ changes: { from: 0, insert: 'one ' } })
     await click(wrapper, SAVE_AND_RESOLVE)
@@ -502,7 +496,7 @@ describe('MergeEditor unsaved results', () => {
   it('FR-CONF-06 a saved result leaves nothing to restore', async () => {
     const file = conflictFileFixture()
     const first = await mountEditor(file)
-    await resolveAll(first)
+    await resolveBothConflicts(first)
     await click(first, SAVE_AND_RESOLVE)
     first.unmount()
 

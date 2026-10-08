@@ -12,9 +12,11 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import CreateWorktreeDialog from '../CreateWorktreeDialog.vue'
 import { mountInBody } from '@/testing/mountInBody'
+import { wailsError } from '@/testing/errors'
 import { chooseOption } from '@/testing/select'
 import { field, fieldLabels } from '@/testing/dialog'
 import { branchFixture } from '@/testing/fixtures/branch'
+import { refsOfEveryKind } from '@/testing/fixtures/refs'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { worktreeFixture } from '@/testing/fixtures/worktree'
 import { useRefsStore } from '@/stores/refs'
@@ -26,11 +28,10 @@ const wslRepo = { repoPath: '/home/u/r', distro: 'Ubuntu' }
 // mountDialog mounts the dialog on a repo whose branches are main (current)
 // and feature, with the remote branch origin/x and the tag v1.
 function mountDialog(props: { repoPath: string; distro?: string; start?: WorktreeStart }) {
-  useRefsStore().refs = {
-    branches: [branchFixture(), branchFixture({ name: 'feature', current: false })],
-    remotes: [{ name: 'origin', branches: [{ name: 'x', sha: 'sha-x' }] }],
-    tags: [{ name: 'v1', sha: 'sha-v1' }],
-  }
+  useRefsStore().refs = refsOfEveryKind([
+    branchFixture(),
+    branchFixture({ name: 'feature', current: false }),
+  ])
   return mountInBody(CreateWorktreeDialog, { props })
 }
 
@@ -233,9 +234,7 @@ describe('CreateWorktreeDialog', () => {
 
   it('FR-WT-03 a rejected InvalidName shows the error and keeps the dialog open', async () => {
     Facade.AddWorktree.mockRejectedValueOnce(
-      new Error('boom', {
-        cause: { message: '"-bad" is not a valid branch name', code: 'INVALID_NAME' },
-      }),
+      wailsError('"-bad" is not a valid branch name', 'INVALID_NAME'),
     )
     const { wrapper, body } = await mountDialog({ repoPath: '/repo' })
 

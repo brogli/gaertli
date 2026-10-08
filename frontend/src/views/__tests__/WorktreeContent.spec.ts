@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountNotices } from '@/testing/mountNotices'
-import { editorNotFound } from '@/testing/errors'
+import { editorNotFound, wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
@@ -65,9 +65,7 @@ describe('WorktreeContent', () => {
   })
 
   it('FR-UX-01 a Summary rejection renders the error banner with its message', async () => {
-    Facade.Summary.mockRejectedValueOnce(
-      new Error('boom', { cause: { message: 'not a git repository' } }),
-    )
+    Facade.Summary.mockRejectedValueOnce(wailsError('not a git repository'))
 
     const wrapper = mountView({ path: '/home/user/project' })
     await flushPromises()

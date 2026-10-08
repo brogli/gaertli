@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import type { BaseWrapper, DOMWrapper, VueWrapper } from '@vue/test-utils'
+import type { BaseWrapper, DOMWrapper } from '@vue/test-utils'
 
 // fieldLabels are the open dialog's field labels in order, each checked to
 // name an element by its id.
@@ -23,16 +23,4 @@ export function field(
 // footerButtons are the names of the buttons in the open dialog's footer.
 export function footerButtons(body: DOMWrapper<Element>): string[] {
   return body.findAll('.p-dialog-footer button').map((b) => b.text())
-}
-
-// expectDialogFooter checks the open dialog's footer holds exactly buttons,
-// Cancel first, and that Cancel closes the dialog.
-export async function expectDialogFooter(
-  wrapper: VueWrapper,
-  body: DOMWrapper<Element>,
-  buttons: string[],
-): Promise<void> {
-  expect(footerButtons(body)).toEqual(buttons)
-  await body.get('[data-test="dialog-cancel"]').trigger('click')
-  expect(wrapper.emitted('close')).toHaveLength(1)
 }

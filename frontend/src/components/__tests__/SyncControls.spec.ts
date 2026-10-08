@@ -45,7 +45,7 @@ import {
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { findButton } from '@/testing/findButton'
-import { branchFixture } from '@/testing/fixtures/branch'
+import { refsFixture } from '@/testing/fixtures/refs'
 import { jobFixture } from '@/testing/fixtures/job'
 
 function mountControls(props: { compact?: boolean } = {}) {
@@ -54,11 +54,7 @@ function mountControls(props: { compact?: boolean } = {}) {
 
 // setRefs gives the repo one current branch and the named remotes.
 function setRefs(branch: Partial<Branch> = {}, remotes = ['origin']): void {
-  useRefsStore().refs = {
-    branches: [branchFixture(branch)],
-    remotes: remotes.map((name) => ({ name, branches: [] })),
-    tags: [],
-  }
+  useRefsStore().refs = refsFixture(branch, remotes)
 }
 
 // rejectPush ends a push job rejected as not fast-forward. Force push shows
