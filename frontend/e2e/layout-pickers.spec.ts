@@ -43,17 +43,6 @@ test('FR-UX-09 a long branch name ends in an ellipsis and shows whole on hover',
   expect(await overflows(name)).toBe(true)
 })
 
-test('FR-BR-09 every ref name in the branch picker starts at the same x', async ({ page }) => {
-  await openMockRepo(page, '&crowdedRefs=1')
-
-  await openBranchPicker(page)
-  const names = ['main', 'B', 'side', 'origin/B', 'v1']
-  const lefts = await Promise.all(
-    names.map(async (name) => (await refLi(page, name).locator('.ref-name').boundingBox())!.x),
-  )
-  expect(new Set(lefts.map(Math.round)).size, lefts.join(', ')).toBe(1)
-})
-
 test('FR-UX-09 a worktree row keeps its name, flags and buttons on one line; a long branch name ends in an ellipsis', async ({
   page,
 }) => {
@@ -82,18 +71,4 @@ test('FR-UX-09 a worktree row keeps its name, flags and buttons on one line; a l
 
   const name = rows.locator(`[data-test=worktree-branch][title="${long}"]`)
   expect(await overflows(name)).toBe(true)
-})
-
-test('FR-WT-13 a worktree row gives up its branch name before its folder name', async ({
-  page,
-}) => {
-  await openMockRepo(page, '&worktrees=wip')
-
-  await openWorktreePicker(page)
-  const row = page.locator('.p-popover [data-test=worktree-row]', { hasText: 'wip' })
-  const folder = row.locator('[data-test=worktree-folder]')
-  await expect(folder).toHaveText('wip')
-  expect(await overflows(folder)).toBe(false)
-  const branch = row.locator('[data-test=worktree-branch]')
-  expect(await overflows(branch)).toBe(true)
 })

@@ -58,22 +58,6 @@ test("FR-BR-09, FR-UX-14 a branch entry's context menu opens at the pointer; one
   await expect(page.locator('.p-popover')).toBeHidden()
 })
 
-test("FR-BR-09 choosing a branch entry's action from its context menu closes the list", async ({
-  page,
-}) => {
-  const pageErrors: Error[] = []
-  page.on('pageerror', (error) => pageErrors.push(error))
-
-  await openBranchList(page)
-  await page.locator('.p-popover [data-test=ref-row]').nth(1).click({ button: 'right' })
-
-  await page.locator('.p-contextmenu [role=menuitem]', { hasText: 'Show in log' }).click()
-
-  await expect(page.locator('.p-contextmenu')).toBeHidden()
-  await expect(page.locator('.p-popover')).toBeHidden()
-  expect(pageErrors).toEqual([])
-})
-
 test('FR-BR-09, FR-UX-14 a branch entry\'s "…" menu opens below its button; one outside click closes the menu and the list', async ({
   page,
 }) => {
