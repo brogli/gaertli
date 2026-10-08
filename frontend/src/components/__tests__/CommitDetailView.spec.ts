@@ -22,6 +22,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import CommitDetailView from '../CommitDetailView.vue'
+import DiffView from '../DiffView.vue'
 import CompareView from '../CompareView.vue'
 import CompareWorkingView from '../CompareWorkingView.vue'
 import { useLogStore } from '@/stores/log'
@@ -117,6 +118,48 @@ describe('CommitDetailView', () => {
       path: 'b.txt',
       oldPath: 'a2.txt',
     })
+  })
+
+  it('FR-LOG-03 selecting a file lists it as selected and opens no diff in the main window', async () => {
+    Facade.CommitDetails.mockResolvedValue(
+      commitDetailsFixture({ files: [{ path: 'a.txt', status: 'M' }] }),
+    )
+
+    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
+    const log = useLogStore()
+    await log.select(commitRow())
+    await flushPromises()
+    await wrapper.get('.files li').trigger('click')
+
+    expect(log.selectedFile?.path).toBe('a.txt')
+    expect(wrapper.findComponent(DiffView).exists()).toBe(false)
+    expect(AppService.OpenDiff).not.toHaveBeenCalled()
+  })
+
+  it('FR-ED-02 opening a file that is gone from the worktree shows the banner naming it', async () => {
+    Facade.CommitDetails.mockResolvedValue(
+      commitDetailsFixture({ files: [{ path: 'docs/readme.md', status: 'M' }] }),
+    )
+    Facade.OpenFile.mockRejectedValue(
+      new Error('boom', {
+        cause: {
+          code: 'FILE_NOT_FOUND',
+          key: 'fileNotFound',
+          args: { path: 'docs/readme.md' },
+          message: 'docs/readme.md no longer exists in this worktree',
+        },
+      }),
+    )
+
+    const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
+    await useLogStore().select(commitRow())
+    await flushPromises()
+    await wrapper.get('.files [data-test="open-editor"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.error-banner').text()).toContain(
+      'docs/readme.md no longer exists in this worktree',
+    )
   })
 
   it('FR-UX-10 labels Author and Committer with dates when they differ, and shows short-hash parents with the full SHA in title', async () => {

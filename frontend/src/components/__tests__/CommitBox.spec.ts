@@ -23,6 +23,7 @@ import {
   type Refs,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 import { branchFixture } from '@/testing/fixtures/branch'
+import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 
 const props = { wt: '/repo' }
@@ -79,6 +80,20 @@ describe('CommitBox', () => {
       expect(submitButton(wrapper).element.disabled).toBe(disabled)
     },
   )
+
+  it("FR-CHG-07 a rejected commit shows the hook's output and keeps the message", async () => {
+    useChangesStore().files = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
+    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    Facade.Commit.mockRejectedValue(wailsError('hook says no', 'STOPPED'))
+
+    const wrapper = mount(CommitBox, { props })
+    await wrapper.get('textarea').setValue('blocked by the hook')
+    await submitButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.error-banner').text()).toContain('hook says no')
+    expect(wrapper.get<HTMLTextAreaElement>('textarea').element.value).toBe('blocked by the hook')
+  })
 
   it('FR-CHG-05 clicking Commit calls Facade.Commit with the message, amend false', async () => {
     const changes = useChangesStore()
