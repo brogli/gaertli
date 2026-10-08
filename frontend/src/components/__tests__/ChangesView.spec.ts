@@ -52,7 +52,7 @@ function rowIn(wrapper: ReturnType<typeof mountWith>, mode: Mode, group: number)
     : wrapper.findAll('[role="tree"]')[group]!.get('[data-pc-section="nodecontent"]')
 }
 
-function isSelected(row: DOMWrapper<Element>, mode: Mode): boolean {
+function isSelected(row: ReturnType<typeof rowIn>, mode: Mode): boolean {
   return mode === 'list'
     ? row.classes().includes('selected')
     : row.attributes('data-p-selected') === 'true'
