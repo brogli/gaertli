@@ -1,14 +1,6 @@
 import { test, expect } from './fixtures'
 import type { Git, Repos } from './repos'
-import {
-  commitFiles,
-  currentBranch,
-  logRow,
-  notice,
-  parents,
-  pickRefAction,
-  rev,
-} from './helpers'
+import { commitFiles, currentBranch, logRow, notice, parents, pickRefAction, rev } from './helpers'
 
 // Merging a branch into the current one and rebasing the current one onto
 // a branch, both from the branch picker's row menu.

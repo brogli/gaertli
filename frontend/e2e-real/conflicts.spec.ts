@@ -180,9 +180,10 @@ test('FR-CONF-05 FR-CONF-06 a merge conflict resolves in the merge editor: a sid
   await result.focus()
   await diff.keyboard.type('edited ')
   await expect(save).toBeDisabled()
-  const text = await result.textContent()
+  const text = (await result.textContent()) ?? ''
   await diff.waitForResponse(
-    (res) => res.url().endsWith('/wails/runtime') && (res.request().postData() ?? '').includes('edited '),
+    (res) =>
+      res.url().endsWith('/wails/runtime') && (res.request().postData() ?? '').includes('edited '),
   )
 
   await diff.close()

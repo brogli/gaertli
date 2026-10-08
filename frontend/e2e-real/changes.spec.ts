@@ -3,14 +3,7 @@ import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import type { Git } from './repos'
-import {
-  clickConfirm,
-  confirmDialog,
-  diffRow,
-  diffText,
-  fileGroup,
-  fileRow,
-} from './helpers'
+import { clickConfirm, confirmDialog, diffRow, diffText, fileGroup, fileRow } from './helpers'
 
 // The changes view on work's real working tree: groups, staging whole
 // files and discards; and the working tree's diff window: diffs, hunks,

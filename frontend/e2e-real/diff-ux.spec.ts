@@ -2,12 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import {
-  commitFiles,
-  commitSha,
-  diffText,
-  hunksText,
-} from './helpers'
+import { commitFiles, commitSha, diffText, hunksText } from './helpers'
 import type { Git, Repos } from './repos'
 
 // The diff window and every way of opening a file in the external editor.
