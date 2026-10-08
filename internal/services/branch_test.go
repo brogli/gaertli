@@ -874,15 +874,13 @@ func TestFR_BR_02_ResetRefusesANonexistentSHAAsGitFailed(t *testing.T) {
 // (MERGE_HEAD set), returning the two branches' common ancestor.
 func mergeConflictFixture(t *testing.T, dir string) (baseSHA string) {
 	t.Helper()
-	gittest.Commit(t, dir, "conflict.txt", "base", "base")
-	baseSHA = gittest.HeadSHA(t, dir)
-	gittest.Run(t, dir, "branch", "other")
-	gittest.Commit(t, dir, "conflict.txt", "master-side", "master change")
-	gittest.Run(t, dir, "checkout", "other")
-	gittest.Commit(t, dir, "conflict.txt", "other-side", "other change")
-	gittest.Run(t, dir, "checkout", "master")
-	tryGit(t, dir, "merge", "other") // conflict expected
-	return baseSHA
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: map[string]string{"conflict.txt": "base"}},
+		gittest.Step{Branch: "other", From: "master", Message: "other change", Files: map[string]string{"conflict.txt": "other-side"}},
+		gittest.Step{Message: "master change", Files: map[string]string{"conflict.txt": "master-side"}},
+	)
+	gitStops(t, dir, "merge", "other")
+	return shas[0]
 }
 
 func mergeInProgress(dir string) bool {
@@ -945,11 +943,12 @@ func trackedInIndex(t *testing.T, dir, name string) bool {
 // overwritten" (exit 1).
 func conflictingCheckoutFixture(t *testing.T, dir string) (olderSHA string) {
 	t.Helper()
-	gittest.Commit(t, dir, "conflict.txt", "old", "older")
-	olderSHA = gittest.HeadSHA(t, dir)
-	gittest.Commit(t, dir, "conflict.txt", "new", "newer")
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "older", Files: map[string]string{"conflict.txt": "old"}},
+		gittest.Step{Message: "newer", Files: map[string]string{"conflict.txt": "new"}},
+	)
 	writeFile(t, dir, "conflict.txt", "dirty")
-	return olderSHA
+	return shas[0]
 }
 
 // branchExists reports whether name is a local branch in dir.
@@ -991,14 +990,14 @@ func currentBranch(t *testing.T, dir string) string {
 // is ambiguous.
 func branchAndTagNamedV1(t *testing.T, dir string) (branchSHA, tagSHA string) {
 	t.Helper()
-	gittest.Commit(t, dir, "seed.txt", "a", "first")
-	branchSHA = gittest.HeadSHA(t, dir)
-	gittest.Run(t, dir, "branch", "v1")
-	gittest.Commit(t, dir, "seed.txt", "b", "second")
-	tagSHA = gittest.HeadSHA(t, dir)
-	gittest.Run(t, dir, "tag", "-a", "-m", "release", "v1")
-	gittest.Commit(t, dir, "seed.txt", "c", "third")
-	return branchSHA, tagSHA
+	shas := gittest.History(t, dir,
+		gittest.Step{Message: "first", Files: map[string]string{"seed.txt": "a"}},
+		gittest.Step{Message: "second", Files: map[string]string{"seed.txt": "b"}},
+		gittest.Step{Message: "third", Files: map[string]string{"seed.txt": "c"}},
+	)
+	gittest.Run(t, dir, "branch", "v1", shas[0])
+	gittest.Run(t, dir, "tag", "-a", "-m", "release", "v1", shas[1])
+	return shas[0], shas[1]
 }
 
 // withOrigin adds a bare remote origin holding dir's master as branch, and
