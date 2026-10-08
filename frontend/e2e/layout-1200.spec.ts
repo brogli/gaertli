@@ -107,6 +107,26 @@ test('FR-UX-09 commit-box checkboxes align with their label text', async ({ page
   }
 })
 
+test('FR-CHG-12 the commit message field shows at least six lines without scrolling', async ({
+  page,
+}) => {
+  await openMockRepo(page)
+  await switchToChanges(page)
+
+  const field = page.locator('.commit-box textarea')
+  await field.waitFor()
+  const { textHeight, lineHeight } = await field.evaluate((el) => {
+    const style = getComputedStyle(el)
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+    return {
+      textHeight: el.clientHeight - padding,
+      lineHeight: parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2,
+    }
+  })
+  // Chromium floors the row height of a fractional line-height per line.
+  expect(textHeight).toBeGreaterThanOrEqual(6 * Math.floor(lineHeight))
+})
+
 test('FR-DIFF-02 the diff toolbar stays in sight while a long diff scrolls', async ({ page }) => {
   await openDiffWindow(page)
 
