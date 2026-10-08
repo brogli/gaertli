@@ -222,14 +222,6 @@ func mergedPreferring(t *testing.T, dir, strategy string) string {
 // lines are the base's.
 func assertRegionsAligned(t *testing.T, got core.ConflictFile) {
 	t.Helper()
-	text := func(content string, rng core.LineRange) string {
-		start, end := edges(rng)
-		lines := splitLines(content)
-		if start < 0 || end > len(lines) {
-			return "<out of range>"
-		}
-		return strings.Join(lines[start:end], "")
-	}
 	for i, r := range got.Regions {
 		changed, unchanged, changedText := r.Incoming, r.Current, got.Incoming.Content
 		unchangedText := got.Current.Content
@@ -239,11 +231,11 @@ func assertRegionsAligned(t *testing.T, got core.ConflictFile) {
 		case core.RegionConflict:
 			continue
 		}
-		if have, want := text(changedText, changed), text(got.Result, r.Result); have != want {
+		if have, want := selected(changedText, changed), selected(got.Result, r.Result); have != want {
 			t.Errorf("base %q current %q incoming %q: region %d (%+v): changed side holds %q, Result %q",
 				got.Base.Content, got.Current.Content, got.Incoming.Content, i, r, have, want)
 		}
-		if have, want := text(unchangedText, unchanged), text(got.Base.Content, r.Base); have != want {
+		if have, want := selected(unchangedText, unchanged), selected(got.Base.Content, r.Base); have != want {
 			t.Errorf("base %q current %q incoming %q: region %d (%+v): unchanged side holds %q, base %q",
 				got.Base.Content, got.Current.Content, got.Incoming.Content, i, r, have, want)
 		}
@@ -271,10 +263,7 @@ func TestFR_CONF_05_ChangeRegionsCoverTheSameChangeInAllFourTexts(t *testing.T) 
 				t.Skip("merges cleanly")
 			}
 			c, wt := openWorktree(t, dir)
-			got, err := c.Conflict(t.Context(), wt, "a.txt")
-			if err != nil {
-				t.Fatal(err)
-			}
+			got := readConflict(t, c, wt, "a.txt")
 
 			assertRegionsAligned(t, got)
 			if have := resolvedWith(t, got, takeCurrent); have != tc.current {

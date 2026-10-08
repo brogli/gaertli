@@ -12,10 +12,7 @@ func TestFR_CONF_05_ConflictRegionBaseKeepsLinesTheCurrentSideDeleted(t *testing
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(conflictRegionsOf(got)) != 1 {
-		t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
-	}
-	assertRegion(t, got, 0, "b\n", "", "B\n")
+	assertRegions(t, got, wantRegion{"b\n", "", "B\n"})
 }
 
 // A separate diff of the base against a side can align repeated lines differently than git did;
@@ -77,14 +74,11 @@ func TestFR_CONF_05_ConflictRegionBaseOfASharedChangeOfAnotherLengthIsTheReplace
 
 			got := readConflict(t, c, wt, "a.txt")
 
-			if len(conflictRegionsOf(got)) != 1 {
-				t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
-			}
 			if style == "diff3" {
-				assertRegion(t, got, 0, "X\n", "P\nQ\nR\nC\n", "P\nQ\nR\nI\n")
+				assertRegions(t, got, wantRegion{"X\n", "P\nQ\nR\nC\n", "P\nQ\nR\nI\n"})
 				return
 			}
-			assertRegion(t, got, 0, "X\n", "C\n", "I\n")
+			assertRegions(t, got, wantRegion{"X\n", "C\n", "I\n"})
 		})
 	}
 }
@@ -121,14 +115,11 @@ func TestFR_CONF_05_ConflictRegionBaseExcludesLinesBothSidesChangedTheSameWay(t 
 
 			got := readConflict(t, c, wt, "a.txt")
 
-			if len(conflictRegionsOf(got)) != 1 {
-				t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
-			}
 			if way.diff3 {
-				assertRegion(t, got, 0, "a\nb\nc\n", "A\nB\nC\n", "A\nY\nC\n")
+				assertRegions(t, got, wantRegion{"a\nb\nc\n", "A\nB\nC\n", "A\nY\nC\n"})
 				return
 			}
-			assertRegion(t, got, 0, "b\n", "B\n", "Y\n")
+			assertRegions(t, got, wantRegion{"b\n", "B\n", "Y\n"})
 		})
 	}
 }

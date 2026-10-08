@@ -77,21 +77,32 @@ func selected(content string, r core.LineRange) string {
 	return strings.Join(lines[start:end], "")
 }
 
-func assertRegion(t *testing.T, got core.ConflictFile, i int, base, current, incoming string) {
+// wantRegion is the base, current and incoming lines a conflict region
+// selects.
+type wantRegion struct{ base, current, incoming string }
+
+// assertRegions fails unless got's conflict regions select want's lines, in
+// order, each over one marker block of the result.
+func assertRegions(t *testing.T, got core.ConflictFile, want ...wantRegion) {
 	t.Helper()
-	r := conflictRegionsOf(got)[i]
-	if s := selected(got.Base.Content, r.Base); s != base {
-		t.Errorf("region %d base = %q (%+v), want %q", i, s, r.Base, base)
+	regions := conflictRegionsOf(got)
+	if len(regions) != len(want) {
+		t.Fatalf("regions = %d, want %d; result:\n%s", len(regions), len(want), got.Result)
 	}
-	if s := selected(got.Current.Content, r.Current); s != current {
-		t.Errorf("region %d current = %q (%+v), want %q", i, s, r.Current, current)
-	}
-	if s := selected(got.Incoming.Content, r.Incoming); s != incoming {
-		t.Errorf("region %d incoming = %q (%+v), want %q", i, s, r.Incoming, incoming)
-	}
-	block := selected(got.Result, r.Result)
-	if !strings.HasPrefix(block, "<<<<<<<") || strings.Count(block, ">>>>>>>") != 1 || !strings.HasSuffix(block, "\n") {
-		t.Errorf("region %d result = %q, want one marker block", i, block)
+	for i, r := range regions {
+		if s := selected(got.Base.Content, r.Base); s != want[i].base {
+			t.Errorf("region %d base = %q (%+v), want %q", i, s, r.Base, want[i].base)
+		}
+		if s := selected(got.Current.Content, r.Current); s != want[i].current {
+			t.Errorf("region %d current = %q (%+v), want %q", i, s, r.Current, want[i].current)
+		}
+		if s := selected(got.Incoming.Content, r.Incoming); s != want[i].incoming {
+			t.Errorf("region %d incoming = %q (%+v), want %q", i, s, r.Incoming, want[i].incoming)
+		}
+		block := selected(got.Result, r.Result)
+		if !strings.HasPrefix(block, "<<<<<<<") || strings.Count(block, ">>>>>>>") != 1 || !strings.HasSuffix(block, "\n") {
+			t.Errorf("region %d result = %q, want one marker block", i, block)
+		}
 	}
 }
 
@@ -110,11 +121,7 @@ func TestFR_CONF_05_ConflictRegionsWithZdiff3AndAnIncomingOnlyChangeBetween(t *t
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(conflictRegionsOf(got)) != 2 {
-		t.Fatalf("regions = %d, want 2; result:\n%s", len(conflictRegionsOf(got)), got.Result)
-	}
-	assertRegion(t, got, 0, "x1\n", "c1\n", "i1\n")
-	assertRegion(t, got, 1, "x2\n", "c2a\nc2b\n", "i2\n")
+	assertRegions(t, got, wantRegion{"x1\n", "c1\n", "i1\n"}, wantRegion{"x2\n", "c2a\nc2b\n", "i2\n"})
 }
 
 func TestFR_CONF_05_ConflictRegionsSkipABlockTheUserResolved(t *testing.T) {
@@ -134,10 +141,7 @@ func TestFR_CONF_05_ConflictRegionsSkipABlockTheUserResolved(t *testing.T) {
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(conflictRegionsOf(got)) != 1 {
-		t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
-	}
-	assertRegion(t, got, 0, "x2\n", "c2a\nc2b\n", "i2\n")
+	assertRegions(t, got, wantRegion{"x2\n", "c2a\nc2b\n", "i2\n"})
 }
 
 func TestFR_CONF_05_ConflictRegionsUseTheMarkerSizeAttribute(t *testing.T) {
@@ -154,10 +158,10 @@ func TestFR_CONF_05_ConflictRegionsUseTheMarkerSizeAttribute(t *testing.T) {
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if got.MarkerSize != 10 || len(conflictRegionsOf(got)) != 1 {
-		t.Fatalf("MarkerSize, regions = %d, %d; result:\n%s", got.MarkerSize, len(conflictRegionsOf(got)), got.Result)
+	if got.MarkerSize != 10 {
+		t.Errorf("MarkerSize = %d, want 10", got.MarkerSize)
 	}
-	assertRegion(t, got, 0, "base\n", "current\n", "incoming\n")
+	assertRegions(t, got, wantRegion{"base\n", "current\n", "incoming\n"})
 }
 
 func TestFR_CONF_05_ConflictRegionsIgnoreTheDiffAttribute(t *testing.T) {
@@ -174,10 +178,7 @@ func TestFR_CONF_05_ConflictRegionsIgnoreTheDiffAttribute(t *testing.T) {
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(conflictRegionsOf(got)) != 1 {
-		t.Fatalf("regions = %d, want 1; result:\n%s", len(conflictRegionsOf(got)), got.Result)
-	}
-	assertRegion(t, got, 0, "base\n", "current\n", "incoming\n")
+	assertRegions(t, got, wantRegion{"base\n", "current\n", "incoming\n"})
 }
 
 // conflictRegionsOf returns the regions of f that are conflicts.

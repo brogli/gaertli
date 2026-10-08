@@ -106,10 +106,10 @@ func TestFR_CONF_05_ConflictTextReadsTheThreeSidesAndTheWorkingFile(t *testing.T
 	if got.Fingerprint == "" {
 		t.Error("Fingerprint is empty")
 	}
-	if got.MarkerSize != 7 || len(conflictRegionsOf(got)) != 1 {
-		t.Fatalf("MarkerSize, regions = %d, %d", got.MarkerSize, len(conflictRegionsOf(got)))
+	if got.MarkerSize != 7 {
+		t.Errorf("MarkerSize = %d, want 7", got.MarkerSize)
 	}
-	assertRegion(t, got, 0, "base\n", "current\n", "incoming\n")
+	assertRegions(t, got, wantRegion{"base\n", "current\n", "incoming\n"})
 }
 
 func TestFR_CONF_06_ConflictTextSendsLFForCRLF(t *testing.T) {
