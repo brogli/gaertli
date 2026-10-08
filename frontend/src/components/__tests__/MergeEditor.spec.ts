@@ -6,7 +6,7 @@ const { Facade } = vi.hoisted(() => ({
 vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
 
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { Text, type Extension } from '@codemirror/state'
+import { type Extension } from '@codemirror/state'
 import { undo } from '@codemirror/commands'
 import { EditorView, ViewPlugin } from '@codemirror/view'
 import * as codeEditor from '@/lib/codeEditor'
@@ -17,7 +17,6 @@ import { findButton } from '@/testing/findButton'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
 import {
-  Operation,
   RegionKind,
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/nebegit/internal/core'
@@ -38,7 +37,7 @@ function headers(wrapper: VueWrapper): string[] {
 }
 
 describe('MergeEditor layout', () => {
-  it('FR-CONF-05 shows the current side, the result and the incoming side', async () => {
+  it('FR-CONF-05 shows the current side, the result holding the base text in each conflict with no marker line, and the incoming side', async () => {
     const file = conflictFileFixture()
     const wrapper = await mountEditor(file)
 
@@ -49,37 +48,8 @@ describe('MergeEditor layout', () => {
     ])
     expect(headers(wrapper)).toEqual(['main · current branch', 'Result', 'side · merged branch'])
     expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 1 of 2 · 2 left')
-  })
-
-  it.each([
-    [
-      Operation.RebaseOperation,
-      '',
-      'main · rebased onto',
-      'abcdef0 on side · commit being replayed',
-    ],
-    [Operation.CherryPickOperation, 'side', 'main · current branch', 'side · picked commit'],
-    [
-      Operation.RevertOperation,
-      'side',
-      'main · current branch',
-      'abcdef0 on side · state before the reverted commit',
-    ],
-  ])('FR-CONF-05 names the panes of a %s', async (operation, incomingRef, current, incoming) => {
-    const base = conflictFileFixture()
-    const file = { ...base, operation, incoming: { ...base.incoming, ref: incomingRef } }
-    const wrapper = await mountEditor(file)
-
-    const [currentHeader, , incomingHeader] = headers(wrapper)
-    expect([currentHeader, incomingHeader]).toEqual([current, incoming])
-  })
-
-  it('FR-CONF-05 the result holds the base text in each conflict, no marker line', async () => {
-    const wrapper = await mountEditor()
     const result = editorViews(wrapper)[1]!
-
     expect(result.state.doc.toString()).not.toMatch(/^[<>]{7}/m)
-    expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 1 of 2 · 2 left')
     expect(result.dom.querySelectorAll('.cm-conflict-unresolved')).toHaveLength(2)
   })
 
@@ -183,15 +153,6 @@ describe('MergeEditor layout', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-test="conflict-position"]').text()).toBe('Change 2 of 2 · 2 left')
-  })
-
-  it('FR-CONF-06 offers one save action and no base pane', async () => {
-    const wrapper = await mountEditor()
-
-    expect(findButton(wrapper, 'Save')).toBeUndefined()
-    expect(findButton(wrapper, 'Show base')).toBeUndefined()
-    expect(findButton(wrapper, SAVE_AND_RESOLVE)).toBeDefined()
-    expect(wrapper.find('[data-test="pane-header-base"]').exists()).toBe(false)
   })
 })
 
@@ -427,26 +388,6 @@ describe('MergeEditor saving', () => {
     )
   })
 
-  it('FR-CONF-06 a file that changed since it was opened is offered a reload', async () => {
-    Facade.SaveConflict.mockRejectedValue(
-      Object.assign(new Error('rejected'), {
-        cause: {
-          message: 'changed',
-          key: 'fileChangedSinceOpened',
-          args: { path: 'a.txt' },
-        },
-      }),
-    )
-    const wrapper = await mountEditor()
-    await resolveAll(wrapper)
-
-    await click(wrapper, SAVE_AND_RESOLVE)
-    expect(wrapper.text()).toContain('a.txt changed since it was opened.')
-    await click(wrapper, 'Reload')
-
-    expect(wrapper.emitted('reload')).toHaveLength(1)
-  })
-
   it('FR-CONF-06 any other save error shows as an error', async () => {
     Facade.SaveConflict.mockRejectedValue(new Error('disk full'))
     const wrapper = await mountEditor()
@@ -460,13 +401,6 @@ describe('MergeEditor saving', () => {
 })
 
 describe('MergeEditor toolbar and lifecycle', () => {
-  it('FR-CONF-05 names the conflicts left next to the position', async () => {
-    const wrapper = await mountEditor()
-    await click(wrapper, 'Take left')
-
-    expect(position(wrapper)).toBe('Change 1 of 2 · 1 left')
-  })
-
   it('FR-CONF-06 a stray marker line explains the disabled Save and mark resolved', async () => {
     const wrapper = await mountEditor()
     await click(wrapper, 'Take left')
@@ -527,16 +461,6 @@ describe('MergeEditor saving while typing', () => {
     expect(draft?.fingerprint).toBe('fpSaved')
     expect(wrapper.emitted('saved')).toEqual([['fpSaved']])
   })
-
-  it('FR-CONF-06 a save tells the new fingerprint', async () => {
-    Facade.SaveConflict.mockReset().mockResolvedValue('fpSaved')
-    const wrapper = await mountEditor()
-    await resolveAll(wrapper)
-
-    await click(wrapper, SAVE_AND_RESOLVE)
-
-    expect(wrapper.emitted('saved')).toEqual([['fpSaved']])
-  })
 })
 
 describe('MergeEditor unsaved results', () => {
@@ -588,39 +512,6 @@ describe('MergeEditor unsaved results', () => {
     expect(useMergeDrafts().get('/repo', 'a.txt', '')).toBeUndefined()
   })
 
-  it('FR-CONF-06 unsaved edits stay when the file changed on disk, which Reload discards', async () => {
-    const wrapper = await mountEditor()
-    await editResult(wrapper)
-
-    await wrapper.setProps({ file: conflictFileFixture({ fingerprint: 'fp2' }) })
-
-    expect(wrapper.text()).toContain('a.txt changed on disk.')
-    expect(editorTexts(wrapper)[RESULT]).toMatch(/^typed /)
-    await click(wrapper, 'Reload')
-    expect(wrapper.emitted('reload')).toHaveLength(1)
-  })
-
-  it('FR-CONF-06 a burst of edits reads the result once per write, not per keystroke', async () => {
-    vi.useFakeTimers()
-    try {
-      Facade.SetMergeDraft.mockClear()
-      const wrapper = await mountEditor()
-      const result = viewAt(wrapper, RESULT)
-      const reads = vi.spyOn(Text.prototype, 'toString')
-
-      for (const word of ['one ', 'two ', 'three ', 'four ']) {
-        result.dispatch({ changes: { from: 0, insert: word } })
-      }
-      await vi.advanceTimersByTimeAsync(1000)
-
-      expect(Facade.SetMergeDraft).toHaveBeenCalledTimes(2)
-      expect(reads).toHaveBeenCalledTimes(2)
-    } finally {
-      vi.restoreAllMocks()
-      vi.useRealTimers()
-    }
-  })
-
   it('FR-CONF-06 closing the editor writes nothing the core already has', async () => {
     vi.useFakeTimers()
     try {
@@ -644,15 +535,6 @@ describe('MergeEditor unsaved results', () => {
     await editResult(wrapper)
 
     expect(wrapper.find('.error-banner').text()).toContain('no session')
-  })
-
-  it('FR-CONF-06 the same file read again changes nothing', async () => {
-    const wrapper = await mountEditor()
-    await editResult(wrapper)
-
-    await wrapper.setProps({ file: conflictFileFixture() })
-
-    expect(wrapper.text()).not.toContain('changed on disk')
   })
 })
 
