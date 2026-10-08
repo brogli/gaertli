@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { expect, type Locator, type Page, type Request } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { openBranchPicker, openWorktreePicker, refLi } from '../e2e/helpers'
 import type { Git } from './repos'
 
@@ -8,16 +8,6 @@ export { openBranchPicker, openWorktreePicker, refLi }
 
 // Locators and actions the area specs share; an area-only helper stays in
 // its spec file.
-
-// boundCallEndingWith resolves on the page's next bound-method call whose
-// arguments end with args.
-export function boundCallEndingWith(page: Page, args: unknown[]): Promise<Request> {
-  return page.waitForRequest((req) => {
-    if (!req.url().endsWith('/wails/runtime')) return false
-    const sent: unknown[] = JSON.parse(req.postData() ?? '{}').args?.args ?? []
-    return JSON.stringify(sent.slice(-args.length)) === JSON.stringify(args)
-  })
-}
 
 // logRow is the log row whose subject contains subject.
 export function logRow(page: Page, subject: string): Locator {
@@ -42,11 +32,6 @@ export async function pickRefAction(page: Page, name: string, item: string): Pro
 // labelled label, e.g. "Open folder…".
 export function pickerAction(page: Page, label: string): Locator {
   return page.locator('[data-test=picker-action]', { hasText: label })
-}
-
-// pickerError is the open picker's error banner.
-export function pickerError(page: Page): Locator {
-  return page.locator('.p-popover .error-banner')
 }
 
 export async function contextMenuItems(page: Page, target: Locator): Promise<string[]> {
@@ -127,13 +112,6 @@ export async function openJobsMenu(page: Page): Promise<Locator> {
   const list = page.locator('.jobs-list')
   await list.waitFor()
   return list
-}
-
-export async function openSettings(page: Page): Promise<Locator> {
-  await page.locator('[data-test=open-settings]').click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
-  await expect(dialog).toBeVisible()
-  return dialog
 }
 
 // choosePullMode opens the sync controls' Pull split button's menu and
