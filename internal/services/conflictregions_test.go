@@ -101,18 +101,6 @@ const (
 	twoConflictsIncoming = "top\ni1\nf1\nf2\nf3\nf4\nM1\nM2\nM3\nf5\nf6\nf7\nf8\ni2\nbottom\n"
 )
 
-func TestFR_CONF_05_ConflictRegionsOfOneConflict(t *testing.T) {
-	t.Parallel()
-	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("one\nbase\ntwo\n"), version("one\ncurrent\ntwo\n"), version("one\nincoming\ntwo\n"))
-
-	got := readConflict(t, c, wt, "a.txt")
-
-	if got.MarkerSize != 7 || len(conflictRegionsOf(got)) != 1 {
-		t.Fatalf("MarkerSize, regions = %d, %d", got.MarkerSize, len(conflictRegionsOf(got)))
-	}
-	assertRegion(t, got, 0, "base\n", "current\n", "incoming\n")
-}
-
 func TestFR_CONF_05_ConflictRegionsWithZdiff3AndAnIncomingOnlyChangeBetween(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version(twoConflictsBase), version(twoConflictsCurrent), version(twoConflictsIncoming))

@@ -105,7 +105,7 @@ func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.Operat
 	}
 }
 
-func TestFR_CONF_04_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
+func TestFR_CONF_04_FR_CP_03_FR_RV_03_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
@@ -115,23 +115,14 @@ func TestFR_CONF_04_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *te
 			}
 
 			if err := c.ContinueOperation(t.Context(), wt); err != nil {
-				t.Fatalf("ContinueOperation = %v, want nil", err)
+				t.Fatalf("ContinueOperation = %v, want nil, no hang on a commit-message editor", err)
 			}
 
+			if fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
+				t.Errorf("%s present, want gone once the operation completed", operationStateFile[kind])
+			}
 			assertOperationCompleted(t, c, wt, dir, beforeHEAD)
 		})
-	}
-}
-
-func TestFR_CONF_04_ContinueOperationRebaseNeverWaitsOnACommitMessageEditor(t *testing.T) {
-	t.Parallel()
-	_, c, wt, _ := stoppedRepo(t, "rebase")
-	if err := c.StageFile(t.Context(), wt, conflictPath("rebase")); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := c.ContinueOperation(t.Context(), wt); err != nil {
-		t.Fatalf("ContinueOperation = %v, want nil, no hang on a commit-message editor", err)
 	}
 }
 
@@ -420,23 +411,6 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 	assertOperation(t, c, wt, "")
 }
 
-func TestFR_CP_03_AStoppedCherryPickResolvesAndCompletesThroughContinueOperation(t *testing.T) {
-	t.Parallel()
-	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
-
-	if err := c.StageFile(t.Context(), wt, conflictPath("cherry-pick")); err != nil {
-		t.Fatal(err)
-	}
-	if err := c.ContinueOperation(t.Context(), wt); err != nil {
-		t.Fatalf("ContinueOperation = %v, want nil", err)
-	}
-
-	if fileExists(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")) {
-		t.Error("CHERRY_PICK_HEAD present, want gone")
-	}
-	assertOperationCompleted(t, c, wt, dir, beforeHEAD)
-}
-
 func TestFR_CP_07_SkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheSurvivor(t *testing.T) {
 	repo := gittest.New(t)
 	dir := repo.Dir
@@ -569,21 +543,4 @@ func TestFR_CP_07_SkipOperationMidMergeSaysAMergeCannotBeSkipped(t *testing.T) {
 	if !fileExists(filepath.Join(dir, ".git", "MERGE_HEAD")) {
 		t.Error("MERGE_HEAD gone, want the merge left untouched")
 	}
-}
-
-func TestFR_RV_03_AStoppedRevertResolvesAndCompletesThroughContinueOperation(t *testing.T) {
-	t.Parallel()
-	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
-
-	if err := c.StageFile(t.Context(), wt, conflictPath("revert")); err != nil {
-		t.Fatal(err)
-	}
-	if err := c.ContinueOperation(t.Context(), wt); err != nil {
-		t.Fatalf("ContinueOperation = %v, want nil", err)
-	}
-
-	if fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
-		t.Error("REVERT_HEAD present, want gone")
-	}
-	assertOperationCompleted(t, c, wt, dir, beforeHEAD)
 }

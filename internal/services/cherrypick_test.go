@@ -153,21 +153,13 @@ func TestFR_CP_04_CherryPickRefusesWithADirtyFileInTheWay(t *testing.T) {
 func TestFR_CP_04_CherryPickFailsWhenAnotherPickIsAlreadyStuck(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "conflict.txt", "base\n", "base")
-	gittest.Run(t, repo.Dir, "branch", "confl")
-	gittest.Run(t, repo.Dir, "checkout", "confl")
-	gittest.Commit(t, repo.Dir, "conflict.txt", "confl\n", "confl change")
-	conflSHA := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "checkout", "master")
-	gittest.Commit(t, repo.Dir, "conflict.txt", "master\n", "master change")
-
-	// The unrelated commit the second call picks, made before the conflict
-	// below: git refuses to switch branches with unmerged paths.
-	gittest.Run(t, repo.Dir, "branch", "other")
-	gittest.Run(t, repo.Dir, "checkout", "other")
-	gittest.Commit(t, repo.Dir, "other.txt", "x", "unrelated commit")
-	otherSHA := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "checkout", "master")
+	shas := gittest.History(t, repo.Dir,
+		gittest.Step{Message: "base", Files: map[string]string{"conflict.txt": "base\n"}},
+		gittest.Step{Branch: "confl", From: "master", Message: "confl change", Files: map[string]string{"conflict.txt": "confl\n"}},
+		gittest.Step{Branch: "confl", Message: "unrelated commit", Files: map[string]string{"other.txt": "x"}},
+		gittest.Step{Message: "master change", Files: map[string]string{"conflict.txt": "master\n"}},
+	)
+	conflSHA, otherSHA := shas[1], shas[2]
 
 	// A conflict made with git directly, not CherryPick: leaves
 	// CHERRY_PICK_HEAD.
@@ -227,39 +219,8 @@ func TestFR_CP_01_CherryPickWorksOnADetachedHEAD(t *testing.T) {
 	}
 }
 
-func TestFR_CP_02_CherryPickAppliesOldestFirstRegardlessOfCallOrder(t *testing.T) {
-	repo := gittest.New(t)
-	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	gittest.Commit(t, repo.Dir, "seed.txt", "r", "root")
-	gittest.Run(t, repo.Dir, "branch", "feature")
-	gittest.Run(t, repo.Dir, "checkout", "feature")
-	commitDated(t, repo.Dir, "chain.txt", "A\n", "A", base)
-	aSHA := gittest.HeadSHA(t, repo.Dir)
-	commitDated(t, repo.Dir, "chain.txt", "A\nB\n", "B", base.Add(time.Minute))
-	bSHA := gittest.HeadSHA(t, repo.Dir)
-	commitDated(t, repo.Dir, "chain.txt", "A\nB\nC\n", "C", base.Add(2*time.Minute))
-	cSHA := gittest.HeadSHA(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "checkout", "master")
-	gittest.Run(t, repo.Dir, "branch", "fresh")
-	gittest.Run(t, repo.Dir, "checkout", "fresh")
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	// Out of order: the service applies oldest first (A, B, C).
-	if err := c.CherryPick(t.Context(), wt, []string{cSHA, aSHA, bSHA}, core.PickOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := commitSubjects(t, repo.Dir, "master", "fresh"); !slices.Equal(got, []string{"A", "B", "C"}) {
-		t.Errorf("commit order on fresh = %v, want [A B C] (oldest first)", got)
-	}
-	content := readFile(t, repo.Dir, "chain.txt")
-	if content != "A\nB\nC\n" {
-		t.Errorf("chain.txt = %q, want the cumulative A\\nB\\nC\\n", content)
-	}
-}
-
 func TestFR_CP_02_CherryPickAppliesParentBeforeChildWhenCommitterDatesTie(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	gittest.Commit(t, repo.Dir, "seed.txt", "r", "root")
@@ -294,15 +255,15 @@ func TestFR_CP_02_CherryPickAppliesParentBeforeChildWhenCommitterDatesTie(t *tes
 	}
 }
 
-func TestFR_CP_05_CherryPickRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t *testing.T) {
+func TestFR_CP_05_FR_RV_03_CherryPickAndRevertRefuseTheWholeBatchWhenAMergeCommitIsBuriedInside(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	x1SHA, mSHA, x2SHA := mergeCommitFixture(t, repo.Dir)
 	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
-
 	c, wt := openWorktree(t, repo.Dir)
+	batch := []string{x1SHA, mSHA, x2SHA}
 
-	err := c.CherryPick(t.Context(), wt, []string{x1SHA, mSHA, x2SHA}, core.PickOptions{})
+	err := c.CherryPick(t.Context(), wt, batch, core.PickOptions{})
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if ce.Args["sha"] == "" || ce.Args["verb"] != "cherry-pick" {
@@ -311,61 +272,21 @@ func TestFR_CP_05_CherryPickRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t
 	if ce.Key != "mergeCommitNotPickable" {
 		t.Errorf("Key = %q, want mergeCommitNotPickable", ce.Key)
 	}
+
+	coretest.AssertCode(t, c.Revert(t.Context(), wt, batch, core.PickOptions{}), core.GitFailed)
+
 	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
-		t.Errorf("HEAD = %s, want unchanged %s (the pre-check must run before any real cherry-pick)", got, beforeHEAD)
+		t.Errorf("HEAD = %s, want unchanged %s (the pre-check must run before any real pick or revert)", got, beforeHEAD)
 	}
-	for _, state := range []string{"CHERRY_PICK_HEAD", "sequencer"} {
+	for _, state := range []string{"CHERRY_PICK_HEAD", "REVERT_HEAD", "sequencer"} {
 		if fileExists(filepath.Join(repo.Dir, ".git", state)) {
-			t.Errorf(".git/%s present, want no cherry-pick in progress", state)
+			t.Errorf(".git/%s present, want no operation in progress", state)
 		}
-	}
-}
-
-func TestFR_RV_03_RevertRefusesTheWholeBatchWhenAMergeCommitIsBuriedInside(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	x1SHA, mSHA, x2SHA := mergeCommitFixture(t, repo.Dir)
-	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	err := c.Revert(t.Context(), wt, []string{x1SHA, mSHA, x2SHA}, core.PickOptions{})
-
-	coretest.AssertCode(t, err, core.GitFailed)
-	if got := gittest.HeadSHA(t, repo.Dir); got != beforeHEAD {
-		t.Errorf("HEAD = %s, want unchanged %s (the pre-check must run before any real revert)", got, beforeHEAD)
-	}
-	for _, state := range []string{"REVERT_HEAD", "sequencer"} {
-		if fileExists(filepath.Join(repo.Dir, ".git", state)) {
-			t.Errorf(".git/%s present, want no revert in progress", state)
-		}
-	}
-}
-
-func TestFR_RV_02_RevertAppliesNewestFirstRegardlessOfCallOrder(t *testing.T) {
-	repo := gittest.New(t)
-	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	commitDated(t, repo.Dir, "chain.txt", "A\n", "A", base)
-	commitDated(t, repo.Dir, "chain.txt", "A\nB\n", "B", base.Add(time.Minute))
-	bSHA := gittest.HeadSHA(t, repo.Dir)
-	commitDated(t, repo.Dir, "chain.txt", "A\nB\nC\n", "C", base.Add(2*time.Minute))
-	cSHA := gittest.HeadSHA(t, repo.Dir)
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	// Oldest first: the service reverts newest first (C, then B); the other
-	// order conflicts on this fixture.
-	if err := c.Revert(t.Context(), wt, []string{bSHA, cSHA}, core.PickOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
-	content := readFile(t, repo.Dir, "chain.txt")
-	if content != "A\n" {
-		t.Errorf("chain.txt = %q, want exactly A's own line", content)
 	}
 }
 
 func TestFR_RV_02_RevertAppliesChildBeforeParentWhenCommitterDatesTie(t *testing.T) {
+	t.Parallel()
 	repo := gittest.New(t)
 	base := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	gittest.Commit(t, repo.Dir, "chain.txt", "A\n", "A")
@@ -679,10 +600,20 @@ func mergeCommitFixture(t *testing.T, dir string) (x1SHA, mSHA, x2SHA string) {
 // timestamps have 1s resolution, so two fast commits could otherwise tie.
 func commitDated(t *testing.T, dir, name, content, msg string, at time.Time) {
 	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gittest.Run(t, dir, "add", "--", name)
 	iso := at.Format(time.RFC3339)
-	t.Setenv("GIT_AUTHOR_DATE", iso)
-	t.Setenv("GIT_COMMITTER_DATE", iso)
-	gittest.Commit(t, dir, name, content, msg)
+	result, err := (git.Runner{}).Run(t.Context(), git.Call{
+		Dir:   dir,
+		Args:  []string{"commit", "--date=" + iso, "-F", "-"},
+		Stdin: []byte(msg),
+		Env:   []string{"GIT_COMMITTER_DATE=" + iso},
+	})
+	if err != nil {
+		t.Fatalf("git commit: %v\n%s", err, result.Stderr)
+	}
 }
 
 // commitSubjects returns the subjects of the commits reachable from to but
