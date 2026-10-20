@@ -16,6 +16,32 @@
           # Both tools are pinned as `tool` directives in go.mod; these shims
           # let the Taskfile's bare `wails3` and the documented `task` resolve.
           goTool = name: pkgs.writeShellScriptBin name ''exec go tool ${name} "$@"'';
+          # WebKitGTK starts its web-process sandbox through bubblewrap at a
+          # store path compiled in. Ubuntu's AppArmor grants user namespaces
+          # only to programs with a profile: the host's /usr/bin/bwrap has one
+          # (25.04 and later), a store path never does. The shim hands over to
+          # the host's bwrap where the store one is denied. replaceDependency
+          # rewrites WebKitGTK to the shim without a rebuild (same-length name).
+          bwrapShim = pkgs.writeTextFile {
+            name = pkgs.bubblewrap.name;
+            destination = "/bin/bwrap";
+            executable = true;
+            text = ''
+              #!${pkgs.runtimeShell}
+              real=${pkgs.bubblewrap}/bin/bwrap
+              if [ -x /usr/bin/bwrap ] && ! "$real" --ro-bind / / --unshare-user true 2>/dev/null; then
+                exec /usr/bin/bwrap "$@"
+              fi
+              exec "$real" "$@"
+            '';
+          };
+          # The dev output's closure holds the library; rewriting from it keeps
+          # headers, pkg-config files and the library consistent.
+          webkitgtkWithHostBwrap = pkgs.replaceDependency {
+            drv = pkgs.webkitgtk_6_0.dev;
+            oldDependency = pkgs.bubblewrap;
+            newDependency = bwrapShim;
+          };
         in
         pkgs.mkShell {
           packages =
@@ -32,7 +58,7 @@
             ++ lib.optionals isLinux [
               pkg-config
               gtk4
-              webkitgtk_6_0
+              webkitgtkWithHostBwrap
               adwaita-icon-theme # mouse cursor for the X11 backend under WSLg
               playwright-driver.browsers
               nsis # makensis, to cross-build the Windows installer
@@ -42,14 +68,17 @@
             if ! command -v go >/dev/null; then
               echo "nebegit: Go is not provided by this shell. Install Go $(sed -n 's/^go //p' go.mod) or newer natively (see CONTRIBUTING.md)." >&2
             fi
-            if grep -qi microsoft /proc/version 2>/dev/null; then
-              # WSLg: the Nix-built libEGL finds no GL driver on a non-NixOS
-              # host (no /run/opengl-driver), so WebKit's web process aborts
-              # with EGL_BAD_PARAMETER and the window stays white. Mesa's
-              # llvmpipe hook points EGL/GLX at Mesa's own software driver.
-              # X11 (XWayland): on WSLg's Wayland path the page loads but never
-              # paints with the software driver; on X11 it renders.
+            if [ ! -e /run/opengl-driver ]; then
+              # Non-NixOS host (WSL, Ubuntu, …): the Nix-built libEGL finds no
+              # GL driver, so WebKit's web process aborts with EGL_BAD_PARAMETER
+              # and the window stays blank. Mesa's llvmpipe hook points EGL/GLX
+              # at Mesa's own software driver.
               export WEBKIT_DISABLE_DMABUF_RENDERER=1
+              source ${pkgs.mesa.llvmpipeHook}/nix-support/setup-hook
+            fi
+            if grep -qi microsoft /proc/version 2>/dev/null; then
+              # WSLg: on its Wayland path the page loads but never paints with
+              # the software driver; on X11 (XWayland) it renders.
               export GDK_BACKEND=x11
               # On X11 GTK draws the pointer from a cursor theme; without one
               # the mouse is invisible over the window.
@@ -61,17 +90,15 @@
               # ("Unhandled parent window type") and the app waits forever.
               # In-process dialogs instead.
               export GDK_DEBUG=no-portals
-              source ${pkgs.mesa.llvmpipeHook}/nix-support/setup-hook
             fi
             export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
             export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
           ''
           + pkgs.lib.optionalString isLinux ''
-            # WebKitGTK runs its web-process sandbox through this bwrap (the
-            # path is compiled in). Ubuntu's AppArmor denies user namespaces to
-            # programs without a profile and ships none for it.
-            if ! ${pkgs.bubblewrap}/bin/bwrap --ro-bind / / --unshare-user true 2>/dev/null; then
-              echo "nebegit: this host denies the shell's bwrap a user namespace, so the app built here cannot start its web-process sandbox. See CONTRIBUTING.md, 'Native Ubuntu'." >&2
+            # Ubuntu 24.04 permits no bwrap to an unprofiled program (its
+            # profile for /usr/bin/bwrap came with 25.04).
+            if ! ${bwrapShim}/bin/bwrap --ro-bind / / --unshare-user true 2>/dev/null; then
+              echo "nebegit: this host denies bwrap a user namespace, so the app built here cannot start its web-process sandbox. See CONTRIBUTING.md, 'Native Ubuntu'." >&2
             fi
           '';
         };

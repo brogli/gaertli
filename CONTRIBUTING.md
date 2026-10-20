@@ -32,14 +32,20 @@ the cross-compiled Windows binary runs on its own.
 
 Release binaries come from CI on stock runners, never from a developer machine.
 
-Under WSLg the shell sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`; without it the window may stay blank.
+On any host but NixOS (WSL, Ubuntu, …) the shell's GL libraries find no driver, so the shell sets
+`WEBKIT_DISABLE_DMABUF_RENDERER=1` and Mesa's software renderer; without them the window stays
+blank.
+
+After the shell's C libraries change (a nixpkgs bump), run `go clean -cache` before `task build`:
+Go's build cache keeps cgo's old link paths.
 
 ### Native Ubuntu
 
-Ubuntu (23.10 or newer) denies user namespaces to programs without an AppArmor profile, and the
-shell's WebKitGTK runs its sandbox through the shell's own `bwrap`, which has none: the app built
-here aborts at start with `bwrap: setting up uid map: Permission denied`, and the shell warns at
-entry. Once, with root:
+Ubuntu (23.10 or newer) grants user namespaces only to programs with an AppArmor profile, and
+WebKitGTK's sandbox needs them. The shell's WebKitGTK therefore hands its sandbox helper over to the
+host's `/usr/bin/bwrap`, which Ubuntu 25.04 and later ship a profile for: nothing to do there.
+Ubuntu 24.04 ships none, so the app aborts at start with
+`bwrap: setting up uid map: Permission denied` and the shell warns at entry. Once, with root:
 
 ```sh
 sudo tee /etc/apparmor.d/nix-bwrap >/dev/null <<'EOF'
@@ -53,7 +59,7 @@ EOF
 sudo apparmor_parser -r /etc/apparmor.d/nix-bwrap
 ```
 
-The released `.deb` carries its own profile; users never need this.
+The released `.deb` carries its own profile; users never need any of this.
 
 ### Windows
 

@@ -48,9 +48,11 @@
     Ubuntu's own shape for such applications (unconfined, user namespaces allowed): Ubuntu denies
     user namespaces to programs without a profile, WebKitGTK 6.0 runs its web-process sandbox
     through bubblewrap, which needs them, and that sandbox has no API switch (DIST-06). Where
-    AppArmor does not run, the file is inert. The development shell's WebKitGTK calls the shell's
-    own bubblewrap, which no Ubuntu profile covers: the shell probes it at entry and points to the
-    contributor docs rather than turning the sandbox off.
+    AppArmor does not run, the file is inert. The development shell's WebKitGTK is rewritten,
+    without a rebuild, to start its sandbox through a shim that hands over to the host's bubblewrap
+    wherever the shell's own is denied a user namespace; Ubuntu 25.04 and later profile the host's.
+    Where neither is permitted (24.04) the shell warns at entry and points to the contributor docs
+    rather than turning the sandbox off.
 - macOS: an unsigned `.app`, zipped, labelled untested (QA-PORT-04).
 - Run-time prerequisites are git and the platform's web view (DIST-01, TR-04 to TR-06); the tar.gz
   and the Windows zip bundle neither.
