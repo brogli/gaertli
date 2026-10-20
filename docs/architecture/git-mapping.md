@@ -205,8 +205,9 @@ The app's own writes also trigger the watcher. Debounce plus reload-after-write 
 
 ## External editor (FR-ED)
 
-- Every "open in editor" action runs in the core (ADR-3), so profiles are stored per environment
-  (FR-ED-11, TR-13).
+- Every "open in editor" action runs in the core (ADR-3): for a WSL repo the command runs inside the
+  distro. One profile serves every environment (FR-ED-11, TR-13): the user runs one editor, and the
+  WSL-aware ones (VS Code, Zed) start their Windows app from their WSL command.
 - A profile is `{name, folderCmd, fileCmd, fileAtLineCmd?}` with the placeholders `{path}` and
   `{line}`. Without `fileAtLineCmd`, `fileCmd` is used.
 - The template is split into arguments first, then the placeholders are filled in. No shell (TR-10).

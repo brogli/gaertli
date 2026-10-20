@@ -146,8 +146,8 @@ arrow keys move between tabs and pick as they go.
     banner, and a refusal over local changes offers the stash-and-retry as its notice's action.
     Every entry action is menu-only, so each entry has a "…" button.
 - **Settings** (FR-UX-04): a dialog over the window, opened from the toolbar's gear button, laid out
-  like every dialog, with a group per editor environment and a base-folder field per environment
-  found (local and each WSL distro).
+  like every dialog, with one editor group and a base-folder field per environment found (local and
+  each WSL distro).
 - **Debug area** (FR-UX-19): a strip along the bottom of each main window, with one button per
   sample notice (error, warning, success). Its sample notices take the normal notice path.
 - **Log view**: the filter bar above the commit list, and between them the error a failed load ended
