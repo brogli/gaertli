@@ -1,4 +1,5 @@
 # DO NOT EDIT - Generated automatically by `wails build`
+# Based on the Wails v3 build template (github.com/wailsapp/wails, MIT).
 
 !include "x64.nsh"
 !include "WinVer.nsh"

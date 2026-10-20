@@ -1,4 +1,5 @@
 #!/bin/sh
+# Based on the Wails v3 build template (github.com/wailsapp/wails, MIT).
 
 # This makes the application appear in application menus and registers its capabilities.
 if command -v update-desktop-database >/dev/null 2>&1; then

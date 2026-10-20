@@ -30,6 +30,7 @@ Choices with a reason worth keeping:
 - Own code exists only where no library fits, each for a stated reason: the graph layout and
   `tools/gencore` (no maintained library), the partial-patch builder, the command splitter, and the
   job manager (small; `context` does most of the work).
-- Code adapted from another project comes only from permissively licensed ones and ships their
-  notice (`tools/licensecheck` adds it to `THIRD-PARTY-NOTICES.txt`, OSS-05). The graph layout and
-  the partial-patch builder are adapted from lazygit (MIT).
+- Code taken from another project comes only from permissively licensed ones, ships their notice
+  (`tools/licensecheck` adds it to `THIRD-PARTY-NOTICES.txt`, OSS-05) and names its source in a
+  comment. The graph layout and the partial-patch builder are adapted from lazygit (MIT); the build
+  and packaging scripts start from Wails's build template (MIT).

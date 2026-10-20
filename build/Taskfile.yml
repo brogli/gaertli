@@ -1,3 +1,4 @@
+# Based on the Wails v3 build template (github.com/wailsapp/wails, MIT).
 version: '3'
 
 tasks:

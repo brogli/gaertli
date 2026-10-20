@@ -1,5 +1,7 @@
 # Cross-compile Wails v3 apps to any platform
 #
+# Based on the Wails v3 build template (github.com/wailsapp/wails, MIT).
+#
 # Darwin: Zig + macOS SDK
 # Linux: Native GCC when host matches target, Zig for cross-arch
 # Windows: Zig + bundled mingw
