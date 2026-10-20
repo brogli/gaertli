@@ -36,9 +36,6 @@ On any host but NixOS (WSL, Ubuntu, …) the shell's GL libraries find no driver
 `WEBKIT_DISABLE_DMABUF_RENDERER=1` and Mesa's software renderer; without them the window stays
 blank.
 
-After the shell's C libraries change (a nixpkgs bump), run `go clean -cache` before `task build`:
-Go's build cache keeps cgo's old link paths.
-
 ### Native Ubuntu
 
 Ubuntu (23.10 or newer) grants user namespaces only to programs with an AppArmor profile, and

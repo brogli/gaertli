@@ -79,6 +79,10 @@
             fi
           ''
           + pkgs.lib.optionalString isLinux ''
+            # Go's build cache ignores pkg-config output, so after a nixpkgs
+            # bump it would relink against the old library paths. The same
+            # -L dirs in CGO_LDFLAGS are part of its cache key.
+            export CGO_LDFLAGS="$(pkg-config --libs-only-L gtk4 webkitgtk-6.0)"
             if [ ! -e /run/opengl-driver ]; then
               # Non-NixOS host (WSL, Ubuntu, …): the Nix-built libEGL finds no
               # GL driver, so WebKit's web process aborts with EGL_BAD_PARAMETER
