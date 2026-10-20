@@ -93,6 +93,13 @@
             fi
             export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
             export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+            if [ "$(stat -f -c %T "''${TMPDIR:-/tmp}" 2>/dev/null)" = tmpfs ]; then
+              # Go builds under TMPDIR. On a RAM-backed /tmp with a per-user
+              # quota (Ubuntu 25.04 and later) a cgo build fails with "disk
+              # quota exceeded".
+              export GOTMPDIR="''${XDG_CACHE_HOME:-$HOME/.cache}/go-tmp"
+              mkdir -p "$GOTMPDIR"
+            fi
           ''
           + pkgs.lib.optionalString isLinux ''
             # Ubuntu 24.04 permits no bwrap to an unprofiled program (its
