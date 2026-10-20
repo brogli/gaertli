@@ -51,8 +51,8 @@ type Preferences struct {
 	DebugMode                bool          `json:"debugMode"`        // each window shows the debug strip
 
 	// WorktreeFolders is the base folder for new worktrees, keyed by
-	// environment: "" for local, else a WSL distro name. An absent entry means the folder holding the repo's
-	// main worktree.
+	// environment: "" for local, else a WSL distro name. An absent entry
+	// means the folder holding the repo's main worktree.
 	WorktreeFolders map[string]string `json:"worktreeFolders,omitempty"`
 }
 
