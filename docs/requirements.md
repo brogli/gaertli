@@ -9,8 +9,8 @@ task plans and tests refer to these IDs.
 
 **nebegit** = Swiss German _näbe_ ("beside") + git: the git tool that sits beside your editor.
 
-A desktop GUI for daily git work, used next to a code editor that lacks strong git tooling: a strong
-log view, commit comparison, worktree handling, and safe sync actions.
+A desktop GUI for daily git work, used next to a code editor that lacks strong git tooling. It
+offers a strong log view, commit comparison, worktree handling, and safe sync actions.
 
 ## Goals
 
@@ -52,8 +52,8 @@ log view, commit comparison, worktree handling, and safe sync actions.
   - [ui.md](requirements/functional/ui.md): UX
 - [quality.md](requirements/quality.md): QA
 - [distribution.md](requirements/distribution.md): DIST, OSS
-- [glossary.md](requirements/glossary.md): the domain terms every document, the code and the UI use
-  (QA-USE-03).
+- [glossary.md](requirements/glossary.md): the domain terms used by every document, the code and the
+  UI (QA-USE-03).
 
 ## Out of scope for v1
 

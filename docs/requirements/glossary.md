@@ -1,6 +1,6 @@
 # Glossary
 
-One name per thing (QA-USE-03): the term in the first column, never the ones in the last.
+One name per thing (QA-USE-03): use the term in the first column, never the ones in the last column.
 
 | Term                                        | Meaning                                                                                                                                                                    | Not                             |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
