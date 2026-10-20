@@ -30,8 +30,6 @@ no auto-update: installing a newer version over the old one keeps your settings.
 - **Windows, zip**: unzip `nebegit-windows-amd64.zip` and run `nebegit.exe`; nothing is installed.
   To use the `nebegit` command, add the unzipped `bin` folder to your user `PATH` by hand (Windows'
   "Edit environment variables for your account").
-- **Windows, winget** (once published): `winget install brogli.nebegit`; `winget upgrade` and
-  `winget uninstall` give the same result as the installer.
 - **WSL**: install the Windows app (any of the above); nothing is installed inside the distro by
   hand. The Linux packages below are for native Linux desktops, not for WSL. See Known limits.
 - **Linux, deb/rpm**: install with your package manager, e.g.

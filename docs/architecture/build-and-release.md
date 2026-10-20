@@ -11,13 +11,13 @@
 
 ## Packaging and releases
 
-- Windows: an NSIS installer (the primary download and the file winget installs) and a portable zip.
+- Windows: an NSIS installer (the primary download) and a portable zip.
   - The installer runs without administrator rights, into `%LOCALAPPDATA%\Programs\nebegit` by
     default (the user can pick another folder), adds a Start menu entry and no desktop icon, and
-    supports a silent install (`/S`) for package managers; it shows up like any other installed app,
-    with its version and publisher. It does not install WebView2: the app's own start-up check
-    (DIST-01) covers a missing one, and a bundled bootstrapper would redistribute Microsoft's own
-    binary under Microsoft's terms, not a permissive licence (OSS-05).
+    supports a silent install (`/S`); it shows up like any other installed app, with its version and
+    publisher. It does not install WebView2: the app's own start-up check (DIST-01) covers a missing
+    one, and a bundled bootstrapper would redistribute Microsoft's own binary under Microsoft's
+    terms, not a permissive licence (OSS-05).
   - Both the installer and the zip carry a `bin` folder with `nebegit` (POSIX sh, for WSL and Git
     Bash) and `nebegit.cmd` (cmd, PowerShell): the `nebegit` command a terminal finds, once that
     folder is on the user PATH (FR-REPO-06). Each script starts the exe beside it and returns at
@@ -35,19 +35,12 @@
     touches PATH outside these two calls. If a call fails, the installer or uninstaller leaves PATH
     as it was and names the folder to add or remove by hand.
   - Installing over an existing installation replaces the files and keeps the settings, which live
-    outside the install folder (DIST-03); a package manager upgrade and replacing the archive's
-    files do the same.
+    outside the install folder (DIST-03); replacing the archive's files does the same.
   - A running nebegit locks its exe. The installer and the uninstaller check for that first, before
     they change anything: interactively they ask the user to close it and retry; a silent run exits
     with 32 (Windows' sharing-violation code) instead of skipping the locked file and reporting
     success, which is what NSIS does by default. The check catches the exe in the install folder
     only, the one file that would be skipped.
-  - winget: `brogli.nebegit`, `InstallerType: nullsoft`, `Scope: user`, installed from the published
-    release asset with its `SHA256SUMS` hash, using NSIS's own silent switches for install and
-    uninstall (DIST-06); its `ExpectedReturnCodes` map 32 to `packageInUse`, so winget tells the
-    user to close the app. No manifest lives in this repo: it would only restate each release's
-    version and hash, and cannot be validated on Linux. The owner submits it to
-    `microsoft/winget-pkgs` by hand, for published releases.
 - Linux: a `.deb` and an `.rpm` (nfpm, via `wails3 tool package`), installing to `/usr/bin` and
   declaring GTK4, WebKitGTK and git as package dependencies; a `.tar.gz` (binary, `LICENSE`,
   `THIRD-PARTY-NOTICES.txt`) for other distributions.
@@ -57,10 +50,10 @@
 - No auto-update, no code signing (DIST-03). Unsigned Windows binaries trigger SmartScreen.
 - Versions are plain semantic versions `X.Y.Z`, set by hand in `build/config.yml` and raised before
   each release; tags are `vX.Y.Z`. One string everywhere: the app, the exe's version resource, the
-  installer's `DisplayVersion` (its numeric version is `X.Y.Z.0`), the deb and rpm, and winget's
-  `PackageVersion`. No pre-release suffix and no build number: "release candidate" is the draft's
-  state, not part of the files, and two candidates of one version never both ship, since only one
-  draft is ever published. The commit tells builds apart.
+  installer's `DisplayVersion` (its numeric version is `X.Y.Z.0`), and the deb and rpm. No
+  pre-release suffix and no build number: "release candidate" is the draft's state, not part of the
+  files, and two candidates of one version never both ship, since only one draft is ever published.
+  The commit tells builds apart.
 - Releases (DIST-02) are started by hand; nothing starts on a merge.
   - Release candidate: a GitHub Actions workflow the maintainer starts on `main` (it refuses any
     other branch, and a version whose tag exists, i.e. one already released). It runs the full CI
