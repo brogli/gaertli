@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/brogli/nebegit/internal/core"
@@ -36,9 +38,9 @@ type WindowSize struct {
 // Preferences are the settings the user edits; the frontend reads and saves
 // them through SettingsService.
 type Preferences struct {
-	// EditorProfiles is keyed by environment: "" for local, else a WSL
-	// distro name.
-	EditorProfiles map[string]core.EditorProfile `json:"editorProfiles,omitempty"`
+	// EditorProfile is the one editor every environment opens files with;
+	// a WSL repo runs its command inside the distro.
+	EditorProfile core.EditorProfile `json:"editorProfile"`
 
 	ProtectedBranches        []string      `json:"protectedBranches"`
 	DefaultPullMode          core.PullMode `json:"defaultPullMode"`
@@ -48,8 +50,8 @@ type Preferences struct {
 	IgnoreWhitespace         bool          `json:"ignoreWhitespace"` // the diff view's whitespace toggle
 	DebugMode                bool          `json:"debugMode"`        // each window shows the debug strip
 
-	// WorktreeFolders is the base folder for new worktrees, keyed like
-	// EditorProfiles. An absent entry means the folder holding the repo's
+	// WorktreeFolders is the base folder for new worktrees, keyed by
+	// environment: "" for local, else a WSL distro name. An absent entry means the folder holding the repo's
 	// main worktree.
 	WorktreeFolders map[string]string `json:"worktreeFolders,omitempty"`
 }
@@ -127,10 +129,31 @@ func Load(path string) (Settings, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return Settings{}, err
 	}
+	if s.EditorProfile == (core.EditorProfile{}) {
+		s.EditorProfile = legacyEditorProfile(data)
+	}
 	if !themeValues[s.Theme] {
 		s.Theme = SystemTheme
 	}
 	return s, nil
+}
+
+// legacyEditorProfile picks the single profile out of an older file's
+// per-environment "editorProfiles": the first filled one by environment
+// name, so the local ("") entry wins.
+func legacyEditorProfile(data []byte) core.EditorProfile {
+	var old struct {
+		EditorProfiles map[string]core.EditorProfile `json:"editorProfiles"`
+	}
+	if json.Unmarshal(data, &old) != nil {
+		return core.EditorProfile{}
+	}
+	for _, env := range slices.Sorted(maps.Keys(old.EditorProfiles)) {
+		if p := old.EditorProfiles[env]; p != (core.EditorProfile{}) {
+			return p
+		}
+	}
+	return core.EditorProfile{}
 }
 
 // Save writes s to path atomically: marshal indented JSON to a temp file in

@@ -64,7 +64,7 @@ type windowEntry struct {
 type distroCorer interface {
 	Ensure(ctx context.Context) (*remote.Client, bool, error)
 
-	// OnConnect and LiveClient back PushEditorProfiles: OnConnect registers
+	// OnConnect and LiveClient back PushEditorProfile: OnConnect registers
 	// the push for every fresh connect, LiveClient lets a settings change
 	// re-push without forcing one.
 	OnConnect(fn func(context.Context, *remote.Client))
@@ -120,7 +120,7 @@ func (r *Registry) SetLocal(local core.API) { r.local = local }
 // SetConsent wires the consent dialog a distro's first deploy asks.
 func (r *Registry) SetConsent(c remote.Consent) { r.consent = c }
 
-// SetStore wires the settings store PushEditorProfiles reads.
+// SetStore wires the settings store PushEditorProfile reads.
 func (r *Registry) SetStore(store *settings.Store) { r.store = store }
 
 // Bind sets the opener that creates real Wails windows.
@@ -140,34 +140,34 @@ func (r *Registry) distroCore(distro string) distroCorer {
 		return dc
 	}
 	dc := r.newDistroCore(distro, r.sinkFor(distro))
-	dc.OnConnect(func(ctx context.Context, c *remote.Client) { r.pushEditorProfile(ctx, c, distro) })
+	dc.OnConnect(func(ctx context.Context, c *remote.Client) { r.pushEditorProfile(ctx, c) })
 	r.distros[distro] = dc
 	return dc
 }
 
-// pushEditorProfile sends env's current profile ("" = local, else a WSL
-// distro name) to api. Best-effort: a failed push leaves the previous
-// profile in effect until the next one, and is not shown to the user.
-func (r *Registry) pushEditorProfile(ctx context.Context, api core.API, env string) {
+// pushEditorProfile sends the editor profile to api. Best-effort: a failed
+// push leaves the previous profile in effect until the next one, and is not
+// shown to the user.
+func (r *Registry) pushEditorProfile(ctx context.Context, api core.API) {
 	if r.store == nil {
 		return
 	}
-	_ = api.SetEditorProfile(ctx, r.store.Get().EditorProfiles[env])
+	_ = api.SetEditorProfile(ctx, r.store.Get().EditorProfile)
 }
 
-// PushEditorProfiles re-pushes every connected core's profile: the local
-// core, plus every distro with a live client. A distro not yet connected
-// gets its profile through OnConnect.
-func (r *Registry) PushEditorProfiles(ctx context.Context) {
-	r.pushEditorProfile(ctx, r.local, "")
+// PushEditorProfile re-pushes the editor profile to every connected core:
+// the local core, plus every distro with a live client. A distro not yet
+// connected gets it through OnConnect.
+func (r *Registry) PushEditorProfile(ctx context.Context) {
+	r.pushEditorProfile(ctx, r.local)
 
 	r.mu.Lock()
 	distros := maps.Clone(r.distros)
 	r.mu.Unlock()
 
-	for name, dc := range distros {
+	for _, dc := range distros {
 		if client, ok := dc.LiveClient(); ok {
-			r.pushEditorProfile(ctx, client, name)
+			r.pushEditorProfile(ctx, client)
 		}
 	}
 }

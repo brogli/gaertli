@@ -957,39 +957,36 @@ func TestFR_REPO_04_FocusingTheDiffWindowKeepsItsWorktreePolled(t *testing.T) {
 	}
 }
 
-// setEditorProfiles saves profiles into a fresh test store, for the
-// PushEditorProfiles tests below.
-func setEditorProfiles(t *testing.T, store *settings.Store, profiles map[string]core.EditorProfile) {
+// setEditorProfile saves profile into a fresh test store, for the
+// PushEditorProfile tests below.
+func setEditorProfile(t *testing.T, store *settings.Store, profile core.EditorProfile) {
 	t.Helper()
-	if err := store.Update(func(s *settings.Settings) { s.EditorProfiles = profiles }); err != nil {
+	if err := store.Update(func(s *settings.Settings) { s.EditorProfile = profile }); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestTR_13_PushEditorProfilesPushesTheLocalCoresProfile(t *testing.T) {
+func TestTR_13_PushEditorProfilePushesTheProfileToTheLocalCore(t *testing.T) {
 	r, _ := newTestRegistry()
 	var pushed []core.EditorProfile
 	r.SetLocal(fakeAPI{editorProfiles: &pushed})
 	store := newTestStore(t)
-	setEditorProfiles(t, store, map[string]core.EditorProfile{"": {Name: "Beta", FolderCmd: "beta {path}"}})
+	setEditorProfile(t, store, core.EditorProfile{Name: "Beta", FolderCmd: "beta {path}"})
 	r.SetStore(store)
 
-	r.PushEditorProfiles(t.Context())
+	r.PushEditorProfile(t.Context())
 
 	if len(pushed) != 1 || pushed[0].Name != "Beta" {
 		t.Errorf("local core received %+v, want exactly one push of Beta", pushed)
 	}
 }
 
-func TestFR_ED_11_CoreForPushesTheDistrosOwnProfileOnFirstConnect(t *testing.T) {
+func TestFR_ED_11_CoreForPushesTheOneProfileToADistroOnFirstConnect(t *testing.T) {
 	r, _ := newTestRegistry()
 	var pushed []core.EditorProfile
 	serveDistroCores(t, r, fakeAPI{editorProfiles: &pushed})
 	store := newTestStore(t)
-	setEditorProfiles(t, store, map[string]core.EditorProfile{
-		"":             {Name: "Alpha", FolderCmd: "alpha {path}"},
-		"Ubuntu-22.04": {Name: "Beta", FolderCmd: "beta {path}"},
-	})
+	setEditorProfile(t, store, core.EditorProfile{Name: "Beta", FolderCmd: "beta {path}"})
 	r.SetStore(store)
 
 	if _, err := r.CoreFor(core.RepoPath(`\\wsl.localhost\Ubuntu-22.04\home\user\project`)); err != nil {
@@ -997,13 +994,14 @@ func TestFR_ED_11_CoreForPushesTheDistrosOwnProfileOnFirstConnect(t *testing.T) 
 	}
 
 	if len(pushed) != 1 || pushed[0].Name != "Beta" {
-		t.Errorf("distro core received %+v, want exactly one push of Beta (its own profile, not local's)", pushed)
+		t.Errorf("distro core received %+v, want exactly one push of Beta", pushed)
 	}
 }
 
-func TestFR_ED_11_PushEditorProfilesOnlyPushesToAlreadyConnectedDistros(t *testing.T) {
+func TestFR_ED_11_PushEditorProfileReachesLocalAndConnectedDistrosOnly(t *testing.T) {
 	r, _ := newTestRegistry()
-	var pushedConnected []core.EditorProfile
+	var pushedLocal, pushedConnected []core.EditorProfile
+	r.SetLocal(fakeAPI{editorProfiles: &pushedLocal})
 	connectedClient := pipeAPIClient(t, fakeAPI{editorProfiles: &pushedConnected})
 	connected := &fakeDistroCore{client: connectedClient, calls: 1} // already connected, as if by an earlier Ensure
 	notConnected := &fakeDistroCore{}                               // calls == 0: never connected
@@ -1014,18 +1012,18 @@ func TestFR_ED_11_PushEditorProfilesOnlyPushesToAlreadyConnectedDistros(t *testi
 	r.mu.Unlock()
 
 	store := newTestStore(t)
-	setEditorProfiles(t, store, map[string]core.EditorProfile{
-		"Connected":    {Name: "Beta", FolderCmd: "beta {path}"},
-		"NotConnected": {Name: "Gamma", FolderCmd: "gamma {path}"},
-	})
+	setEditorProfile(t, store, core.EditorProfile{Name: "Beta", FolderCmd: "beta {path}"})
 	r.SetStore(store)
 
-	r.PushEditorProfiles(t.Context())
+	r.PushEditorProfile(t.Context())
 
+	if len(pushedLocal) != 1 || pushedLocal[0].Name != "Beta" {
+		t.Errorf("local core received %+v, want exactly one push of Beta", pushedLocal)
+	}
 	if len(pushedConnected) != 1 || pushedConnected[0].Name != "Beta" {
 		t.Errorf("connected distro received %+v, want exactly one push of Beta", pushedConnected)
 	}
 	if notConnected.calls != 0 {
-		t.Errorf("NotConnected.calls = %d, want 0 (PushEditorProfiles must not trigger Ensure/deploy)", notConnected.calls)
+		t.Errorf("NotConnected.calls = %d, want 0 (PushEditorProfile must not trigger Ensure/deploy)", notConnected.calls)
 	}
 }

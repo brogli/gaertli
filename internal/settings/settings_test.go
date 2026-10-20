@@ -3,7 +3,6 @@ package settings_test
 import (
 	"encoding/json"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -66,7 +65,7 @@ func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
 		OpenWorktrees:  []string{"/a", "/b"},
 		DiffWindowSize: &settings.WindowSize{Width: 900, Height: 600},
 		Preferences: settings.Preferences{
-			EditorProfiles:           map[string]core.EditorProfile{"": {Name: "Alpha", FolderCmd: "alpha {path}"}},
+			EditorProfile:            core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}"},
 			ProtectedBranches:        []string{"main"},
 			DefaultPullMode:          core.PullRebase,
 			DiffMode:                 settings.SideBySideDiff,
@@ -324,22 +323,43 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 	}
 }
 
-func TestFR_ED_11_EditorProfilesRoundTripPerEnvironment(t *testing.T) {
+func TestFR_ED_11_EditorProfileRoundTrips(t *testing.T) {
 	want := settings.Settings{Preferences: settings.Preferences{
-		EditorProfiles: map[string]core.EditorProfile{
-			"":             {Name: "Alpha", FolderCmd: "alpha {path}", FileCmd: "alpha {path}", FileAtLineCmd: "alpha {path}:{line}"},
-			"Ubuntu-22.04": {Name: "Beta", FolderCmd: "beta {path}", FileCmd: "beta {path}"},
-		},
+		EditorProfile: core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}", FileCmd: "alpha {path}", FileAtLineCmd: "alpha {path}:{line}"},
 	}}
 
-	if got := saveAndLoad(t, want); !maps.Equal(got.EditorProfiles, want.EditorProfiles) {
-		t.Errorf("EditorProfiles = %+v, want %+v", got.EditorProfiles, want.EditorProfiles)
+	if got := saveAndLoad(t, want); got.EditorProfile != want.EditorProfile {
+		t.Errorf("EditorProfile = %+v, want %+v", got.EditorProfile, want.EditorProfile)
+	}
+}
+
+func TestFR_ED_11_LoadMigratesTheLocalEntryOfOldPerEnvironmentProfiles(t *testing.T) {
+	got := loadJSON(t, `{"editorProfiles": {"": {"name": "Zed", "folderCmd": "zed {path}"}, "Ubuntu": {"name": "VS Code", "folderCmd": "code {path}"}}}`)
+
+	if got.EditorProfile.Name != "Zed" {
+		t.Errorf("EditorProfile = %+v, want Zed", got.EditorProfile)
+	}
+}
+
+func TestFR_ED_11_LoadMigratesTheFirstFilledEntryWhenTheLocalOneIsEmpty(t *testing.T) {
+	got := loadJSON(t, `{"editorProfiles": {"": {}, "Ubuntu": {"name": "VS Code", "folderCmd": "code {path}"}}}`)
+
+	if got.EditorProfile.Name != "VS Code" {
+		t.Errorf("EditorProfile = %+v, want VS Code", got.EditorProfile)
+	}
+}
+
+func TestFR_ED_11_LoadKeepsTheSingleProfileOverOldEntries(t *testing.T) {
+	got := loadJSON(t, `{"editorProfile": {"name": "Zed", "folderCmd": "zed {path}"}, "editorProfiles": {"": {"name": "VS Code", "folderCmd": "code {path}"}}}`)
+
+	if got.EditorProfile.Name != "Zed" {
+		t.Errorf("EditorProfile = %+v, want Zed", got.EditorProfile)
 	}
 }
 
 // encoding/json ignores an older settings file's bare "editor" key.
 func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
-	if got := loadJSON(t, `{"editor": "alpha"}`); len(got.EditorProfiles) != 0 {
-		t.Errorf("EditorProfiles = %+v, want empty", got.EditorProfiles)
+	if got := loadJSON(t, `{"editor": "alpha"}`); got.EditorProfile != (core.EditorProfile{}) {
+		t.Errorf("EditorProfile = %+v, want empty", got.EditorProfile)
 	}
 }

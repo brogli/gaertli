@@ -44,7 +44,7 @@ func (s *SettingsService) Set(ctx context.Context, next settings.Preferences) er
 		return err
 	}
 	applog.SetLevel(s.level, next.DebugMode)
-	s.reg.PushEditorProfiles(ctx)
+	s.reg.PushEditorProfile(ctx)
 	s.events.Emit("settings:changed")
 	return nil
 }

@@ -2,7 +2,6 @@ package app
 
 import (
 	"log/slog"
-	"maps"
 	"slices"
 	"testing"
 
@@ -30,7 +29,7 @@ func TestFR_UX_04_SettingsServiceSetThenGetRoundTrips(t *testing.T) {
 	reg, _ := newTestRegistry()
 	s := NewSettingsService(newTestStore(t), reg, &fakeEmitter{}, &slog.LevelVar{})
 	want := settings.Preferences{
-		EditorProfiles:  map[string]core.EditorProfile{"": {Name: "Alpha", FolderCmd: "alpha {path}"}},
+		EditorProfile:   core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}"},
 		DefaultPullMode: core.PullRebase,
 		DiffMode:        settings.UnifiedDiff,
 	}
@@ -39,7 +38,7 @@ func TestFR_UX_04_SettingsServiceSetThenGetRoundTrips(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := s.Get()
-	if !maps.Equal(got.EditorProfiles, want.EditorProfiles) || got.DefaultPullMode != want.DefaultPullMode {
+	if got.EditorProfile != want.EditorProfile || got.DefaultPullMode != want.DefaultPullMode {
 		t.Errorf("Get() = %+v, want %+v", got, want)
 	}
 }
@@ -137,7 +136,7 @@ func TestTR_13_SettingsServiceSetPushesTheNewProfileToTheLocalCore(t *testing.T)
 	reg.SetStore(store)
 	s := NewSettingsService(store, reg, &fakeEmitter{}, &slog.LevelVar{})
 
-	next := settings.Preferences{EditorProfiles: map[string]core.EditorProfile{"": {Name: "Beta", FolderCmd: "beta {path}"}}}
+	next := settings.Preferences{EditorProfile: core.EditorProfile{Name: "Beta", FolderCmd: "beta {path}"}}
 	if err := s.Set(t.Context(), next); err != nil {
 		t.Fatal(err)
 	}

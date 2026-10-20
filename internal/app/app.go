@@ -58,7 +58,7 @@ func Run(assets fs.FS, args []string) error {
 	reg := NewRegistry()
 	reg.SetStore(store)
 	reg.SetLocal(services.New(reg.Dispatch))
-	reg.PushEditorProfiles(context.Background())
+	reg.PushEditorProfile(context.Background())
 	reg.SetConsent(nativeConsent{ask: askYesNo})
 
 	var sh shell
