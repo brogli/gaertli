@@ -127,91 +127,71 @@ describe('SettingsPanel', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  it('FR-ED-04, FR-ED-11 renders one independently editable form per environment, submitting the whole updated map', async () => {
+  it('FR-ED-04, FR-ED-11 renders the stored editor profile in one form, submitting the edited profile', async () => {
     SettingsService.Get.mockResolvedValue(
       defaultSettingsFixture({
-        editorProfiles: {
-          '': {
-            name: 'Zed',
-            folderCmd: 'zed {path}',
-            fileCmd: 'zed {path}',
-            fileAtLineCmd: 'zed {path}:{line}',
-          },
-          'Ubuntu-22.04': { name: 'VS Code', folderCmd: 'code {path}', fileCmd: 'code {path}' },
+        editorProfile: {
+          name: 'Zed',
+          folderCmd: 'zed {path}',
+          fileCmd: 'zed {path}',
+          fileAtLineCmd: 'zed {path}:{line}',
         },
       }),
     )
 
     const wrapper = await mountPanel()
 
-    const fieldsets = wrapper.findAll('fieldset')
-    expect(fieldsets).toHaveLength(2)
-
-    await fieldsets[0]!.get('[data-test="folder-cmd"]').setValue('subl {path}')
-
+    await wrapper.get('[data-test="folder-cmd"]').setValue('subl {path}')
     await submit(wrapper)
 
     expect(SettingsService.Set).toHaveBeenCalledTimes(1)
-    const sent = SettingsService.Set.mock.calls[0]?.[0]
-    expect(sent.editorProfiles['']).toMatchObject({ name: 'Zed', folderCmd: 'subl {path}' })
-    expect(sent.editorProfiles['Ubuntu-22.04']).toMatchObject({
-      name: 'VS Code',
-      folderCmd: 'code {path}',
+    expect(SettingsService.Set.mock.calls[0]?.[0].editorProfile).toMatchObject({
+      name: 'Zed',
+      folderCmd: 'subl {path}',
     })
   })
 
-  it('FR-ED-03 a WSL distro always has its own editor form, starting empty, with no control to add one', async () => {
-    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
+  it('FR-ED-11 with WSL distros installed Settings still shows one editor form', async () => {
+    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04', 'Debian'])
 
     const wrapper = await mountPanel()
 
-    const fieldsets = wrapper.findAll('fieldset')
-    expect(fieldsets).toHaveLength(2)
-    expect(fieldsets[1]!.text()).toContain('Ubuntu-22.04')
-    expect(fieldsets[1]!.get<HTMLInputElement>('[data-test="folder-cmd"]').element.value).toBe('')
+    expect(wrapper.findAll('fieldset')).toHaveLength(1)
+    expect(wrapper.findAll('[data-test="folder-cmd"]')).toHaveLength(1)
+    expect(wrapper.get('legend').text()).toBe('Open in editor')
   })
 
-  it('FR-ED-03 picking a preset in the Ubuntu form and saving updates only that profile', async () => {
-    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
+  it('FR-ED-11 picking a preset with WSL distros installed saves it as the one profile', async () => {
+    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04', 'Debian'])
 
     const wrapper = await mountPanel()
 
-    const fieldsets = wrapper.findAll('fieldset')
-    await pickPreset(fieldsets[1]!, 'VS Code')
+    await pickPreset(wrapper, 'VS Code')
     await submit(wrapper)
 
     const sent = SettingsService.Set.mock.calls[0]?.[0]
-    expect(sent.editorProfiles['Ubuntu-22.04']).toMatchObject({
-      name: 'VS Code',
-      folderCmd: 'code {path}',
-    })
-    expect(sent.editorProfiles['']).toMatchObject({ name: '', folderCmd: '' })
+    expect(sent.editorProfile).toMatchObject({ name: 'VS Code', folderCmd: 'code {path}' })
+    expect(sent.editorProfiles).toBeUndefined()
   })
 
   it('FR-ED-13 on a Windows host the Zed preset opens files in a window of their own', async () => {
     System.IsWindows.mockReturnValue(true)
-    AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
     SettingsService.Get.mockResolvedValue(
       defaultSettingsFixture({
-        editorProfiles: {
-          '': { name: 'VS Code', folderCmd: 'code {path}', fileCmd: 'code {path}' },
-        },
+        editorProfile: { name: 'VS Code', folderCmd: 'code {path}', fileCmd: 'code {path}' },
       }),
     )
 
     const wrapper = await mountPanel()
 
-    const fieldsets = wrapper.findAll('fieldset')
-    await pickPreset(fieldsets[0]!, 'Zed')
+    await pickPreset(wrapper, 'Zed')
     await submit(wrapper)
 
-    const sent = SettingsService.Set.mock.calls[0]?.[0]
-    expect(sent.editorProfiles['']).toMatchObject({
+    expect(SettingsService.Set.mock.calls[0]?.[0].editorProfile).toMatchObject({
       folderCmd: 'zed {path}',
       fileCmd: 'zed -n {path}',
       fileAtLineCmd: 'zed -n {path}:{line}',
     })
-    expect(sent.editorProfiles['Ubuntu-22.04']).toMatchObject({ name: '', folderCmd: '' })
   })
 
   it('FR-ED-13 on a Linux host the Zed preset opens files in the last used window', async () => {
@@ -220,42 +200,10 @@ describe('SettingsPanel', () => {
     await pickPreset(wrapper, 'Zed')
     await submit(wrapper)
 
-    expect(SettingsService.Set.mock.calls[0]?.[0].editorProfiles['']).toMatchObject({
+    expect(SettingsService.Set.mock.calls[0]?.[0].editorProfile).toMatchObject({
       fileCmd: 'zed {path}',
       fileAtLineCmd: 'zed {path}:{line}',
     })
-  })
-
-  it('FR-ED-03 a stored profile for a distro no longer installed still gets a form, kept on save', async () => {
-    SettingsService.Get.mockResolvedValue(
-      defaultSettingsFixture({
-        editorProfiles: {
-          '': { name: 'Zed', folderCmd: 'zed {path}', fileCmd: 'zed {path}' },
-          Ubuntu: { name: 'VS Code', folderCmd: 'code {path}', fileCmd: 'code {path}' },
-        },
-      }),
-    )
-    AppService.ListWSLDistros.mockResolvedValue(['Debian'])
-
-    const wrapper = await mountPanel()
-
-    expect(wrapper.findAll('legend').map((l) => l.text())).toEqual([
-      'Open in editor: Linux',
-      'Open in editor: WSL Debian',
-      'Open in editor: WSL Ubuntu',
-    ])
-    expect(wrapper.findAll('button').map((b) => b.text())).not.toContain('Test')
-
-    await submit(wrapper)
-
-    const sent = SettingsService.Set.mock.calls[0]?.[0]
-    expect(sent.editorProfiles.Ubuntu).toMatchObject({ name: 'VS Code' })
-    expect(sent.editorProfiles.Debian).toMatchObject({ name: '', folderCmd: '' })
-    expect(wrapper.findAll('fieldset').map((f) => f.findAll('label')[0]!.text())).toEqual([
-      'Name (shown as "Open in Zed")',
-      'Name (shown as "Open in editor")',
-      'Name (shown as "Open in VS Code")',
-    ])
   })
 
   it('FR-REPO-07 on a host without WSL, Settings shows no error and no distro controls', async () => {
@@ -265,7 +213,7 @@ describe('SettingsPanel', () => {
 
     expect(wrapper.findComponent(ErrorBanner).exists()).toBe(false)
     expect(wrapper.findAll('fieldset')).toHaveLength(1)
-    expect(wrapper.get('legend').text()).toBe('Open in editor: Linux')
+    expect(wrapper.get('legend').text()).toBe('Open in editor')
   })
 
   it('FR-UX-01 a rejected save renders ErrorBanner with the error', async () => {
@@ -307,7 +255,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-UX-17 each editor environment is a fieldset of its own; every field has its own label on its own row', async () => {
+  it('FR-UX-17 the editor is a fieldset of its own; every field has its own label on its own row', async () => {
     const wrapper = await mountPanel()
 
     const fieldset = wrapper.get('.p-fieldset')

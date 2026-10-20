@@ -139,8 +139,7 @@
     "showDetails": "show details"
   },
   "settings": {
-    "editorLocal": "Open in editor: {os}",
-    "openInEditorWsl": "Open in editor: WSL {name}",
+    "openInEditor": "Open in editor",
     "nameLabel": "Name (shown as \"Open in {name}\")",
     "folderCommand": "Folder command",
     "fileCommand": "File command",

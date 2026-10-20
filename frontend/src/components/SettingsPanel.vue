@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { System } from '@wailsio/runtime'
 import AutoComplete from 'openvue/autocomplete'
 import Button from 'openvue/button'
@@ -136,9 +136,8 @@ const themeOptions = computed<ThemeOption[]>(() => [
   })),
 ])
 
-// editorProfiles is edited directly, one form per environment, keyed like
-// Settings.EditorProfiles ("" = local, else a WSL distro name).
-const editorProfiles = reactive<Record<string, EditorProfile>>({})
+// editorProfile is edited directly: the one editor for every environment.
+const editorProfile = reactive<EditorProfile>({ ...EMPTY_PROFILE })
 
 // worktreeFolders is edited directly, keyed like Settings.WorktreeFolders.
 // Every environment on this host has a field; an entry of a distro not
@@ -161,36 +160,6 @@ const loaded = ref(false)
 
 // environments is the local system ('') and each installed WSL distro.
 const environments = computed(() => ['', ...distros.value])
-
-// editorEnvironments lists every environment with an editor form: each of
-// environments, and any distro no longer installed whose profile is still
-// stored.
-const editorEnvironments = computed(() => [
-  ...new Set([...environments.value, ...Object.keys(editorProfiles)]),
-])
-
-// A newly listed environment (a distro just discovered, or the local one
-// before its stored settings load) starts with an empty form.
-watch(
-  editorEnvironments,
-  (envs) => {
-    for (const name of envs) editorProfiles[name] ??= { ...EMPTY_PROFILE }
-  },
-  { immediate: true },
-)
-
-// profile reads name's editor form state.
-function profile(name: string): EditorProfile {
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- the watch above guarantees an entry for every name in editorEnvironments
-  return editorProfiles[name]!
-}
-
-// Each environment's form sets the command behind its "Open in …".
-function environmentLabel(name: string): string {
-  return name === ''
-    ? t('settings.editorLocal', { os: System.IsWindows() ? 'Windows' : 'Linux' })
-    : t('settings.openInEditorWsl', { name })
-}
 
 function worktreeFolderLabel(name: string): string {
   return name === '' ? t('settings.worktreeFolder') : t('settings.worktreeFolderWsl', { name })
@@ -227,7 +196,7 @@ async function loadForm(): Promise<void> {
     theme.value = s.theme || SYSTEM_THEME
     form.ignoreWhitespace = s.ignoreWhitespace
     form.debugMode = s.debugMode
-    Object.assign(editorProfiles, s.editorProfiles ?? {})
+    Object.assign(editorProfile, s.editorProfile)
     Object.assign(worktreeFolders, s.worktreeFolders ?? {})
   }
   loaded.value = true
@@ -252,7 +221,7 @@ async function submit(): Promise<void> {
     ...store.settings,
     ...form,
     theme: theme.value === SYSTEM_THEME ? Theme.SystemTheme : theme.value,
-    editorProfiles: { ...editorProfiles },
+    editorProfile: { ...editorProfile },
     worktreeFolders: nonEmptyFolders(),
     protectedBranches: form.protectedBranches.map((b) => b.trim()).filter(Boolean),
   }
@@ -267,24 +236,24 @@ async function submit(): Promise<void> {
   <form v-if="loaded" class="settings-panel flex flex-col gap-4" @submit.prevent="submit">
     <ErrorBanner v-if="error" :error="error" />
 
-    <Fieldset v-for="name in editorEnvironments" :key="name" :legend="environmentLabel(name)">
+    <Fieldset :legend="t('settings.openInEditor')">
       <div class="flex flex-col gap-4">
         <FormField
           v-slot="{ id }"
           :label="
-            t('settings.nameLabel', { name: profile(name).name || t('toolbar.editorFallback') })
+            t('settings.nameLabel', { name: editorProfile.name || t('toolbar.editorFallback') })
           "
         >
-          <InputText :id="id" v-model="profile(name).name" fluid />
+          <InputText :id="id" v-model="editorProfile.name" fluid />
         </FormField>
         <FormField v-slot="{ id }" :label="t('settings.folderCommand')">
-          <InputText :id="id" v-model="profile(name).folderCmd" fluid data-test="folder-cmd" />
+          <InputText :id="id" v-model="editorProfile.folderCmd" fluid data-test="folder-cmd" />
         </FormField>
         <FormField v-slot="{ id }" :label="t('settings.fileCommand')">
-          <InputText :id="id" v-model="profile(name).fileCmd" fluid />
+          <InputText :id="id" v-model="editorProfile.fileCmd" fluid />
         </FormField>
         <FormField v-slot="{ id }" :label="t('settings.fileAtLineCommand')">
-          <InputText :id="id" v-model="profile(name).fileAtLineCmd" fluid />
+          <InputText :id="id" v-model="editorProfile.fileAtLineCmd" fluid />
         </FormField>
         <div class="flex flex-wrap items-center gap-2">
           {{ t('settings.preset') }}
@@ -294,7 +263,7 @@ async function submit(): Promise<void> {
             v-bind="SECONDARY_BUTTON"
             :label="presetName"
             data-test="editor-preset"
-            @click="applyPreset(profile(name), preset)"
+            @click="applyPreset(editorProfile, preset)"
           />
         </div>
       </div>

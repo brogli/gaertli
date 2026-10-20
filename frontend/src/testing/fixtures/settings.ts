@@ -9,7 +9,7 @@ import {
 // every test that mocks SettingsService.Get.
 export function defaultSettingsFixture(overrides: Partial<Preferences> = {}): Preferences {
   return {
-    editorProfiles: {},
+    editorProfile: { name: '', folderCmd: '', fileCmd: '', fileAtLineCmd: '' },
     protectedBranches: [],
     defaultPullMode: PullMode.PullMerge,
     diffMode: DiffMode.UnifiedDiff,

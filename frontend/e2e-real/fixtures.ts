@@ -150,13 +150,11 @@ function seedSettings(
   return {
     openWorktrees: open.map((name) => repos[name]),
     recentRepos: [],
-    editorProfiles: {
-      '': {
-        name: 'Stand-in',
-        folderCmd: `${editor} {path}`,
-        fileCmd: `${editor} {path}`,
-        fileAtLineCmd: `${editor} {path}:{line}`,
-      },
+    editorProfile: {
+      name: 'Stand-in',
+      folderCmd: `${editor} {path}`,
+      fileCmd: `${editor} {path}`,
+      fileAtLineCmd: `${editor} {path}:{line}`,
     },
     protectedBranches: ['main', 'master'],
     defaultPullMode: PullMode.PullMerge,
