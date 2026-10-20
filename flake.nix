@@ -68,6 +68,17 @@
             if ! command -v go >/dev/null; then
               echo "nebegit: Go is not provided by this shell. Install Go $(sed -n 's/^go //p' go.mod) or newer natively (see CONTRIBUTING.md)." >&2
             fi
+            export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
+            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+            if [ "$(stat -f -c %T "''${TMPDIR:-/tmp}" 2>/dev/null)" = tmpfs ]; then
+              # Go builds under TMPDIR. On a RAM-backed /tmp with a per-user
+              # quota (Ubuntu 25.04 and later) a cgo build fails with "disk
+              # quota exceeded".
+              export GOTMPDIR="''${XDG_CACHE_HOME:-$HOME/.cache}/go-tmp"
+              mkdir -p "$GOTMPDIR"
+            fi
+          ''
+          + pkgs.lib.optionalString isLinux ''
             if [ ! -e /run/opengl-driver ]; then
               # Non-NixOS host (WSL, Ubuntu, …): the Nix-built libEGL finds no
               # GL driver, so WebKit's web process aborts with EGL_BAD_PARAMETER
@@ -91,17 +102,6 @@
               # In-process dialogs instead.
               export GDK_DEBUG=no-portals
             fi
-            export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
-            export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
-            if [ "$(stat -f -c %T "''${TMPDIR:-/tmp}" 2>/dev/null)" = tmpfs ]; then
-              # Go builds under TMPDIR. On a RAM-backed /tmp with a per-user
-              # quota (Ubuntu 25.04 and later) a cgo build fails with "disk
-              # quota exceeded".
-              export GOTMPDIR="''${XDG_CACHE_HOME:-$HOME/.cache}/go-tmp"
-              mkdir -p "$GOTMPDIR"
-            fi
-          ''
-          + pkgs.lib.optionalString isLinux ''
             # Ubuntu 24.04 permits no bwrap to an unprofiled program (its
             # profile for /usr/bin/bwrap came with 25.04).
             if ! ${bwrapShim}/bin/bwrap --ro-bind / / --unshare-user true 2>/dev/null; then
