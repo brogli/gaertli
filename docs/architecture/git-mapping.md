@@ -121,7 +121,7 @@ Folding selected commits of the current branch is git's own interactive rebase, 
 editor:
 
 1. The selection is checked first, read-only: the selected commits must lie on one line from the
-   oldest of them to HEAD, with no merge on it; FR-LOG-14 lists the other blockers. There is no
+   oldest of them to HEAD, with no merge on it; FR-LOG-17 lists the other blockers. There is no
    autostash: a hidden stash entry would be a second thing to resolve when a move conflicts.
 2. The core writes the whole todo: `pick` the oldest selected commit, `fixup` the others in their
    order, `exec git commit --amend --cleanup=verbatim -C <source>`, then `pick` the rest.

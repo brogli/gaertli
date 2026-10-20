@@ -26,7 +26,7 @@ describe('SetUpstreamDialog', () => {
     Facade.Push.mockReset().mockResolvedValue('job-1')
   })
 
-  it('FR-SYNC-03 one remote: names it, no select; confirm pushes to it', async () => {
+  it('FR-SYNC-12 one remote: names it, no select; confirm pushes to it', async () => {
     const { body } = await mountDialog(['origin'], 'origin')
 
     expect(body.text()).toContain('origin/feature')
@@ -38,7 +38,7 @@ describe('SetUpstreamDialog', () => {
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'feature')
   })
 
-  it('FR-SYNC-03 cancel closes without pushing', async () => {
+  it('FR-SYNC-12 cancel closes without pushing', async () => {
     const { wrapper, body } = await mountDialog(['origin'], 'origin')
 
     await body.get('[data-test="dialog-cancel"]').trigger('click')

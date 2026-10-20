@@ -308,7 +308,7 @@ describe('BranchPicker', () => {
     expect(wrapper.emitted('create-branch')).toEqual([[{ rev: 'abc1234567', label: 'abc1234' }]])
   })
 
-  it("FR-BR-09 a right-click on a local branch opens its actions: check out, new branch, new worktree, update, rename, delete and show in log; the current branch's lack check out, update, rename and delete", async () => {
+  it("FR-BR-13 a right-click on a local branch opens its actions: check out, new branch, new worktree, update, rename, delete and show in log; the current branch's lack check out, update, rename and delete", async () => {
     const { body } = await openPicker()
     expect(body.find('[data-test="ref-actions"]').exists()).toBe(false)
 
@@ -333,7 +333,7 @@ describe('BranchPicker', () => {
     ])
   })
 
-  it("FR-BR-09 a remote branch's actions offer check out, new branch, new worktree and show in log; a tag's also show history", async () => {
+  it("FR-BR-13 a remote branch's actions offer check out, new branch, new worktree and show in log; a tag's also show history", async () => {
     const { body } = await openPicker()
     const expected = (name: string) => [
       'Check out',
@@ -432,7 +432,7 @@ describe('BranchPicker', () => {
     expect(notice.get('.p-toast').text()).toContain('hook failed')
   })
 
-  it('FR-BR-09 clicking a row\'s "…" opens the same menu as its right-click', async () => {
+  it('FR-WT-15 clicking a row\'s "…" opens the same menu as its right-click', async () => {
     const { body } = await openPicker()
 
     await openActions(body, 'feat')
@@ -444,7 +444,7 @@ describe('BranchPicker', () => {
     expect(menuLabels(body)).toEqual(fromRightClick)
   })
 
-  it('FR-BR-09 the right-clicked entry becomes the active one', async () => {
+  it('FR-WT-15 the right-clicked entry becomes the active one', async () => {
     const { body } = await openPicker()
 
     await openActions(body, 'v1')
@@ -452,7 +452,7 @@ describe('BranchPicker', () => {
     expect(body.get('.picker-rows li.active').text()).toContain('v1')
   })
 
-  it("FR-BR-09 Shift+F10 or the context-menu key in the filter opens the active entry's actions", async () => {
+  it("FR-WT-15 Shift+F10 or the context-menu key in the filter opens the active entry's actions", async () => {
     const { body } = await openPicker()
     const filter = body.get('.picker-list input')
 
@@ -467,7 +467,7 @@ describe('BranchPicker', () => {
     expect(menuLabels(body)).toContain('Check out') // feat
   })
 
-  it('FR-BR-09 choosing an action closes the list', async () => {
+  it('FR-WT-15 choosing an action closes the list', async () => {
     const { body } = await openPicker()
 
     await pickAction(body, 'feat', 'Rename…')

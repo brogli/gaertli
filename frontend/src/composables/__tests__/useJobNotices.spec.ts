@@ -121,7 +121,7 @@ describe('useJobNotices', () => {
     expect(onPull).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-SYNC-04 a rejected push on a branch without upstream shows the error and no Pull or Force push', async () => {
+  it('FR-SYNC-13 a rejected push on a branch without upstream shows the error and no Pull or Force push', async () => {
     const notice = await mountWithNotices()
     useRefsStore().refs = refsFixture()
 

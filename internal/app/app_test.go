@@ -351,7 +351,7 @@ func TestFR_WT_05_FR_WT_08_SwitchToMovesTheWindowsSelection(t *testing.T) {
 // switchTo records the new worktree as the repo's recent entry, replacing
 // the one the repo picker's fallback would otherwise still see for an old,
 // since-removed worktree.
-func TestFR_WT_13_SwitchToUpdatesTheRepoRecentEntry(t *testing.T) {
+func TestFR_WT_16_SwitchToUpdatesTheRepoRecentEntry(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	windowID := opener.windows[0].ID()

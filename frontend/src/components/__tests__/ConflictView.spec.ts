@@ -202,7 +202,7 @@ describe('ConflictView', () => {
       await flushPromises()
     }
 
-    it('FR-CONF-06 the same fingerprint keeps the editor as it is', async () => {
+    it('FR-CONF-11 the same fingerprint keeps the editor as it is', async () => {
       const wrapper = await mountView()
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' } })
@@ -214,7 +214,7 @@ describe('ConflictView', () => {
       expect(wrapper.text()).not.toContain('changed on disk')
     })
 
-    it('FR-CONF-06 a save keeps the editor, its edits and undo through the reload it causes', async () => {
+    it('FR-CONF-11 a save keeps the editor, its edits and undo through the reload it causes', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView()
       await resolveBothConflicts(wrapper)
@@ -231,7 +231,7 @@ describe('ConflictView', () => {
       expect(before.state.doc.toString()).toMatch(/^a\n/)
     })
 
-    it('FR-CONF-06 a read that started before a save does not undo the save', async () => {
+    it('FR-CONF-11 a read that started before a save does not undo the save', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView()
       await resolveBothConflicts(wrapper)
@@ -252,7 +252,7 @@ describe('ConflictView', () => {
       expect(resultView(wrapper)).toBe(before)
     })
 
-    it('FR-CONF-06 a read that fails after a newer read started shows no error', async () => {
+    it('FR-CONF-11 a read that fails after a newer read started shows no error', async () => {
       const wrapper = await mountView()
       let failStaleRead: (e: Error) => void = () => undefined
       Facade.Conflict.mockReturnValueOnce(
@@ -269,7 +269,7 @@ describe('ConflictView', () => {
       expect(wrapper.find('.error-banner').exists()).toBe(false)
     })
 
-    it('FR-CONF-06 a read of a file that is no longer conflicted shows no error', async () => {
+    it('FR-CONF-11 a read of a file that is no longer conflicted shows no error', async () => {
       const wrapper = await mountView()
       Facade.Conflict.mockRejectedValue(
         Object.assign(new Error('rejected'), {
@@ -305,7 +305,7 @@ describe('ConflictView', () => {
       expect(resultView(wrapper).state.doc.toString()).toBe('other')
     })
 
-    it('FR-CONF-06 a changed file shows as it is now, but keeps unsaved edits and says so; Reload drops them', async () => {
+    it('FR-CONF-11 a changed file shows as it is now, but keeps unsaved edits and says so; Reload drops them', async () => {
       const wrapper = await mountView()
       await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
@@ -326,7 +326,7 @@ describe('ConflictView', () => {
       ['a changed file', { result: 'on disk', regions: [], fingerprint: 'fp2' }],
       ['the same file', {}],
     ])(
-      'FR-CONF-06 %s read as a new conflict in the path shows afresh, without the edits made for the earlier one',
+      'FR-CONF-11 %s read as a new conflict in the path shows afresh, without the edits made for the earlier one',
       async (_, file) => {
         const wrapper = await mountView({ conflictId: 'c1' })
         resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
@@ -340,7 +340,7 @@ describe('ConflictView', () => {
       },
     )
 
-    it('FR-CONF-06 Reload reads the draft only after the core dropped it', async () => {
+    it('FR-CONF-11 Reload reads the draft only after the core dropped it', async () => {
       const wrapper = await mountView()
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       const [, , stored] = Facade.SetMergeDraft.mock.lastCall!
@@ -366,7 +366,7 @@ describe('ConflictView', () => {
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
     })
 
-    it('FR-CONF-06 a taken region and the edits survive a new page: the core returns them', async () => {
+    it('FR-CONF-11 a taken region and the edits survive a new page: the core returns them', async () => {
       const wrapper = await mountView()
       await findButton(wrapper, 'Take left')!.trigger('click')
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
@@ -384,7 +384,7 @@ describe('ConflictView', () => {
       expect(reopened.text()).toContain('1 left')
     })
 
-    it('FR-CONF-06 edits reach the core while typing: the first at once, a burst after a pause', async () => {
+    it('FR-CONF-11 edits reach the core while typing: the first at once, a burst after a pause', async () => {
       vi.useFakeTimers()
       try {
         const wrapper = await mountView()
@@ -402,7 +402,7 @@ describe('ConflictView', () => {
       }
     })
 
-    it('FR-CONF-06 edits still waiting reach the core when the window closes', async () => {
+    it('FR-CONF-11 edits still waiting reach the core when the window closes', async () => {
       vi.useFakeTimers()
       try {
         const wrapper = await mountView()

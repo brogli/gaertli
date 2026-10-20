@@ -69,7 +69,7 @@ func TestFR_LOG_14_SquashTodoPicksTheOldestFixesUpTheOthersAmendsThenReplaysTheR
 	}
 }
 
-func TestFR_LOG_14_AnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
+func TestFR_LOG_19_AnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
 	t.Parallel()
 	timedOut := core.Errorf(core.Cancelled, "context deadline exceeded")
 
@@ -198,7 +198,7 @@ func conflictLine(t *testing.T, dir string) (b, d string) {
 	return shas[1], shas[3]
 }
 
-func TestFR_LOG_14_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
+func TestFR_LOG_19_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
@@ -245,7 +245,7 @@ func TestFR_LOG_14_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T
 	}
 }
 
-func TestFR_LOG_14_SquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
+func TestFR_LOG_17_SquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -398,7 +398,7 @@ func TestFR_LOG_14_SquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *
 	}
 }
 
-func TestFR_LOG_14_AStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
+func TestFR_LOG_19_AStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name    string
@@ -456,7 +456,7 @@ func TestFR_LOG_14_AStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testin
 // reuses another's message (-C), as the todo's amend does.
 const refuseAmendHook = "[ \"$2\" = commit ] && { echo refusing >&2; exit 1; }\nexit 0\n"
 
-func TestFR_LOG_14_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
+func TestFR_LOG_19_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -478,7 +478,7 @@ func TestFR_LOG_14_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 	assertHistory(t, repo.Dir, "E subject: e.txt", "C subject: c.txt", "Folded: b.txt d.txt", "base subject: base.txt")
 }
 
-func TestFR_LOG_14_ACommitMadeAfterTheCheckStopsTheRebaseInsteadOfBeingDropped(t *testing.T) {
+func TestFR_LOG_19_ACommitMadeAfterTheCheckStopsTheRebaseInsteadOfBeingDropped(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)

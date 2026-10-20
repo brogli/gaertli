@@ -25,7 +25,7 @@ func (p *fakePicker) Pick(dir string) (string, bool) {
 	return p.path, p.ok
 }
 
-func TestFR_WT_13_PickAndOpenDoesNothingOnCancel(t *testing.T) {
+func TestFR_WT_16_PickAndOpenDoesNothingOnCancel(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	s := &AppService{shell: shell{reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{}}
@@ -40,7 +40,7 @@ func TestFR_WT_13_PickAndOpenDoesNothingOnCancel(t *testing.T) {
 
 // A window showing repo A picks repo B: that window switches to B, no new
 // window opens.
-func TestFR_WT_13_PickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.T) {
+func TestFR_WT_16_PickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	api := fakeAPI{openWorktree: openAsIs}
@@ -60,7 +60,7 @@ func TestFR_WT_13_PickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.
 
 // Window 1 shows A, window 2 shows B; window 1 picks B: window 2 is brought
 // forward, window 1 stays on A.
-func TestFR_WT_13_PickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *testing.T) {
+func TestFR_WT_16_PickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	reg.OpenOrFocus("/b", "/b", "")
@@ -191,7 +191,7 @@ func TestFR_REPO_07_OpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
 
 // NewWindow always opens another window with no selection, unlike
 // OpenOrFocus("", ...), which would focus one already open.
-func TestFR_WT_13_NewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
+func TestFR_WT_16_NewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("", "", "")
 	s := &AppService{shell: shell{reg: reg}}
@@ -208,7 +208,7 @@ func TestFR_WT_13_NewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
 
 // NewWindow leaves settings' remembered open worktrees unchanged: an
 // empty-selection window is not one of them.
-func TestFR_WT_13_NewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
+func TestFR_WT_16_NewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/a"} }); err != nil {
@@ -387,7 +387,7 @@ func TestFR_WT_05_SelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
 
 // SelectRecentRepo switches straight to the entry's own path when it still
 // opens; the fallback is never consulted.
-func TestFR_WT_13_SelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
+func TestFR_WT_16_SelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	api := fakeAPI{
@@ -408,7 +408,7 @@ func TestFR_WT_13_SelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
 // A gone entry (Code NotARepo) with a RepoKey retries at the repo's main
 // worktree, found through MainWorktree; a WSL entry's RepoKey and the
 // worktree MainWorktree returns both cross in UNC form.
-func TestFR_WT_13_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T) {
+func TestFR_WT_16_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	var mainWorktreeArg core.RepoPath
@@ -445,7 +445,7 @@ func TestFR_WT_13_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t
 }
 
 // Without a RepoKey the entry's own error is returned as-is.
-func TestFR_WT_13_SelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
+func TestFR_WT_16_SelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	api := fakeAPI{
@@ -466,7 +466,7 @@ func TestFR_WT_13_SelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
 
 // A bare repo whose only worktree is also gone: MainWorktree's own failure
 // is returned, no second OpenWorktree attempted.
-func TestFR_WT_13_SelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *testing.T) {
+func TestFR_WT_16_SelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	openCount := 0

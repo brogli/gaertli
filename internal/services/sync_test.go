@@ -755,11 +755,11 @@ func TestFR_SYNC_03_PushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
 	}
 }
 
-// TestFR_SYNC_03_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway
+// TestFR_SYNC_12_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway
 // covers a caller that named a branch (PushTarget, or a dialog) before HEAD
 // switched elsewhere: Push must still push and track that named branch, not
 // whatever is current now.
-func TestFR_SYNC_03_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *testing.T) {
+func TestFR_SYNC_12_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -784,11 +784,11 @@ func TestFR_SYNC_03_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *te
 	}
 }
 
-// TestFR_SYNC_03_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue covers
+// TestFR_SYNC_12_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue covers
 // push.autoSetupRemote's three outcomes: exit 1 with nothing configured
 // means false, a true spelling means true, and a bad value is git's own
 // refusal (Code GitFailed, naming the bad value).
-func TestFR_SYNC_03_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue(t *testing.T) {
+func TestFR_SYNC_12_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -812,11 +812,11 @@ func TestFR_SYNC_03_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue(t *testin
 	}
 }
 
-// TestFR_SYNC_03_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote
+// TestFR_SYNC_12_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote
 // covers %(push:remotename)'s own three configured levels, in git's
 // priority order, with three remotes so none of them is the sole-remote
 // fallback.
-func TestFR_SYNC_03_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote(t *testing.T) {
+func TestFR_SYNC_12_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -849,10 +849,10 @@ func TestFR_SYNC_03_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRe
 	}
 }
 
-// TestFR_SYNC_03_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured
+// TestFR_SYNC_12_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured
 // covers the two fallbacks %(push:remotename) does not apply itself: the
 // sole remote, and giving up (empty) once a second, unnamed remote exists.
-func TestFR_SYNC_03_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured(t *testing.T) {
+func TestFR_SYNC_12_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -869,7 +869,7 @@ func TestFR_SYNC_03_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigur
 	}
 }
 
-func TestFR_SYNC_03_PushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
+func TestFR_SYNC_12_PushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -884,11 +884,11 @@ func TestFR_SYNC_03_PushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
-// TestFR_SYNC_03_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange
+// TestFR_SYNC_12_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange
 // covers a `git branch -u` run outside the app, which only edits
 // .git/config: PushTarget must reflect it immediately, unlike a cached refs
 // store the UI would otherwise rely on.
-func TestFR_SYNC_03_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange(t *testing.T) {
+func TestFR_SYNC_12_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -956,12 +956,12 @@ func TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	}
 }
 
-// TestFR_SYNC_04_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing
+// TestFR_SYNC_13_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing
 // covers a first push (a remote given, no upstream configured yet) whose
 // remote already has a same-named branch with commits this branch lacks: it
 // still classifies NotFastForward, but with its own message, naming neither
 // pull nor force push, since neither applies without an upstream.
-func TestFR_SYNC_04_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing(t *testing.T) {
+func TestFR_SYNC_13_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")

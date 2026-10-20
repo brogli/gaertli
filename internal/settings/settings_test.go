@@ -189,7 +189,7 @@ func TestFR_REPO_02_AddRecentMovesToFrontAndDedupes(t *testing.T) {
 	}
 }
 
-func TestFR_WT_13_AddRecentListsARepoOnceAcrossItsWorktrees(t *testing.T) {
+func TestFR_WT_16_AddRecentListsARepoOnceAcrossItsWorktrees(t *testing.T) {
 	s := settings.Settings{}
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Hour)
@@ -203,7 +203,7 @@ func TestFR_WT_13_AddRecentListsARepoOnceAcrossItsWorktrees(t *testing.T) {
 	}
 }
 
-func TestFR_WT_13_AddRecentKeepsSameRepoKeyInTwoDistrosApart(t *testing.T) {
+func TestFR_WT_16_AddRecentKeepsSameRepoKeyInTwoDistrosApart(t *testing.T) {
 	s := settings.Settings{}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 

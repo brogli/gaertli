@@ -113,7 +113,7 @@ func resolvedWith(t *testing.T, got core.ConflictFile, take regionTake) string {
 
 // A smoke check over random merges. Every failure it found is pinned as a table case in
 // TestFR_CONF_05_ChangeRegionsCoverTheSameChangeInAllFourTexts and conflictregionedges_test.go.
-func TestFR_CONF_05_TakingASideInEveryRegionMatchesMergingWithThatSidePreferred(t *testing.T) {
+func TestFR_CONF_10_TakingASideInEveryRegionMatchesMergingWithThatSidePreferred(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" || testing.Short() { // git starts slowly there; the region logic is platform-independent
 		t.Skip("fuzz test")

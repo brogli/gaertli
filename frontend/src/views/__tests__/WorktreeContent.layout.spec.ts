@@ -79,7 +79,7 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
   })
 
-  it('FR-UX-08 medium (1200): the log shows beside a "Views" tablist [Details, Changes (4)] defaulting to Details; clicking Changes shows the changes view', async () => {
+  it('FR-UX-21 medium (1200): the log shows beside a "Views" tablist [Details, Changes (4)] defaulting to Details; clicking Changes shows the changes view', async () => {
     Facade.Status.mockResolvedValue(
       changedFilesFixture({
         unstaged: [
@@ -195,7 +195,7 @@ describe('WorktreeContent layouts', () => {
     expectIconOnly(button, 'Create branch here')
   })
 
-  it('FR-UX-07, FR-UX-08 narrow (600): switching to Changes and back keeps the commit message and the log list scroll position', async () => {
+  it('FR-UX-21 narrow (600): switching to Changes and back keeps the commit message and the log list scroll position', async () => {
     const wrapper = await mountAt(600)
     const logList = wrapper.get('.log-list').element
     logList.scrollTop = 42

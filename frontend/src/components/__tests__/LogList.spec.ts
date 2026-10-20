@@ -653,7 +653,7 @@ describe('LogList', () => {
     expect(Facade.SquashCheck).toHaveBeenCalledWith('/repo', ['sha-a', 'sha-b', 'sha-d'])
   })
 
-  it('FR-LOG-14 a blocker replaces squash and fixup with one disabled item saying why', async () => {
+  it('FR-LOG-17 a blocker replaces squash and fixup with one disabled item saying why', async () => {
     Facade.SquashCheck.mockResolvedValue({
       pushed: false,
       message: '',
@@ -683,7 +683,7 @@ describe('LogList', () => {
     expect(field.element.value).toBe('A\n\nB')
   })
 
-  it('FR-LOG-14 a fixup asks first, then clears the selection once done', async () => {
+  it('FR-LOG-18 a fixup asks first, then clears the selection once done', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
     await rowEls[0]!.trigger('click')

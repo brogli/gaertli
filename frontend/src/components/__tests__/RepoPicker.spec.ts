@@ -113,7 +113,7 @@ describe('RepoPicker', () => {
     window.innerWidth = 1024
   })
 
-  it('FR-WT-13 the button names the repo by its main worktree; the list lists this repo first, checked, then the other recents', async () => {
+  it('FR-WT-16 the button names the repo by its main worktree; the list lists this repo first, checked, then the other recents', async () => {
     const { wrapper, body } = await openPicker({ path: '/repos/alpha-feat' })
 
     expect(wrapper.get('[data-test="repo-picker"]').text()).toContain('alpha')
@@ -124,7 +124,7 @@ describe('RepoPicker', () => {
     expect(rows[1]!.text()).toContain('WSL: Ubuntu')
   })
 
-  it('FR-WT-13 choosing a recent repo hands the whole entry to the core, RepoKey included, for it to switch or fall back', async () => {
+  it('FR-WT-16 choosing a recent repo hands the whole entry to the core, RepoKey included, for it to switch or fall back', async () => {
     const { body } = await openPicker()
 
     await repoRow(body, beta.path).trigger('click')
@@ -132,7 +132,7 @@ describe('RepoPicker', () => {
     expect(AppService.SelectRecentRepo).toHaveBeenCalledWith(beta)
   })
 
-  it('FR-WT-13 a failure the core could not recover from shows in the list', async () => {
+  it('FR-WT-16 a failure the core could not recover from shows in the list', async () => {
     AppService.SelectRecentRepo.mockRejectedValue(wailsError('still gone', 'NOT_A_REPO'))
     const { wrapper, body } = await openPicker()
 
@@ -142,7 +142,7 @@ describe('RepoPicker', () => {
     expect(wrapper.findComponent(ErrorBanner).text()).toContain('still gone')
   })
 
-  it('FR-WT-13 window with no selection: asPage shows the list in place, with no button', async () => {
+  it('FR-WT-16 window with no selection: asPage shows the list in place, with no button', async () => {
     const { wrapper, body } = await openPicker({ path: '', asPage: true })
 
     expect(wrapper.find('[data-test="repo-picker"]').exists()).toBe(false)
@@ -158,7 +158,7 @@ describe('RepoPicker', () => {
     expect(AppService.PickAndOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-WT-13 "New window" follows "Open folder…", the only actions also where WSL has distros; choosing it opens a new window', async () => {
+  it('FR-WT-16 "New window" follows "Open folder…", the only actions also where WSL has distros; choosing it opens a new window', async () => {
     AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
     const { body } = await openPicker()
 

@@ -123,7 +123,7 @@ func TestFR_WT_01_ListWorktreesReportsEveryWorktreeShape(t *testing.T) {
 	})
 }
 
-func TestFR_WT_13_MainWorktreeErrorsForABareRepoWhoseOnlyWorktreeIsGone(t *testing.T) {
+func TestFR_WT_16_MainWorktreeErrorsForABareRepoWhoseOnlyWorktreeIsGone(t *testing.T) {
 	t.Parallel()
 	bareDir, linkedDir, _ := bareRepoWithWorktree(t)
 	if err := os.RemoveAll(linkedDir); err != nil {

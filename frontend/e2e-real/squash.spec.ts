@@ -5,7 +5,7 @@ import { contextMenuItems, logRow, notice, pickFromContextMenu, rev, shortRev } 
 // component tests mock the core, so only here does a menu choice run the
 // rebase and the watcher bring the rewritten log back.
 
-test('FR-LOG-14 a merge commit between the selected commits blocks squash and fixup, and the menu says so', async ({
+test('FR-LOG-17 a merge commit between the selected commits blocks squash and fixup, and the menu says so', async ({
   app,
   repos,
   git,

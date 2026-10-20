@@ -67,7 +67,7 @@ test('FR-BR-09, FR-UX-14 a branch entry\'s context menu opens at the pointer and
   await expectOutsideClickClosesBoth()
 })
 
-test("FR-BR-09 Shift+F10 in the branch list opens the active entry's context menu below it; Escape closes both", async ({
+test("FR-WT-15 Shift+F10 in the branch list opens the active entry's context menu below it; Escape closes both", async ({
   page,
 }) => {
   await openMockRepo(page)

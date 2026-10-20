@@ -343,7 +343,7 @@ describe('DiffWindowView', () => {
     expect(Facade.DiffWorking.mock.calls.length).toBeGreaterThan(diffCalls)
   })
 
-  it('FR-CONF-06 a draft of a file that is no longer conflicted is dropped', async () => {
+  it('FR-CONF-11 a draft of a file that is no longer conflicted is dropped', async () => {
     Facade.Status.mockResolvedValue(twoConflicted())
     await mountWindow(oneOfTwo)
     const drafts = useMergeDrafts()
@@ -375,7 +375,7 @@ describe('DiffWindowView', () => {
     expect(Window.Close).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CONF-06 Escape with an unsaved merge result closes the window without asking', async () => {
+  it('FR-CONF-11 Escape with an unsaved merge result closes the window without asking', async () => {
     confirmRequire.mockReset()
     await mountWindow(commitA)
     useMergeDrafts().set('/repo', 'a.txt', '', () => ({

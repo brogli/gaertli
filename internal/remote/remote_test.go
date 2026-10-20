@@ -122,7 +122,7 @@ func TestADR_3_VersionCallCrossesThePipe(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_06_MergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
+func TestFR_CONF_11_MergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
 	c := pipeClient(t, &fake{}, nil)
 	want := &core.MergeDraft{
 		Text: "a\nb\n", Fingerprint: "fp",

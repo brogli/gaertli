@@ -44,7 +44,7 @@ describe('joinPath', () => {
     ['drive root', 'C:\\', 'wt', 'C:\\wt'],
     ['UNC', '\\\\wsl.localhost\\Ubuntu\\home', 'wt', '\\\\wsl.localhost\\Ubuntu\\home\\wt'],
     ['no folder', '', 'wt', 'wt'],
-  ])("FR-WT-02 joins a %s folder and a name in the folder's style", (_, folder, name, joined) => {
+  ])("FR-WT-18 joins a %s folder and a name in the folder's style", (_, folder, name, joined) => {
     expect(joinPath(folder, name)).toBe(joined)
   })
 })
@@ -57,7 +57,7 @@ describe('lastSegment and withLastSegment', () => {
     ['no separator', 'wt', 'wt', 'x'],
     ['empty', '', '', 'x'],
   ])(
-    'FR-WT-02 reads and replaces the raw text after the last separator of a %s path',
+    'FR-WT-18 reads and replaces the raw text after the last separator of a %s path',
     (_, path, last, replaced) => {
       expect(lastSegment(path)).toBe(last)
       expect(withLastSegment(path, 'x')).toBe(replaced)

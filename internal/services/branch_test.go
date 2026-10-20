@@ -399,7 +399,7 @@ func TestFR_BR_01_CreateBranchStartsAtTheFullRefNamedWhenATagAndABranchShareItsN
 	}
 }
 
-func TestFR_BR_01_CreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
+func TestFR_BR_14_CreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, remoteBranch, newName string }{
 		{"a different name", "master", "topic"},
@@ -430,7 +430,7 @@ func TestFR_BR_01_CreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
 
 // A branch started at a remote branch tracks nothing until its first push
 // gives it its own upstream.
-func TestFR_BR_01_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t *testing.T) {
+func TestFR_BR_14_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")

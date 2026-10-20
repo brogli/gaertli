@@ -73,7 +73,7 @@ editor start (Warn), a WSL core's stderr (Warn). A successful git command or edi
   pointer are the Toast's own behaviour.
 - Dialogs (FR-UX-17): a modal dialog of one width, its body a column of rows: a label above its
   control, a checkbox beside its label, the buttons (Cancel, then the action) in the footer.
-  - A new worktree's folder name and location stay in step (FR-WT-02). The base folder is the
+  - A new worktree's folder name and location stay in step (FR-WT-18). The base folder is the
     settings entry for the repo's environment, so a WSL repo gets a folder inside its distro.
   - A new branch's start point (FR-BR-01) is a filterable drop-down over the window's refs, grouped
     like the log's branch filter and sent by its full ref name (`git-mapping.md`). From the log
@@ -111,7 +111,7 @@ view 25%, remembered per layout):
 
 Medium, resizable panes hold the log view (60%) and a side panel (40%): a tab row [Details, Changes
 (n)] on top, the chosen view below. Narrow, a tab row [Log, Details, Changes (n)] on top and the
-chosen view below at full width. "(n)" is the changes view's file count (FR-UX-08), absent at 0.
+chosen view below at full width. "(n)" is the changes view's file count (FR-UX-21), absent at 0.
 Hidden views stay mounted, so switching keeps the scroll position and the typed commit message. The
 arrow keys move between tabs and pick as they go.
 
@@ -127,8 +127,8 @@ arrow keys move between tabs and pick as they go.
   no dialog, popup or menu is open, and leaves Escape to a focused text field. Each shortcut shows
   on its control in muted text: at the right inside the Commit button and beside a menu entry, after
   the action's name in a tooltip ("Push · Ctrl+Shift+K").
-- **Pickers** (FR-WT-13, FR-BR-09): one button style and one list: a filter field, keyboard
-  navigation, and row buttons that never activate the row. The list owns each row's menu: a
+- **Pickers** (FR-WT-13, FR-WT-15, FR-BR-09): one button style and one list: a filter field,
+  keyboard navigation, and row buttons that never activate the row. The list owns each row's menu: a
   right-click opens it at the pointer; Shift+F10, the context-menu key, or the row's "…" button
   (where the picker asks for one) open it below the row or the button.
   - The worktree picker's entry shows the folder name, then its branch in smaller text, then its
@@ -174,7 +174,7 @@ arrow keys move between tabs and pick as they go.
     working-tree comparison. Swap reverses the selection; stop comparing drops it. Three or more are
     no comparison, and the commit detail view says how many are selected.
   - The menu on several commits asks the core whether they can be squashed before it opens, and
-    offers squash and fixup or says why not (FR-LOG-14).
+    offers squash and fixup or says why not (FR-LOG-14, FR-LOG-17).
   - Cherry-pick and revert pass the selected commits as selected; the core orders them, by commit
     date and, for commits sharing a date, topologically.
 - **Commit detail view**: the selected commit's message and fields (FR-UX-10; parents on one line)
@@ -224,9 +224,9 @@ arrow keys move between tabs and pick as they go.
   the diff's background, and added from removed, by at least 0.08 ΔE in OKLab; text on them keeps
   4.5:1 contrast; the change marker keeps 3:1 against the diff's background. An e2e check measures
   each theme.
-- **Merge editor** (FR-CONF-05, FR-CONF-06, ADR-7): three CodeMirror editors in a splitter, the
-  current side and the incoming side read-only around the editable result. Each pane names its side
-  and that side's role in the operation.
+- **Merge editor** (FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11, ADR-7): three CodeMirror editors
+  in a splitter, the current side and the incoming side read-only around the editable result. Each
+  pane names its side and that side's role in the operation.
   - One list of regions covers every change the user decides: the conflicts (marker blocks) and the
     changes only one side made, which git already applied to the file. A change both sides made
     alike is applied and not a region. The core computes the list, each region with a kind and its

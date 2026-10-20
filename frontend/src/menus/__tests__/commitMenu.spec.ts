@@ -206,7 +206,7 @@ describe('buildSelectionMenuItems', () => {
 })
 
 describe('buildSquashMenuItems', () => {
-  it('FR-LOG-14 with a blocker: one disabled item saying why, no actions', () => {
+  it('FR-LOG-17 with a blocker: one disabled item saying why, no actions', () => {
     const actions = { squash: vi.fn(), fixup: vi.fn() }
     const items = buildSquashMenuItems(2, 'a rebase is in progress', actions, t)
 

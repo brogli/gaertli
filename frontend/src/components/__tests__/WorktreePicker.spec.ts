@@ -89,7 +89,7 @@ describe('WorktreePicker', () => {
     window.innerWidth = 1024
   })
 
-  it("FR-WT-13 the button names the worktree by its folder; the list starts with New worktree…, then this repo's worktrees, the current one checked", async () => {
+  it("FR-WT-17 the button names the worktree by its folder; the list starts with New worktree…, then this repo's worktrees, the current one checked", async () => {
     const { wrapper, body } = await openPicker({
       wt: '/repos/alpha-feat',
       path: '/repos/alpha-feat',
@@ -101,7 +101,7 @@ describe('WorktreePicker', () => {
     expect(worktreeRow(body, '/repos/alpha-feat').find('.current-marker i').exists()).toBe(true)
   })
 
-  it('FR-WT-13 a row shows its folder name first and its branch after it, smaller; typing part of a folder name leaves only its row', async () => {
+  it('FR-WT-17 a row shows its folder name first and its branch after it, smaller; typing part of a folder name leaves only its row', async () => {
     const { body } = await openPicker()
 
     const parts = worktreeRow(body, '/repos/alpha-feat').findAll(
@@ -130,7 +130,7 @@ describe('WorktreePicker', () => {
     expect(AppService.OpenPath).toHaveBeenCalledWith('/repos/alpha-feat')
   })
 
-  it('FR-WT-13 a right-click opens a worktree\'s menu: the current one, another, one missing and a bare one differ; no "…" buttons show', async () => {
+  it('FR-WT-17 a right-click opens a worktree\'s menu: the current one, another, one missing and a bare one differ; no "…" buttons show', async () => {
     const other = worktreeFixture({ path: '/repos/alpha-other', branch: 'other' })
     const gone = worktreeFixture({ path: '/repos/alpha-gone', branch: 'gone', missing: true })
     const bare = worktreeFixture({ path: '/repos/alpha.git', branch: '', sha: '', bare: true })
@@ -163,7 +163,7 @@ describe('WorktreePicker', () => {
     ])
   })
 
-  it("FR-WT-13 Shift+F10 in the filter opens the active worktree's menu", async () => {
+  it("FR-WT-15 Shift+F10 in the filter opens the active worktree's menu", async () => {
     const { body } = await openPicker()
     const filter = body.get('.picker-list input')
 
@@ -201,7 +201,7 @@ describe('WorktreePicker', () => {
     expect(Facade.RemoveWorktree).toHaveBeenCalledWith('/repos/alpha', '/repos/alpha-feat', false)
   })
 
-  it('FR-WT-13 the Remove button closes the list before confirming; a refusal other than DIRTY_WORKTREE shows as a notice, no second confirmation', async () => {
+  it('FR-WT-15 the Remove button closes the list before confirming; a refusal other than DIRTY_WORKTREE shows as a notice, no second confirmation', async () => {
     Facade.RemoveWorktree.mockRejectedValueOnce(wailsError('is locked', 'GIT_FAILED'))
     const notice = await mountNotices()
     const { body } = await openPicker()

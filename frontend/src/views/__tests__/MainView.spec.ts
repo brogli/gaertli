@@ -25,7 +25,7 @@ describe('MainView', () => {
     resetMainWindowApp()
   })
 
-  it('FR-WT-13 with no path, the repo list is the page, not WorktreeContent', async () => {
+  it('FR-WT-16 with no path, the repo list is the page, not WorktreeContent', async () => {
     AppService.RecentRepos.mockResolvedValue([
       { path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' },
     ])
@@ -37,7 +37,7 @@ describe('MainView', () => {
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(false)
   })
 
-  it('FR-WT-13 Ctrl+Shift+N opens a new window', async () => {
+  it('FR-WT-16 Ctrl+Shift+N opens a new window', async () => {
     mount(MainView, { props: { path: '' } })
     await flushPromises()
 

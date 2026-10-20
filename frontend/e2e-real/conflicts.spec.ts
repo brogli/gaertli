@@ -148,7 +148,7 @@ test('FR-CONF-01 a pull that stops on conflicts shows the merge in the banner; A
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 
-test('FR-CONF-05 FR-CONF-06 a merge conflict resolves in the merge editor: a side taken, changes only one side made applied, a region edited by hand and kept across closing the window, marked done, saved and staged with no markers', async ({
+test('FR-CONF-10 FR-CONF-06 a merge conflict resolves in the merge editor: a side taken, changes only one side made applied, a region edited by hand and kept across closing the window, marked done, saved and staged with no markers', async ({
   app,
   openDiff,
   repos,

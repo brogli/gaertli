@@ -154,7 +154,7 @@ describe('CreateWorktreeDialog', () => {
     }
   }
 
-  it("FR-WT-02 unset in Settings, the base folder is the main worktree's parent; the name joins the repo's folder and the branch", async () => {
+  it("FR-WT-18 unset in Settings, the base folder is the main worktree's parent; the name joins the repo's folder and the branch", async () => {
     const { body } = await mountDialog({ repoPath: '/repos/alpha-feature' })
 
     await chooseOption(body, 'existing-branch', 'feature')
@@ -163,7 +163,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'alpha-feature', location: '/repos/alpha-feature' })
   })
 
-  it("FR-WT-02 Settings' base folder for the repo's environment holds the new worktree", async () => {
+  it("FR-WT-18 Settings' base folder for the repo's environment holds the new worktree", async () => {
     useSettingsStore().settings = defaultSettingsFixture({
       worktreeFolders: { '': '/wt', Ubuntu: '/home/u/wt' },
     })
@@ -178,7 +178,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(wsl.body).location).toBe('/home/u/wt/alpha-feature')
   })
 
-  it("FR-WT-02 the name and the location's last folder stay in step", async () => {
+  it("FR-WT-18 the name and the location's last folder stay in step", async () => {
     const { body } = await mountDialog({ repoPath: '/repos/alpha' })
 
     await field(body, 'Folder name').setValue('x')
@@ -188,7 +188,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'y', location: '/other/y' })
   })
 
-  it("FR-WT-02 the name follows a new branch's name, a slash as a hyphen, until the name is edited", async () => {
+  it("FR-WT-18 the name follows a new branch's name, a slash as a hyphen, until the name is edited", async () => {
     const { body } = await mountDialog({ repoPath: '/repos/alpha' })
     await body.get('input[type="checkbox"]').setValue(true)
 
@@ -200,7 +200,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'mine', location: '/repos/mine' })
   })
 
-  it('FR-WT-02 a long location scrolls to its end, so the changing folder name stays visible; the full path is its tooltip', async () => {
+  it('FR-WT-18 a long location scrolls to its end, so the changing folder name stays visible; the full path is its tooltip', async () => {
     Facade.ListWorktrees.mockResolvedValue([
       worktreeFixture({
         path: '/home/user/projects/very/deeply/nested/repositories/alpha',
@@ -216,7 +216,7 @@ describe('CreateWorktreeDialog', () => {
     expect(location.attributes('title')).toBe(location.element.value)
   })
 
-  it('FR-WT-02 a folder picked with Browse… becomes the location, its last folder the name', async () => {
+  it('FR-WT-18 a folder picked with Browse… becomes the location, its last folder the name', async () => {
     AppService.PickFolder.mockResolvedValue(['/picked/z', true])
     const { body } = await mountDialog({ repoPath: '/repos/alpha' })
 

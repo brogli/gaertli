@@ -51,7 +51,7 @@ describe('conflictText', () => {
     )
   })
 
-  it('FR-CONF-05 builds each take from the side lines', () => {
+  it('FR-CONF-10 builds each take from the side lines', () => {
     const file = conflictFileFixture()
 
     expect(takenLines(file, 1, 'current')).toEqual(['c2'])

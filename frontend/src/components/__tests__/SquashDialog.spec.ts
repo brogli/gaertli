@@ -72,7 +72,7 @@ describe('SquashDialog', () => {
     expect(wrapper.emitted('done')).toHaveLength(1)
   })
 
-  it('FR-LOG-14 fixup asks first, with no message field, and keeps the oldest message', async () => {
+  it('FR-LOG-18 fixup asks first, with no message field, and keeps the oldest message', async () => {
     const { body } = await mountDialog({}, true)
 
     expect(body.find('[data-test="squash-message"]').exists()).toBe(false)
@@ -85,7 +85,7 @@ describe('SquashDialog', () => {
     expect(Facade.Fixup).toHaveBeenCalledWith('/repo', shas)
   })
 
-  it('FR-LOG-14 a pushed commit is named, with the protected-branch warning on a protected branch', async () => {
+  it('FR-LOG-18 a pushed commit is named, with the protected-branch warning on a protected branch', async () => {
     const unpushed = await mountDialog()
     expect(unpushed.body.text()).not.toContain('already pushed')
     unpushed.wrapper.unmount()
@@ -97,7 +97,7 @@ describe('SquashDialog', () => {
     expect(body.text()).toContain('"main" is a protected branch.')
   })
 
-  it('FR-LOG-14 success leaves a notice naming the branch and the previous commit', async () => {
+  it('FR-LOG-20 success leaves a notice naming the branch and the previous commit', async () => {
     const notice = await mountNotices()
     const { body } = await mountDialog()
 
@@ -125,7 +125,7 @@ describe('SquashDialog', () => {
       closes: false,
       shows: 'hook said no',
     },
-  ] as const)('FR-LOG-14 $outcome', async ({ error, closes, shows }) => {
+  ] as const)('FR-LOG-19 $outcome', async ({ error, closes, shows }) => {
     Facade.Squash.mockRejectedValueOnce(wailsError(error.message, error.code))
     const notice = await mountNotices()
     const { wrapper, body } = await mountDialog()

@@ -38,7 +38,7 @@ async function mountList(
 }
 
 describe('PickerList', () => {
-  it('FR-WT-13 a button in a row runs its own action and does not activate the row', async () => {
+  it('FR-WT-15 a button in a row runs its own action and does not activate the row', async () => {
     const action = vi.fn()
     const { wrapper } = await mountList(action)
 
@@ -72,7 +72,7 @@ describe('PickerList', () => {
     expect(wrapper.get('li.active').text()).toBe('alpha')
   })
 
-  it('FR-BR-09 each non-header row gets an "Actions" button opening a menu; the header gets none', async () => {
+  it('FR-WT-15 each non-header row gets an "Actions" button opening a menu; the header gets none', async () => {
     const { wrapper } = await mountList(vi.fn(), rows, { menu: menuFor, menuButton: true })
 
     const items = wrapper.findAll('li')
@@ -85,7 +85,7 @@ describe('PickerList', () => {
     }
   })
 
-  it('FR-BR-09 clicking a row\'s "…" opens its menu, makes the row active, and does not activate it', async () => {
+  it('FR-WT-15 clicking a row\'s "…" opens its menu, makes the row active, and does not activate it', async () => {
     const { wrapper, body } = await mountList(vi.fn(), rows, { menu: menuFor, menuButton: true })
 
     await wrapper.findAll('li')[2]!.get('[data-test="row-actions"]').trigger('click')
@@ -95,7 +95,7 @@ describe('PickerList', () => {
     expect(wrapper.emitted('activate')).toBeUndefined()
   })
 
-  it('FR-WT-13 a right-click, then Shift+F10, open each active row\'s menu; no "…" buttons; a header\'s right-click opens none', async () => {
+  it('FR-WT-15 a right-click, then Shift+F10, open each active row\'s menu; no "…" buttons; a header\'s right-click opens none', async () => {
     const { wrapper, body } = await mountList(vi.fn(), rows, { menu: menuFor })
 
     expect(wrapper.find('[data-test="row-actions"]').exists()).toBe(false)
@@ -112,7 +112,7 @@ describe('PickerList', () => {
     expect(menuLabels(body)).toEqual(['a-item'])
   })
 
-  it('FR-BR-09 a long list renders only the rows in view', async () => {
+  it('FR-WT-13 a long list renders only the rows in view', async () => {
     const many = Array.from({ length: 2000 }, (_, i) => ({ key: `r${i}`, label: `ref ${i}` }))
     const { wrapper } = await mountList(vi.fn(), many)
 
