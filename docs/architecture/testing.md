@@ -65,11 +65,12 @@ an automated test.
 
 ## CI
 
-CI follows TR-14, TR-26 and TR-42. Every push to `dev` or `main` and every pull request runs the
-Linux jobs side by side: lint (treefmt, type check, traceability, licence check), the Go tests, the
-frontend tests with the Linux build and the Windows cross-build (TR-26), the mock and the
-real-backend e2e suites, and the Go tests with the race detector against the oldest supported git,
-built from source (QA-COMP-03). The Windows job (the Go tests on Windows, where every git process is
-slow) and the macOS build are billed at a multiple, so they run for pull requests into `main`, in
-the release workflow and when started by hand. A newer push cancels the run in progress. The
-performance checks run on demand (`task bench`).
+CI follows TR-14, TR-26 and TR-42. Every pull request runs the Linux jobs side by side: lint
+(treefmt, type check, traceability, licence check), the Go tests, the frontend tests with the Linux
+build and the Windows cross-build (TR-26), the mock and the real-backend e2e suites, and the Go
+tests with the race detector against the oldest supported git, built from source (QA-COMP-03). The
+Windows job (the Go tests on Windows, where every git process is slow) and the macOS build are
+billed at a multiple, so they run for pull requests into `main`, in the release workflow and when
+started by hand. Pushes to `dev` and `main` start no run, since `task ci` checks each commit before
+it is made. A newer push to a pull request cancels its run in progress. The performance checks run
+on demand (`task bench`).

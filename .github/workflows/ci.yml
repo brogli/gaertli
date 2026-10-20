@@ -1,8 +1,7 @@
 name: ci
 
+# Pull requests only: a push is already checked by `task ci` before its commit.
 on:
-  push:
-    branches: [dev, main]
   pull_request:
     branches: [dev, main]
   workflow_call:
@@ -12,11 +11,11 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same branch or pull request cancels the run in
-# progress. A release's call (workflow_dispatch) is never cancelled.
+# A newer push to the same pull request cancels the run in progress. A
+# release's call (workflow_dispatch) is never cancelled.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux:
@@ -117,10 +116,8 @@ jobs:
     # the WSL core). The Windows binary itself is cross-compiled on Linux,
     # in the linux job's `task ci:frontend`. Billed at twice the Linux rate
     # and slow (git starts slowly there), so it runs for pull requests into
-    # main and for releases, not for every push.
-    if:
-      github.event_name != 'push' && (github.event_name != 'pull_request' || github.base_ref ==
-      'main')
+    # main and for releases, not for those into dev.
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -185,9 +182,7 @@ jobs:
   macos:
     # A build only (QA-PORT-04), billed at ten times the Linux rate: pull
     # requests into main and releases.
-    if:
-      github.event_name != 'push' && (github.event_name != 'pull_request' || github.base_ref ==
-      'main')
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
