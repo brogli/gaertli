@@ -1,0 +1,11 @@
+# Ubuntu's AppArmor denies user namespaces to programs without a profile;
+# WebKitGTK's web-process sandbox (bubblewrap) needs them. Ubuntu's own shape
+# for such applications: unconfined, user namespaces allowed.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile nebegit /usr/bin/nebegit flags=(unconfined) {
+  userns,
+
+  include if exists <local/nebegit>
+}

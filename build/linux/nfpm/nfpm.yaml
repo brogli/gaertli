@@ -18,6 +18,12 @@ contents:
     dst: '/usr/share/icons/hicolor/1024x1024/apps/nebegit.png'
   - src: './build/linux/nebegit.desktop'
     dst: '/usr/share/applications/nebegit.desktop'
+  # Ubuntu's AppArmor denies user namespaces to programs without a profile;
+  # WebKitGTK's sandbox needs them. Inert where AppArmor does not run.
+  - src: './build/linux/apparmor/nebegit'
+    dst: '/etc/apparmor.d/nebegit'
+    type: config
+    packager: deb
 
 # GTK4 and WebKitGTK 6.0. git is the user's own: the app checks its
 # version at start.

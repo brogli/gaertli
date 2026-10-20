@@ -65,6 +65,14 @@
             fi
             export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
             export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+          ''
+          + pkgs.lib.optionalString isLinux ''
+            # WebKitGTK runs its web-process sandbox through this bwrap (the
+            # path is compiled in). Ubuntu's AppArmor denies user namespaces to
+            # programs without a profile and ships none for it.
+            if ! ${pkgs.bubblewrap}/bin/bwrap --ro-bind / / --unshare-user true 2>/dev/null; then
+              echo "nebegit: this host denies the shell's bwrap a user namespace, so the app built here cannot start its web-process sandbox. See CONTRIBUTING.md, 'Native Ubuntu'." >&2
+            fi
           '';
         };
     in

@@ -34,6 +34,27 @@ Release binaries come from CI on stock runners, never from a developer machine.
 
 Under WSLg the shell sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`; without it the window may stay blank.
 
+### Native Ubuntu
+
+Ubuntu (23.10 or newer) denies user namespaces to programs without an AppArmor profile, and the
+shell's WebKitGTK runs its sandbox through the shell's own `bwrap`, which has none: the app built
+here aborts at start with `bwrap: setting up uid map: Permission denied`, and the shell warns at
+entry. Once, with root:
+
+```sh
+sudo tee /etc/apparmor.d/nix-bwrap >/dev/null <<'EOF'
+abi <abi/4.0>,
+include <tunables/global>
+
+profile nix-bwrap /nix/store/*-bubblewrap-*/bin/bwrap flags=(unconfined) {
+  userns,
+}
+EOF
+sudo apparmor_parser -r /etc/apparmor.d/nix-bwrap
+```
+
+The released `.deb` carries its own profile; users never need this.
+
 ### Windows
 
 Recommended: develop inside WSL with the steps above and cross-compile the Windows binary from the
