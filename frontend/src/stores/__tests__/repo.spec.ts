@@ -1,3 +1,4 @@
+// Requirements: FR-REPO-04, FR-WT-09
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,7 +25,7 @@ describe('repo store', () => {
     AppService.UpdateWindowTitle.mockReset().mockResolvedValue(undefined)
   })
 
-  it("FR-WT-09 calls UpdateWindowTitle with the worktree's path and branch after loading Summary", async () => {
+  it("calls UpdateWindowTitle with the worktree's path and branch after loading Summary", async () => {
     const repo = useRepoStore()
 
     await repo.loadSummary('/home/user/project')
@@ -33,7 +34,7 @@ describe('repo store', () => {
     expect(AppService.UpdateWindowTitle).toHaveBeenCalledWith('/home/user/project', 'main')
   })
 
-  it('FR-REPO-04 reloads Summary on a state or refs repo:changed event, not on index', async () => {
+  it('reloads Summary on a state or refs repo:changed event, not on index', async () => {
     const repo = useRepoStore()
     await repo.loadSummary('/repo')
     Facade.Summary.mockClear()

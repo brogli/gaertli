@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-05
 import { expect, test, type Page } from '@playwright/test'
 import { contrastRatio, deltaEOK, parseColor } from '../src/testing/colour'
 import { mockConflictUrl } from './helpers'
@@ -71,7 +72,7 @@ async function outlineColour(page: Page): Promise<string> {
 }
 
 for (const theme of THEMES) {
-  test(`FR-CONF-05 ${theme} theme: changed, added, unresolved and resolved lines and the selection outline are visibly distinct`, async ({
+  test(`${theme} theme: changed, added, unresolved and resolved lines and the selection outline are visibly distinct`, async ({
     page,
   }) => {
     await page.goto(`${mockConflictUrl}&theme=${theme}`)

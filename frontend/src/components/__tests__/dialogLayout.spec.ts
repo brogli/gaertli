@@ -1,3 +1,4 @@
+// Requirements: FR-UX-17
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -85,7 +86,7 @@ describe('dialog layout', () => {
   })
 
   it.each(dialogs)(
-    'FR-UX-17 $name: Cancel and the action sit together at the bottom; Cancel closes',
+    '$name: Cancel and the action sit together at the bottom; Cancel closes',
     async ({ mount, buttons }) => {
       const { wrapper, body } = await mount()
 
@@ -96,7 +97,7 @@ describe('dialog layout', () => {
   )
 
   it.each(dialogs.filter((d) => d.labels))(
-    'FR-UX-17 $name: each field has its own label',
+    '$name: each field has its own label',
     async ({ mount, labels }) => {
       const { body } = await mount()
 

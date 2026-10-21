@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-05
+
 package services
 
 import (
@@ -6,7 +8,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_CONF_05_ConflictRegionBaseKeepsLinesTheCurrentSideDeleted(t *testing.T) {
+func TestConflictRegionBaseKeepsLinesTheCurrentSideDeleted(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("a\nb\nc\n"), version("a\nc\n"), version("a\nB\nc\n"))
 
@@ -17,7 +19,7 @@ func TestFR_CONF_05_ConflictRegionBaseKeepsLinesTheCurrentSideDeleted(t *testing
 
 // A separate diff of the base against a side can align repeated lines differently than git did;
 // in the diff3 style the region's base is the section git wrote.
-func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInDiff3Style(t *testing.T) {
+func TestConflictRegionBaseIsGitsBaseSectionInDiff3Style(t *testing.T) {
 	t.Parallel()
 	cases := map[string][3]string{
 		"repeated start": {"c\nc\na\na\n", "A\nc\na\n", "D\nc\nD\nc\na\n"},
@@ -44,7 +46,7 @@ func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInDiff3Style(t *testing.T
 // checkout --conflict=diff3 writes the diff3 style whatever merge.conflictStyle says. Its merge
 // ignores diff.algorithm, which the diffs of the base against each side follow, so only the base
 // section places the region.
-func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInAFileRewrittenInDiff3Style(t *testing.T) {
+func TestConflictRegionBaseIsGitsBaseSectionInAFileRewrittenInDiff3Style(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version("c\nc\nd\nd\n"), version("B\nc\nd\n"), version("c\nc\nD\nd\n"))
 	tryGit(t, dir, "merge", "side")
@@ -62,7 +64,7 @@ func TestFR_CONF_05_ConflictRegionBaseIsGitsBaseSectionInAFileRewrittenInDiff3St
 
 // Both sides replaced one base line with the same three lines and one line each: no base line
 // stands for the shared lines alone, so the region's base is the whole replaced line.
-func TestFR_CONF_05_ConflictRegionBaseOfASharedChangeOfAnotherLengthIsTheReplacedLines(t *testing.T) {
+func TestConflictRegionBaseOfASharedChangeOfAnotherLengthIsTheReplacedLines(t *testing.T) {
 	t.Parallel()
 	for _, style := range []string{"merge", "zdiff3", "diff3"} {
 		t.Run(style, func(t *testing.T) {
@@ -85,7 +87,7 @@ func TestFR_CONF_05_ConflictRegionBaseOfASharedChangeOfAnotherLengthIsTheReplace
 
 // The merge and zdiff3 styles leave the lines both sides changed alike outside the markers; the
 // region's base is the lines that differ only.
-func TestFR_CONF_05_ConflictRegionBaseExcludesLinesBothSidesChangedTheSameWay(t *testing.T) {
+func TestConflictRegionBaseExcludesLinesBothSidesChangedTheSameWay(t *testing.T) {
 	t.Parallel()
 	// Each way writes the file in a style; the config may name another.
 	ways := map[string]struct {

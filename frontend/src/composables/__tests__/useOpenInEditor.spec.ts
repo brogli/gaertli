@@ -1,3 +1,4 @@
+// Requirements: FR-ED-06, FR-UX-15
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
@@ -46,7 +47,7 @@ describe('useOpenInEditor', () => {
   })
 
   it.each(opens)(
-    'FR-ED-06 %s failing EDITOR_NOT_FOUND shows an error notice naming the command, no error left on the call',
+    '%s failing EDITOR_NOT_FOUND shows an error notice naming the command, no error left on the call',
     async (_name, call, open) => {
       call.mockRejectedValueOnce(editorNotFound('myed'))
       const notice = await mountNotices()
@@ -60,7 +61,7 @@ describe('useOpenInEditor', () => {
     },
   )
 
-  it('FR-ED-06 any other failure stays on the call as its error, with no notice', async () => {
+  it('any other failure stays on the call as its error, with no notice', async () => {
     Facade.OpenFile.mockRejectedValueOnce(wailsError('disk gone', 'GIT_FAILED'))
     const notice = await mountNotices()
     const host = mountHost()
@@ -72,7 +73,7 @@ describe('useOpenInEditor', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it("FR-UX-15 a second EDITOR_NOT_FOUND failure replaces the first one's notice", async () => {
+  it("a second EDITOR_NOT_FOUND failure replaces the first one's notice", async () => {
     Facade.OpenFile.mockRejectedValueOnce(editorNotFound('alpha')).mockRejectedValueOnce(
       editorNotFound('beta'),
     )

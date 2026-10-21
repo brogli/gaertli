@@ -1,8 +1,10 @@
+// Requirements: FR-WT-09
+
 package app
 
 import "testing"
 
-func TestFR_WT_09_WindowTitle(t *testing.T) {
+func TestWindowTitle(t *testing.T) {
 	cases := []struct{ path, branch, want string }{
 		{"", "", "nebegit"},
 		{"/x/project", "", "project"},

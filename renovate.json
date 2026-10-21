@@ -49,13 +49,13 @@
       "enabled": false
     },
     {
-      "description": "The runtime must equal the Go module's version (TR-02).",
+      "description": "The runtime must equal the Go module's version.",
       "groupName": "Wails",
       "matchPackageNames": ["github.com/wailsapp/wails/v3", "@wailsio/runtime"],
       "automerge": false
     },
     {
-      "description": "Node and pnpm's majors are pinned to the Nix shell's (TR-23); bump them there instead.",
+      "description": "Node and pnpm's majors are pinned to the Nix shell's; bump them there instead.",
       "matchManagers": ["github-actions"],
       "matchDepNames": ["node", "pnpm"],
       "enabled": false

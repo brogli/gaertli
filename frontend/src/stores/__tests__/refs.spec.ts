@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-01
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,7 +22,7 @@ describe('refs store', () => {
     Events.On.mockReset()
   })
 
-  it('FR-LOG-01 reloads Refs on a refs repo:changed event, not on state', async () => {
+  it('reloads Refs on a refs repo:changed event, not on state', async () => {
     const refs = useRefsStore()
     await refs.load('/repo')
     expect(Facade.Refs).toHaveBeenCalledTimes(1)

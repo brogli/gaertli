@@ -1,3 +1,5 @@
+// Requirements: FR-LOG-05, FR-REPO-04, FR-REPO-05, QA-PERF-06
+
 package session
 
 import (
@@ -59,7 +61,7 @@ func TestManagerOpenSharesRepoAcrossLinkedWorktrees(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_05_ManagerOpenRejectsNonRepoPathSayingSo(t *testing.T) {
+func TestManagerOpenRejectsNonRepoPathSayingSo(t *testing.T) {
 	m := NewManager(func(core.Event) {})
 	dir := t.TempDir()
 
@@ -166,7 +168,7 @@ func TestRepoLogSnapshotClampsWindowAndReportsState(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_05_RepoLogIndicesOfMapsSHAsToRowIndices(t *testing.T) {
+func TestRepoLogIndicesOfMapsSHAsToRowIndices(t *testing.T) {
 	r := &Repo{}
 	gen, _ := r.LogBeginLoad()
 	r.LogAppend(gen, core.LogCommit{SHA: "a"}, core.LogCommit{SHA: "b"}, core.LogCommit{SHA: "c"})
@@ -181,7 +183,7 @@ func TestFR_LOG_05_RepoLogIndicesOfMapsSHAsToRowIndices(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_05_WorktreeLogIndicesOfPrefersTheFilteredViewWhenActive(t *testing.T) {
+func TestWorktreeLogIndicesOfPrefersTheFilteredViewWhenActive(t *testing.T) {
 	w := &Worktree{Repo: &Repo{}}
 	baseGen, _ := w.Repo.LogBeginLoad()
 	w.Repo.LogAppend(baseGen, core.LogCommit{SHA: "base"})
@@ -201,7 +203,7 @@ func TestFR_LOG_05_WorktreeLogIndicesOfPrefersTheFilteredViewWhenActive(t *testi
 	}
 }
 
-func TestFR_LOG_05_WorktreeLogIndicesOfFallsBackToTheBaseLogWithNoFilterActive(t *testing.T) {
+func TestWorktreeLogIndicesOfFallsBackToTheBaseLogWithNoFilterActive(t *testing.T) {
 	w := &Worktree{Repo: &Repo{}}
 	gen, _ := w.Repo.LogBeginLoad()
 	w.Repo.LogAppend(gen, core.LogCommit{SHA: "a"})
@@ -216,7 +218,7 @@ func TestFR_LOG_05_WorktreeLogIndicesOfFallsBackToTheBaseLogWithNoFilterActive(t
 	}
 }
 
-func TestFR_REPO_04_LogBeginReloadFailsWhileALoadIsInFlight(t *testing.T) {
+func TestLogBeginReloadFailsWhileALoadIsInFlight(t *testing.T) {
 	r := &Repo{}
 	gen, ok := r.LogBeginLoad()
 	if !ok {
@@ -233,7 +235,7 @@ func TestFR_REPO_04_LogBeginReloadFailsWhileALoadIsInFlight(t *testing.T) {
 // FilterRestart reads and acts on "is a filter active" under one lock, so a
 // SetLogFilter landing between a separate read and restart cannot revive a
 // filter FilterClear just cleared.
-func TestFR_REPO_04_FilterRestartFindsNothingActiveAfterFilterClear(t *testing.T) {
+func TestFilterRestartFindsNothingActiveAfterFilterClear(t *testing.T) {
 	w := &Worktree{}
 	w.FilterBegin(core.LogFilter{Path: "a"}, func() {})
 
@@ -245,7 +247,7 @@ func TestFR_REPO_04_FilterRestartFindsNothingActiveAfterFilterClear(t *testing.T
 }
 
 // Nor can it restart a filter SetLogFilter already replaced.
-func TestFR_REPO_04_FilterRestartRestartsTheCurrentFilterNotAnEarlierOne(t *testing.T) {
+func TestFilterRestartRestartsTheCurrentFilterNotAnEarlierOne(t *testing.T) {
 	w := &Worktree{}
 	w.FilterBegin(core.LogFilter{Path: "a"}, func() {})
 	second := core.LogFilter{Path: "b"}
@@ -264,7 +266,7 @@ func TestFR_REPO_04_FilterRestartRestartsTheCurrentFilterNotAnEarlierOne(t *test
 	}
 }
 
-func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
+func TestManagerOpenWiresARealRepoWatcher(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 
@@ -283,7 +285,7 @@ func TestFR_REPO_04_ManagerOpenWiresARealRepoWatcher(t *testing.T) {
 	})
 }
 
-func TestFR_REPO_04_ManagerOpenWiresARealWorktreePoller(t *testing.T) {
+func TestManagerOpenWiresARealWorktreePoller(t *testing.T) {
 	orig := watch.PollInterval
 	watch.PollInterval = 30 * time.Millisecond
 	t.Cleanup(func() { watch.PollInterval = orig })
@@ -339,7 +341,7 @@ func (f *fakeWorktreePoller) Blur()     {}
 func (f *fakeWorktreePoller) CheckNow() {}
 func (f *fakeWorktreePoller) Close()    { f.closeCount++ }
 
-func TestQA_PERF_06_ManagerCloseTearsDownThePollerAndTheLastWorktreesWatcher(t *testing.T) {
+func TestManagerCloseTearsDownThePollerAndTheLastWorktreesWatcher(t *testing.T) {
 	repo := gittest.New(t)
 	linked := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", "-b", "feature", linked)

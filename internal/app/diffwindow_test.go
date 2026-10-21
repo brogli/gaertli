@@ -1,3 +1,5 @@
+// Requirements: FR-DIFF-07
+
 package app
 
 import (
@@ -9,7 +11,7 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-func TestFR_DIFF_07_DiffWindowTitleNamesTheWorktreeAndWhatItShows(t *testing.T) {
+func TestDiffWindowTitleNamesTheWorktreeAndWhatItShows(t *testing.T) {
 	a := "1111111111111111111111111111111111111a"
 	b := "2222222222222222222222222222222222222b"
 	cases := []struct {
@@ -32,7 +34,7 @@ func TestFR_DIFF_07_DiffWindowTitleNamesTheWorktreeAndWhatItShows(t *testing.T) 
 	}
 }
 
-func TestFR_DIFF_07_DiffURLCarriesTheWorktreeAndTheTarget(t *testing.T) {
+func TestDiffURLCarriesTheWorktreeAndTheTarget(t *testing.T) {
 	base := url.Values{"view": {"diff"}, "wt": {"wt-1"}}
 	with := func(fields url.Values) url.Values {
 		q := maps.Clone(base)

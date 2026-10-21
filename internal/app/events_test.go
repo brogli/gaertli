@@ -1,3 +1,5 @@
+// Requirements: QA-PORT-02
+
 package app
 
 import (
@@ -40,7 +42,7 @@ func assertRegisteredType(t *testing.T, name string, data any) {
 	}
 }
 
-func TestTR_28_DispatchEmitsEachEventsRegisteredPayloadType(t *testing.T) {
+func TestDispatchEmitsEachEventsRegisteredPayloadType(t *testing.T) {
 	// "command" is not sampled here: dispatch logs it instead of emitting it
 	// to a window (see applog_test.go).
 	samples := map[string]any{
@@ -106,7 +108,7 @@ func emittedEventNames(t *testing.T, dirs ...string) []string {
 	return slices.Compact(names)
 }
 
-func TestTR_28_EveryEmittedEventDecodesAndOnlyWindowEventsAreRegistered(t *testing.T) {
+func TestEveryEmittedEventDecodesAndOnlyWindowEventsAreRegistered(t *testing.T) {
 	emitted := emittedEventNames(t, ".", "../session", "../services")
 
 	if decoded := slices.Sorted(maps.Keys(eventPayloads)); !slices.Equal(decoded, emitted) {
@@ -135,7 +137,7 @@ func TestTR_28_EveryEmittedEventDecodesAndOnlyWindowEventsAreRegistered(t *testi
 	}
 }
 
-func TestTR_28_DispatchDropsAndLogsAPayloadThatDoesNotDecode(t *testing.T) {
+func TestDispatchDropsAndLogsAPayloadThatDoesNotDecode(t *testing.T) {
 	r, opener := newTestRegistry()
 	var logged strings.Builder
 	r.log = slog.New(slog.NewTextHandler(&logged, nil))
@@ -151,7 +153,7 @@ func TestTR_28_DispatchDropsAndLogsAPayloadThatDoesNotDecode(t *testing.T) {
 	}
 }
 
-func TestTR_28_TheDiffWindowIsRetargetedWithTheRegisteredPayloadType(t *testing.T) {
+func TestTheDiffWindowIsRetargetedWithTheRegisteredPayloadType(t *testing.T) {
 	r, opener := newTestRegistry()
 	key := diffWindowKey{wt: "wt"}
 

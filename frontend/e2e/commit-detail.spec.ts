@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-15
 import { test, expect, type Locator } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
@@ -7,7 +8,7 @@ import { openMockRepo } from './helpers'
 const top = async (locator: Locator) => (await locator.boundingBox())!.y
 
 for (const width of [1600, 1200, 420]) {
-  test(`FR-LOG-15 at ${width}px a commit's message and its files scroll each on its own`, async ({
+  test(`at ${width}px a commit's message and its files scroll each on its own`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 800 })

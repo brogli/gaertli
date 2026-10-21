@@ -1,9 +1,10 @@
+// Requirements: FR-CONF-05, FR-CONF-10
 import { describe, expect, it } from 'vitest'
 import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
 import { resultFromBase, takenLines } from '../conflictText'
 
 describe('conflictText', () => {
-  it('FR-CONF-05 the result holds the base lines in place of each marker block', () => {
+  it('the result holds the base lines in place of each marker block', () => {
     const file = conflictFileFixture()
 
     expect(resultFromBase(file)).toEqual({
@@ -15,7 +16,7 @@ describe('conflictText', () => {
     })
   })
 
-  it('FR-CONF-05 a conflict without a base leaves its regions empty', () => {
+  it('a conflict without a base leaves its regions empty', () => {
     const file = conflictFileFixture({ base: { present: false } })
     const regions = file.regions!.map((region) => ({ ...region, base: { start: 0, lines: 0 } }))
 
@@ -28,7 +29,7 @@ describe('conflictText', () => {
     })
   })
 
-  it('FR-CONF-05 the result holds the base lines of every change, also one with no lines in the result', () => {
+  it('the result holds the base lines of every change, also one with no lines in the result', () => {
     const file = changesFileFixture()
     const deleted = {
       ...file.regions![0]!,
@@ -51,7 +52,7 @@ describe('conflictText', () => {
     )
   })
 
-  it('FR-CONF-10 builds each take from the side lines', () => {
+  it('builds each take from the side lines', () => {
     const file = conflictFileFixture()
 
     expect(takenLines(file, 1, 'current')).toEqual(['c2'])

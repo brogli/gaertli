@@ -1,3 +1,4 @@
+// Requirements: FR-SYNC-07, FR-UX-01, FR-UX-09, FR-UX-12
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,7 +33,7 @@ describe('JobsMenu', () => {
     Events.On.mockReset()
   })
 
-  it('FR-UX-12 no jobs: the button is present with the idle tooltip, no badge', async () => {
+  it('no jobs: the button is present with the idle tooltip, no badge', async () => {
     Facade.Jobs.mockResolvedValue([])
     const { wrapper, body } = await mountMenu()
 
@@ -41,7 +42,7 @@ describe('JobsMenu', () => {
     expect(wrapper.findComponent(Badge).exists()).toBe(false)
   })
 
-  it('FR-UX-09 the trigger is an OpenVue Button, secondary and outlined', async () => {
+  it('the trigger is an OpenVue Button, secondary and outlined', async () => {
     Facade.Jobs.mockResolvedValue([])
     const { body } = await mountMenu()
 
@@ -51,7 +52,7 @@ describe('JobsMenu', () => {
     expect(classes).toContain('p-button-outlined')
   })
 
-  it('FR-UX-12 opening the idle list shows its one line', async () => {
+  it('opening the idle list shows its one line', async () => {
     Facade.Jobs.mockResolvedValue([])
     const { body } = await mountMenu()
 
@@ -60,7 +61,7 @@ describe('JobsMenu', () => {
     expect(body.text()).toContain('No running jobs')
   })
 
-  it('FR-UX-12 two running jobs: the badge shows 2 and the list has two rows with label, message and a progress bar', async () => {
+  it('two running jobs: the badge shows 2 and the list has two rows with label, message and a progress bar', async () => {
     Facade.Jobs.mockResolvedValue([
       jobFixture({ message: 'halfway' }),
       jobFixture({ id: 'j2', kind: JobKind.PushJob, progress: -1 }),
@@ -80,7 +81,7 @@ describe('JobsMenu', () => {
     expect(wrapper.findAllComponents(ProgressBar)[1]!.props('mode')).toBe('indeterminate')
   })
 
-  it("FR-UX-12 an update-branch job's row names the branch, not the raw kind", async () => {
+  it("an update-branch job's row names the branch, not the raw kind", async () => {
     Facade.Jobs.mockResolvedValue([
       jobFixture({ kind: JobKind.UpdateBranchJob, branch: 'feature', progress: 40 }),
     ])
@@ -90,7 +91,7 @@ describe('JobsMenu', () => {
     expect(body.get('[data-test="job-row"]').text()).toContain('Update feature')
   })
 
-  it("FR-SYNC-07 clicking a row's abort button calls CancelJob(id)", async () => {
+  it("clicking a row's abort button calls CancelJob(id)", async () => {
     Facade.Jobs.mockResolvedValue([jobFixture()])
     const { body } = await mountMenu()
     await body.get('[data-test="jobs-menu"]').trigger('click')
@@ -100,7 +101,7 @@ describe('JobsMenu', () => {
     expect(Facade.CancelJob).toHaveBeenCalledWith('/repo', 'j1')
   })
 
-  it('FR-SYNC-07 a cancelled job:update removes its row and the badge', async () => {
+  it('a cancelled job:update removes its row and the badge', async () => {
     Facade.Jobs.mockResolvedValue([jobFixture()])
     const { wrapper, body } = await mountMenu()
 
@@ -111,7 +112,7 @@ describe('JobsMenu', () => {
     expect(body.get('[data-test="jobs-menu"]').attributes('title')).toBe('No running jobs')
   })
 
-  it('FR-UX-01 a rejected cancel renders ErrorBanner with the error, in the list', async () => {
+  it('a rejected cancel renders ErrorBanner with the error, in the list', async () => {
     Facade.Jobs.mockResolvedValue([jobFixture()])
     Facade.CancelJob.mockRejectedValueOnce(wailsError('cancel failed'))
     const { wrapper, body } = await mountMenu()
@@ -125,7 +126,7 @@ describe('JobsMenu', () => {
     expect(error.props('error')).toEqual({ message: 'cancel failed' })
   })
 
-  it("FR-SYNC-07 another window's job:update shows no job, so none can be cancelled", async () => {
+  it("another window's job:update shows no job, so none can be cancelled", async () => {
     Facade.Jobs.mockResolvedValue([])
     const { body } = await mountMenu()
 

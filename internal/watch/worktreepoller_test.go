@@ -1,3 +1,5 @@
+// Requirements: FR-REPO-04, QA-PERF-06
+
 package watch
 
 import (
@@ -20,7 +22,7 @@ import (
 // process never is.
 const nonexistentGit = "/nonexistent/nebegit-test-git"
 
-func TestFR_REPO_04_WorktreePollerObservesAWorkingFileEditDirectly(t *testing.T) {
+func TestWorktreePollerObservesAWorkingFileEditDirectly(t *testing.T) {
 	setInterval(t, &PollInterval, 30*time.Millisecond)
 
 	repo := gittest.New(t)
@@ -40,7 +42,7 @@ func TestFR_REPO_04_WorktreePollerObservesAWorkingFileEditDirectly(t *testing.T)
 
 // A second edit to a file already listed as changed leaves git status's
 // output identical; the poll still reports it, so an open diff catches up.
-func TestFR_REPO_04_WorktreePollerSeesAFurtherEditToAnAlreadyChangedFile(t *testing.T) {
+func TestWorktreePollerSeesAFurtherEditToAnAlreadyChangedFile(t *testing.T) {
 	for _, file := range []string{"seed.txt", "untracked.txt"} {
 		t.Run(file, func(t *testing.T) {
 			repo := gittest.New(t)
@@ -66,7 +68,7 @@ func TestFR_REPO_04_WorktreePollerSeesAFurtherEditToAnAlreadyChangedFile(t *test
 	}
 }
 
-func TestFR_REPO_04_WorktreePollerBacksOffAfterASlowPollThenResets(t *testing.T) {
+func TestWorktreePollerBacksOffAfterASlowPollThenResets(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var slowOnce sync.Once
 		var mu sync.Mutex
@@ -101,7 +103,7 @@ func TestFR_REPO_04_WorktreePollerBacksOffAfterASlowPollThenResets(t *testing.T)
 
 // A test's Cleanup restores PollInterval while a poller it built may still
 // be polling.
-func TestFR_REPO_04_WorktreePollerKeepsTheIntervalItWasBuiltWith(t *testing.T) {
+func TestWorktreePollerKeepsTheIntervalItWasBuiltWith(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var count atomic.Int32
 		runner := git.Runner{Git: nonexistentGit, Log: func(git.Entry) { count.Add(1) }}
@@ -119,7 +121,7 @@ func TestFR_REPO_04_WorktreePollerKeepsTheIntervalItWasBuiltWith(t *testing.T) {
 	})
 }
 
-func TestQA_PERF_06_BlurStopsPollingAfterTheTimer(t *testing.T) {
+func TestBlurStopsPollingAfterTheTimer(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var count atomic.Int32
 		runner := git.Runner{Git: nonexistentGit, Log: func(git.Entry) { count.Add(1) }}

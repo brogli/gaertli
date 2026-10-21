@@ -1,3 +1,5 @@
+// Requirements: FR-REPO-06, QA-PORT-02
+
 package remote_test
 
 import (
@@ -6,7 +8,7 @@ import (
 	"github.com/brogli/nebegit/internal/remote"
 )
 
-func TestFR_REPO_06_BuildWSLPathRoundTripsThroughClassifyWSLPath(t *testing.T) {
+func TestBuildWSLPathRoundTripsThroughClassifyWSLPath(t *testing.T) {
 	distro, linuxPath := "Ubuntu-22.04", "/home/user/project"
 
 	uncPath := remote.BuildWSLPath(distro, linuxPath)
@@ -20,7 +22,7 @@ func TestFR_REPO_06_BuildWSLPathRoundTripsThroughClassifyWSLPath(t *testing.T) {
 	}
 }
 
-func TestADR_3_ClassifyWSLPath(t *testing.T) {
+func TestClassifyWSLPath(t *testing.T) {
 	tests := []struct {
 		name       string
 		path       string

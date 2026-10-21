@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-09, FR-CP-06, FR-RV-04
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -28,13 +29,13 @@ describe('PickDialog', () => {
     AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-CP-06 does not render the "cherry picked from" checkbox for a revert', async () => {
+  it('does not render the "cherry picked from" checkbox for a revert', async () => {
     const { body } = await mountDialog('revert', ['a1'])
 
     expect(body.text()).not.toContain('cherry picked from')
   })
 
-  it("FR-CP-06 Confirm calls CherryPick with the form's own options", async () => {
+  it("Confirm calls CherryPick with the form's own options", async () => {
     const { body } = await mountDialog('cherry-pick', ['a1'])
     const checkboxes = body.findAll('input[type=checkbox]')
     await checkboxes[0]!.setValue(true) // Apply without committing
@@ -50,7 +51,7 @@ describe('PickDialog', () => {
     })
   })
 
-  it('FR-RV-04 Confirm calls Revert, ignoring recordOrigin for a revert', async () => {
+  it('Confirm calls Revert, ignoring recordOrigin for a revert', async () => {
     const { body } = await mountDialog('revert', ['a1', 'a2'])
     await body.get('input[type=checkbox]').setValue(true) // Apply without committing
 
@@ -64,7 +65,7 @@ describe('PickDialog', () => {
     })
   })
 
-  it("FR-CP-06 a rejection renders in this dialog's own ErrorBanner and keeps it open", async () => {
+  it("a rejection renders in this dialog's own ErrorBanner and keeps it open", async () => {
     Facade.CherryPick.mockRejectedValueOnce(wailsError('conflict'))
     const { wrapper, body } = await mountDialog('cherry-pick', ['a1'])
 
@@ -75,7 +76,7 @@ describe('PickDialog', () => {
     expect(wrapper.emitted('close')).toBeUndefined()
   })
 
-  it('FR-CONF-09 a stop on conflicts opens the diff window and closes the dialog', async () => {
+  it('a stop on conflicts opens the diff window and closes the dialog', async () => {
     Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
     const { wrapper, body } = await mountDialog('cherry-pick', ['a1'])
 

@@ -1,3 +1,5 @@
+// Requirements: FR-SYNC-07
+
 package services
 
 import (
@@ -13,7 +15,7 @@ import (
 	"github.com/brogli/nebegit/internal/jobs"
 )
 
-func TestFR_SYNC_07_JobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
+func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	c, wt := openWorktree(t, repo.Dir)

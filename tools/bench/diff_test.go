@@ -1,5 +1,7 @@
 //go:build bench
 
+// Requirements: QA-PERF-05
+
 package bench
 
 import (
@@ -12,7 +14,7 @@ import (
 	"github.com/brogli/nebegit/internal/services"
 )
 
-func TestQA_PERF_05_DiffFileUnder1MBUnder500ms(t *testing.T) {
+func TestDiffFileUnder1MBUnder500ms(t *testing.T) {
 	repo := gittest.New(t)
 	content := strings.Repeat("a line of committed text\n", 700*1024/25) // ~700 KB
 	gittest.Commit(t, repo.Dir, "file.txt", content, "add a ~700KB file")

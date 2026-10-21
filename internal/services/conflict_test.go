@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-02, FR-CONF-05, FR-CONF-06, FR-CONF-07
+
 package services
 
 import (
@@ -81,7 +83,7 @@ func readConflict(t *testing.T, c *Core, wt core.WorktreeID, path string) core.C
 	return got
 }
 
-func TestFR_CONF_05_ConflictTextReadsTheThreeSidesAndTheWorkingFile(t *testing.T) {
+func TestConflictTextReadsTheThreeSidesAndTheWorkingFile(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("one\nbase\n"), version("one\ncurrent\n"), version("one\nincoming\n"))
 
@@ -112,7 +114,7 @@ func TestFR_CONF_05_ConflictTextReadsTheThreeSidesAndTheWorkingFile(t *testing.T
 	assertRegions(t, got, wantRegion{"base\n", "current\n", "incoming\n"})
 }
 
-func TestFR_CONF_06_ConflictTextSendsLFForCRLF(t *testing.T) {
+func TestConflictTextSendsLFForCRLF(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("one\r\nbase\r\n"), version("one\r\ncurrent\r\n"), version("one\r\nincoming\r\nlone\rcr\r\n"))
 
@@ -126,7 +128,7 @@ func TestFR_CONF_06_ConflictTextSendsLFForCRLF(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_07_ConflictKindDeleted(t *testing.T) {
+func TestConflictKindDeleted(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name              string
@@ -152,7 +154,7 @@ func TestFR_CONF_07_ConflictKindDeleted(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_07_ConflictKindBinary(t *testing.T) {
+func TestConflictKindBinary(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.bin", version("base\x00"), version("cur\x00rent"), version("inc\x00oming"))
 
@@ -166,7 +168,7 @@ func TestFR_CONF_07_ConflictKindBinary(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_07_ConflictKindBinaryByAttribute(t *testing.T) {
+func TestConflictKindBinaryByAttribute(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	dir := repo.Dir
@@ -186,7 +188,7 @@ func TestFR_CONF_07_ConflictKindBinaryByAttribute(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_07_ConflictKindSymlink(t *testing.T) {
+func TestConflictKindSymlink(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	dir := repo.Dir
@@ -213,7 +215,7 @@ func TestFR_CONF_07_ConflictKindSymlink(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_07_ConflictKindRenameOnEachPathOfARenameRename(t *testing.T) {
+func TestConflictKindRenameOnEachPathOfARenameRename(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	dir := repo.Dir
@@ -234,7 +236,7 @@ func TestFR_CONF_07_ConflictKindRenameOnEachPathOfARenameRename(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_07_ConflictKindSubmodule(t *testing.T) {
+func TestConflictKindSubmodule(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	dir := repo.Dir
@@ -258,7 +260,7 @@ func TestFR_CONF_07_ConflictKindSubmodule(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_02_ConflictKindNotUTF8(t *testing.T) {
+func TestConflictKindNotUTF8(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("caf\xe9 base\n"), version("caf\xe9 current\n"), version("caf\xe9 incoming\n"))
 
@@ -272,7 +274,7 @@ func TestFR_CONF_02_ConflictKindNotUTF8(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_02_ConflictTextWithoutWorkingFileIsFileNotFound(t *testing.T) {
+func TestConflictTextWithoutWorkingFileIsFileNotFound(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("base\n"), version("current\n"), version("incoming\n"))
 	if err := os.Remove(filepath.Join(dir, "a.txt")); err != nil {
@@ -284,7 +286,7 @@ func TestFR_CONF_02_ConflictTextWithoutWorkingFileIsFileNotFound(t *testing.T) {
 	coretest.AssertCode(t, err, core.FileNotFound)
 }
 
-func TestFR_CONF_05_ConflictOnACleanPathIsNotConflicted(t *testing.T) {
+func TestConflictOnACleanPathIsNotConflicted(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("base\n"), version("current\n"), version("incoming\n"))
 
@@ -293,7 +295,7 @@ func TestFR_CONF_05_ConflictOnACleanPathIsNotConflicted(t *testing.T) {
 	requireGitFailedKey(t, err, "notConflicted")
 }
 
-func TestFR_CONF_05_ConflictLabelsTheSidesByOperation(t *testing.T) {
+func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 	t.Parallel()
 	one, two, three := version("one\n"), version("two\n"), version("three\n")
 	cases := []struct {
@@ -414,7 +416,7 @@ func TestFR_CONF_05_ConflictLabelsTheSidesByOperation(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_05_ConflictRefPrefersLocalBranchThenRemoteThenTagFirstByName(t *testing.T) {
+func TestConflictRefPrefersLocalBranchThenRemoteThenTagFirstByName(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version("one\n"), version("two\n"), version("three\n"))
 	gittest.Run(t, dir, "tag", "v1", "side")
@@ -430,7 +432,7 @@ func TestFR_CONF_05_ConflictRefPrefersLocalBranchThenRemoteThenTagFirstByName(t 
 	}
 }
 
-func TestFR_CONF_05_ConflictRefFallsBackToRemoteBranchThenTag(t *testing.T) {
+func TestConflictRefFallsBackToRemoteBranchThenTag(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version("one\n"), version("two\n"), version("three\n"))
 	gittest.Run(t, dir, "tag", "v1", "side")

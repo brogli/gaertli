@@ -1,3 +1,4 @@
+// Requirements: FR-DIFF-07, FR-ED-06, FR-UX-01, FR-UX-06, OSS-02
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,11 +32,11 @@ describe('App', () => {
     document.documentElement.classList.remove('nebegit-dark')
   })
 
-  it('OSS-02 renders the app name with no worktree open', () => {
+  it('renders the app name with no worktree open', () => {
     expect(mount(App).text()).toContain('nebegit')
   })
 
-  it('FR-DIFF-07 routes ?view=diff to DiffWindowView with its worktree and target, not MainView', async () => {
+  it('routes ?view=diff to DiffWindowView with its worktree and target, not MainView', async () => {
     window.history.pushState(
       {},
       '',
@@ -61,7 +62,7 @@ describe('App', () => {
     expect(wrapper.findComponent(MainView).exists()).toBe(false)
   })
 
-  it("FR-UX-01, FR-ED-06 the diff window's own notice area shows an open-editor failure from its file list", async () => {
+  it("the diff window's own notice area shows an open-editor failure from its file list", async () => {
     window.history.pushState(
       {},
       '',
@@ -77,7 +78,7 @@ describe('App', () => {
     expect(body.get('.p-toast-message').text()).toContain('myed')
   })
 
-  it('FR-UX-06 follows the OS by default, then applies a forced theme once settings change', async () => {
+  it('follows the OS by default, then applies a forced theme once settings change', async () => {
     const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
       const fake = {
         matches: query.includes('dark'),

@@ -1,3 +1,5 @@
+// Requirements: FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-LOG-04, QA-COMP-01
+
 package services
 
 import (
@@ -44,7 +46,7 @@ func movedLineFixture(t *testing.T, dir string) {
 	writeFile(t, dir, "m.txt", "A\nB\nC\nD\nA\nB\nC\n")
 }
 
-func TestQA_COMP_01_DiffWorkingHunksFollowTheConfiguredDiffAlgorithm(t *testing.T) {
+func TestDiffWorkingHunksFollowTheConfiguredDiffAlgorithm(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		algorithm string
@@ -75,7 +77,7 @@ func autocrlfFixture(t *testing.T, dir string) {
 	writeFile(t, dir, "f.txt", "l1\r\nCHANGED\r\nl3\r\n")
 }
 
-func TestQA_COMP_01_DiffWorkingShowsACRLFWorkingFileInTheCleanForm(t *testing.T) {
+func TestDiffWorkingShowsACRLFWorkingFileInTheCleanForm(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	autocrlfFixture(t, repo.Dir)
@@ -96,7 +98,7 @@ func filterFixture(t *testing.T, dir string) {
 	writeFile(t, dir, "f", "hello\nthere\n")
 }
 
-func TestQA_COMP_01_DiffWorkingShowsAFilteredWorkingFileInTheCleanForm(t *testing.T) {
+func TestDiffWorkingShowsAFilteredWorkingFileInTheCleanForm(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	filterFixture(t, repo.Dir)
@@ -106,7 +108,7 @@ func TestQA_COMP_01_DiffWorkingShowsAFilteredWorkingFileInTheCleanForm(t *testin
 	assertDiff(t, got, err, "HELLO\nWORLD\n", "HELLO\nTHERE\n", hunk(2, 1, 2, 1))
 }
 
-func TestFR_DIFF_06_DiffWorkingIgnoringWhitespaceKeepsOnlyRealChangesInTheHunks(t *testing.T) {
+func TestDiffWorkingIgnoringWhitespaceKeepsOnlyRealChangesInTheHunks(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "one\ntwo\nthree\n", "base")
@@ -119,7 +121,7 @@ func TestFR_DIFF_06_DiffWorkingIgnoringWhitespaceKeepsOnlyRealChangesInTheHunks(
 	assertDiff(t, ignoring, ignoringErr, "one\ntwo\nthree\n", "one\ntwo  \nTHREE\n", hunk(3, 1, 3, 1))
 }
 
-func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *testing.T) {
+func TestDiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *testing.T) {
 	t.Parallel()
 	none := core.DiffOptions{}
 	body := strings.Repeat("line unchanged\n", 20)
@@ -237,7 +239,7 @@ func TestQA_COMP_01_DiffCallsReturnGitsContentsAndHunksForEveryKindOfChange(t *t
 	})
 }
 
-func TestFR_DIFF_03_DiffCallsTreatFilesGitCallsBinaryAsBinary(t *testing.T) {
+func TestDiffCallsTreatFilesGitCallsBinaryAsBinary(t *testing.T) {
 	t.Parallel()
 	for _, attributes := range []string{"*.dat binary\n", "*.dat -diff\n"} {
 		t.Run(attributes, func(t *testing.T) {
@@ -265,7 +267,7 @@ func TestFR_DIFF_03_DiffCallsTreatFilesGitCallsBinaryAsBinary(t *testing.T) {
 	}
 }
 
-func TestADR_7_ParseCatFileBatchReadsAFoundOrAMissingObject(t *testing.T) {
+func TestParseCatFileBatchReadsAFoundOrAMissingObject(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		data string
@@ -281,7 +283,7 @@ func TestADR_7_ParseCatFileBatchReadsAFoundOrAMissingObject(t *testing.T) {
 	}
 }
 
-func TestADR_7_BlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
+func TestBlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
 	t.Parallel()
 	size, err := blobSize("12345")
 	if err != nil || size != 12345 {
@@ -294,7 +296,7 @@ func TestADR_7_BlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
+func TestDiffFileReturnsExactContentOnBothSides(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "first\n", "first")
@@ -312,7 +314,7 @@ func TestFR_LOG_04_DiffFileReturnsExactContentOnBothSides(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
+func TestDiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "still here\n", "add a.txt")
@@ -331,7 +333,7 @@ func TestFR_LOG_04_DiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 	}
 }
 
-func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
+func TestDiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")
@@ -348,7 +350,7 @@ func TestFR_DIFF_03_DiffFileOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T)
 	}
 }
 
-func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
+func TestDiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	big := strings.Repeat("a", maxDiffFileSize+1)
@@ -377,7 +379,7 @@ func TestFR_DIFF_04_DiffFileCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 	}
 }
 
-func TestFR_DIFF_04_DiffFileUnder1MBReturnsTheFullContent(t *testing.T) {
+func TestDiffFileUnder1MBReturnsTheFullContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	content := strings.Repeat("a line of committed text\n", 700*1024/25) // ~700KB, under maxDiffFileSize
@@ -395,7 +397,7 @@ func TestFR_DIFF_04_DiffFileUnder1MBReturnsTheFullContent(t *testing.T) {
 	}
 }
 
-func TestQA_COMP_01_ParsePatchReadsAPureRenameAsAnEntryWithoutHunks(t *testing.T) {
+func TestParsePatchReadsAPureRenameAsAnEntryWithoutHunks(t *testing.T) {
 	t.Parallel()
 	patch := "diff --git a/a.txt b/b.txt\nsimilarity index 100%\nrename from a.txt\nrename to b.txt\n"
 
@@ -406,7 +408,7 @@ func TestQA_COMP_01_ParsePatchReadsAPureRenameAsAnEntryWithoutHunks(t *testing.T
 	}
 }
 
-func TestQA_COMP_01_ParsePatchKeepsALastLineWithoutANewlineInTheSides(t *testing.T) {
+func TestParsePatchKeepsALastLineWithoutANewlineInTheSides(t *testing.T) {
 	t.Parallel()
 	patch := "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n a\n-b\n\\ No newline at end of file\n+B\n\\ No newline at end of file\n"
 

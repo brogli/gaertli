@@ -1,3 +1,4 @@
+// Requirements: QA-COMP-01
 import { describe, expect, it } from 'vitest'
 import { Text } from '@codemirror/state'
 import { Chunk } from '@codemirror/merge'
@@ -68,7 +69,7 @@ describe('hunkChanges', () => {
       'alpha\nbeta\ngamma\ndelta\nalpha\nbeta\ngamma\n',
       [hunk(3, 0, 4, 1), hunk(7, 1, 7, 0)],
     ],
-  ])("QA-COMP-01 each git hunk is one chunk on git's lines: %s", (_, a, b, hunks) => {
+  ])("each git hunk is one chunk on git's lines: %s", (_, a, b, hunks) => {
     expect(chunkLines(a, b, hunks)).toEqual(hunks.map(gitLines))
   })
 
@@ -94,13 +95,13 @@ describe('hunkChanges', () => {
       ],
     ],
   ])(
-    'QA-COMP-01 two hunks fewer than 3 characters apart are one chunk covering both: %s',
+    'two hunks fewer than 3 characters apart are one chunk covering both: %s',
     (_, a, b, hunks, want) => {
       expect(chunkLines(a, b, hunks)).toEqual([want])
     },
   )
 
-  it('QA-COMP-01 a change to the final newline also covers the empty line after the side that ends in one', () => {
+  it('a change to the final newline also covers the empty line after the side that ends in one', () => {
     expect(chunkLines('a\nb\n', 'a\nB', [hunk(2, 1, 2, 1)])).toEqual([
       [
         [2, 3],

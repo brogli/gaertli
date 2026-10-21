@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-05
 import { afterEach, describe, expect, it } from 'vitest'
 import { EditorView } from '@codemirror/view'
 import type { Pane } from '../conflictPanes'
@@ -7,7 +8,7 @@ const map = (anchors: Anchor[], from: Pane, to: Pane, line: number) =>
   mapLine(linePairs(anchors, from, to), line)
 
 describe('conflictScroll', () => {
-  it('FR-CONF-05 builds anchors from file starts, region edges and file ends', () => {
+  it('builds anchors from file starts, region edges and file ends', () => {
     const anchors = regionAnchors(
       [
         {
@@ -26,7 +27,7 @@ describe('conflictScroll', () => {
     ])
   })
 
-  it('FR-CONF-05 drops anchors that would go backwards in a pane', () => {
+  it('drops anchors that would go backwards in a pane', () => {
     const anchors = regionAnchors(
       [
         { current: { start: 5, lines: 1 }, result: { start: 5, lines: 1 } },
@@ -49,25 +50,25 @@ describe('conflictScroll', () => {
     { current: 11, result: 15, incoming: 9 },
   ]
 
-  it('FR-CONF-05 maps anchor lines exactly', () => {
+  it('maps anchor lines exactly', () => {
     expect(map(anchors, 'current', 'result', 5)).toBe(9)
     expect(map(anchors, 'incoming', 'current', 5)).toBe(7)
     expect(map(anchors, 'result', 'incoming', 1)).toBe(1)
   })
 
-  it('FR-CONF-05 maps lines between anchors linearly', () => {
+  it('maps lines between anchors linearly', () => {
     expect(map(anchors, 'current', 'result', 3)).toBe(5)
     expect(map(anchors, 'current', 'incoming', 2)).toBe(1.5)
     expect(map(anchors, 'current', 'result', 9.5)).toBe(13.5)
   })
 
-  it('FR-CONF-05 maps lines before the first and after the last anchor by offset', () => {
+  it('maps lines before the first and after the last anchor by offset', () => {
     const inner = anchors.slice(1, 3)
     expect(map(inner, 'current', 'result', 4)).toBe(8)
     expect(map(inner, 'current', 'result', 9)).toBe(13)
   })
 
-  it('FR-CONF-05 maps by the anchors that have both panes, whatever their spacing', () => {
+  it('maps by the anchors that have both panes, whatever their spacing', () => {
     const partial: Anchor[] = [
       { current: 1, result: 1 },
       { current: 4, result: 4, incoming: 2 },
@@ -101,7 +102,7 @@ describe('conflictScroll', () => {
       view.scrollDOM.dispatchEvent(new Event('scroll'))
     }
 
-    it('FR-CONF-05 scrolls the other panes to the line at the same height', () => {
+    it('scrolls the other panes to the line at the same height', () => {
       const [current, result] = [pane(), pane()]
       const anchors: Anchor[] = [
         { current: 1, result: 1 },
@@ -124,7 +125,7 @@ describe('conflictScroll', () => {
       expect(result.scrollDOM.scrollTop).toBe(lineTop(result, 1))
     })
 
-    it('FR-CONF-05 does not bounce a scroll back to the pane it came from', () => {
+    it('does not bounce a scroll back to the pane it came from', () => {
       const [current, result] = [pane(), pane()]
       const anchors: Anchor[] = [
         { current: 1, result: 1 },

@@ -1,3 +1,5 @@
+// Requirements: FR-UX-01, FR-UX-11
+
 package core_test
 
 import (
@@ -8,7 +10,7 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-func TestFR_UX_01_ErrorCrossesTheBoundaryAsOneType(t *testing.T) {
+func TestErrorCrossesTheBoundaryAsOneType(t *testing.T) {
 	in := &core.Error{Code: core.NotARepo, Message: "not a git repository", GitStderr: "fatal: x", Command: "git rev-parse"}
 
 	b, err := json.Marshal(in)
@@ -32,7 +34,7 @@ func TestFR_UX_01_ErrorCrossesTheBoundaryAsOneType(t *testing.T) {
 	}
 }
 
-func TestFR_UX_11_ErrorArgsNameTheMessagesVariableParts(t *testing.T) {
+func TestErrorArgsNameTheMessagesVariableParts(t *testing.T) {
 	e := core.ErrorfArgs(core.EditorNotFound, "editorNotOnPath", map[string]string{"command": "myed"}, "%q is not on PATH", "myed")
 
 	if want := `"myed" is not on PATH`; e.Message != want {
@@ -55,7 +57,7 @@ func TestFR_UX_11_ErrorArgsNameTheMessagesVariableParts(t *testing.T) {
 	}
 }
 
-func TestFR_UX_11_ErrorfLeavesKeyAndArgsZero(t *testing.T) {
+func TestErrorfLeavesKeyAndArgsZero(t *testing.T) {
 	e := core.Errorf(core.Internal, "boom")
 	if e.Key != "" {
 		t.Errorf("Key = %q, want empty", e.Key)
@@ -65,7 +67,7 @@ func TestFR_UX_11_ErrorfLeavesKeyAndArgsZero(t *testing.T) {
 	}
 }
 
-func TestFR_UX_11_RetagReclassifiesAnExistingError(t *testing.T) {
+func TestRetagReclassifiesAnExistingError(t *testing.T) {
 	e := &core.Error{Code: core.GitFailed, Message: "old", GitStderr: "fatal: x", Command: "git push"}
 
 	e.Retag(core.PushRejected, "pushRejected", map[string]string{"reason": "hook declined"}, "The remote refused the push (%s).", "hook declined")
@@ -87,7 +89,7 @@ func TestFR_UX_11_RetagReclassifiesAnExistingError(t *testing.T) {
 	}
 }
 
-func TestFR_UX_11_ErrorKeysHasNoEmptyKeyOrNilArgs(t *testing.T) {
+func TestErrorKeysHasNoEmptyKeyOrNilArgs(t *testing.T) {
 	for key, args := range core.ErrorKeys {
 		if key == "" {
 			t.Error("ErrorKeys has an empty key")

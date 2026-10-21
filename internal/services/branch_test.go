@@ -1,3 +1,5 @@
+// Requirements: FR-BR-01, FR-BR-02, FR-BR-03, FR-BR-04, FR-BR-05, FR-BR-06, FR-BR-08, FR-BR-09, FR-BR-10, FR-BR-14, QA-REL-02
+
 package services
 
 import (
@@ -12,7 +14,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_BR_05_RemapDirtyClassifiesByExitCodeNotText(t *testing.T) {
+func TestRemapDirtyClassifiesByExitCodeNotText(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
@@ -31,7 +33,7 @@ func TestFR_BR_05_RemapDirtyClassifiesByExitCodeNotText(t *testing.T) {
 	}
 }
 
-func TestFR_BR_06_RenameBranchRefusesBadNewNamesThenRenamesANonCurrentBranch(t *testing.T) {
+func TestRenameBranchRefusesBadNewNamesThenRenamesANonCurrentBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -73,7 +75,7 @@ func TestFR_BR_06_RenameBranchRefusesBadNewNamesThenRenamesANonCurrentBranch(t *
 
 // git renames a branch checked out elsewhere and moves that worktree's HEAD
 // along; only a branch being rebased or bisected is refused up front.
-func TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree(t *testing.T) {
+func TestRenameBranchRenamesABranchCheckedOutInAnotherWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -98,7 +100,7 @@ func TestFR_BR_10_RenameBranchRenamesABranchCheckedOutInAnotherWorktree(t *testi
 	}
 }
 
-func TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingRebasedElsewhere(t *testing.T) {
+func TestRenameAndDeleteBranchRefuseABranchBeingRebasedElsewhere(t *testing.T) {
 	t.Parallel()
 	repo, wtDir := rebaseInProgressFixture(t)
 	wtPath := gitPath(t, wtDir)
@@ -132,10 +134,10 @@ func TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingRebasedElsewhere(t *tes
 	}
 }
 
-// TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingBisected asks the
+// TestRenameAndDeleteBranchRefuseABranchBeingBisected asks the
 // bisecting worktree itself to rename (refuseBranchInUse finds a branch in
 // use in any worktree, this one included) and the main worktree to delete.
-func TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingBisected(t *testing.T) {
+func TestRenameAndDeleteBranchRefuseABranchBeingBisected(t *testing.T) {
 	t.Parallel()
 	repo, wtDir := bisectInProgressFixture(t)
 	wtPath := gitPath(t, wtDir)
@@ -172,7 +174,7 @@ func TestFR_BR_10_RenameAndDeleteBranchRefuseABranchBeingBisected(t *testing.T) 
 	}
 }
 
-func TestFR_BR_06_DeleteBranchRefusesAnUnmergedBranchUnlessForcedThenDeletesAMergedOne(t *testing.T) {
+func TestDeleteBranchRefusesAnUnmergedBranchUnlessForcedThenDeletesAMergedOne(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -204,7 +206,7 @@ func TestFR_BR_06_DeleteBranchRefusesAnUnmergedBranchUnlessForcedThenDeletesAMer
 	}
 }
 
-func TestFR_BR_10_DeleteBranchRefusesABranchCheckedOutInAnotherWorktree(t *testing.T) {
+func TestDeleteBranchRefusesABranchCheckedOutInAnotherWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -240,12 +242,12 @@ func TestFR_BR_10_DeleteBranchRefusesABranchCheckedOutInAnotherWorktree(t *testi
 	}
 }
 
-// TestFR_BR_10_DeleteBranchSucceedsOnTheBareMainReposHEADBranch covers a
+// TestDeleteBranchSucceedsOnTheBareMainReposHEADBranch covers a
 // bare main repo: its HEAD points to a branch, but a bare repo has no
 // checkout, so that branch is not "checked out" anywhere and delete must
 // not refuse it the way it would a branch actually checked out in another
 // worktree.
-func TestFR_BR_10_DeleteBranchSucceedsOnTheBareMainReposHEADBranch(t *testing.T) {
+func TestDeleteBranchSucceedsOnTheBareMainReposHEADBranch(t *testing.T) {
 	t.Parallel()
 	bareDir, linkedDir, head := bareRepoWithWorktree(t)
 
@@ -260,7 +262,7 @@ func TestFR_BR_10_DeleteBranchSucceedsOnTheBareMainReposHEADBranch(t *testing.T)
 	}
 }
 
-func TestFR_BR_01_CreateBranchWithoutCheckoutLeavesCurrentBranchAlone(t *testing.T) {
+func TestCreateBranchWithoutCheckoutLeavesCurrentBranchAlone(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -281,7 +283,7 @@ func TestFR_BR_01_CreateBranchWithoutCheckoutLeavesCurrentBranchAlone(t *testing
 	}
 }
 
-func TestFR_BR_01_CreateBranchWithCheckoutSwitchesToIt(t *testing.T) {
+func TestCreateBranchWithCheckoutSwitchesToIt(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -302,7 +304,7 @@ func TestFR_BR_01_CreateBranchWithCheckoutSwitchesToIt(t *testing.T) {
 	}
 }
 
-func TestFR_BR_01_CreateBranchRejectsADuplicateNameAsGitFailed(t *testing.T) {
+func TestCreateBranchRejectsADuplicateNameAsGitFailed(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -323,7 +325,7 @@ func TestFR_BR_01_CreateBranchRejectsADuplicateNameAsGitFailed(t *testing.T) {
 	}
 }
 
-func TestFR_BR_01_CreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T) {
+func TestCreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -342,7 +344,7 @@ func TestFR_BR_01_CreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T
 	}
 }
 
-func TestFR_BR_05_CheckoutRefusesADirtyConflictAsDirtyWorktree(t *testing.T) {
+func TestCheckoutRefusesADirtyConflictAsDirtyWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	olderSHA := conflictingCheckoutFixture(t, repo.Dir)
@@ -374,7 +376,7 @@ func TestFR_BR_05_CheckoutRefusesADirtyConflictAsDirtyWorktree(t *testing.T) {
 	}
 }
 
-func TestFR_BR_01_CreateBranchStartsAtTheFullRefNamedWhenATagAndABranchShareItsName(t *testing.T) {
+func TestCreateBranchStartsAtTheFullRefNamedWhenATagAndABranchShareItsName(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	branchSHA, tagSHA := branchAndTagNamedV1(t, repo.Dir)
@@ -399,7 +401,7 @@ func TestFR_BR_01_CreateBranchStartsAtTheFullRefNamedWhenATagAndABranchShareItsN
 	}
 }
 
-func TestFR_BR_14_CreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
+func TestCreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, remoteBranch, newName string }{
 		{"a different name", "master", "topic"},
@@ -430,7 +432,7 @@ func TestFR_BR_14_CreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
 
 // A branch started at a remote branch tracks nothing until its first push
 // gives it its own upstream.
-func TestFR_BR_14_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t *testing.T) {
+func TestABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -462,7 +464,7 @@ func TestFR_BR_14_ABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t
 	}
 }
 
-func TestFR_BR_05_CheckoutSwitchesToAnExistingLocalBranch(t *testing.T) {
+func TestCheckoutSwitchesToAnExistingLocalBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -482,7 +484,7 @@ func TestFR_BR_05_CheckoutSwitchesToAnExistingLocalBranch(t *testing.T) {
 	}
 }
 
-func TestFR_BR_05_CheckoutDWIMsARemoteTrackingBranchIntoALocalOne(t *testing.T) {
+func TestCheckoutDWIMsARemoteTrackingBranchIntoALocalOne(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -502,7 +504,7 @@ func TestFR_BR_05_CheckoutDWIMsARemoteTrackingBranchIntoALocalOne(t *testing.T) 
 	}
 }
 
-func TestFR_BR_09_CheckoutOfARemoteBranchsFullRefTracksItDespiteATagOfItsName(t *testing.T) {
+func TestCheckoutOfARemoteBranchsFullRefTracksItDespiteATagOfItsName(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -523,7 +525,7 @@ func TestFR_BR_09_CheckoutOfARemoteBranchsFullRefTracksItDespiteATagOfItsName(t 
 	}
 }
 
-func TestFR_BR_05_CheckoutNamesTheOtherWorktreeWhenABranchIsAlreadyCheckedOutThere(t *testing.T) {
+func TestCheckoutNamesTheOtherWorktreeWhenABranchIsAlreadyCheckedOutThere(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -546,7 +548,7 @@ func TestFR_BR_05_CheckoutNamesTheOtherWorktreeWhenABranchIsAlreadyCheckedOutThe
 	}
 }
 
-func TestFR_BR_08_CheckoutCommitDetachesHEADAtTheGivenSHA(t *testing.T) {
+func TestCheckoutCommitDetachesHEADAtTheGivenSHA(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -567,7 +569,7 @@ func TestFR_BR_08_CheckoutCommitDetachesHEADAtTheGivenSHA(t *testing.T) {
 	}
 }
 
-func TestFR_BR_08_CheckoutCommitSucceedsEvenWhenAlreadyDetachedInAnotherWorktree(t *testing.T) {
+func TestCheckoutCommitSucceedsEvenWhenAlreadyDetachedInAnotherWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -582,7 +584,7 @@ func TestFR_BR_08_CheckoutCommitSucceedsEvenWhenAlreadyDetachedInAnotherWorktree
 	}
 }
 
-func TestQA_REL_02_BranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
+func TestBranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t) // no commit: an unborn HEAD
 
@@ -597,7 +599,7 @@ func TestQA_REL_02_BranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
 	}
 }
 
-func TestFR_BR_02_ResetSoftMovesBranchLeavesIndexAndWorkingTreeUntouched(t *testing.T) {
+func TestResetSoftMovesBranchLeavesIndexAndWorkingTreeUntouched(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	firstSHA := resetFixture(t, repo.Dir)
@@ -621,7 +623,7 @@ func TestFR_BR_02_ResetSoftMovesBranchLeavesIndexAndWorkingTreeUntouched(t *test
 	}
 }
 
-func TestFR_BR_02_ResetMixedLeavesWorkingTreeUntracksPathsAbsentFromTarget(t *testing.T) {
+func TestResetMixedLeavesWorkingTreeUntracksPathsAbsentFromTarget(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	firstSHA := resetFixture(t, repo.Dir)
@@ -647,7 +649,7 @@ func TestFR_BR_02_ResetMixedLeavesWorkingTreeUntracksPathsAbsentFromTarget(t *te
 	}
 }
 
-func TestFR_BR_02_ResetHardMatchesTargetExactlyLeavesUntrackedFileAlone(t *testing.T) {
+func TestResetHardMatchesTargetExactlyLeavesUntrackedFileAlone(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	firstSHA := resetFixture(t, repo.Dir)
@@ -673,7 +675,7 @@ func TestFR_BR_02_ResetHardMatchesTargetExactlyLeavesUntrackedFileAlone(t *testi
 	}
 }
 
-func TestFR_BR_02_ResetWhileDetachedMovesHEADNotTheCheckedOutBranch(t *testing.T) {
+func TestResetWhileDetachedMovesHEADNotTheCheckedOutBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -701,7 +703,7 @@ func TestFR_BR_02_ResetWhileDetachedMovesHEADNotTheCheckedOutBranch(t *testing.T
 	}
 }
 
-func TestFR_BR_03_UncommittedCountCountsTrackedChangesNotUntrackedFiles(t *testing.T) {
+func TestUncommittedCountCountsTrackedChangesNotUntrackedFiles(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
@@ -731,7 +733,7 @@ func TestFR_BR_03_UncommittedCountCountsTrackedChangesNotUntrackedFiles(t *testi
 	}
 }
 
-func TestFR_BR_03_UncommittedCountIsZeroOnACleanWorkingTree(t *testing.T) {
+func TestUncommittedCountIsZeroOnACleanWorkingTree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -747,7 +749,7 @@ func TestFR_BR_03_UncommittedCountIsZeroOnACleanWorkingTree(t *testing.T) {
 	}
 }
 
-func TestFR_BR_04_ResetReturnsThePreviousHEAD(t *testing.T) {
+func TestResetReturnsThePreviousHEAD(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -771,7 +773,7 @@ func TestFR_BR_04_ResetReturnsThePreviousHEAD(t *testing.T) {
 	}
 }
 
-func TestFR_BR_02_ResetSoftAndKeepRefuseDuringAnUnresolvedConflictAndHardEndsIt(t *testing.T) {
+func TestResetSoftAndKeepRefuseDuringAnUnresolvedConflictAndHardEndsIt(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	baseSHA := mergeConflictFixture(t, repo.Dir)
@@ -806,7 +808,7 @@ func TestFR_BR_02_ResetSoftAndKeepRefuseDuringAnUnresolvedConflictAndHardEndsIt(
 	}
 }
 
-func TestFR_BR_02_ResetKeepMatchesTargetExactlyOnACleanTree(t *testing.T) {
+func TestResetKeepMatchesTargetExactlyOnACleanTree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -831,7 +833,7 @@ func TestFR_BR_02_ResetKeepMatchesTargetExactlyOnACleanTree(t *testing.T) {
 	}
 }
 
-func TestFR_BR_02_ResetKeepRefusesALocalChangeLeavingHEADIndexAndWorkingTreeUntouched(t *testing.T) {
+func TestResetKeepRefusesALocalChangeLeavingHEADIndexAndWorkingTreeUntouched(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	firstSHA := resetFixture(t, repo.Dir)
@@ -855,7 +857,7 @@ func TestFR_BR_02_ResetKeepRefusesALocalChangeLeavingHEADIndexAndWorkingTreeUnto
 	}
 }
 
-func TestFR_BR_02_ResetRefusesANonexistentSHAAsGitFailed(t *testing.T) {
+func TestResetRefusesANonexistentSHAAsGitFailed(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")

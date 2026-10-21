@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-04, FR-ED-02, FR-UX-05
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,7 +39,7 @@ describe('CompareWorkingView', () => {
     AppService.OpenDiff.mockReset()
   })
 
-  it('FR-CMP-04 a double-click on a file opens it in the diff window', async () => {
+  it('a double-click on a file opens it in the diff window', async () => {
     const { wrapper } = await mountAgainstWorking([
       { path: 'b.txt', oldPath: 'a.txt', status: 'R' },
     ])
@@ -54,7 +55,7 @@ describe('CompareWorkingView', () => {
     })
   })
 
-  it('FR-CMP-04 renders the changed files, with no swap button', async () => {
+  it('renders the changed files, with no swap button', async () => {
     const { wrapper } = await mountAgainstWorking([
       { path: 'a.txt', status: 'M' },
       { path: 'b.txt', status: 'A' },
@@ -65,7 +66,7 @@ describe('CompareWorkingView', () => {
     expect(wrapper.find('[data-test="swap"]').exists()).toBe(false)
   })
 
-  it('FR-ED-02 an open-editor event from the file list calls Facade.OpenFile', async () => {
+  it('an open-editor event from the file list calls Facade.OpenFile', async () => {
     const { wrapper } = await mountAgainstWorking([{ path: 'a.txt', status: 'M' }])
 
     await wrapper.get('[data-test="open-editor"]').trigger('click')
@@ -73,13 +74,13 @@ describe('CompareWorkingView', () => {
     expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
   })
 
-  it('FR-CMP-04 notes that new, uncommitted files are not part of this comparison', async () => {
+  it('notes that new, uncommitted files are not part of this comparison', async () => {
     const { wrapper } = await mountAgainstWorking()
 
     expect(wrapper.text()).toContain('untracked')
   })
 
-  it("FR-CMP-04 shows the commit's short hash in the from colour box, like the two-commit comparison's", async () => {
+  it("shows the commit's short hash in the from colour box, like the two-commit comparison's", async () => {
     const { wrapper } = await mountAgainstWorking()
 
     const fromTag = wrapper.get('[data-test="from-tag"]')
@@ -88,7 +89,7 @@ describe('CompareWorkingView', () => {
     expect(fromTag.classes()).toContain('from')
   })
 
-  it('FR-CMP-04 clicking exit, whose tooltip names its shortcut and not aria-label, leaves the working-tree compare', async () => {
+  it('clicking exit, whose tooltip names its shortcut and not aria-label, leaves the working-tree compare', async () => {
     const { wrapper, compare } = await mountAgainstWorking()
 
     const exit = wrapper.get('[data-test="exit"]')
@@ -99,7 +100,7 @@ describe('CompareWorkingView', () => {
     expect(compare.workingCommit).toBeNull()
   })
 
-  it('FR-UX-05 FR-CMP-04 pressing Escape leaves the working-tree compare', async () => {
+  it('pressing Escape leaves the working-tree compare', async () => {
     const { compare } = await mountAgainstWorking()
 
     pressKey('Escape')

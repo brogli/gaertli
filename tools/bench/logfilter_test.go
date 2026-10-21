@@ -1,5 +1,7 @@
 //go:build bench
 
+// Requirements: QA-PERF-04
+
 package bench
 
 import (
@@ -7,11 +9,11 @@ import (
 	"time"
 )
 
-// TestQA_PERF_04_SearchLogUnder2s checks against the 100k-commit reference
+// TestSearchLogUnder2s checks against the 100k-commit reference
 // repo that a query matching a small subset of commits ("merge feature-1",
 // plus the substring-adjacent "feature-10".."feature-19") resolves within
 // budget.
-func TestQA_PERF_04_SearchLogUnder2s(t *testing.T) {
+func TestSearchLogUnder2s(t *testing.T) {
 	c, id := openReference(t)
 	if err := c.LoadLog(t.Context(), id); err != nil {
 		t.Fatal(err)

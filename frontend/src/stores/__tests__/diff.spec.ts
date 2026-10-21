@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-04, FR-DIFF-07, FR-REPO-04
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -23,7 +24,7 @@ describe('diff store', () => {
     Facade.DiffWorking.mockReset()
   })
 
-  it('FR-CHG-04 load caches the staged and unstaged diff of the same path separately', async () => {
+  it('load caches the staged and unstaged diff of the same path separately', async () => {
     const diff = useDiffStore()
     const staged = diffFileFixture({ oldContent: 'staged old', newContent: 'staged new' })
     const unstaged = diffFileFixture({ oldContent: 'unstaged old', newContent: 'unstaged new' })
@@ -40,7 +41,7 @@ describe('diff store', () => {
     expect(Facade.DiffWorking).toHaveBeenCalledTimes(2)
   })
 
-  it("FR-DIFF-07 a diff window moved to another worktree fetches that worktree's diff of the same path", async () => {
+  it("a diff window moved to another worktree fetches that worktree's diff of the same path", async () => {
     const diff = useDiffStore()
     const here = diffFileFixture({ oldContent: 'old', newContent: 'in /repo' })
     const there = diffFileFixture({ oldContent: 'old', newContent: 'in /other' })
@@ -52,7 +53,7 @@ describe('diff store', () => {
     expect(diff.file).toEqual(there)
   })
 
-  it('FR-REPO-04 refetch re-runs the last load past the cache; unchanged content keeps the same file object', async () => {
+  it('refetch re-runs the last load past the cache; unchanged content keeps the same file object', async () => {
     const diff = useDiffStore()
     const first = diffFileFixture({ oldContent: 'old', newContent: 'new' })
     Facade.DiffWorking.mockResolvedValueOnce(first)
@@ -70,7 +71,7 @@ describe('diff store', () => {
     expect(Facade.DiffWorking).toHaveBeenLastCalledWith('/repo', 'a.txt', '', false, opts)
   })
 
-  it('FR-DIFF-07 a late answer for a file left meanwhile is not shown', async () => {
+  it('a late answer for a file left meanwhile is not shown', async () => {
     const diff = useDiffStore()
     const file = (path: string): DiffTarget => ({ ...working(false), path })
     let answerA: (f: DiffFile) => void = () => {}
@@ -90,7 +91,7 @@ describe('diff store', () => {
     expect(diff.loading).toBe(false)
   })
 
-  it('FR-REPO-04 refetch reloads the file shown, also when it came from the cache', async () => {
+  it('refetch reloads the file shown, also when it came from the cache', async () => {
     const diff = useDiffStore()
     Facade.DiffWorking.mockImplementation((_wt, path: string) =>
       Promise.resolve(diffFileFixture({ path, newContent: `${path} now` })),

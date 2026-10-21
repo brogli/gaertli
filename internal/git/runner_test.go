@@ -1,3 +1,5 @@
+// Requirements: FR-UX-01, FR-UX-02, QA-COMP-01, QA-COMP-02, QA-REL-01, QA-SAFE-02, QA-SAFE-04, QA-SEC-03
+
 package git
 
 import (
@@ -24,7 +26,7 @@ var fakegit string
 // build fakegit.
 var FakegitPath = &fakegit
 
-func TestTR_09_DefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
+func TestDefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
 	t.Setenv("NEBEGIT_TEST_MARKER", "present")
 	unsetenvForTest(t, "GIT_EDITOR")
 	env := runEnvDump(t, Call{})
@@ -39,7 +41,7 @@ func TestTR_09_DefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
 
 // A git started from a terminal must not reach it: a prompt on /dev/tty
 // fails at once instead of stopping git in a background process group.
-func TestTR_09_GitRunsInASessionOfItsOwnWithoutATerminal(t *testing.T) {
+func TestGitRunsInASessionOfItsOwnWithoutATerminal(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("reads /proc")
 	}
@@ -54,17 +56,17 @@ func TestTR_09_GitRunsInASessionOfItsOwnWithoutATerminal(t *testing.T) {
 	}
 }
 
-func TestTR_09_ReadOnlyAddsOptionalLocks(t *testing.T) {
+func TestReadOnlyAddsOptionalLocks(t *testing.T) {
 	env := runEnvDump(t, Call{ReadOnly: true})
 	assertEnv(t, env, "GIT_OPTIONAL_LOCKS", "0")
 }
 
-func TestTR_09_NoEditorAddsGitEditor(t *testing.T) {
+func TestNoEditorAddsGitEditor(t *testing.T) {
 	env := runEnvDump(t, Call{NoEditor: true})
 	assertEnv(t, env, "GIT_EDITOR", "true")
 }
 
-func TestTR_09_EnvAddsTheCallsOwnVariables(t *testing.T) {
+func TestEnvAddsTheCallsOwnVariables(t *testing.T) {
 	env := runEnvDump(t, Call{Env: []string{"GIT_SEQUENCE_EDITOR=:", "NEBEGIT_TODO=pick 1"}})
 	assertEnv(t, env, "GIT_SEQUENCE_EDITOR", ":")
 	assertEnv(t, env, "NEBEGIT_TODO", "pick 1")
@@ -115,7 +117,7 @@ func assertEnvAbsent(t *testing.T, env map[string]string, key string) {
 	}
 }
 
-func TestTR_10_ArgvPassedVerbatimNoShell(t *testing.T) {
+func TestArgvPassedVerbatimNoShell(t *testing.T) {
 	dangerous := []string{"; touch marker;", "`id`", "with spaces"}
 	dir := t.TempDir()
 	result, err := (Runner{Git: fakegit}).Run(t.Context(), Call{
@@ -135,7 +137,7 @@ func TestTR_10_ArgvPassedVerbatimNoShell(t *testing.T) {
 	}
 }
 
-func TestTR_08_ExitZeroSucceedsDespiteStderr(t *testing.T) {
+func TestExitZeroSucceedsDespiteStderr(t *testing.T) {
 	t.Setenv("FAKEGIT_STDERR", "fatal: looks bad")
 	result, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
 	if err != nil {
@@ -146,14 +148,14 @@ func TestTR_08_ExitZeroSucceedsDespiteStderr(t *testing.T) {
 	}
 }
 
-func TestTR_08_ExitNonZeroFailsDespiteBenignStdout(t *testing.T) {
+func TestExitNonZeroFailsDespiteBenignStdout(t *testing.T) {
 	t.Setenv("FAKEGIT_EXIT", "1")
 	t.Setenv("FAKEGIT_STDOUT", "all fine")
 	_, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
-func TestTR_11_CancelKillsAndReturnsQuickly(t *testing.T) {
+func TestCancelKillsAndReturnsQuickly(t *testing.T) {
 	t.Setenv("FAKEGIT_SLEEP_MS", "5000")
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(50*time.Millisecond, cancel)
@@ -168,7 +170,7 @@ func TestTR_11_CancelKillsAndReturnsQuickly(t *testing.T) {
 	}
 }
 
-func TestFR_UX_01_GitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
+func TestGitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "conflict.txt: needs merge\n")
 	t.Setenv("FAKEGIT_EXIT", "1")
 	_, err := (Runner{Git: fakegit}).Run(t.Context(), Call{Args: []string{"whatever"}})
@@ -178,7 +180,7 @@ func TestFR_UX_01_GitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
 	}
 }
 
-func TestFR_UX_01_AGitFailuresMessageIsGitsOwn(t *testing.T) {
+func TestAGitFailuresMessageIsGitsOwn(t *testing.T) {
 	cases := []struct{ name, stderr, want string }{
 		{"prefix stripped", "fatal: a branch named 'main' already exists\n", "a branch named 'main' already exists"},
 		{
@@ -212,7 +214,7 @@ func TestFR_UX_01_AGitFailuresMessageIsGitsOwn(t *testing.T) {
 	}
 }
 
-func TestFR_UX_01_GitStderrPrefersStderrOverStdoutWhenBothArePresent(t *testing.T) {
+func TestGitStderrPrefersStderrOverStdoutWhenBothArePresent(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "on stdout")
 	t.Setenv("FAKEGIT_STDERR", "on stderr")
 	t.Setenv("FAKEGIT_EXIT", "1")
@@ -223,7 +225,7 @@ func TestFR_UX_01_GitStderrPrefersStderrOverStdoutWhenBothArePresent(t *testing.
 	}
 }
 
-func TestQA_REL_01_NeverPanics(t *testing.T) {
+func TestNeverPanics(t *testing.T) {
 	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -245,7 +247,7 @@ func TestQA_REL_01_NeverPanics(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_LogsEveryCall(t *testing.T) {
+func TestLogsEveryCall(t *testing.T) {
 	var entries []Entry
 	r := Runner{Git: fakegit, Log: func(e Entry) { entries = append(entries, e) }}
 
@@ -280,7 +282,7 @@ func TestFR_UX_02_LogsEveryCall(t *testing.T) {
 	}
 }
 
-func TestQA_SAFE_02_CancelActuallyKillsProcess(t *testing.T) {
+func TestCancelActuallyKillsProcess(t *testing.T) {
 	heartbeat := sleepWithHeartbeat(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(50*time.Millisecond, cancel)
@@ -294,7 +296,7 @@ func TestQA_SAFE_02_CancelActuallyKillsProcess(t *testing.T) {
 const testGrace = 200 * time.Millisecond
 
 // git removes its lock files when interrupted, not when killed.
-func TestQA_SAFE_04_CancelInterruptsGitBeforeKillingIt(t *testing.T) {
+func TestCancelInterruptsGitBeforeKillingIt(t *testing.T) {
 	skipWithoutPOSIXSignals(t)
 	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
@@ -308,7 +310,7 @@ func TestQA_SAFE_04_CancelInterruptsGitBeforeKillingIt(t *testing.T) {
 	}
 }
 
-func TestQA_SAFE_04_AGitIgnoringTheInterruptIsKilledAfterTheGracePeriod(t *testing.T) {
+func TestAGitIgnoringTheInterruptIsKilledAfterTheGracePeriod(t *testing.T) {
 	skipWithoutPOSIXSignals(t)
 	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
@@ -326,7 +328,7 @@ func TestQA_SAFE_04_AGitIgnoringTheInterruptIsKilledAfterTheGracePeriod(t *testi
 
 // The kill after the grace period reaches git alone; a hook or transport
 // that ignores the interrupt must not outlive the cancel.
-func TestQA_SAFE_04_CancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) {
+func TestCancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
@@ -342,7 +344,7 @@ func TestQA_SAFE_04_CancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) 
 
 // A hook or transport that ends its own way on the interrupt, after its
 // output left git's pipes, gets the grace period to do so.
-func TestQA_SAFE_04_AChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
+func TestAChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
@@ -357,7 +359,7 @@ func TestQA_SAFE_04_AChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
 
 // git that ended before the cancel was never interrupted, so nothing of
 // its group is killed either, though a child still held its output.
-func TestQA_SAFE_04_NothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
+func TestNothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 

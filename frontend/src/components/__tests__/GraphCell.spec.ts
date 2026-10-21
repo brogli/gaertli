@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-02
 import { mount, type DOMWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import GraphCell from '../GraphCell.vue'
@@ -37,13 +38,13 @@ describe('GraphCell', () => {
     ],
   }
 
-  it('FR-LOG-02 a passing lane is a vertical line from the top of the row to its bottom', () => {
+  it('a passing lane is a vertical line from the top of the row to its bottom', () => {
     const through = mountCell(merge).get(`path.through.${laneColourClass(3)}`)
 
     expect(ends(through)).toEqual({ from: [laneX(3), 0], to: [laneX(3), HEIGHT] })
   })
 
-  it('FR-LOG-02 a fork curves from the top of its lane into the dot; a merge curves from the dot to the bottom of its lane', () => {
+  it('a fork curves from the top of its lane into the dot; a merge curves from the dot to the bottom of its lane', () => {
     const wrapper = mountCell(merge)
     const dot = wrapper.get('circle')
     const dotAt = [Number(dot.attributes('cx')), Number(dot.attributes('cy'))]
@@ -57,7 +58,7 @@ describe('GraphCell', () => {
     expect(merged.attributes('d')).toContain('C')
   })
 
-  it('FR-LOG-02 the dot and every line take their own lane colour, the palette repeating', () => {
+  it('the dot and every line take their own lane colour, the palette repeating', () => {
     const wrapper = mountCell({
       lane: 0,
       colour: LANE_PALETTE_SIZE,
@@ -74,7 +75,7 @@ describe('GraphCell', () => {
     ])
   })
 
-  it('FR-LOG-02 the strip is as wide as the lanes it is given, not the lanes its row uses', () => {
+  it('the strip is as wide as the lanes it is given, not the lanes its row uses', () => {
     const wrapper = mountCell(
       { lane: 1, colour: 1, edges: [{ lane: 0, kind: EdgeKind.ThroughEdge, colour: 0 }] },
       5,
@@ -83,7 +84,7 @@ describe('GraphCell', () => {
     expect(wrapper.get('svg').attributes('width')).toBe(String(5 * LANE_WIDTH))
   })
 
-  it('FR-LOG-02 the "+k" overflow marker sits right of the highest lane, inside the strip', () => {
+  it('the "+k" overflow marker sits right of the highest lane, inside the strip', () => {
     const wrapper = mountCell(
       {
         lane: 1,

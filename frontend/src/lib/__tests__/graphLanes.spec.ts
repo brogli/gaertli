@@ -1,9 +1,10 @@
+// Requirements: FR-LOG-01
 import { describe, expect, it } from 'vitest'
 import { laneSpan } from '../graphLanes'
 import { EdgeKind } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 
 describe('laneSpan', () => {
-  it('FR-LOG-01 reaches the highest lane a row draws in, its dot or a line', () => {
+  it('reaches the highest lane a row draws in, its dot or a line', () => {
     expect(laneSpan({ lane: 0, colour: 0, edges: null })).toBe(1)
     expect(
       laneSpan({ lane: 1, colour: 0, edges: [{ lane: 0, kind: EdgeKind.InEdge, colour: 0 }] }),
@@ -13,7 +14,7 @@ describe('laneSpan', () => {
     ).toBe(3)
   })
 
-  it('FR-LOG-01 keeps two more lanes for a "+k" overflow marker', () => {
+  it('keeps two more lanes for a "+k" overflow marker', () => {
     expect(laneSpan({ lane: 1, colour: 0, edges: [], overflow: 4 })).toBe(4)
   })
 })

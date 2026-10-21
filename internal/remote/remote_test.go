@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-11, QA-PORT-02
+
 package remote_test
 
 import (
@@ -94,7 +96,7 @@ func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {
 	}, sink)
 }
 
-func TestADR_3_ClosingAClientDoesNotWaitForTheCoresOutputToEnd(t *testing.T) {
+func TestClosingAClientDoesNotWaitForTheCoresOutputToEnd(t *testing.T) {
 	r, w := io.Pipe()
 	t.Cleanup(func() { _ = w.Close() })
 	client := remote.NewClient(r, io.Discard, nil)
@@ -109,7 +111,7 @@ func TestADR_3_ClosingAClientDoesNotWaitForTheCoresOutputToEnd(t *testing.T) {
 	}
 }
 
-func TestADR_3_VersionCallCrossesThePipe(t *testing.T) {
+func TestVersionCallCrossesThePipe(t *testing.T) {
 	want := core.Version{App: "1.2.3", Protocol: 7}
 	c := pipeClient(t, &fake{version: func() (core.Version, error) { return want, nil }}, nil)
 
@@ -122,7 +124,7 @@ func TestADR_3_VersionCallCrossesThePipe(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_11_MergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
+func TestMergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
 	c := pipeClient(t, &fake{}, nil)
 	want := &core.MergeDraft{
 		Text: "a\nb\n", Fingerprint: "fp",
@@ -141,7 +143,7 @@ func TestFR_CONF_11_MergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
 	}
 }
 
-func TestADR_3_CoreErrorCrossesThePipeWithAllFields(t *testing.T) {
+func TestCoreErrorCrossesThePipeWithAllFields(t *testing.T) {
 	want := &core.Error{Code: core.NotARepo, Message: "no repo", Key: "notARepo", Args: map[string]string{"path": "x"}, GitStderr: "x", Command: "git rev-parse"}
 	c := pipeClient(t, &fake{version: func() (core.Version, error) { return core.Version{}, want }}, nil)
 
@@ -155,7 +157,7 @@ func TestADR_3_CoreErrorCrossesThePipeWithAllFields(t *testing.T) {
 	}
 }
 
-func TestADR_3_PanicInCoreBecomesInternalErrorAndServerSurvives(t *testing.T) {
+func TestPanicInCoreBecomesInternalErrorAndServerSurvives(t *testing.T) {
 	calls := 0
 	c := pipeClient(t, &fake{version: func() (core.Version, error) {
 		calls++
@@ -175,7 +177,7 @@ func TestADR_3_PanicInCoreBecomesInternalErrorAndServerSurvives(t *testing.T) {
 	}
 }
 
-func TestADR_3_EventsReachTheClientSink(t *testing.T) {
+func TestEventsReachTheClientSink(t *testing.T) {
 	got := make(chan core.Event, 1)
 	f := &fake{version: func() (core.Version, error) { return core.Version{}, nil }}
 	c := pipeClient(t, f, func(e core.Event) { got <- e })

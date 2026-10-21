@@ -1,3 +1,5 @@
+// Requirements: FR-LOG-03
+
 package services
 
 import (
@@ -8,7 +10,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
+func TestCommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "x", "base")
@@ -44,7 +46,7 @@ func TestFR_LOG_03_CommitDetailsReportsBodyParentsAndRename(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T) {
+func TestCommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "shared.txt", "base", "base")
@@ -70,7 +72,7 @@ func TestFR_LOG_03_CommitDetailsOnMergeDiffsAgainstFirstParentOnly(t *testing.T)
 	}
 }
 
-func TestFR_LOG_03_ParseCommitDetailsFieldsEmailsAndDates(t *testing.T) {
+func TestParseCommitDetailsFieldsEmailsAndDates(t *testing.T) {
 	t.Parallel()
 	header := strings.Join([]string{
 		"aaaa", "bbbb cccc", "Alice", "alice@example.com", "1700000000",

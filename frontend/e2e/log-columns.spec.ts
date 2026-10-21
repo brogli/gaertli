@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-05, FR-LOG-01, FR-LOG-02, FR-UX-09
 import { test, expect, type Page } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
@@ -26,7 +27,7 @@ async function expectColumnsLineUp(page: Page, parts: string[] = PARTS): Promise
   lefts.forEach((xs, i) => expect(new Set(xs), parts[i]).toHaveProperty('size', 1))
 }
 
-test('FR-UX-09 at 420 px the author column hides instead of shrinking to a sliver; the rest still line up', async ({
+test('at 420 px the author column hides instead of shrinking to a sliver; the rest still line up', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 420, height: 800 })
@@ -37,7 +38,7 @@ test('FR-UX-09 at 420 px the author column hides instead of shrinking to a slive
   await expectColumnsLineUp(page, ['.message', '.subject', '.date', '.hash'])
 })
 
-test('FR-LOG-01 FR-CMP-05 the columns line up at 1200 px, a selected or compared row included, and compared rows keep their content where it is', async ({
+test('the columns line up at 1200 px, a selected or compared row included, and compared rows keep their content where it is', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
@@ -60,7 +61,7 @@ test('FR-LOG-01 FR-CMP-05 the columns line up at 1200 px, a selected or compared
   await expectColumnsLineUp(page)
 })
 
-test('FR-LOG-02 the graph draws its branch lines in more than one colour, none in the text colour', async ({
+test('the graph draws its branch lines in more than one colour, none in the text colour', async ({
   page,
 }) => {
   await openMockRepo(page)

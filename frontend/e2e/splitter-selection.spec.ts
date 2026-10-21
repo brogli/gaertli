@@ -1,3 +1,4 @@
+// Requirements: FR-UX-20
 import { test, expect, type Page } from '@playwright/test'
 import { mockDiffUrl } from './helpers'
 
@@ -14,7 +15,7 @@ function selectionText(page: Page): Promise<string> {
   return page.evaluate(() => window.getSelection()?.toString() ?? '')
 }
 
-test('FR-UX-20 dragging the file-list/diff divider over the toolbar keeps a selection made before', async ({
+test('dragging the file-list/diff divider over the toolbar keeps a selection made before', async ({
   page,
 }) => {
   await page.goto(mockDiffUrl)

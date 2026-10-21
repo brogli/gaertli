@@ -1,3 +1,5 @@
+// Requirements: FR-CHG-05, FR-CHG-06, FR-CHG-07, FR-CHG-08
+
 package services
 
 import (
@@ -20,7 +22,7 @@ func writeHook(t *testing.T, dir, name, script string) {
 	}
 }
 
-func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByteAndRunsTheHook(t *testing.T) {
+func TestCommitCommitsStagedChangesWithAMultilineMessageByteForByteAndRunsTheHook(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	writeFile(t, repo.Dir, "a.txt", "content\n")
@@ -45,7 +47,7 @@ func TestFR_CHG_05_CommitCommitsStagedChangesWithAMultilineMessageByteForByteAnd
 	}
 }
 
-func TestFR_CHG_05_CommitFailsWhenNothingIsStagedOrTheMessageIsWhitespaceOnly(t *testing.T) {
+func TestCommitFailsWhenNothingIsStagedOrTheMessageIsWhitespaceOnly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "content\n", "add a.txt")
@@ -63,7 +65,7 @@ func TestFR_CHG_05_CommitFailsWhenNothingIsStagedOrTheMessageIsWhitespaceOnly(t 
 	}
 }
 
-func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceAlsoWithNothingStagedRewordingOnly(t *testing.T) {
+func TestCommitAmendRewritesHeadInPlaceAlsoWithNothingStagedRewordingOnly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "first message")
@@ -98,7 +100,7 @@ func TestFR_CHG_06_CommitAmendRewritesHeadInPlaceAlsoWithNothingStagedRewordingO
 	}
 }
 
-func TestFR_CHG_06_CommitAmendOnAnUnbornHeadFailsCleanly(t *testing.T) {
+func TestCommitAmendOnAnUnbornHeadFailsCleanly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 
@@ -108,7 +110,7 @@ func TestFR_CHG_06_CommitAmendOnAnUnbornHeadFailsCleanly(t *testing.T) {
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
-func TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr(t *testing.T) {
+func TestAFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
@@ -129,7 +131,7 @@ func TestFR_CHG_07_AFailingPreCommitHooksOwnOutputOnEitherStreamReachesGitStderr
 	}
 }
 
-func TestFR_CHG_08_ASuccessfulCommitClearsTheDraft(t *testing.T) {
+func TestASuccessfulCommitClearsTheDraft(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
@@ -153,7 +155,7 @@ func TestFR_CHG_08_ASuccessfulCommitClearsTheDraft(t *testing.T) {
 	}
 }
 
-func TestFR_CHG_08_AFailedCommitLeavesTheDraftUntouched(t *testing.T) {
+func TestAFailedCommitLeavesTheDraftUntouched(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")

@@ -1,3 +1,4 @@
+// Requirements: FR-UX-01, FR-UX-15
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick } from 'vue'
@@ -35,7 +36,7 @@ const failure = errorNotice({
 })
 
 describe('NoticeArea', () => {
-  it('FR-UX-01 an error notice shows top right in the standard error look, its headline as summary', async () => {
+  it('an error notice shows top right in the standard error look, its headline as summary', async () => {
     const body = await showNotice(failure)
 
     expect(body.find('.p-toast').classes()).toContain('p-toast-top-right')
@@ -45,7 +46,7 @@ describe('NoticeArea', () => {
     expect(message.get('.p-toast-summary').text()).toBe('fatal: could not read from remote')
   })
 
-  it("FR-UX-01 an error notice shows git's command and stderr inside the message behind Show details", async () => {
+  it("an error notice shows git's command and stderr inside the message behind Show details", async () => {
     const body = await showNotice(failure)
     const message = body.find('.p-toast-message')
     expect(message.find('pre').exists()).toBe(false)
@@ -55,7 +56,7 @@ describe('NoticeArea', () => {
     expect(message.get('pre').text()).toContain('git fetch origin')
   })
 
-  it('FR-UX-01 a success notice with a hash shows in the success look; its Copy button copies the hash', async () => {
+  it('a success notice with a hash shows in the success look; its Copy button copies the hash', async () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const body = await showNotice({
@@ -71,7 +72,7 @@ describe('NoticeArea', () => {
     expect(writeText).toHaveBeenCalledWith('deadbeef')
   })
 
-  it("FR-UX-15 the Toast's own close button closes the notice", async () => {
+  it("the Toast's own close button closes the notice", async () => {
     const body = await showNotice(failure)
 
     await body.get('.p-toast-close-button').trigger('click')
@@ -118,7 +119,7 @@ describe('NoticeArea', () => {
         },
         true,
       ],
-    ])('FR-UX-15 %s after 5 s', async (_, message, stillShown) => {
+    ])('%s after 5 s', async (_, message, stillShown) => {
       const body = await showThenFakeTimers(message)
 
       await vi.advanceTimersByTimeAsync(5000)

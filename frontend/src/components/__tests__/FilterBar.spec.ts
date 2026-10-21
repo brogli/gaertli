@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-05, FR-LOG-06, FR-LOG-08
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
@@ -68,7 +69,7 @@ describe('FilterBar', () => {
     mockRefsStore.refs = { branches: [], remotes: [], tags: [] }
   })
 
-  it('FR-LOG-05 shows "n of m", steps with Enter/Shift+Enter, and Escape clears the query', async () => {
+  it('shows "n of m", steps with Enter/Shift+Enter, and Escape clears the query', async () => {
     mockLogStore.matches = [3, 9, 20]
     const wrapper = mount(FilterBar)
     const input = wrapper.find('input[placeholder="Search message"]')
@@ -93,7 +94,7 @@ describe('FilterBar', () => {
     expect(wrapper.find('[data-test="match-label"]').exists()).toBe(false)
   })
 
-  it('FR-LOG-06 the options list local branches, remote branches and tags in groups, by short name, standing for full ref names', () => {
+  it('the options list local branches, remote branches and tags in groups, by short name, standing for full ref names', () => {
     mockRefsStore.refs = {
       branches: [{ name: 'main' }, { name: 'v1' }],
       remotes: [{ name: 'origin', branches: [{ name: 'main' }] }],
@@ -117,7 +118,7 @@ describe('FilterBar', () => {
     ])
   })
 
-  it('FR-LOG-06 picking a tag applies it by its full ref name, keeping the other fields', async () => {
+  it('picking a tag applies it by its full ref name, keeping the other fields', async () => {
     mockLogStore.filter = { path: 'src/' }
     const wrapper = mount(FilterBar)
 
@@ -127,7 +128,7 @@ describe('FilterBar', () => {
     expect(mockApplyFilter).toHaveBeenCalledWith({ path: 'src/', branches: ['refs/tags/v1'] })
   })
 
-  it('FR-LOG-06 a branch or tag filter set elsewhere shows in the field', async () => {
+  it('a branch or tag filter set elsewhere shows in the field', async () => {
     const wrapper = mount(FilterBar)
 
     mockLogStore.filter = { branches: ['refs/tags/v1'] }
@@ -136,7 +137,7 @@ describe('FilterBar', () => {
     expect(wrapper.findComponent(MultiSelect).props('modelValue')).toEqual(['refs/tags/v1'])
   })
 
-  it('FR-LOG-06 selecting branches in the MultiSelect applies immediately', async () => {
+  it('selecting branches in the MultiSelect applies immediately', async () => {
     const wrapper = mount(FilterBar)
 
     wrapper
@@ -150,7 +151,7 @@ describe('FilterBar', () => {
     )
   })
 
-  it("FR-LOG-05 clicking the message field's clear icon clears the query, not the branches/author/path filter", async () => {
+  it("clicking the message field's clear icon clears the query, not the branches/author/path filter", async () => {
     mockLogStore.query = 'fix'
     const wrapper = mount(FilterBar)
 
@@ -160,7 +161,7 @@ describe('FilterBar', () => {
     expect(mockApplyFilter).not.toHaveBeenCalled()
   })
 
-  it('FR-LOG-08 clearing the path keeps the other active filters', async () => {
+  it('clearing the path keeps the other active filters', async () => {
     mockLogStore.filter = { path: 'src/', branches: ['refs/heads/main'] }
     const wrapper = mount(FilterBar)
 
@@ -169,14 +170,14 @@ describe('FilterBar', () => {
     expect(mockApplyFilter).toHaveBeenCalledWith({ branches: ['refs/heads/main'] })
   })
 
-  it('FR-LOG-08 an empty message field shows no clear icon', () => {
+  it('an empty message field shows no clear icon', () => {
     const wrapper = mount(FilterBar)
 
     expect(wrapper.find('[data-test="clear-query"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="clear-path"]').exists()).toBe(false)
   })
 
-  it('FR-LOG-08 shows no chip list and no clear-filters button', () => {
+  it('shows no chip list and no clear-filters button', () => {
     mockLogStore.filter = { path: 'y' }
     mockLogStore.query = 'x'
     mockLogStore.filterActive = true
@@ -186,7 +187,7 @@ describe('FilterBar', () => {
     expect(wrapper.find('[data-test="clear-filters"]').exists()).toBe(false)
   })
 
-  it('FR-LOG-08 clearing the author AutoComplete applies without the author', async () => {
+  it('clearing the author AutoComplete applies without the author', async () => {
     mockLogStore.filter = { author: 'ann' }
     const wrapper = mount(FilterBar)
 

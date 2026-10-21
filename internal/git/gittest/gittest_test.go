@@ -1,3 +1,5 @@
+// Requirements: QA-COMP-01, QA-MNT-03, QA-SAFE-03, QA-SEC-03
+
 package gittest
 
 import (
@@ -11,7 +13,7 @@ import (
 	"github.com/brogli/nebegit/internal/git"
 )
 
-func TestTR_14_NewInitializesIsolatedRepo(t *testing.T) {
+func TestNewInitializesIsolatedRepo(t *testing.T) {
 	repo := New(t)
 
 	if _, err := os.Stat(filepath.Join(repo.Dir, ".git")); err != nil {
@@ -23,7 +25,7 @@ func TestTR_14_NewInitializesIsolatedRepo(t *testing.T) {
 	}
 }
 
-func TestQA_SEC_03_OddFilenameSurvivesAddAndCommit(t *testing.T) {
+func TestOddFilenameSurvivesAddAndCommit(t *testing.T) {
 	repo := New(t)
 	const name = "$(touch pwn).txt"
 	marker := filepath.Join(repo.Dir, "pwn") // where a shell running in the repo would create it
@@ -36,7 +38,7 @@ func TestQA_SEC_03_OddFilenameSurvivesAddAndCommit(t *testing.T) {
 	assertAbsent(t, marker)
 }
 
-func TestQA_SEC_03_EndOfOptionsBlocksRevisionInjection(t *testing.T) {
+func TestEndOfOptionsBlocksRevisionInjection(t *testing.T) {
 	repo := New(t)
 	marker := filepath.Join(repo.Dir, "pwn") // where a shell running in the repo would create it
 
@@ -49,7 +51,7 @@ func TestQA_SEC_03_EndOfOptionsBlocksRevisionInjection(t *testing.T) {
 	assertAbsent(t, marker)
 }
 
-func TestQA_COMP_01_HooksRunUnmodified(t *testing.T) {
+func TestHooksRunUnmodified(t *testing.T) {
 	repo := New(t)
 	marker := filepath.Join(repo.Dir, "hook-ran")
 	hook := "#!/bin/sh\ntouch hook-ran\n"
@@ -65,7 +67,7 @@ func TestQA_COMP_01_HooksRunUnmodified(t *testing.T) {
 	}
 }
 
-func TestQA_SAFE_03_ConfigFilesUntouchedByCalls(t *testing.T) {
+func TestConfigFilesUntouchedByCalls(t *testing.T) {
 	repo := New(t)
 	localConfig := filepath.Join(repo.Dir, ".git", "config")
 	globalConfig := os.Getenv("GIT_CONFIG_GLOBAL")

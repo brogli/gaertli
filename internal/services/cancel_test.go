@@ -1,3 +1,5 @@
+// Requirements: FR-SYNC-07
+
 package services
 
 import (
@@ -14,7 +16,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_SYNC_07_ACancelledFetchLeavesNoLockAndTheNextFetchWorks(t *testing.T) {
+func TestACancelledFetchLeavesNoLockAndTheNextFetchWorks(t *testing.T) {
 	t.Parallel()
 	repo, origin := cancelFixture(t)
 	tip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
@@ -31,7 +33,7 @@ func TestFR_SYNC_07_ACancelledFetchLeavesNoLockAndTheNextFetchWorks(t *testing.T
 	}
 }
 
-func TestFR_SYNC_07_ACancelledPullLeavesNoLockAndTheNextPullWorks(t *testing.T) {
+func TestACancelledPullLeavesNoLockAndTheNextPullWorks(t *testing.T) {
 	t.Parallel()
 	repo, origin := cancelFixture(t)
 	tip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
@@ -48,7 +50,7 @@ func TestFR_SYNC_07_ACancelledPullLeavesNoLockAndTheNextPullWorks(t *testing.T) 
 	}
 }
 
-func TestFR_SYNC_07_ACancelledPushLeavesNoLockAndTheNextPushWorks(t *testing.T) {
+func TestACancelledPushLeavesNoLockAndTheNextPushWorks(t *testing.T) {
 	t.Parallel()
 	repo, origin := cancelFixture(t)
 	gittest.Commit(t, repo.Dir, "local.txt", "l", "local commit")

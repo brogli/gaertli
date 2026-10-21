@@ -1,3 +1,4 @@
+// Requirements: FR-SYNC-12
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +24,7 @@ describe('usePush', () => {
     Facade.PushTarget.mockReset()
   })
 
-  it('FR-SYNC-12 no upstream, PushTarget auto with a remote: pushes the named branch there without asking', async () => {
+  it('no upstream, PushTarget auto with a remote: pushes the named branch there without asking', async () => {
     setBranch({ upstream: '' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
@@ -40,7 +41,7 @@ describe('usePush', () => {
     expect(upstreamQuestion.value).toBeNull()
   })
 
-  it('FR-SYNC-12 no upstream, PushTarget not auto, then auto without a remote: asks both times naming PushTarget’s branch, never pushes', async () => {
+  it('no upstream, PushTarget not auto, then auto without a remote: asks both times naming PushTarget’s branch, never pushes', async () => {
     setBranch({ name: 'feature', upstream: '' })
     Facade.PushTarget.mockResolvedValueOnce({
       remote: 'origin',
@@ -67,7 +68,7 @@ describe('usePush', () => {
     expect(Facade.Push).not.toHaveBeenCalled()
   })
 
-  it('FR-SYNC-12 a store without an upstream but PushTarget.hasUpstream true (a config-only change the store has not reloaded): pushes plainly', async () => {
+  it('a store without an upstream but PushTarget.hasUpstream true (a config-only change the store has not reloaded): pushes plainly', async () => {
     setBranch({ upstream: '' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
@@ -84,7 +85,7 @@ describe('usePush', () => {
     expect(upstreamQuestion.value).toBeNull()
   })
 
-  it('FR-SYNC-12 a branch with an upstream still calls PushTarget: it alone decides', async () => {
+  it('a branch with an upstream still calls PushTarget: it alone decides', async () => {
     setBranch({ upstream: 'origin/main' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',

@@ -1,3 +1,5 @@
+// Requirements: QA-MNT-03
+
 package gittest
 
 import (
@@ -6,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestTR_14_CopyIsAnIndependentRepoWithTheSameState(t *testing.T) {
+func TestCopyIsAnIndependentRepoWithTheSameState(t *testing.T) {
 	original := New(t)
 	shas := History(t, original.Dir, Step{Message: "base", Files: map[string]string{"a.txt": "a\n"}})
 	if err := os.WriteFile(filepath.Join(original.Dir, "a.txt"), []byte("edited\n"), 0o644); err != nil {
@@ -27,7 +29,7 @@ func TestTR_14_CopyIsAnIndependentRepoWithTheSameState(t *testing.T) {
 	}
 }
 
-func TestTR_14_HistoryWritesBranchesAndMergeInOneRun(t *testing.T) {
+func TestHistoryWritesBranchesAndMergeInOneRun(t *testing.T) {
 	repo := New(t)
 
 	shas := History(t, repo.Dir,

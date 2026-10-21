@@ -1,3 +1,5 @@
+// Requirements: FR-DIFF-07, FR-REPO-02, FR-REPO-07, FR-REPO-08, FR-UX-02, FR-WT-05, FR-WT-08, FR-WT-09, FR-WT-16, QA-PORT-02
+
 package app
 
 import (
@@ -25,7 +27,7 @@ func (p *fakePicker) Pick(dir string) (string, bool) {
 	return p.path, p.ok
 }
 
-func TestFR_WT_16_PickAndOpenDoesNothingOnCancel(t *testing.T) {
+func TestPickAndOpenDoesNothingOnCancel(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	s := &AppService{shell: shell{reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{}}
@@ -40,7 +42,7 @@ func TestFR_WT_16_PickAndOpenDoesNothingOnCancel(t *testing.T) {
 
 // A window showing repo A picks repo B: that window switches to B, no new
 // window opens.
-func TestFR_WT_16_PickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.T) {
+func TestPickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	api := fakeAPI{openWorktree: openAsIs}
@@ -60,7 +62,7 @@ func TestFR_WT_16_PickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.
 
 // Window 1 shows A, window 2 shows B; window 1 picks B: window 2 is brought
 // forward, window 1 stays on A.
-func TestFR_WT_16_PickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *testing.T) {
+func TestPickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	reg.OpenOrFocus("/b", "/b", "")
@@ -83,7 +85,7 @@ func TestFR_WT_16_PickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *
 	}
 }
 
-func TestFR_WT_08_OpenPathOpensALocalPath(t *testing.T) {
+func TestOpenPathOpensALocalPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	api := fakeAPI{openWorktree: openAsIs}
 	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
@@ -94,7 +96,7 @@ func TestFR_WT_08_OpenPathOpensALocalPath(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_02_RecentReposListsStoredEntries(t *testing.T) {
+func TestRecentReposListsStoredEntries(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) { s.AddRecent(settings.RecentRepo{Path: "/a"}, time.Now()) }); err != nil {
 		t.Fatal(err)
@@ -107,7 +109,7 @@ func TestFR_REPO_02_RecentReposListsStoredEntries(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_08_RemoveRecentRepoDropsItLeavingOpenWorktreesUnchanged(t *testing.T) {
+func TestRemoveRecentRepoDropsItLeavingOpenWorktreesUnchanged(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) {
 		s.RecentRepos = []settings.RecentRepo{{Path: "/a"}, {Path: "/b"}}
@@ -132,7 +134,7 @@ func TestFR_REPO_08_RemoveRecentRepoDropsItLeavingOpenWorktreesUnchanged(t *test
 
 // The one folder dialog reaches a distro through its network share; the
 // picked path alone decides the core.
-func TestFR_REPO_07_OpenFolderOpensAFolderInsideADistroOnItsCore(t *testing.T) {
+func TestOpenFolderOpensAFolderInsideADistroOnItsCore(t *testing.T) {
 	for _, picked := range []string{`\\wsl.localhost\Ubuntu\home\u\r`, `\\wsl$\Ubuntu\home\u\r`} {
 		t.Run(picked, func(t *testing.T) {
 			reg, opener := newTestRegistry()
@@ -163,7 +165,7 @@ func TestFR_REPO_07_OpenFolderOpensAFolderInsideADistroOnItsCore(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_07_OpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
+func TestOpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.SetLocal(fakeAPI{openWorktree: openAsIs})
 	reg.OpenOrFocus("", "", "")
@@ -191,7 +193,7 @@ func TestFR_REPO_07_OpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
 
 // NewWindow always opens another window with no selection, unlike
 // OpenOrFocus("", ...), which would focus one already open.
-func TestFR_WT_16_NewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
+func TestNewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("", "", "")
 	s := &AppService{shell: shell{reg: reg}}
@@ -208,7 +210,7 @@ func TestFR_WT_16_NewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
 
 // NewWindow leaves settings' remembered open worktrees unchanged: an
 // empty-selection window is not one of them.
-func TestFR_WT_16_NewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
+func TestNewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/a"} }); err != nil {
@@ -223,7 +225,7 @@ func TestFR_WT_16_NewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_07_OpenPathOpensTheGivenPath(t *testing.T) {
+func TestOpenPathOpensTheGivenPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	api := fakeAPI{openWorktree: openAsIs}
 	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
@@ -239,7 +241,7 @@ func callFrom(id uint) context.Context {
 	return context.WithValue(context.Background(), application.WindowKey, &fakeCallingWindow{id: id})
 }
 
-func TestFR_DIFF_07_OpenDiffOpensADiffWindowOnTheTarget(t *testing.T) {
+func TestOpenDiffOpensADiffWindowOnTheTarget(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/x/project", "/x/project", "")
 	s := &AppService{shell: shell{reg: reg}}
@@ -259,7 +261,7 @@ func TestFR_DIFF_07_OpenDiffOpensADiffWindowOnTheTarget(t *testing.T) {
 	}
 }
 
-func TestFR_DIFF_07_OpenDiffFromTheSameMainWindowRetargetsItsDiffWindow(t *testing.T) {
+func TestOpenDiffFromTheSameMainWindowRetargetsItsDiffWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/x/project", "/x/project", "")
 	s := &AppService{shell: shell{reg: reg}}
@@ -293,7 +295,7 @@ func TestFR_DIFF_07_OpenDiffFromTheSameMainWindowRetargetsItsDiffWindow(t *testi
 	}
 }
 
-func TestFR_DIFF_07_EachMainWindowHasItsOwnDiffWindow(t *testing.T) {
+func TestEachMainWindowHasItsOwnDiffWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	reg.OpenOrFocus("/b", "/b", "")
@@ -316,7 +318,7 @@ func TestFR_DIFF_07_EachMainWindowHasItsOwnDiffWindow(t *testing.T) {
 }
 
 // A call from outside any window, such as the second-instance hand-over, carries no window.
-func TestFR_DIFF_07_WithNoCallingWindowTheDiffWindowIsKeyedByItsWorktree(t *testing.T) {
+func TestWithNoCallingWindowTheDiffWindowIsKeyedByItsWorktree(t *testing.T) {
 	reg, opener := newTestRegistry()
 	s := &AppService{shell: shell{reg: reg}}
 	target := DiffTarget{Kind: WorkingDiff, Path: "f"}
@@ -334,7 +336,7 @@ func TestFR_DIFF_07_WithNoCallingWindowTheDiffWindowIsKeyedByItsWorktree(t *test
 }
 
 // The window comes from ctx; a windowless/background call is a no-op.
-func TestFR_WT_09_UpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
+func TestUpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
 	fw := &fakeCallingWindow{}
 	ctx := context.WithValue(t.Context(), application.WindowKey, fw)
 	s := &AppService{}
@@ -350,7 +352,7 @@ func TestFR_WT_09_UpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_LogPathReportsTheAppLogsLocation(t *testing.T) {
+func TestLogPathReportsTheAppLogsLocation(t *testing.T) {
 	s := &AppService{shell: shell{logPath: "/x/nebegit.log"}}
 
 	got := s.LogPath()
@@ -359,7 +361,7 @@ func TestFR_UX_02_LogPathReportsTheAppLogsLocation(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_LogPathReportsWhyTheLogCouldNotOpen(t *testing.T) {
+func TestLogPathReportsWhyTheLogCouldNotOpen(t *testing.T) {
 	s := &AppService{shell: shell{logErr: "permission denied"}}
 
 	got := s.LogPath()
@@ -369,7 +371,7 @@ func TestFR_UX_02_LogPathReportsWhyTheLogCouldNotOpen(t *testing.T) {
 }
 
 // A windowless/background call fails without ever touching OpenWorktree.
-func TestFR_WT_05_SelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
+func TestSelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
 	called := false
 	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
 		called = true
@@ -387,7 +389,7 @@ func TestFR_WT_05_SelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
 
 // SelectRecentRepo switches straight to the entry's own path when it still
 // opens; the fallback is never consulted.
-func TestFR_WT_16_SelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
+func TestSelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	api := fakeAPI{
@@ -408,7 +410,7 @@ func TestFR_WT_16_SelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
 // A gone entry (Code NotARepo) with a RepoKey retries at the repo's main
 // worktree, found through MainWorktree; a WSL entry's RepoKey and the
 // worktree MainWorktree returns both cross in UNC form.
-func TestFR_WT_16_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T) {
+func TestSelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	var mainWorktreeArg core.RepoPath
@@ -445,7 +447,7 @@ func TestFR_WT_16_SelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t
 }
 
 // Without a RepoKey the entry's own error is returned as-is.
-func TestFR_WT_16_SelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
+func TestSelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	api := fakeAPI{
@@ -466,7 +468,7 @@ func TestFR_WT_16_SelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
 
 // A bare repo whose only worktree is also gone: MainWorktree's own failure
 // is returned, no second OpenWorktree attempted.
-func TestFR_WT_16_SelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *testing.T) {
+func TestSelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	openCount := 0
@@ -494,7 +496,7 @@ func TestFR_WT_16_SelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *t
 // OpenRecentRepo opens the entry in a window of its own; a window already
 // showing another repo is left on it, and the entry moves to the front of
 // the recents.
-func TestFR_REPO_08_OpenRecentRepoOpensASecondWindow(t *testing.T) {
+func TestOpenRecentRepoOpensASecondWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	api := fakeAPI{openWorktree: openAsIs}
@@ -518,7 +520,7 @@ func TestFR_REPO_08_OpenRecentRepoOpensASecondWindow(t *testing.T) {
 
 // A window already showing the entry's worktree is focused instead of
 // opening a second one.
-func TestFR_REPO_08_OpenRecentRepoFocusesAWindowAlreadyShowingTheEntry(t *testing.T) {
+func TestOpenRecentRepoFocusesAWindowAlreadyShowingTheEntry(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	reg.OpenOrFocus("/b", "/b", "")
@@ -540,7 +542,7 @@ func TestFR_REPO_08_OpenRecentRepoFocusesAWindowAlreadyShowingTheEntry(t *testin
 
 // A gone entry (Code NotARepo) with a RepoKey retries at the repo's main
 // worktree, as SelectRecentRepo does, and opens a window there.
-func TestFR_REPO_08_OpenRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T) {
+func TestOpenRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T) {
 	reg, opener := newTestRegistry()
 	var mainWorktreeArg core.RepoPath
 	api := fakeAPI{
@@ -573,7 +575,7 @@ func TestFR_REPO_08_OpenRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t
 
 // Without a RepoKey to retry, OpenRecentRepo returns the failure instead of
 // showing it in the native dialog OpenPath would use.
-func TestFR_REPO_08_OpenRecentRepoReturnsTheErrorWithoutShowingItNatively(t *testing.T) {
+func TestOpenRecentRepoReturnsTheErrorWithoutShowingItNatively(t *testing.T) {
 	reg, opener := newTestRegistry()
 	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
 		return core.WorktreeInfo{}, core.Errorf(core.NotARepo, "gone")
@@ -594,7 +596,7 @@ func TestFR_REPO_08_OpenRecentRepoReturnsTheErrorWithoutShowingItNatively(t *tes
 
 // nativeConsent needs no *application.App: it must work before Wails' own
 // App.Run creates its platform layer.
-func TestQA_PORT_02_ConsentAsksItsQuestionWithoutTheWailsApp(t *testing.T) {
+func TestConsentAsksItsQuestionWithoutTheWailsApp(t *testing.T) {
 	for _, want := range []bool{true, false} {
 		var gotTitle, gotMsg string
 		c := nativeConsent{ask: func(title, msg string) bool {
@@ -614,7 +616,7 @@ func TestQA_PORT_02_ConsentAsksItsQuestionWithoutTheWailsApp(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_07_ListWSLDistrosOnAHostWithoutWSLIsEmptyNotAnError(t *testing.T) {
+func TestListWSLDistrosOnAHostWithoutWSLIsEmptyNotAnError(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("a Windows host may have WSL")
 	}

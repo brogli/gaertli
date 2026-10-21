@@ -1,3 +1,4 @@
+// Requirements: FR-SYNC-09, FR-UX-03, QA-SAFE-01
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,21 +50,21 @@ describe('StashBanner', () => {
       conflicted: [{ path: 'a.txt', status: 'UU' }],
       shown: false,
     },
-  ])('FR-SYNC-09 with $state the banner shows: $shown', ({ stash, conflicted, shown }) => {
+  ])('with $state the banner shows: $shown', ({ stash, conflicted, shown }) => {
     const wrapper = mountWithStash(stash, conflicted)
 
     expect(wrapper.find('[data-test="stash-banner"]').exists()).toBe(shown)
     expect(wrapper.text().includes('Local changes from before a pull, merge or rebase')).toBe(shown)
   })
 
-  it('FR-SYNC-09 clicking Restore calls Facade.PopStash with the stash ref', async () => {
+  it('clicking Restore calls Facade.PopStash with the stash ref', async () => {
     const wrapper = mountWithStash('stash@{0}')
     await findButton(wrapper, 'Restore')!.trigger('click')
 
     expect(Facade.PopStash).toHaveBeenCalledWith('/repo', 'stash@{0}')
   })
 
-  it('FR-SYNC-09, FR-UX-03, QA-SAFE-01 clicking Drop… confirms, naming the loss, before calling Facade.DropStash', async () => {
+  it('clicking Drop… confirms, naming the loss, before calling Facade.DropStash', async () => {
     const wrapper = mountWithStash('stash@{0}')
     await findButton(wrapper, 'Drop…')!.trigger('click')
 

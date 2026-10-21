@@ -1,3 +1,4 @@
+// Requirements: FR-UX-15
 import { test, expect } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
@@ -11,7 +12,7 @@ function alphaOf(color: string): number {
   return rgba ? Number(rgba[1]) : 1
 }
 
-test('FR-UX-15 in the light and the dark theme an error, a warning and a success notice are each opaque', async ({
+test('in the light and the dark theme an error, a warning and a success notice are each opaque', async ({
   page,
 }) => {
   await page.emulateMedia({ colorScheme: 'light' })

@@ -1,3 +1,5 @@
+// Requirements: DIST-04, FR-REPO-02, FR-REPO-05, FR-REPO-06, FR-WT-05, FR-WT-08, FR-WT-16
+
 package app
 
 import (
@@ -120,7 +122,7 @@ func newTestStore(t *testing.T) *settings.Store {
 	return st
 }
 
-func TestFR_REPO_06_LaunchPath(t *testing.T) {
+func TestLaunchPath(t *testing.T) {
 	abs := t.TempDir()
 	cases := []struct {
 		args     []string
@@ -139,7 +141,7 @@ func TestFR_REPO_06_LaunchPath(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_06_LaunchPathThenOpenOrFocusOpensAWindow(t *testing.T) {
+func TestLaunchPathThenOpenOrFocusOpensAWindow(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	path, ok := launchPath([]string{"nebegit", "/a"}, "/wd")
@@ -156,7 +158,7 @@ func TestFR_REPO_06_LaunchPathThenOpenOrFocusOpensAWindow(t *testing.T) {
 // The first launch resolves its path argument the same way the
 // second-instance relay resolves a relayed one: against the launching
 // working directory.
-func TestFR_REPO_06_LaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
+func TestLaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
 	wslDir := `\\wsl.localhost\Ubuntu\home\u\repo`
 	abs := t.TempDir()
 	cases := []struct {
@@ -181,7 +183,7 @@ func TestFR_REPO_06_LaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_06_ASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testing.T) {
+func TestASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testing.T) {
 	launchDir, elsewhere := t.TempDir(), t.TempDir()
 	cases := []struct{ arg, want string }{
 		{".", launchDir},
@@ -200,7 +202,7 @@ func TestFR_REPO_06_ASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testi
 	}
 }
 
-func TestFR_REPO_02_ASecondInstanceWithoutAPathRelaysNone(t *testing.T) {
+func TestASecondInstanceWithoutAPathRelaysNone(t *testing.T) {
 	got := "unset"
 	opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path }, nil)
 
@@ -213,7 +215,7 @@ func TestFR_REPO_02_ASecondInstanceWithoutAPathRelaysNone(t *testing.T) {
 
 // A window per remembered selection, each with a real, non-empty id —
 // never the empty-selection placeholder.
-func TestFR_REPO_02_RestoreOpensAWindowForEachRememberedSelection(t *testing.T) {
+func TestRestoreOpensAWindowForEachRememberedSelection(t *testing.T) {
 	reg, opener := newTestRegistry()
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/p1", "/p2"} }); err != nil {
@@ -240,7 +242,7 @@ func TestFR_REPO_02_RestoreOpensAWindowForEachRememberedSelection(t *testing.T) 
 	}
 }
 
-func TestFR_REPO_02_RestoreOpensOneEmptySelectionWindowWhenNothingWasOpen(t *testing.T) {
+func TestRestoreOpensOneEmptySelectionWindowWhenNothingWasOpen(t *testing.T) {
 	reg, opener := newTestRegistry()
 	store := newTestStore(t)
 	api := fakeAPI{openWorktree: func(context.Context, core.RepoPath) (core.WorktreeInfo, error) {
@@ -258,7 +260,7 @@ func TestFR_REPO_02_RestoreOpensOneEmptySelectionWindowWhenNothingWasOpen(t *tes
 	}
 }
 
-func TestFR_REPO_02_RestoreFallsBackToTheEmptySelectionWindowWhenNoRememberedWorktreeOpens(t *testing.T) {
+func TestRestoreFallsBackToTheEmptySelectionWindowWhenNoRememberedWorktreeOpens(t *testing.T) {
 	reg, opener := newTestRegistry()
 	store := newTestStore(t)
 	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/gone1", "/gone2"} }); err != nil {
@@ -277,7 +279,7 @@ func TestFR_REPO_02_RestoreFallsBackToTheEmptySelectionWindowWhenNoRememberedWor
 	}
 }
 
-func TestFR_REPO_05_OpenReportsWhetherTheWindowOpened(t *testing.T) {
+func TestOpenReportsWhetherTheWindowOpened(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
 	api := fakeAPI{openWorktree: func(ctx context.Context, path core.RepoPath) (core.WorktreeInfo, error) {
@@ -317,7 +319,7 @@ func (w *fakeCallingWindow) SetTitle(title string) application.Window {
 
 // switchTo validates path the same way open() does, moves the
 // calling window's own registry selection, and navigates it in place.
-func TestFR_WT_05_FR_WT_08_SwitchToMovesTheWindowsSelection(t *testing.T) {
+func TestSwitchToMovesTheWindowsSelection(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	windowID := opener.windows[0].ID()
@@ -351,7 +353,7 @@ func TestFR_WT_05_FR_WT_08_SwitchToMovesTheWindowsSelection(t *testing.T) {
 // switchTo records the new worktree as the repo's recent entry, replacing
 // the one the repo picker's fallback would otherwise still see for an old,
 // since-removed worktree.
-func TestFR_WT_16_SwitchToUpdatesTheRepoRecentEntry(t *testing.T) {
+func TestSwitchToUpdatesTheRepoRecentEntry(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	windowID := opener.windows[0].ID()
@@ -388,7 +390,7 @@ func recentPaths(recent []settings.RecentRepo) []string {
 
 // A WSL window's URL carries the distro the path arrived from, so a later
 // MainView/WorktreeContent load knows which core to route through.
-func TestFR_REPO_02_SwitchToCarriesTheDistroInTheURL(t *testing.T) {
+func TestSwitchToCarriesTheDistroInTheURL(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
 	windowID := opener.windows[0].ID()
@@ -408,7 +410,7 @@ func TestFR_REPO_02_SwitchToCarriesTheDistroInTheURL(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_02_SelectionURLCarriesTheDistro(t *testing.T) {
+func TestSelectionURLCarriesTheDistro(t *testing.T) {
 	cases := []struct{ path, distro, want string }{
 		{"", "", "/"},
 		{"/home/u/r", "", "/?path=%2Fhome%2Fu%2Fr"},
@@ -421,7 +423,7 @@ func TestFR_REPO_02_SelectionURLCarriesTheDistro(t *testing.T) {
 	}
 }
 
-func TestDIST_04_PathActionForDispatchesTheInstallerFlagsOnly(t *testing.T) {
+func TestPathActionForDispatchesTheInstallerFlagsOnly(t *testing.T) {
 	cases := []struct {
 		args []string
 		want func(string) error
@@ -439,7 +441,7 @@ func TestDIST_04_PathActionForDispatchesTheInstallerFlagsOnly(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_05_OpenWorktreePathNotifiesAndOpensNoWindowOnFailure(t *testing.T) {
+func TestOpenWorktreePathNotifiesAndOpensNoWindowOnFailure(t *testing.T) {
 	reg, opener := newTestRegistry()
 	store := newTestStore(t)
 	api := fakeAPI{openWorktree: notARepo}

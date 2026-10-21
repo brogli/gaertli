@@ -1,3 +1,5 @@
+// Requirements: DIST-03, QA-PORT-02
+
 package main_test
 
 import (
@@ -22,7 +24,7 @@ func TestMain(m *testing.M) {
 	testbin.Main(m, testbin.Bin{Path: &bin, Pkg: "."})
 }
 
-func TestADR_3_StdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
+func TestStdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), bin, "--stdio")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -61,7 +63,7 @@ func TestADR_3_StdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 	}
 }
 
-func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
+func TestVersionFlagPrintsAppVersion(t *testing.T) {
 	out, err := exec.CommandContext(t.Context(), bin, "--version").Output()
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +73,7 @@ func TestADR_3_VersionFlagPrintsAppVersion(t *testing.T) {
 	}
 }
 
-func TestDIST_03_LdflagsStampAppVersion(t *testing.T) {
+func TestLdflagsStampAppVersion(t *testing.T) {
 	stamped := filepath.Join(t.TempDir(), testbin.Exe("nebegit-core-stamped"))
 	build := exec.CommandContext(t.Context(), "go", "build",
 		"-ldflags", "-X github.com/brogli/nebegit/internal/buildinfo.App=v9.9.9",
@@ -89,14 +91,14 @@ func TestDIST_03_LdflagsStampAppVersion(t *testing.T) {
 	}
 }
 
-func TestADR_3_UnknownArgumentExits2(t *testing.T) {
+func TestUnknownArgumentExits2(t *testing.T) {
 	err := exec.CommandContext(t.Context(), bin, "--bogus").Run()
 	if exit, ok := errors.AsType[*exec.ExitError](err); !ok || exit.ExitCode() != 2 {
 		t.Errorf("err = %v, want exit 2", err)
 	}
 }
 
-func TestADR_3_ABarePathExits2WithTheUsageLine(t *testing.T) {
+func TestABarePathExits2WithTheUsageLine(t *testing.T) {
 	out, err := exec.CommandContext(t.Context(), bin, "/some/path").CombinedOutput()
 	if exit, ok := errors.AsType[*exec.ExitError](err); !ok || exit.ExitCode() != 2 {
 		t.Errorf("err = %v, want exit 2", err)

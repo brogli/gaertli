@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-01, FR-UX-09
 import { test, expect, type Locator } from '@playwright/test'
 import { dragLogBorder, openMockRepo, overflows, switchToChanges } from './helpers'
 
@@ -8,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
 })
 
-test("FR-UX-09 the changes heading shows whole; Stage all and Unstage all share one row, each file row keeps its buttons on the name's line", async ({
+test("the changes heading shows whole; Stage all and Unstage all share one row, each file row keeps its buttons on the name's line", async ({
   page,
 }) => {
   await openMockRepo(page)
@@ -39,9 +40,7 @@ test("FR-UX-09 the changes heading shows whole; Stage all and Unstage all share 
   }
 })
 
-test('FR-LOG-01 a crowded log row shows two whole ref labels and "+N" naming them all', async ({
-  page,
-}) => {
+test('a crowded log row shows two whole ref labels and "+N" naming them all', async ({ page }) => {
   await openMockRepo(page)
 
   const row = page.locator('.row', { has: page.locator('.ref-label.head') })
@@ -56,7 +55,7 @@ test('FR-LOG-01 a crowded log row shows two whole ref labels and "+N" naming the
   expect((await row.locator('.subject').boundingBox())!.width).toBeGreaterThanOrEqual(80)
 })
 
-test('FR-UX-09 in a narrow log view the ref labels shrink to an ellipsis; "+N" and the hash stay inside the row', async ({
+test('in a narrow log view the ref labels shrink to an ellipsis; "+N" and the hash stay inside the row', async ({
   page,
 }) => {
   await openMockRepo(page)

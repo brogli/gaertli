@@ -1,3 +1,4 @@
+// Requirements: FR-UX-19
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import DebugArea from '../DebugArea.vue'
@@ -15,7 +16,7 @@ async function mountWithNotices() {
 }
 
 describe('DebugArea', () => {
-  it('FR-UX-19 has an error, a warning and a success button', async () => {
+  it('has an error, a warning and a success button', async () => {
     const { debug } = await mountWithNotices()
 
     expect(findButton(debug, 'Error')).toBeTruthy()
@@ -23,7 +24,7 @@ describe('DebugArea', () => {
     expect(findButton(debug, 'Success')).toBeTruthy()
   })
 
-  it('FR-UX-19 each button shows a sample notice of its own severity, through the normal notice path', async () => {
+  it('each button shows a sample notice of its own severity, through the normal notice path', async () => {
     const { debug, body } = await mountWithNotices()
 
     await findButton(debug, 'Error')!.trigger('click')
@@ -34,7 +35,7 @@ describe('DebugArea', () => {
     expect(message.get('.p-toast-summary').text()).toBe('Sample error notice')
   })
 
-  it('FR-UX-19 the three sample notices stack instead of replacing each other', async () => {
+  it('the three sample notices stack instead of replacing each other', async () => {
     const { debug, body } = await mountWithNotices()
 
     await findButton(debug, 'Error')!.trigger('click')
@@ -57,7 +58,7 @@ describe('DebugArea', () => {
       vi.useRealTimers()
     })
 
-    it('FR-UX-19 5 s after showing all three samples, only the error remains', async () => {
+    it('5 s after showing all three samples, only the error remains', async () => {
       const { debug, body } = await mountWithNotices()
       vi.useFakeTimers()
 

@@ -1,3 +1,4 @@
+// Requirements: FR-REPO-01, FR-REPO-07, FR-REPO-08, FR-UX-05, FR-UX-09, FR-WT-13, FR-WT-16
 import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -113,7 +114,7 @@ describe('RepoPicker', () => {
     window.innerWidth = 1024
   })
 
-  it('FR-WT-16 the button names the repo by its main worktree; the list lists this repo first, checked, then the other recents', async () => {
+  it('the button names the repo by its main worktree; the list lists this repo first, checked, then the other recents', async () => {
     const { wrapper, body } = await openPicker({ path: '/repos/alpha-feat' })
 
     expect(wrapper.get('[data-test="repo-picker"]').text()).toContain('alpha')
@@ -124,7 +125,7 @@ describe('RepoPicker', () => {
     expect(rows[1]!.text()).toContain('WSL: Ubuntu')
   })
 
-  it('FR-WT-16 choosing a recent repo hands the whole entry to the core, RepoKey included, for it to switch or fall back', async () => {
+  it('choosing a recent repo hands the whole entry to the core, RepoKey included, for it to switch or fall back', async () => {
     const { body } = await openPicker()
 
     await repoRow(body, beta.path).trigger('click')
@@ -132,7 +133,7 @@ describe('RepoPicker', () => {
     expect(AppService.SelectRecentRepo).toHaveBeenCalledWith(beta)
   })
 
-  it('FR-WT-16 a failure the core could not recover from shows in the list', async () => {
+  it('a failure the core could not recover from shows in the list', async () => {
     AppService.SelectRecentRepo.mockRejectedValue(wailsError('still gone', 'NOT_A_REPO'))
     const { wrapper, body } = await openPicker()
 
@@ -142,7 +143,7 @@ describe('RepoPicker', () => {
     expect(wrapper.findComponent(ErrorBanner).text()).toContain('still gone')
   })
 
-  it('FR-WT-16 window with no selection: asPage shows the list in place, with no button', async () => {
+  it('window with no selection: asPage shows the list in place, with no button', async () => {
     const { wrapper, body } = await openPicker({ path: '', asPage: true })
 
     expect(wrapper.find('[data-test="repo-picker"]').exists()).toBe(false)
@@ -150,7 +151,7 @@ describe('RepoPicker', () => {
     expect(actionLabels(body)).toEqual(['Open folder…', 'New window'])
   })
 
-  it('FR-REPO-01 "Open folder…" opens the folder picker', async () => {
+  it('"Open folder…" opens the folder picker', async () => {
     const { body } = await openPicker()
 
     await actionRow(body, 'Open folder…').trigger('click')
@@ -158,7 +159,7 @@ describe('RepoPicker', () => {
     expect(AppService.PickAndOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-WT-16 "New window" follows "Open folder…", the only actions also where WSL has distros; choosing it opens a new window', async () => {
+  it('"New window" follows "Open folder…", the only actions also where WSL has distros; choosing it opens a new window', async () => {
     AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04'])
     const { body } = await openPicker()
 
@@ -169,7 +170,7 @@ describe('RepoPicker', () => {
     expect(AppService.NewWindow).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-UX-05 FR-WT-13 "New window" shows shortcuts.newWindow through ShortcutHint; "Open folder…" shows none', async () => {
+  it('"New window" shows shortcuts.newWindow through ShortcutHint; "Open folder…" shows none', async () => {
     const { body } = await openPicker()
 
     expect(actionRow(body, 'New window').find('[data-test="shortcut-hint"]').text()).toBe(
@@ -178,7 +179,7 @@ describe('RepoPicker', () => {
     expect(actionRow(body, 'Open folder…').find('[data-test="shortcut-hint"]').exists()).toBe(false)
   })
 
-  it('FR-REPO-07 a recent repo inside WSL names its distro, a local one none; the button of a WSL window marks it as WSL', async () => {
+  it('a recent repo inside WSL names its distro, a local one none; the button of a WSL window marks it as WSL', async () => {
     const { body } = await openPicker({ path: '/repos/other' })
     const wsl = await mountInBody(RepoPicker, { props: { path: '/repos/other', distro: 'Ubuntu' } })
 
@@ -187,7 +188,7 @@ describe('RepoPicker', () => {
     expect(wsl.wrapper.get('[data-test="repo-picker"]').text()).toContain('WSL')
   })
 
-  it('FR-UX-09 narrow (400px): the button shows its icon only, the path in title and aria-label', async () => {
+  it('narrow (400px): the button shows its icon only, the path in title and aria-label', async () => {
     window.innerWidth = 400
     const { wrapper } = await mountInBody(RepoPicker, { props: { path: '/repos/alpha' } })
 
@@ -195,7 +196,7 @@ describe('RepoPicker', () => {
     expectIconOnly(button, '/repos/alpha')
   })
 
-  it('FR-REPO-08 a recent repo other than the window\'s own gets a "…" button and a right-click menu with "Open in new window" and "Remove from recents"; the current row and the actions get neither', async () => {
+  it('a recent repo other than the window\'s own gets a "…" button and a right-click menu with "Open in new window" and "Remove from recents"; the current row and the actions get neither', async () => {
     const { body } = await openPicker()
 
     expect(rowLiFor(repoRow(body, alpha.path)).find('[data-test="row-actions"]').exists()).toBe(
@@ -213,7 +214,7 @@ describe('RepoPicker', () => {
     expect(menuLabels(body)).toEqual(['Open in new window', 'Remove from recents'])
   })
 
-  it('FR-REPO-08 "…" then "Open in new window" closes the list and calls OpenRecentRepo with the whole entry', async () => {
+  it('"…" then "Open in new window" closes the list and calls OpenRecentRepo with the whole entry', async () => {
     const { body } = await openPicker()
 
     await rowLiFor(repoRow(body, beta.path)).get('[data-test="row-actions"]').trigger('click')
@@ -223,7 +224,7 @@ describe('RepoPicker', () => {
     expect(await listOpen(body)).toBe(false)
   })
 
-  it("FR-REPO-08 Open in new window failing shows the refusal as a notice, not the list's banner", async () => {
+  it("Open in new window failing shows the refusal as a notice, not the list's banner", async () => {
     AppService.OpenRecentRepo.mockRejectedValueOnce(wailsError('boom'))
     const notice = await mountNotices()
     const { body } = await openPicker()
@@ -234,7 +235,7 @@ describe('RepoPicker', () => {
     expect(body.find('.error-banner').exists()).toBe(false)
   })
 
-  it('FR-REPO-08 page form: Remove from recents removes the row and reloads the recents, the list stays', async () => {
+  it('page form: Remove from recents removes the row and reloads the recents, the list stays', async () => {
     AppService.RecentRepos.mockReset()
       .mockResolvedValueOnce([alpha, beta])
       .mockResolvedValueOnce([alpha])
@@ -249,7 +250,7 @@ describe('RepoPicker', () => {
     expect(wrapper.find('.repo-list').exists()).toBe(true)
   })
 
-  it('FR-REPO-08 Remove from recents failing shows the refusal as a notice', async () => {
+  it('Remove from recents failing shows the refusal as a notice', async () => {
     AppService.RemoveRecentRepo.mockRejectedValueOnce(wailsError('boom'))
     const notice = await mountNotices()
     const { body } = await openPicker()

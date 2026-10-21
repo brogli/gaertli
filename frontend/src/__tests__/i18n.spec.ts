@@ -1,3 +1,4 @@
+// Requirements: FR-UX-11
 import { globSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -72,8 +73,8 @@ function attrOffenders(template: string): string[] {
   return offenders
 }
 
-describe('TR-35 translation guard', () => {
-  it('TR-35 no .vue template holds untranslated literal text or attribute', () => {
+describe('translation guard', () => {
+  it('no .vue template holds untranslated literal text or attribute', () => {
     const offenders = globSync('src/**/*.vue').flatMap((file) => {
       const template = templateOf(readFileSync(file, 'utf-8'))
       const found = [...textNodeOffenders(template), ...attrOffenders(template)]
@@ -82,7 +83,7 @@ describe('TR-35 translation guard', () => {
     expect(offenders).toEqual([])
   })
 
-  it('FR-UX-11 every literal t()/$t() key used in the source exists in en.json', () => {
+  it('every literal t()/$t() key used in the source exists in en.json', () => {
     const keyPattern = /(?<![\w$])\$?t\(\s*(['"])([a-zA-Z0-9_.]+)\1/g
     const files = globSync('src/**/*.{ts,vue}').filter((f) => !f.includes('/__tests__/'))
     const missing: string[] = []

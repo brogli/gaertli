@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-01, FR-CMP-04, FR-CP-06, FR-LOG-11, FR-LOG-17, FR-RV-04, FR-UX-05
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildOneCommitMenuItems,
@@ -50,7 +51,7 @@ function selectionActions() {
 }
 
 describe('buildOneCommitMenuItems', () => {
-  it('FR-LOG-11 the one-commit items in order, no "Compare with …" without a previous selection', () => {
+  it('the one-commit items in order, no "Compare with …" without a previous selection', () => {
     const items = buildOneCommitMenuItems(row(), oneCommitActions(), t)
 
     expect(labelsOf(items)).toEqual([
@@ -83,7 +84,7 @@ describe('buildOneCommitMenuItems', () => {
     expect(a[action]).toHaveBeenCalledWith(...args)
   })
 
-  it('FR-LOG-11 "Cherry-pick" and "Revert" each call their own spy once', () => {
+  it('"Cherry-pick" and "Revert" each call their own spy once', () => {
     const a = oneCommitActions()
     const items = buildOneCommitMenuItems(row(), a, t)
 
@@ -94,7 +95,7 @@ describe('buildOneCommitMenuItems', () => {
     expect(a.revert).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CP-06, FR-RV-04 "Cherry-pick…" and "Revert…" each call their own options spy once', () => {
+  it('"Cherry-pick…" and "Revert…" each call their own options spy once', () => {
     const a = oneCommitActions()
     const items = buildOneCommitMenuItems(row(), a, t)
 
@@ -105,7 +106,7 @@ describe('buildOneCommitMenuItems', () => {
     expect(a.revertOptions).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-LOG-11 the two copy items write to the clipboard', () => {
+  it('the two copy items write to the clipboard', () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const items = buildOneCommitMenuItems(row(), oneCommitActions(), t)
@@ -117,7 +118,7 @@ describe('buildOneCommitMenuItems', () => {
     expect(writeText).toHaveBeenNthCalledWith(2, 'Fix the bug')
   })
 
-  it('FR-CMP-04 "Compare with working tree" is always present and calls compareWithWorking', () => {
+  it('"Compare with working tree" is always present and calls compareWithWorking', () => {
     const a = oneCommitActions()
     const items = buildOneCommitMenuItems(row(), a, t)
 
@@ -126,7 +127,7 @@ describe('buildOneCommitMenuItems', () => {
     expect(a.compareWithWorking).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CMP-01, FR-LOG-11 with compareWithPrevious, appends "Compare with <short hash>" last and calls it', () => {
+  it('with compareWithPrevious, appends "Compare with <short hash>" last and calls it', () => {
     const run = vi.fn()
     const items = buildOneCommitMenuItems(
       row(),
@@ -144,7 +145,7 @@ describe('buildOneCommitMenuItems', () => {
 describe('buildSelectionMenuItems', () => {
   const twoRows = [row({ sha: 'a' }), row({ sha: 'b' })]
 
-  it('FR-LOG-11 three commits: pick, revert, squash, fixup, copy hashes, no swap', () => {
+  it('three commits: pick, revert, squash, fixup, copy hashes, no swap', () => {
     const rows = [row({ sha: 'a' }), row({ sha: 'b' }), row({ sha: 'c' })]
     const squash = buildSquashMenuItems(3, null, { squash: vi.fn(), fixup: vi.fn() }, t)
 
@@ -161,7 +162,7 @@ describe('buildSelectionMenuItems', () => {
     ])
   })
 
-  it('FR-LOG-11 two commits: the same shape, plus swap and stop comparing last', () => {
+  it('two commits: the same shape, plus swap and stop comparing last', () => {
     const items = buildSelectionMenuItems(twoRows, selectionActions(), [], t)
 
     expect(labelsOf(items)).toEqual([
@@ -175,7 +176,7 @@ describe('buildSelectionMenuItems', () => {
     ])
   })
 
-  it('FR-UX-05 "Stop comparing" carries its shortcut; other items carry none', () => {
+  it('"Stop comparing" carries its shortcut; other items carry none', () => {
     const items = buildSelectionMenuItems(twoRows, selectionActions(), [], t)
 
     expect(findItem(items, 'Stop comparing')).toMatchObject({ shortcut: 'Esc' })
@@ -183,7 +184,7 @@ describe('buildSelectionMenuItems', () => {
     expect(findItem(items, 'Cherry-pick 2 commits')).not.toHaveProperty('shortcut')
   })
 
-  it('FR-LOG-11 each item calls its own action', () => {
+  it('each item calls its own action', () => {
     const actions = selectionActions()
     const items = buildSelectionMenuItems(twoRows, actions, [], t)
 
@@ -206,7 +207,7 @@ describe('buildSelectionMenuItems', () => {
 })
 
 describe('buildSquashMenuItems', () => {
-  it('FR-LOG-17 with a blocker: one disabled item saying why, no actions', () => {
+  it('with a blocker: one disabled item saying why, no actions', () => {
     const actions = { squash: vi.fn(), fixup: vi.fn() }
     const items = buildSquashMenuItems(2, 'a rebase is in progress', actions, t)
 

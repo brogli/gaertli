@@ -1,8 +1,10 @@
+// Requirements: FR-SYNC-07
+
 package git
 
 import "testing"
 
-func TestFR_SYNC_07_ParseProgressLine(t *testing.T) {
+func TestParseProgressLine(t *testing.T) {
 	tests := []struct {
 		line        string
 		wantPercent int

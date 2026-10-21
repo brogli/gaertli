@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-05, FR-UX-05
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref, type VNodeChild } from 'vue'
@@ -34,7 +35,7 @@ function pressKey(key = 'k'): boolean {
 }
 
 describe('useShortcut', () => {
-  it('FR-UX-05 skips the handler while an OpenVue Dialog is open, runs it once closed', async () => {
+  it('skips the handler while an OpenVue Dialog is open, runs it once closed', async () => {
     const dialogVisible = ref(false)
     const { handler } = mountShortcut('k', {}, () =>
       h(Dialog, {
@@ -55,7 +56,7 @@ describe('useShortcut', () => {
     expect(handler).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-UX-05 skips the handler for an open Popover, and for a shown ContextMenu, always preventing default', async () => {
+  it('skips the handler for an open Popover, and for a shown ContextMenu, always preventing default', async () => {
     const popoverRef = ref<InstanceType<typeof Popover>>()
     const menuRef = ref<InstanceType<typeof ContextMenu>>()
     const { wrapper, handler } = mountShortcut('k', {}, () =>
@@ -84,7 +85,7 @@ describe('useShortcut', () => {
     expect(handler).not.toHaveBeenCalled()
   })
 
-  it('FR-UX-05 FR-LOG-05 inTextField:false skips a key targeting an input, runs when it does not', () => {
+  it('inTextField:false skips a key targeting an input, runs when it does not', () => {
     const { handler } = mountShortcut('Escape', { inTextField: false })
     const input = document.createElement('input')
     document.body.appendChild(input)
@@ -98,7 +99,7 @@ describe('useShortcut', () => {
     document.body.removeChild(input)
   })
 
-  it('FR-UX-05 a listbox in the page (the repo picker as a window) does not block the handler', () => {
+  it('a listbox in the page (the repo picker as a window) does not block the handler', () => {
     const { handler } = mountShortcut('k', {}, () =>
       h('ul', { role: 'listbox' }, [h('li', { role: 'option' }, 'a')]),
     )

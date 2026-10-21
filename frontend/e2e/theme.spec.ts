@@ -1,3 +1,4 @@
+// Requirements: FR-UX-06
 import { test, expect, type Page } from '@playwright/test'
 import { mockDiffUrl, openMockRepo } from './helpers'
 
@@ -65,7 +66,7 @@ async function readDiffBackgrounds(
   return { codeArea, fileList }
 }
 
-test('FR-UX-06 the page paints the code area and the empty file list area light in the light theme, and the code area dark itself, not black, in the dark theme', async ({
+test('the page paints the code area and the empty file list area light in the light theme, and the code area dark itself, not black, in the dark theme', async ({
   page,
 }) => {
   await page.emulateMedia({ colorScheme: 'light' })
@@ -84,7 +85,7 @@ test('FR-UX-06 the page paints the code area and the empty file list area light 
     .toBe(true)
 })
 
-test('FR-UX-06 choosing Dracula in Settings and saving paints the main window in its colours at once', async ({
+test('choosing Dracula in Settings and saving paints the main window in its colours at once', async ({
   page,
 }) => {
   await openMockRepo(page)

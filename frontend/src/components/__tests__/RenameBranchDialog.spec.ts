@@ -1,3 +1,4 @@
+// Requirements: FR-BR-06
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -14,7 +15,7 @@ describe('RenameBranchDialog', () => {
     Facade.RenameBranch.mockReset()
   })
 
-  it('FR-BR-06 pre-fills the input with the current name and submits the edited name', async () => {
+  it('pre-fills the input with the current name and submits the edited name', async () => {
     Facade.RenameBranch.mockResolvedValue(undefined)
     const { body } = await mountInBody(RenameBranchDialog, {
       props: { wt: '/repo', name: 'feature' },
@@ -31,7 +32,7 @@ describe('RenameBranchDialog', () => {
     expect(Facade.RenameBranch).toHaveBeenCalledWith('/repo', 'feature', 'renamed')
   })
 
-  it('FR-BR-06 shows the rejection message and keeps the dialog open on failure', async () => {
+  it('shows the rejection message and keeps the dialog open on failure', async () => {
     Facade.RenameBranch.mockRejectedValueOnce(wailsError('"-bad" is not a valid branch name'))
     const { wrapper, body } = await mountInBody(RenameBranchDialog, {
       props: { wt: '/repo', name: 'feature' },

@@ -1,3 +1,5 @@
+// Requirements: FR-UX-02
+
 package app
 
 import (
@@ -26,7 +28,7 @@ func dispatchLogged(t *testing.T, level slog.Level, name string, wt core.Worktre
 	return logged.String()
 }
 
-func TestFR_UX_02_ASuccessfulCommandAtInfoLevelLogsNothing(t *testing.T) {
+func TestASuccessfulCommandAtInfoLevelLogsNothing(t *testing.T) {
 	out := dispatchLogged(t, slog.LevelInfo, "command", "wt1", core.CommandRecord{
 		Command: "git status", Dir: "/repo", DurationMS: 12, ExitCode: 0,
 	})
@@ -36,7 +38,7 @@ func TestFR_UX_02_ASuccessfulCommandAtInfoLevelLogsNothing(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_ASuccessfulCommandAtDebugLevelLogsOneDebugRecord(t *testing.T) {
+func TestASuccessfulCommandAtDebugLevelLogsOneDebugRecord(t *testing.T) {
 	out := dispatchLogged(t, slog.LevelDebug, "command", "wt1", core.CommandRecord{
 		Command: "git status", Dir: "/repo", DurationMS: 12, ExitCode: 0,
 	})
@@ -51,7 +53,7 @@ func TestFR_UX_02_ASuccessfulCommandAtDebugLevelLogsOneDebugRecord(t *testing.T)
 	}
 }
 
-func TestFR_UX_02_ABackgroundCommandAtDebugLevelLogsOneDebugRecord(t *testing.T) {
+func TestABackgroundCommandAtDebugLevelLogsOneDebugRecord(t *testing.T) {
 	out := dispatchLogged(t, slog.LevelDebug, "command", "wt1", core.CommandRecord{
 		Command: "git status", Background: true, ExitCode: 0,
 	})
@@ -61,7 +63,7 @@ func TestFR_UX_02_ABackgroundCommandAtDebugLevelLogsOneDebugRecord(t *testing.T)
 	}
 }
 
-func TestFR_UX_02_AFailedCommandLogsWarnEvenAtInfoLevel(t *testing.T) {
+func TestAFailedCommandLogsWarnEvenAtInfoLevel(t *testing.T) {
 	out := dispatchLogged(t, slog.LevelInfo, "command", "wt1", core.CommandRecord{
 		Command:   "git fetch",
 		ExitCode:  128,
@@ -83,7 +85,7 @@ func TestFR_UX_02_AFailedCommandLogsWarnEvenAtInfoLevel(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_AnEditorStartIsLoggedAtDebugWithItsArgv(t *testing.T) {
+func TestAnEditorStartIsLoggedAtDebugWithItsArgv(t *testing.T) {
 	out := dispatchLogged(t, slog.LevelDebug, "editor", "wt1", core.EditorRecord{Argv: []string{"alpha", "/repo"}})
 
 	if strings.Contains(out, "level=INFO") || strings.Contains(out, "level=WARN") {
@@ -99,7 +101,7 @@ func TestFR_UX_02_AnEditorStartIsLoggedAtDebugWithItsArgv(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_AFailedEditorStartIsLoggedAtWarnWithItsArgvAndError(t *testing.T) {
+func TestAFailedEditorStartIsLoggedAtWarnWithItsArgvAndError(t *testing.T) {
 	out := dispatchLogged(t, slog.LevelDebug, "editor", "wt1", core.EditorRecord{
 		Argv: []string{"myed", "/repo"}, Error: `"myed" is not on PATH`,
 	})
@@ -114,7 +116,7 @@ func TestFR_UX_02_AFailedEditorStartIsLoggedAtWarnWithItsArgvAndError(t *testing
 	}
 }
 
-func TestFR_UX_02_CommandAndEditorEventsAreNeverEmittedToAWindow(t *testing.T) {
+func TestCommandAndEditorEventsAreNeverEmittedToAWindow(t *testing.T) {
 	records := map[string]any{
 		"command": core.CommandRecord{Command: "git status"},
 		"editor":  core.EditorRecord{Argv: []string{"alpha"}},

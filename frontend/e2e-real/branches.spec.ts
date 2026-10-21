@@ -1,3 +1,4 @@
+// Requirements: FR-BR-01, FR-BR-03, FR-BR-04, FR-BR-06, FR-BR-09
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
@@ -41,7 +42,7 @@ async function expectCurrent(page: Page, name: string): Promise<void> {
   await page.keyboard.press('Escape')
 }
 
-test('FR-BR-01 a new branch from a commit is checked out by default and shown as current', async ({
+test('a new branch from a commit is checked out by default and shown as current', async ({
   app,
   repos,
   git,
@@ -56,11 +57,7 @@ test('FR-BR-01 a new branch from a commit is checked out by default and shown as
   await expectCurrent(app, 'fresh')
 })
 
-test('FR-BR-09 a branch picked in the branch picker is checked out', async ({
-  app,
-  repos,
-  git,
-}) => {
+test('a branch picked in the branch picker is checked out', async ({ app, repos, git }) => {
   await openBranchPicker(app)
   await refRow(app, 'feature').click()
 
@@ -68,7 +65,7 @@ test('FR-BR-09 a branch picked in the branch picker is checked out', async ({
   await expectCurrent(app, 'feature')
 })
 
-test('FR-BR-01 "New branch…" starts the branch at the branch picked from the list', async ({
+test('"New branch…" starts the branch at the branch picked from the list', async ({
   app,
   repos,
   git,
@@ -85,7 +82,7 @@ test('FR-BR-01 "New branch…" starts the branch at the branch picked from the l
   expect(rev(git, repos.work, 'from-list')).toBe(rev(git, repos.work, 'feature'))
 })
 
-test('FR-BR-03 a hard reset asks first, names how many files are lost, then discards them', async ({
+test('a hard reset asks first, names how many files are lost, then discards them', async ({
   app,
   repos,
   git,
@@ -107,7 +104,7 @@ test('FR-BR-03 a hard reset asks first, names how many files are lost, then disc
 test.describe('a repo with no remote', () => {
   test.use({ open: ['scratch'] })
 
-  test('FR-BR-04 a hard reset drops the undone commits from the log view at once, filtered or not, without another action', async ({
+  test('a hard reset drops the undone commits from the log view at once, filtered or not, without another action', async ({
     openApp,
     repos,
   }) => {
@@ -131,7 +128,7 @@ test.describe('a repo with no remote', () => {
   })
 })
 
-test('FR-BR-06 a renamed branch shows under its new name in the branch picker', async ({
+test('a renamed branch shows under its new name in the branch picker', async ({
   app,
   repos,
   git,

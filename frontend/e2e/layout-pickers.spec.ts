@@ -1,3 +1,4 @@
+// Requirements: FR-UX-09
 import { test, expect } from '@playwright/test'
 import { openBranchPicker, openMockRepo, openWorktreePicker, overflows, refLi } from './helpers'
 
@@ -7,9 +8,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
 })
 
-test('FR-UX-09 a long branch name ends in an ellipsis and shows whole on hover', async ({
-  page,
-}) => {
+test('a long branch name ends in an ellipsis and shows whole on hover', async ({ page }) => {
   await openMockRepo(page)
   const long = 'feature/a-rather-long-branch-name-that-does-not-fit'
 
@@ -19,7 +18,7 @@ test('FR-UX-09 a long branch name ends in an ellipsis and shows whole on hover',
   expect(await overflows(name)).toBe(true)
 })
 
-test('FR-UX-09 a worktree row keeps its name, flags and buttons on one line; a long branch name ends in an ellipsis', async ({
+test('a worktree row keeps its name, flags and buttons on one line; a long branch name ends in an ellipsis', async ({
   page,
 }) => {
   await openMockRepo(page, '&worktrees=crowded')

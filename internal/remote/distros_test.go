@@ -1,3 +1,5 @@
+// Requirements: FR-REPO-07, QA-PORT-02
+
 package remote
 
 import (
@@ -21,7 +23,7 @@ var wantDistros = []Distro{
 	{Name: "Debian", Version: 1},
 }
 
-func TestQA_PORT_02_DistrosOfNamesEachDistroWithItsWSLVersion(t *testing.T) {
+func TestDistrosOfNamesEachDistroWithItsWSLVersion(t *testing.T) {
 	tests := []struct {
 		name, quiet, verbose string
 		want                 []Distro
@@ -57,7 +59,7 @@ func TestQA_PORT_02_DistrosOfNamesEachDistroWithItsWSLVersion(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_07_DecodeWSLTextUTF16LE(t *testing.T) {
+func TestDecodeWSLTextUTF16LE(t *testing.T) {
 	for _, bom := range []bool{true, false} {
 		got := distrosOf(utf16LEBytes(quiet, bom), utf16LEBytes(verbose, bom))
 		if !reflect.DeepEqual(got, wantDistros) {
@@ -78,7 +80,7 @@ func utf16LEBytes(s string, bom bool) []byte {
 	return buf
 }
 
-func TestQA_PORT_02_WslPresentFalseWhenNotOnPath(t *testing.T) {
+func TestWslPresentFalseWhenNotOnPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
 	if wslPresent() {

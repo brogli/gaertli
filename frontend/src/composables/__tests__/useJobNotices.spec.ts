@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-09, FR-SYNC-04, FR-SYNC-08, FR-SYNC-09, FR-SYNC-13, FR-UPD-05, FR-UX-01, FR-UX-12, FR-UX-15, FR-UX-16
 import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -98,7 +99,7 @@ describe('useJobNotices', () => {
     onPullEnded.mockReset()
   })
 
-  it('FR-SYNC-04 a failed push job shows a notice with the reason and Pull/Force push, running the actions', async () => {
+  it('a failed push job shows a notice with the reason and Pull/Force push, running the actions', async () => {
     const notice = await mountWithNotices()
     setUpstream()
 
@@ -110,7 +111,7 @@ describe('useJobNotices', () => {
     expect(onForcePush).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-SYNC-04 clicking Pull in the rejection notice runs the Pull action', async () => {
+  it('clicking Pull in the rejection notice runs the Pull action', async () => {
     const notice = await mountWithNotices()
     setUpstream()
 
@@ -121,7 +122,7 @@ describe('useJobNotices', () => {
     expect(onPull).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-SYNC-13 a rejected push on a branch without upstream shows the error and no Pull or Force push', async () => {
+  it('a rejected push on a branch without upstream shows the error and no Pull or Force push', async () => {
     const notice = await mountWithNotices()
     useRefsStore().refs = refsFixture()
 
@@ -133,7 +134,7 @@ describe('useJobNotices', () => {
     expect(findButton(notice, 'Force push')).toBeUndefined()
   })
 
-  it('FR-SYNC-04 a later pull clears the rejection notice', async () => {
+  it('a later pull clears the rejection notice', async () => {
     const notice = await mountWithNotices()
     const jobs = useJobsStore()
 
@@ -149,7 +150,7 @@ describe('useJobNotices', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it('FR-SYNC-09 a pull job failed DIRTY_WORKTREE shows "Stash and pull", running PullWithStash', async () => {
+  it('a pull job failed DIRTY_WORKTREE shows "Stash and pull", running PullWithStash', async () => {
     const notice = await mountWithNotices()
 
     useJobsStore().upsert(blockedPullJob)
@@ -160,7 +161,7 @@ describe('useJobNotices', () => {
     expect(onStashPull).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CONF-09 every pull end is passed on; one that stopped on conflicts shows no notice', async () => {
+  it('every pull end is passed on; one that stopped on conflicts shows no notice', async () => {
     const notice = await mountWithNotices()
     const conflicted = jobFixture({
       id: 'conflicted',
@@ -178,7 +179,7 @@ describe('useJobNotices', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it('FR-SYNC-08, FR-UX-01 a sync failure not explained elsewhere shows a plain notice', async () => {
+  it('a sync failure not explained elsewhere shows a plain notice', async () => {
     const notice = await mountWithNotices()
 
     useJobsStore().upsert(failedFetchJob)
@@ -187,7 +188,7 @@ describe('useJobNotices', () => {
     expect(notice.text()).toContain('Could not sign in to the remote.')
   })
 
-  it("FR-UX-01, FR-SYNC-08 a sync failure's notice shows git's command and stderr behind a details toggle", async () => {
+  it("a sync failure's notice shows git's command and stderr behind a details toggle", async () => {
     const notice = await mountWithNotices()
 
     useJobsStore().upsert(
@@ -212,7 +213,7 @@ describe('useJobNotices', () => {
     expect(notice.text()).toContain('git fetch origin')
   })
 
-  it('FR-UX-01 a failure another notice explains shows no extra notice', async () => {
+  it('a failure another notice explains shows no extra notice', async () => {
     const notice = await mountWithNotices()
     const jobs = useJobsStore()
 
@@ -228,7 +229,7 @@ describe('useJobNotices', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it('FR-UX-16 a job failed LOCKED shows "Try again", running onRetryJob with the job', async () => {
+  it('a job failed LOCKED shows "Try again", running onRetryJob with the job', async () => {
     const notice = await mountWithNotices()
     const job = jobFixture({
       state: JobState.JobFailed,
@@ -246,7 +247,7 @@ describe('useJobNotices', () => {
     expect(onRetryJob).toHaveBeenCalledWith(job)
   })
 
-  it('FR-UX-12 an update-branch job ends updated: notice names the branch, commit count, from and to', async () => {
+  it('an update-branch job ends updated: notice names the branch, commit count, from and to', async () => {
     const notice = await mountWithNotices()
 
     useJobsStore().upsert(
@@ -264,7 +265,7 @@ describe('useJobNotices', () => {
     expect(notice.text()).toContain('Updated feature: 3 commits, abc1234 → def5678')
   })
 
-  it('FR-UPD-05 an update-branch job ends up to date: notice says so', async () => {
+  it('an update-branch job ends up to date: notice says so', async () => {
     const notice = await mountWithNotices()
 
     useJobsStore().upsert(branchUpdateJob())
@@ -273,7 +274,7 @@ describe('useJobNotices', () => {
     expect(notice.text()).toContain('feature is up to date')
   })
 
-  it('FR-UPD-05 an update-branch job fails: notice shows the failure', async () => {
+  it('an update-branch job fails: notice shows the failure', async () => {
     const notice = await mountWithNotices()
 
     useJobsStore().upsert(
@@ -296,7 +297,7 @@ describe('useJobNotices', () => {
   ]
 
   it.each(endedJobs)(
-    'FR-UX-15 %s: its closed notice does not come back on a later job update or a reload of the jobs',
+    '%s: its closed notice does not come back on a later job update or a reload of the jobs',
     async (_, job) => {
       const notice = await mountWithNotices()
       const jobs = useJobsStore()
@@ -316,7 +317,7 @@ describe('useJobNotices', () => {
     },
   )
 
-  it('FR-UX-15 a job that ended before the window listed it shows no notice', async () => {
+  it('a job that ended before the window listed it shows no notice', async () => {
     const notice = await mountWithNotices()
     Facade.Jobs.mockResolvedValue(endedJobs.map(([, job], i) => ({ ...job, id: `j${i}` })))
 
@@ -326,7 +327,7 @@ describe('useJobNotices', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it("FR-UX-15 one branch's update result leaves another branch's open", async () => {
+  it("one branch's update result leaves another branch's open", async () => {
     const notice = await mountWithNotices()
     const jobs = useJobsStore()
 

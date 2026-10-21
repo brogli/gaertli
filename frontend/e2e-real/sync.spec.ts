@@ -1,3 +1,4 @@
+// Requirements: FR-SYNC-01, FR-SYNC-02, FR-SYNC-03, FR-SYNC-04, FR-SYNC-05, FR-SYNC-06, FR-SYNC-07, FR-SYNC-08, FR-SYNC-09, FR-UX-12
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
@@ -71,7 +72,7 @@ function remoteAheadAndLocalAhead(git: Git, work: string, other: string): void {
   commitFiles(git, work, 'local ahead', { 'local.txt': 'local\n' })
 }
 
-test('FR-SYNC-01 Fetch lists a new remote branch and drops one deleted on the remote', async ({
+test('Fetch lists a new remote branch and drops one deleted on the remote', async ({
   app,
   repos,
   git,
@@ -91,11 +92,7 @@ test('FR-SYNC-01 Fetch lists a new remote branch and drops one deleted on the re
   await expect(refRow(app, 'origin/topic/x')).toHaveCount(0)
 })
 
-test('FR-SYNC-07 a running fetch shows its progress and can be cancelled', async ({
-  app,
-  repos,
-  git,
-}) => {
+test('a running fetch shows its progress and can be cancelled', async ({ app, repos, git }) => {
   git(repos.work, 'config', 'remote.origin.uploadpack', slowUploadPack)
   git(repos.other, 'push', '-q', 'origin', 'main:refs/heads/newremote')
 
@@ -124,7 +121,7 @@ test.describe('with work and other open', () => {
     await expect(page.locator('.row .subject').first()).toHaveText(subject)
   }
 
-  test("FR-UX-12 FR-SYNC-07 a fetch's job shows in its worktree's page only", async ({
+  test("a fetch's job shows in its worktree's page only", async ({
     app,
     openApp,
     repos,
@@ -144,7 +141,7 @@ test.describe('with work and other open', () => {
   })
 })
 
-test('FR-SYNC-03 Push sends the current branch and the ahead count drops to zero', async ({
+test('Push sends the current branch and the ahead count drops to zero', async ({
   openApp,
   repos,
   git,
@@ -159,7 +156,7 @@ test('FR-SYNC-03 Push sends the current branch and the ahead count drops to zero
   expect(rev(git, repos.remote, 'main')).toBe(rev(git, repos.work, 'HEAD'))
 })
 
-test('FR-SYNC-02 choosing Pull (rebase) changes the button without pulling; Pull then rebases, and the mode survives a reload', async ({
+test('choosing Pull (rebase) changes the button without pulling; Pull then rebases, and the mode survives a reload', async ({
   openApp,
   repos,
   git,
@@ -184,7 +181,7 @@ test('FR-SYNC-02 choosing Pull (rebase) changes the button without pulling; Pull
   await expect(pullButton(app)).toHaveAttribute('title', 'Pull (rebase) · Ctrl+T')
 })
 
-test('FR-SYNC-06 force push asks first, warns on a protected branch, and the remote follows', async ({
+test('force push asks first, warns on a protected branch, and the remote follows', async ({
   openApp,
   repos,
   git,
@@ -202,7 +199,7 @@ test('FR-SYNC-06 force push asks first, warns on a protected branch, and the rem
   await expect(notice(app)).toBeHidden()
 })
 
-test("FR-SYNC-04 FR-SYNC-05 a rejected push names git's reason and offers Pull and Force push; forcing it is refused while the remote has commits not yet fetched", async ({
+test("a rejected push names git's reason and offers Pull and Force push; forcing it is refused while the remote has commits not yet fetched", async ({
   openApp,
   repos,
   git,
@@ -224,7 +221,7 @@ test("FR-SYNC-04 FR-SYNC-05 a rejected push names git's reason and offers Pull a
   expect(rev(git, repos.remote, 'main')).toBe(remoteTip)
 })
 
-test("FR-SYNC-08 a fetch from a login-protected remote says sign-in failed, shows git's message and never sends credentials", async ({
+test("a fetch from a login-protected remote says sign-in failed, shows git's message and never sends credentials", async ({
   app,
   repos,
   git,
@@ -241,7 +238,7 @@ test("FR-SYNC-08 a fetch from a login-protected remote says sign-in failed, show
   expect(loginProtectedRemote.authorizations.every((a) => a === '')).toBe(true)
 })
 
-test("FR-SYNC-09 a stash-and-pull that stops on conflicts keeps the stash; Restore brings back the app's stash, not a newer one", async ({
+test("a stash-and-pull that stops on conflicts keeps the stash; Restore brings back the app's stash, not a newer one", async ({
   openApp,
   repos,
   git,

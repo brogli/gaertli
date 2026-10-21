@@ -1,3 +1,5 @@
+// Requirements: DIST-04
+
 package userpath
 
 import (
@@ -5,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestDIST_04_WithEntryAppendsOnceAndKeepsOtherEntriesVerbatim(t *testing.T) {
+func TestWithEntryAppendsOnceAndKeepsOtherEntriesVerbatim(t *testing.T) {
 	path := `C:\a;%USERPROFILE%\b`
 	dir := `C:\Apps\nebegit\bin`
 
@@ -21,7 +23,7 @@ func TestDIST_04_WithEntryAppendsOnceAndKeepsOtherEntriesVerbatim(t *testing.T) 
 	}
 }
 
-func TestDIST_04_WithEntryKeepsEveryCharacterOfALongPath(t *testing.T) {
+func TestWithEntryKeepsEveryCharacterOfALongPath(t *testing.T) {
 	long := strings.Repeat(`C:\dir;`, 300) // 2100 characters
 	dir := `C:\Apps\nebegit\bin`
 
@@ -33,7 +35,7 @@ func TestDIST_04_WithEntryKeepsEveryCharacterOfALongPath(t *testing.T) {
 	}
 }
 
-func TestDIST_04_WithEntryIgnoresCaseAndATrailingBackslash(t *testing.T) {
+func TestWithEntryIgnoresCaseAndATrailingBackslash(t *testing.T) {
 	path := `C:\a;C:\APPS\NEBEGIT\BIN\;C:\b`
 	dir := `C:\Apps\nebegit\bin`
 
@@ -44,7 +46,7 @@ func TestDIST_04_WithEntryIgnoresCaseAndATrailingBackslash(t *testing.T) {
 	}
 }
 
-func TestDIST_04_WithoutEntryDropsEveryMatchAndKeepsTheRestInOrder(t *testing.T) {
+func TestWithoutEntryDropsEveryMatchAndKeepsTheRestInOrder(t *testing.T) {
 	path := `C:\a;C:\Apps\nebegit\bin;C:\b;C:\APPS\NEBEGIT\BIN\;C:\c`
 	dir := `C:\Apps\nebegit\bin`
 
@@ -56,7 +58,7 @@ func TestDIST_04_WithoutEntryDropsEveryMatchAndKeepsTheRestInOrder(t *testing.T)
 	}
 }
 
-func TestDIST_04_WithoutEntryOnAnEmptyPathStaysEmpty(t *testing.T) {
+func TestWithoutEntryOnAnEmptyPathStaysEmpty(t *testing.T) {
 	if got := withoutEntry("", `C:\Apps\nebegit\bin`); got != "" {
 		t.Fatalf(`withoutEntry("", dir) = %q, want ""`, got)
 	}

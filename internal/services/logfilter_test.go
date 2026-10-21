@@ -1,3 +1,5 @@
+// Requirements: FR-LOG-05, FR-LOG-06, FR-LOG-07, FR-LOG-08, QA-PERF-04
+
 package services
 
 import (
@@ -10,7 +12,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_LOG_05_LogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
+func TestLogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
 	t.Parallel()
 	args := LogArgs(core.LogFilter{Author: "a", Branches: []string{"main"}, Path: "p"})
 	if slices.ContainsFunc(args, func(a string) bool { return strings.HasPrefix(a, "--grep") }) {
@@ -25,7 +27,7 @@ func TestFR_LOG_05_LogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_05_HashPatternMatchesHexOnly(t *testing.T) {
+func TestHashPatternMatchesHexOnly(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		s    string
@@ -45,7 +47,7 @@ func TestFR_LOG_05_HashPatternMatchesHexOnly(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *testing.T) {
+func TestSearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first commit")
@@ -88,7 +90,7 @@ func TestFR_LOG_05_SearchLogFindsMatchingMessagesCaseInsensitiveInLogOrder(t *te
 	}
 }
 
-func TestFR_LOG_05_SearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
+func TestSearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.History(t, repo.Dir,
@@ -118,7 +120,7 @@ func TestFR_LOG_05_SearchLogCombinesWithTheActiveAuthorFilter(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_05_SearchLogByHashInAFilteredViewFindsOnlyCommitsInsideIt(t *testing.T) {
+func TestSearchLogByHashInAFilteredViewFindsOnlyCommitsInsideIt(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	_, tagSHA := branchAndTagNamedV1(t, repo.Dir)
@@ -153,7 +155,7 @@ func TestFR_LOG_05_SearchLogByHashInAFilteredViewFindsOnlyCommitsInsideIt(t *tes
 	}
 }
 
-func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
+func TestSetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "root.txt", "r", "root")
@@ -186,7 +188,7 @@ func TestFR_LOG_06_SetLogFilterByBranchScopesToItsOwnHistory(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_06_SetLogFilterByTagShowsTheHistoryLeadingToIt(t *testing.T) {
+func TestSetLogFilterByTagShowsTheHistoryLeadingToIt(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	branchAndTagNamedV1(t, repo.Dir) // v1: a branch at "first", an annotated tag at "second"
@@ -207,7 +209,7 @@ func TestFR_LOG_06_SetLogFilterByTagShowsTheHistoryLeadingToIt(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *testing.T) {
+func TestSetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "path.txt", "1", "A touches path")
@@ -236,7 +238,7 @@ func TestFR_LOG_07_SetLogFilterByPathRewritesParentsAcrossSkippedCommits(t *test
 	}
 }
 
-func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) {
+func TestSetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.History(t, repo.Dir,
@@ -260,7 +262,7 @@ func TestFR_LOG_08_SetLogFilterCombinesAuthorBranchAndPathWithAND(t *testing.T) 
 	}
 }
 
-func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T) {
+func TestSetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
@@ -297,7 +299,7 @@ func TestFR_LOG_08_SetLogFilterEmptyClearsInstantlyWithNoNewGitCall(t *testing.T
 	}
 }
 
-func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
+func TestSetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
 	streamFakeLog(t, c, id, 5, 100)
@@ -329,7 +331,7 @@ func TestFR_LOG_08_SetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 }
 
 // The ≤2s-at-100k-commits target is tools/bench's case.
-func TestQA_PERF_04_FirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
+func TestFirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
 	streamFakeLog(t, c, id, 5, 200) // 5 records * 200ms = 1s unstreamed

@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-05
+
 package services
 
 import (
@@ -8,7 +10,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_CONF_05_ConflictSideChangesMarkWhereASideDiffersFromTheBase(t *testing.T) {
+func TestConflictSideChangesMarkWhereASideDiffersFromTheBase(t *testing.T) {
 	t.Parallel()
 	base := "l1\nl2\nl3\nl4\nl5\n"
 	current := "l1\nc2\nl3\nl4\nc5\n"
@@ -30,7 +32,7 @@ func TestFR_CONF_05_ConflictSideChangesMarkWhereASideDiffersFromTheBase(t *testi
 	}
 }
 
-func TestFR_CONF_05_ConflictSideChangesMarkAddedLines(t *testing.T) {
+func TestConflictSideChangesMarkAddedLines(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("l1\nl2\nl3\n"), version("l1\nl2\nc3\n"), version("l1\nnew\nl2\ni3\n"))
 
@@ -42,7 +44,7 @@ func TestFR_CONF_05_ConflictSideChangesMarkAddedLines(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_05_ConflictSideChangesWithoutABaseAreTheWholeSide(t *testing.T) {
+func TestConflictSideChangesWithoutABaseAreTheWholeSide(t *testing.T) {
 	t.Parallel()
 	dir := gittest.New(t).Dir
 	commitVersion(t, dir, "other.txt", version("x\n"), "start")
@@ -66,7 +68,7 @@ func TestFR_CONF_05_ConflictSideChangesWithoutABaseAreTheWholeSide(t *testing.T)
 	}
 }
 
-func TestFR_CONF_05_ConflictRegionsListEveryChangeWithItsKindAndRanges(t *testing.T) {
+func TestConflictRegionsListEveryChangeWithItsKindAndRanges(t *testing.T) {
 	t.Parallel()
 	base := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\n"
 	current := "l1\nc2\nl3\nl4\nc5\nl6\nl7\nl8\nl9\nl10\n"
@@ -87,7 +89,7 @@ func TestFR_CONF_05_ConflictRegionsListEveryChangeWithItsKindAndRanges(t *testin
 	}
 }
 
-func TestFR_CONF_05_ConflictRegionsLeaveOutAChangeBothSidesMadeAlike(t *testing.T) {
+func TestConflictRegionsLeaveOutAChangeBothSidesMadeAlike(t *testing.T) {
 	t.Parallel()
 	base := "l1\nl2\nl3\nl4\nl5\n"
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version(base), version("l1\nsame\nl3\nl4\nc5\n"), version("l1\nsame\nl3\nl4\ni5\n"))

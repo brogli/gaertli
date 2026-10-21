@@ -1,3 +1,4 @@
+// Requirements: FR-BR-09, FR-UX-14, FR-WT-15
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { openBranchPicker, openMockRepo, openWorktreePicker, settleAnimations } from './helpers'
 
@@ -13,7 +14,7 @@ async function settledBox(page: Page, locator: Locator) {
   return (await locator.boundingBox())!
 }
 
-test('FR-UX-14 a worktree row button click still lets a later outside click close the list', async ({
+test('a worktree row button click still lets a later outside click close the list', async ({
   page,
 }) => {
   await openMockRepo(page)
@@ -28,7 +29,7 @@ test('FR-UX-14 a worktree row button click still lets a later outside click clos
   await expect(page.locator('.p-popover')).toBeHidden()
 })
 
-test('FR-BR-09, FR-UX-14 a branch entry\'s context menu opens at the pointer and its "…" menu below its button; one outside click closes the menu and the list', async ({
+test('a branch entry\'s context menu opens at the pointer and its "…" menu below its button; one outside click closes the menu and the list', async ({
   page,
 }) => {
   await openMockRepo(page)
@@ -67,7 +68,7 @@ test('FR-BR-09, FR-UX-14 a branch entry\'s context menu opens at the pointer and
   await expectOutsideClickClosesBoth()
 })
 
-test("FR-WT-15 Shift+F10 in the branch list opens the active entry's context menu below it; Escape closes both", async ({
+test("Shift+F10 in the branch list opens the active entry's context menu below it; Escape closes both", async ({
   page,
 }) => {
   await openMockRepo(page)

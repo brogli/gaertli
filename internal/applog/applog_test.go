@@ -1,3 +1,5 @@
+// Requirements: FR-UX-02, FR-UX-19
+
 package applog
 
 import (
@@ -28,7 +30,7 @@ func platformStateDir(t *testing.T) string {
 	}
 }
 
-func TestFR_UX_02_OpenCreatesTheLogUnderThePlatformsStateDir(t *testing.T) {
+func TestOpenCreatesTheLogUnderThePlatformsStateDir(t *testing.T) {
 	want := platformStateDir(t)
 
 	logger, path, closer, _, err := Open(false)
@@ -57,7 +59,7 @@ func TestFR_UX_02_OpenCreatesTheLogUnderThePlatformsStateDir(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_OpenRotatesAnOversizedLog(t *testing.T) {
+func TestOpenRotatesAnOversizedLog(t *testing.T) {
 	path := platformStateDir(t)
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -90,7 +92,7 @@ func TestFR_UX_02_OpenRotatesAnOversizedLog(t *testing.T) {
 	}
 }
 
-func TestFR_UX_19_OpenStartsAtInfo(t *testing.T) {
+func TestOpenStartsAtInfo(t *testing.T) {
 	platformStateDir(t)
 
 	_, _, closer, level, err := Open(false)
@@ -104,7 +106,7 @@ func TestFR_UX_19_OpenStartsAtInfo(t *testing.T) {
 	}
 }
 
-func TestFR_UX_19_OpenStartsAtDebugWhenNebegitLogIsDebug(t *testing.T) {
+func TestOpenStartsAtDebugWhenNebegitLogIsDebug(t *testing.T) {
 	platformStateDir(t)
 	t.Setenv("NEBEGIT_LOG", "debug")
 
@@ -119,7 +121,7 @@ func TestFR_UX_19_OpenStartsAtDebugWhenNebegitLogIsDebug(t *testing.T) {
 	}
 }
 
-func TestFR_UX_19_SetLevelDebugModeTrueSetsDebug(t *testing.T) {
+func TestSetLevelDebugModeTrueSetsDebug(t *testing.T) {
 	level := &slog.LevelVar{}
 
 	SetLevel(level, true)
@@ -129,7 +131,7 @@ func TestFR_UX_19_SetLevelDebugModeTrueSetsDebug(t *testing.T) {
 	}
 }
 
-func TestFR_UX_19_SetLevelDebugModeFalseSetsInfo(t *testing.T) {
+func TestSetLevelDebugModeFalseSetsInfo(t *testing.T) {
 	level := &slog.LevelVar{}
 	level.Set(slog.LevelDebug)
 
@@ -140,7 +142,7 @@ func TestFR_UX_19_SetLevelDebugModeFalseSetsInfo(t *testing.T) {
 	}
 }
 
-func TestFR_UX_19_SetLevelNebegitLogDebugForcesDebugEvenWhenDebugModeFalse(t *testing.T) {
+func TestSetLevelNebegitLogDebugForcesDebugEvenWhenDebugModeFalse(t *testing.T) {
 	t.Setenv("NEBEGIT_LOG", "debug")
 	level := &slog.LevelVar{}
 

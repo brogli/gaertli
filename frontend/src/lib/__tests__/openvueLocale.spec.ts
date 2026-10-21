@@ -1,3 +1,4 @@
+// Requirements: FR-UX-11
 import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import { openvueLocale } from '../openvueLocale'
@@ -21,7 +22,7 @@ const openvue = {
 }
 
 describe('openvueLocale', () => {
-  it("FR-UX-11 OpenVue's built-in texts come from the catalogue, its own {0} placeholder kept", () => {
+  it("OpenVue's built-in texts come from the catalogue, its own {0} placeholder kept", () => {
     const other = createI18n({ legacy: false, locale: 'en', messages: { en: { ...en, openvue } } })
 
     const locale = openvueLocale(other.global.t)

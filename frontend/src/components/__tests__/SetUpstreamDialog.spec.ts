@@ -1,3 +1,4 @@
+// Requirements: FR-SYNC-11, FR-SYNC-12
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -26,7 +27,7 @@ describe('SetUpstreamDialog', () => {
     Facade.Push.mockReset().mockResolvedValue('job-1')
   })
 
-  it('FR-SYNC-12 one remote: names it, no select; confirm pushes to it', async () => {
+  it('one remote: names it, no select; confirm pushes to it', async () => {
     const { body } = await mountDialog(['origin'], 'origin')
 
     expect(body.text()).toContain('origin/feature')
@@ -38,7 +39,7 @@ describe('SetUpstreamDialog', () => {
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'feature')
   })
 
-  it('FR-SYNC-12 cancel closes without pushing', async () => {
+  it('cancel closes without pushing', async () => {
     const { wrapper, body } = await mountDialog(['origin'], 'origin')
 
     await body.get('[data-test="dialog-cancel"]').trigger('click')
@@ -47,7 +48,7 @@ describe('SetUpstreamDialog', () => {
     expect(Facade.Push).not.toHaveBeenCalled()
   })
 
-  it('FR-SYNC-11 several remotes, nothing preselected: select shown, confirm disabled until picked, then pushes to it', async () => {
+  it('several remotes, nothing preselected: select shown, confirm disabled until picked, then pushes to it', async () => {
     const { body } = await mountDialog(['up', 'other'], '')
 
     const select = body.get('[data-test="set-upstream-remote"]')
@@ -69,7 +70,7 @@ describe('SetUpstreamDialog', () => {
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'other', 'feature')
   })
 
-  it('FR-SYNC-11 several remotes, one preselected: select shows it', async () => {
+  it('several remotes, one preselected: select shows it', async () => {
     const { body } = await mountDialog(['up', 'origin'], 'origin')
 
     expect(body.get('[data-test="set-upstream-remote"]').text()).toBe('origin')

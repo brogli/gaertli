@@ -1,3 +1,5 @@
+// Requirements: DIST-03, OSS-04, QA-MNT-04, QA-MNT-05
+
 // Package repocheck holds the tests that scan the working tree for what no
 // linter checks: foreign lockfiles, owner-specific defaults, test-file
 // placement, glossary use, the release version script.
@@ -30,7 +32,7 @@ func readFile(t *testing.T, root, rel string) string {
 	return string(b)
 }
 
-func TestTR_23_NoOtherPackageManagersLockfile(t *testing.T) {
+func TestNoOtherPackageManagersLockfile(t *testing.T) {
 	root := repoRoot(t)
 
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -55,7 +57,7 @@ func TestTR_23_NoOtherPackageManagersLockfile(t *testing.T) {
 // .spec., ts or js).
 var vitestTestPattern = regexp.MustCompile(`\.(test|spec)\.(ts|js)$`)
 
-func TestTR_33_TestFilesLiveInTestsFolderAsSpecTs(t *testing.T) {
+func TestTestFilesLiveInTestsFolderAsSpecTs(t *testing.T) {
 	root := filepath.Join(repoRoot(t), "frontend/src")
 	var offenders []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -137,7 +139,7 @@ func findOwnerSpecificDefaults(t *testing.T, root string) []string {
 	return violations
 }
 
-func TestOSS_04_NoOwnerSpecificDefaults(t *testing.T) {
+func TestNoOwnerSpecificDefaults(t *testing.T) {
 	t.Run("fixture", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFixture := func(name, content string) {
@@ -166,7 +168,7 @@ func TestOSS_04_NoOwnerSpecificDefaults(t *testing.T) {
 	})
 }
 
-func TestDIST_03_ReleaseVersionIsConfigsSemanticVersion(t *testing.T) {
+func TestReleaseVersionIsConfigsSemanticVersion(t *testing.T) {
 	dir := t.TempDir()
 	script := readFile(t, repoRoot(t), "build/release-version.sh")
 	if err := os.WriteFile(filepath.Join(dir, "release-version.sh"), []byte(script), 0o755); err != nil {

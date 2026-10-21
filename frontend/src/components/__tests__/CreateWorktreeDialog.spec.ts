@@ -1,3 +1,4 @@
+// Requirements: FR-REPO-07, FR-UX-17, FR-WT-02, FR-WT-03, FR-WT-12, FR-WT-18
 import { type DOMWrapper, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -86,7 +87,7 @@ describe('CreateWorktreeDialog', () => {
       target: '\\\\wsl.localhost\\Ubuntu\\home\\u\\r\\wt',
     },
   ])(
-    'FR-WT-02 an existing branch chosen submits with an empty start and newBranch false ($env repo, WSL paths as UNC)',
+    'an existing branch chosen submits with an empty start and newBranch false ($env repo, WSL paths as UNC)',
     async ({ props, location, repo, target }) => {
       Facade.AddWorktree.mockResolvedValue({})
 
@@ -113,7 +114,7 @@ describe('CreateWorktreeDialog', () => {
     { start: 'origin/x', ref: 'refs/remotes/origin/x' },
     { start: 'v1', ref: 'refs/tags/v1' },
   ])(
-    'FR-WT-02 a new branch starts at the current branch unless a branch or tag is picked, sent by its full ref name; the location defaults to the base folder ($start)',
+    'a new branch starts at the current branch unless a branch or tag is picked, sent by its full ref name; the location defaults to the base folder ($start)',
     async ({ start, ref }) => {
       const { body } = await mountDialog({ repoPath: '/repos/alpha' })
 
@@ -129,7 +130,7 @@ describe('CreateWorktreeDialog', () => {
     },
   )
 
-  it('FR-WT-02 a new branch from the log view starts at that commit, shown fixed', async () => {
+  it('a new branch from the log view starts at that commit, shown fixed', async () => {
     const start: WorktreeStart = { newBranch: true, start: { rev: 'abc123456', label: 'abc1234' } }
     const { body } = await mountDialog({ repoPath: '/repos/alpha', start })
     expect(field(body, 'Start point').element.value).toBe('abc1234')
@@ -154,7 +155,7 @@ describe('CreateWorktreeDialog', () => {
     }
   }
 
-  it("FR-WT-18 unset in Settings, the base folder is the main worktree's parent; the name joins the repo's folder and the branch", async () => {
+  it("unset in Settings, the base folder is the main worktree's parent; the name joins the repo's folder and the branch", async () => {
     const { body } = await mountDialog({ repoPath: '/repos/alpha-feature' })
 
     await chooseOption(body, 'existing-branch', 'feature')
@@ -163,7 +164,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'alpha-feature', location: '/repos/alpha-feature' })
   })
 
-  it("FR-WT-18 Settings' base folder for the repo's environment holds the new worktree", async () => {
+  it("Settings' base folder for the repo's environment holds the new worktree", async () => {
     useSettingsStore().settings = defaultSettingsFixture({
       worktreeFolders: { '': '/wt', Ubuntu: '/home/u/wt' },
     })
@@ -178,7 +179,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(wsl.body).location).toBe('/home/u/wt/alpha-feature')
   })
 
-  it("FR-WT-18 the name and the location's last folder stay in step", async () => {
+  it("the name and the location's last folder stay in step", async () => {
     const { body } = await mountDialog({ repoPath: '/repos/alpha' })
 
     await field(body, 'Folder name').setValue('x')
@@ -188,7 +189,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'y', location: '/other/y' })
   })
 
-  it("FR-WT-18 the name follows a new branch's name, a slash as a hyphen, until the name is edited", async () => {
+  it("the name follows a new branch's name, a slash as a hyphen, until the name is edited", async () => {
     const { body } = await mountDialog({ repoPath: '/repos/alpha' })
     await body.get('input[type="checkbox"]').setValue(true)
 
@@ -200,7 +201,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'mine', location: '/repos/mine' })
   })
 
-  it('FR-WT-18 a long location scrolls to its end, so the changing folder name stays visible; the full path is its tooltip', async () => {
+  it('a long location scrolls to its end, so the changing folder name stays visible; the full path is its tooltip', async () => {
     Facade.ListWorktrees.mockResolvedValue([
       worktreeFixture({
         path: '/home/user/projects/very/deeply/nested/repositories/alpha',
@@ -216,7 +217,7 @@ describe('CreateWorktreeDialog', () => {
     expect(location.attributes('title')).toBe(location.element.value)
   })
 
-  it('FR-WT-18 a folder picked with Browse… becomes the location, its last folder the name', async () => {
+  it('a folder picked with Browse… becomes the location, its last folder the name', async () => {
     AppService.PickFolder.mockResolvedValue(['/picked/z', true])
     const { body } = await mountDialog({ repoPath: '/repos/alpha' })
 
@@ -226,7 +227,7 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'z', location: '/picked/z' })
   })
 
-  it('FR-UX-17 a new branch adds its own labelled fields; Browse sits beside Location', async () => {
+  it('a new branch adds its own labelled fields; Browse sits beside Location', async () => {
     const { body } = await mountDialog({ repoPath: '/repo' })
 
     await body.get('input[type="checkbox"]').setValue(true)
@@ -234,7 +235,7 @@ describe('CreateWorktreeDialog', () => {
     expect(body.find('.p-inputgroup [data-test="browse-target"]').exists()).toBe(true)
   })
 
-  it("FR-REPO-07 Browse seeds PickFolder at the distro's UNC root for a WSL repo", async () => {
+  it("Browse seeds PickFolder at the distro's UNC root for a WSL repo", async () => {
     const { body } = await mountDialog(wslRepo)
 
     await body.get('[data-test="browse-target"]').trigger('click')
@@ -242,7 +243,7 @@ describe('CreateWorktreeDialog', () => {
     expect(AppService.PickFolder).toHaveBeenCalledWith('\\\\wsl.localhost\\Ubuntu')
   })
 
-  it('FR-WT-03 a rejected InvalidName shows the error and keeps the dialog open', async () => {
+  it('a rejected InvalidName shows the error and keeps the dialog open', async () => {
     Facade.AddWorktree.mockRejectedValueOnce(
       wailsError('"-bad" is not a valid branch name', 'INVALID_NAME'),
     )
@@ -257,7 +258,7 @@ describe('CreateWorktreeDialog', () => {
     expect(wrapper.emitted('close')).toBeUndefined()
   })
 
-  it('FR-WT-02 an existing-branch start preselects that branch in the dropdown', async () => {
+  it('an existing-branch start preselects that branch in the dropdown', async () => {
     const { body } = await mountDialog({
       repoPath: '/repo',
       start: { newBranch: false, branch: 'feature' },
@@ -266,7 +267,7 @@ describe('CreateWorktreeDialog', () => {
     expect(body.get('[data-test="existing-branch"]').text()).toBe('feature')
   })
 
-  it('FR-WT-12 a successful create shows the follow-up instead of closing', async () => {
+  it('a successful create shows the follow-up instead of closing', async () => {
     const { wrapper, body } = await createFollowUp()
 
     expect(body.text()).toContain('Open in app window')
@@ -290,7 +291,7 @@ describe('CreateWorktreeDialog', () => {
   ])
 
   it.each(followUps)(
-    'FR-WT-12 $button opens the created path, as its UNC form in a WSL repo, then closes ($env)',
+    '$button opens the created path, as its UNC form in a WSL repo, then closes ($env)',
     async ({ props, created, opened, button, called, other }) => {
       Facade.AddWorktree.mockResolvedValue({ path: created })
       const { wrapper, body } = await submitExisting(props, created)
@@ -305,7 +306,7 @@ describe('CreateWorktreeDialog', () => {
     },
   )
 
-  it('FR-WT-12 "Both" calls OpenPath then OpenFolderAt, then closes', async () => {
+  it('"Both" calls OpenPath then OpenFolderAt, then closes', async () => {
     const { wrapper, body } = await createFollowUp()
 
     await body.get('[data-test="open-both"]').trigger('click')
@@ -319,7 +320,7 @@ describe('CreateWorktreeDialog', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  it('FR-WT-12 "Not now" closes without calling either binding', async () => {
+  it('"Not now" closes without calling either binding', async () => {
     const { wrapper, body } = await createFollowUp()
 
     await body.get('[data-test="not-now"]').trigger('click')

@@ -1,3 +1,4 @@
+// Requirements: FR-DIFF-02, FR-DIFF-06, FR-DIFF-07, FR-ED-09
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
@@ -26,11 +27,7 @@ const diffLine = (page: Page, text: string) =>
   diffPane(page).locator('.cm-line', { hasText: text }).first()
 const selectedFile = (page: Page) => page.locator('.file-list li.selected')
 
-test("FR-DIFF-07 the diff window lists a commit's files beside the diff", async ({
-  openDiff,
-  git,
-  repos,
-}) => {
+test("the diff window lists a commit's files beside the diff", async ({ openDiff, git, repos }) => {
   const diff = await openDiff(repos.work, {
     kind: 'commit',
     sha: commitSha(git, repos.work, 'docs and func b'),
@@ -42,7 +39,7 @@ test("FR-DIFF-07 the diff window lists a commit's files beside the diff", async 
   await expect(diffText(diff)).toContainText('more docs')
 })
 
-test('FR-DIFF-02 FR-ED-09 next/previous change jump between far changes; "Open in editor" opens the file at the clicked line', async ({
+test('next/previous change jump between far changes; "Open in editor" opens the file at the clicked line', async ({
   openDiff,
   git,
   repos,
@@ -73,10 +70,7 @@ test('FR-DIFF-02 FR-ED-09 next/previous change jump between far changes; "Open i
     .toEqual([`stand-in-editor ${path.join(repos.work, 'long.txt')}:180`])
 })
 
-test('FR-DIFF-06 "ignore whitespace" hides a whitespace-only change', async ({
-  openDiff,
-  repos,
-}) => {
+test('"ignore whitespace" hides a whitespace-only change', async ({ openDiff, repos }) => {
   fs.writeFileSync(path.join(repos.work, 'hunks.txt'), hunksText({ 7: 'line 7   ' }))
   const diff = await openDiff(repos.work, { kind: 'working', file: 'hunks.txt' })
   const changed = diffPane(diff).locator('.cm-changedLine, .cm-deletedChunk')

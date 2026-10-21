@@ -1,3 +1,5 @@
+// Requirements: FR-CHG-10
+
 package services
 
 import (
@@ -13,7 +15,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_CHG_10_DiscardFileRestoresATrackedFileAndRemovesAnUntrackedFileOrDirectory(t *testing.T) {
+func TestDiscardFileRestoresATrackedFileAndRemovesAnUntrackedFileOrDirectory(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
@@ -48,7 +50,7 @@ func TestFR_CHG_10_DiscardFileRestoresATrackedFileAndRemovesAnUntrackedFileOrDir
 	}
 }
 
-func TestFR_CHG_10_DiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstagedChangePending(t *testing.T) {
+func TestDiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstagedChangePending(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	changed := twoHunksFixture(t, repo.Dir)
@@ -76,7 +78,7 @@ func TestFR_CHG_10_DiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstage
 	}
 }
 
-func TestFR_CHG_10_DiscardLinesOfTheSecondHunkAloneRevertsItsOwnBlockNotAnIdenticalOne(t *testing.T) {
+func TestDiscardLinesOfTheSecondHunkAloneRevertsItsOwnBlockNotAnIdenticalOne(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", twinBlocks("", "CHANGED", "TARGET"), "base")
@@ -93,7 +95,7 @@ func TestFR_CHG_10_DiscardLinesOfTheSecondHunkAloneRevertsItsOwnBlockNotAnIdenti
 	}
 }
 
-func TestFR_CHG_10_DiscardLinesRestoringLinesAfterALastLineWithoutNewlineGivesThatLineANewline(t *testing.T) {
+func TestDiscardLinesRestoringLinesAfterALastLineWithoutNewlineGivesThatLineANewline(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "first\nlast\nold1\nold2\n", "base")
@@ -112,7 +114,7 @@ func TestFR_CHG_10_DiscardLinesRestoringLinesAfterALastLineWithoutNewlineGivesTh
 // A selection that names a replacement's old lines with its new ones, as a
 // hunk action does and as the UI sends a line selection in a replacement
 // (see DiffView's selectedLines).
-func TestFR_CHG_10_DiscardLinesOfAReplacementRestoresTheReplacedLine(t *testing.T) {
+func TestDiscardLinesOfAReplacementRestoresTheReplacedLine(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "a\nb", "base")
@@ -128,7 +130,7 @@ func TestFR_CHG_10_DiscardLinesOfAReplacementRestoresTheReplacedLine(t *testing.
 	}
 }
 
-func TestFR_CHG_10_DiscardLinesRestoringALineWithoutNewlineThatAKeptLineFollowsGivesItANewline(t *testing.T) {
+func TestDiscardLinesRestoringALineWithoutNewlineThatAKeptLineFollowsGivesItANewline(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "a\nX", "base")
@@ -144,7 +146,7 @@ func TestFR_CHG_10_DiscardLinesRestoringALineWithoutNewlineThatAKeptLineFollowsG
 	}
 }
 
-func TestFR_CHG_10_DiscardLinesRefusesStaleSelectionsAndAppliesNothing(t *testing.T) {
+func TestDiscardLinesRefusesStaleSelectionsAndAppliesNothing(t *testing.T) {
 	t.Parallel()
 	const base, displayed = "1\n2\n3\n4\n5\n6\n", "1\n2\n3\n4\nX\n5\n6\n"
 	tests := []struct {
@@ -184,7 +186,7 @@ func TestFR_CHG_10_DiscardLinesRefusesStaleSelectionsAndAppliesNothing(t *testin
 	}
 }
 
-func TestFR_CHG_10_DiscardLinesRevertsOnlyTheSelectedHunk(t *testing.T) {
+func TestDiscardLinesRevertsOnlyTheSelectedHunk(t *testing.T) {
 	t.Parallel()
 	t.Run("a CRLF working file under autocrlf keeps CRLF on every line", func(t *testing.T) {
 		repo := gittest.New(t)
@@ -218,7 +220,7 @@ func TestFR_CHG_10_DiscardLinesRevertsOnlyTheSelectedHunk(t *testing.T) {
 	})
 }
 
-func TestFR_CHG_10_DiscardFileTakesAGlobLikeNameLiterally(t *testing.T) {
+func TestDiscardFileTakesAGlobLikeNameLiterally(t *testing.T) {
 	t.Parallel()
 	dir := globRepo(t)
 	writeFile(t, dir, "a.txt", "changed\n")
@@ -237,7 +239,7 @@ func TestFR_CHG_10_DiscardFileTakesAGlobLikeNameLiterally(t *testing.T) {
 	}
 }
 
-func TestFR_CHG_10_DiscardUntrackedFileTakesAGlobLikeNameLiterally(t *testing.T) {
+func TestDiscardUntrackedFileTakesAGlobLikeNameLiterally(t *testing.T) {
 	t.Parallel()
 	dir := gittest.New(t).Dir
 	gittest.Commit(t, dir, "seed.txt", "x", "seed")
@@ -257,7 +259,7 @@ func TestFR_CHG_10_DiscardUntrackedFileTakesAGlobLikeNameLiterally(t *testing.T)
 	}
 }
 
-func TestFR_CHG_10_DiscardLinesOfAPatternNamedFileChangesOnlyThatFile(t *testing.T) {
+func TestDiscardLinesOfAPatternNamedFileChangesOnlyThatFile(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	patternTwins(t, repo.Dir)

@@ -1,3 +1,5 @@
+// Requirements: FR-LOG-02
+
 package graph
 
 import (
@@ -8,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestFR_LOG_02_LinearHistoryDrawsOneLaneIntoAndOutOfEachDot(t *testing.T) {
+func TestLinearHistoryDrawsOneLaneIntoAndOutOfEachDot(t *testing.T) {
 	l := NewLayout()
 
 	c := l.Next(Commit{SHA: "C", Parents: []string{"B"}})
@@ -28,7 +30,7 @@ func TestFR_LOG_02_LinearHistoryDrawsOneLaneIntoAndOutOfEachDot(t *testing.T) {
 }
 
 // B and C, both off A, merge into M. Topo order (newest first) feeds M, B, C, A.
-func TestFR_LOG_02_MergeDrawsALineToEachParentsLane(t *testing.T) {
+func TestMergeDrawsALineToEachParentsLane(t *testing.T) {
 	l := NewLayout()
 
 	m := l.Next(Commit{SHA: "M", Parents: []string{"B", "C"}})
@@ -48,7 +50,7 @@ func TestFR_LOG_02_MergeDrawsALineToEachParentsLane(t *testing.T) {
 }
 
 // The same history: A is where B's and C's lanes meet.
-func TestFR_LOG_02_ForkDrawsEachBranchIntoTheSharedCommit(t *testing.T) {
+func TestForkDrawsEachBranchIntoTheSharedCommit(t *testing.T) {
 	l := NewLayout()
 	l.Next(Commit{SHA: "M", Parents: []string{"B", "C"}})
 	l.Next(Commit{SHA: "B", Parents: []string{"A"}})
@@ -62,7 +64,7 @@ func TestFR_LOG_02_ForkDrawsEachBranchIntoTheSharedCommit(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_02_OctopusMergeDrawsALineToEveryParent(t *testing.T) {
+func TestOctopusMergeDrawsALineToEveryParent(t *testing.T) {
 	l := NewLayout()
 
 	o := l.Next(Commit{SHA: "O", Parents: []string{"P1", "P2", "P3"}})
@@ -76,7 +78,7 @@ func TestFR_LOG_02_OctopusMergeDrawsALineToEveryParent(t *testing.T) {
 // On a random history, the lanes leaving a row at its bottom (through, out)
 // are exactly the lanes entering the next row at its top (through, in),
 // each in the same colour.
-func TestFR_LOG_02_LinesMeetAtRowBoundaries(t *testing.T) {
+func TestLinesMeetAtRowBoundaries(t *testing.T) {
 	l := NewLayout()
 	var above map[int]int
 	for i, c := range randomHistory(300) {
@@ -92,7 +94,7 @@ func TestFR_LOG_02_LinesMeetAtRowBoundaries(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_02_FreedLaneIsReusedBelowTheFork(t *testing.T) {
+func TestFreedLaneIsReusedBelowTheFork(t *testing.T) {
 	l := NewLayout()
 	l.Next(Commit{SHA: "X", Parents: []string{"R"}})
 	l.Next(Commit{SHA: "Y", Parents: []string{"R"}})
@@ -108,7 +110,7 @@ func TestFR_LOG_02_FreedLaneIsReusedBelowTheFork(t *testing.T) {
 }
 
 // 40 branches share one root, past the 32-lane cap. The 8 tips past the cap draw only their dot.
-func TestFR_LOG_02_WideForkOverflowsPastCap(t *testing.T) {
+func TestWideForkOverflowsPastCap(t *testing.T) {
 	l := NewLayout()
 
 	const branches = 40

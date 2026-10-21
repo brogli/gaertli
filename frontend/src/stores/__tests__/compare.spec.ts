@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-01, FR-CMP-03, FR-CMP-04
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -22,7 +23,7 @@ describe('compare store', () => {
     Facade.CompareWithWorking.mockReset()
   })
 
-  it('FR-CMP-01 from is the commit selected first, to the one selected second, whatever their dates; three or more form no comparison', () => {
+  it('from is the commit selected first, to the one selected second, whatever their dates; three or more form no comparison', () => {
     const log = useLogStore()
     const compare = useCompareStore()
     const pickedFirst = row('picked-first') // the later-dated commit, selected first
@@ -37,7 +38,7 @@ describe('compare store', () => {
     expect(compare.active).toBe(false)
   })
 
-  it('FR-CMP-03 swap exchanges from and to, so the log view marks move to the other commit', () => {
+  it('swap exchanges from and to, so the log view marks move to the other commit', () => {
     const log = useLogStore()
     const compare = useCompareStore()
     const pickedFirst = row('picked-first')
@@ -50,7 +51,7 @@ describe('compare store', () => {
     expect(compare.to).toEqual(pickedFirst)
   })
 
-  it('FR-CMP-04 startAgainstWorking sets workingCommit and clears any selection', () => {
+  it('startAgainstWorking sets workingCommit and clears any selection', () => {
     const log = useLogStore()
     const compare = useCompareStore()
     log.selection = [row('x'), row('y')]
@@ -62,7 +63,7 @@ describe('compare store', () => {
     expect(log.selection).toEqual([])
   })
 
-  it('FR-CMP-04 loadAgainstWorking populates files from Facade.CompareWithWorking', async () => {
+  it('loadAgainstWorking populates files from Facade.CompareWithWorking', async () => {
     const compare = useCompareStore()
     const files = [{ status: 'M', path: 'a.txt' }]
     Facade.CompareWithWorking.mockResolvedValue(files)
@@ -73,7 +74,7 @@ describe('compare store', () => {
     expect(compare.files).toEqual(files)
   })
 
-  it('FR-CMP-01 exit drops the selection and any comparison state', () => {
+  it('exit drops the selection and any comparison state', () => {
     const log = useLogStore()
     const compare = useCompareStore()
     log.selection = [row('x'), row('y')]

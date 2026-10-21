@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-01
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -14,7 +15,7 @@ describe('changes store', () => {
     Facade.Status.mockReset()
   })
 
-  it('FR-CHG-01 load(wt) fills files from Status and clears loading once done', async () => {
+  it('load(wt) fills files from Status and clears loading once done', async () => {
     const result = changedFilesFixture({ staged: [{ path: 'a.txt', status: 'M' }] })
     Facade.Status.mockResolvedValue(result)
     const changes = useChangesStore()

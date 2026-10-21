@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-06
+
 package services
 
 import (
@@ -17,7 +19,7 @@ func requireGitFailedKey(t *testing.T, err error, key string) {
 	}
 }
 
-func TestFR_CONF_06_SaveConflictWritesCRLFWhenTheFileUsesCRLF(t *testing.T) {
+func TestSaveConflictWritesCRLFWhenTheFileUsesCRLF(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("a\r\nbase\r\nz\r\n"), version("a\r\ncur\r\nz\r\n"), version("a\r\ninc\r\nz\r\n"))
 	got := readConflict(t, c, wt, "a.txt")
@@ -48,7 +50,7 @@ func TestFR_CONF_06_SaveConflictWritesCRLFWhenTheFileUsesCRLF(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_06_SaveConflictStagesLFBlobsUnderAutocrlf(t *testing.T) {
+func TestSaveConflictStagesLFBlobsUnderAutocrlf(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version("a\nbase\nz\n"), version("a\ncur\nz\n"), version("a\ninc\nz\n"))
 	gittest.Run(t, dir, "config", "core.autocrlf", "true")
@@ -65,7 +67,7 @@ func TestFR_CONF_06_SaveConflictStagesLFBlobsUnderAutocrlf(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_06_SaveConflictOfAnUnchangedResultKeepsTheBOMFileBytes(t *testing.T) {
+func TestSaveConflictOfAnUnchangedResultKeepsTheBOMFileBytes(t *testing.T) {
 	t.Parallel()
 	const bom = "\xef\xbb\xbf"
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version(bom+"a\nbase\nz\n"), version(bom+"a\ncur\nz\n"), version(bom+"a\ninc\nz\n"))
@@ -81,7 +83,7 @@ func TestFR_CONF_06_SaveConflictOfAnUnchangedResultKeepsTheBOMFileBytes(t *testi
 	}
 }
 
-func TestFR_CONF_06_SaveConflictRefusesAFileChangedSinceItWasOpened(t *testing.T) {
+func TestSaveConflictRefusesAFileChangedSinceItWasOpened(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 	got := readConflict(t, c, wt, "a.txt")
@@ -95,7 +97,7 @@ func TestFR_CONF_06_SaveConflictRefusesAFileChangedSinceItWasOpened(t *testing.T
 	}
 }
 
-func TestFR_CONF_06_SaveConflictRefusesToResolveWithMarkersLeft(t *testing.T) {
+func TestSaveConflictRefusesToResolveWithMarkersLeft(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 	got := readConflict(t, c, wt, "a.txt")
@@ -120,7 +122,7 @@ func TestFR_CONF_06_SaveConflictRefusesToResolveWithMarkersLeft(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_06_SaveConflictIgnoresLinesThatOnlyStartLikeMarkers(t *testing.T) {
+func TestSaveConflictIgnoresLinesThatOnlyStartLikeMarkers(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 	got := readConflict(t, c, wt, "a.txt")
@@ -131,7 +133,7 @@ func TestFR_CONF_06_SaveConflictIgnoresLinesThatOnlyStartLikeMarkers(t *testing.
 	}
 }
 
-func TestFR_CONF_06_SaveConflictFollowsTheMarkerSizeAttribute(t *testing.T) {
+func TestSaveConflictFollowsTheMarkerSizeAttribute(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 	writeFile(t, dir, ".gitattributes", "a.txt conflict-marker-size=10\n")
@@ -144,7 +146,7 @@ func TestFR_CONF_06_SaveConflictFollowsTheMarkerSizeAttribute(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_06_SaveConflictWithTheAttributeSizeMarkerIsRefused(t *testing.T) {
+func TestSaveConflictWithTheAttributeSizeMarkerIsRefused(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 	writeFile(t, dir, ".gitattributes", "a.txt conflict-marker-size=10\n")
@@ -157,7 +159,7 @@ func TestFR_CONF_06_SaveConflictWithTheAttributeSizeMarkerIsRefused(t *testing.T
 	requireGitFailedKey(t, err, "conflictMarkersLeft")
 }
 
-func TestFR_CONF_06_SaveConflictKeepsTheLineEndsOfAMixedFile(t *testing.T) {
+func TestSaveConflictKeepsTheLineEndsOfAMixedFile(t *testing.T) {
 	t.Parallel()
 	dir := gittest.New(t).Dir
 	gittest.Run(t, dir, "config", "core.autocrlf", "false")
@@ -187,7 +189,7 @@ func TestFR_CONF_06_SaveConflictKeepsTheLineEndsOfAMixedFile(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_06_ConflictFindsTheMarkersOfAMixedLineEndingFile(t *testing.T) {
+func TestConflictFindsTheMarkersOfAMixedLineEndingFile(t *testing.T) {
 	t.Parallel()
 	dir := gittest.New(t).Dir
 	gittest.Run(t, dir, "config", "core.autocrlf", "false")

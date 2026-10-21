@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-01, FR-CMP-03, FR-CMP-04, FR-CMP-05, FR-CONF-09, FR-CP-01, FR-CP-04, FR-CP-05, FR-CP-06, FR-LOG-01, FR-LOG-02, FR-LOG-05, FR-LOG-09, FR-LOG-11, FR-LOG-13, FR-LOG-14, FR-LOG-17, FR-LOG-18, FR-RV-04, FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-10
 import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -108,7 +109,7 @@ describe('LogList', () => {
     expect(wrapper.emitted(event)).toEqual([args])
   })
 
-  it('FR-LOG-11 clicking a menu item copies to the clipboard and closes the menu', async () => {
+  it('clicking a menu item copies to the clipboard and closes the menu', async () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
 
@@ -124,7 +125,7 @@ describe('LogList', () => {
     expect(body.find('.p-contextmenu').exists()).toBe(false)
   })
 
-  it('FR-LOG-02 hides GraphCell when the view is flat, shows it otherwise', async () => {
+  it('hides GraphCell when the view is flat, shows it otherwise', async () => {
     const { wrapper } = await mountWithRows([sampleRow])
     const log = useLogStore()
 
@@ -136,7 +137,7 @@ describe('LogList', () => {
     expect(wrapper.find('.graph-cell').exists()).toBe(false)
   })
 
-  it('FR-LOG-05 matched rows carry the highlight class, the current one the strong class, no row lost', async () => {
+  it('matched rows carry the highlight class, the current one the strong class, no row lost', async () => {
     const { rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
 
@@ -152,7 +153,7 @@ describe('LogList', () => {
     expect(rowEls.length).toBe(3)
   })
 
-  it('FR-CMP-05 a compared row that is also a search match keeps its comparison bar', async () => {
+  it('a compared row that is also a search match keeps its comparison bar', async () => {
     const { rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
 
@@ -166,7 +167,7 @@ describe('LogList', () => {
     expect(rowEls[0]!.classes()).toContain('compare-from')
   })
 
-  it('FR-LOG-01 rows not loaded yet show no selection while nothing is selected', async () => {
+  it('rows not loaded yet show no selection while nothing is selected', async () => {
     const { wrapper } = await mountWithRows(['sha-a'])
     const log = useLogStore()
     log.loaded = 3
@@ -177,7 +178,7 @@ describe('LogList', () => {
     for (const el of rowEls) expect(el.classes()).not.toContain('selected')
   })
 
-  it('FR-LOG-01 every graph strip is as wide as the widest graph among the rendered rows', async () => {
+  it('every graph strip is as wide as the widest graph among the rendered rows', async () => {
     const through = (lane: number) => ({ lane, kind: EdgeKind.ThroughEdge, colour: lane })
     const { wrapper } = await mountWithRows([
       row('a', { graph: { lane: 0, colour: 0, edges: [] } }),
@@ -190,7 +191,7 @@ describe('LogList', () => {
     expect(new Set(widths).size).toBe(1)
   })
 
-  it('FR-LOG-01 the hash column is as wide as the longest short hash among the rendered rows', async () => {
+  it('the hash column is as wide as the longest short hash among the rendered rows', async () => {
     const { wrapper } = await mountWithRows([
       row('a', { shortSha: 'abcdef0' }),
       row('b', { shortSha: 'abcdef012' }),
@@ -200,7 +201,7 @@ describe('LogList', () => {
     expect(list.style.getPropertyValue('--hash-width')).toBe('9ch')
   })
 
-  it('FR-LOG-01 ref labels follow the subject inside the message column, before the author', async () => {
+  it('ref labels follow the subject inside the message column, before the author', async () => {
     const { wrapper } = await mountWithRows([
       commitRow({ refs: [{ name: 'main', kind: RefKind.BranchRef }] }),
     ])
@@ -216,7 +217,7 @@ describe('LogList', () => {
     expect(message.contains(label)).toBe(true)
   })
 
-  it('FR-UX-09 the subject and author show their whole text on hover', async () => {
+  it('the subject and author show their whole text on hover', async () => {
     const { wrapper } = await mountWithRows([
       commitRow({ subject: 'A long subject', author: 'Ada Lovelace', authorAt: 0 }),
     ])
@@ -225,7 +226,7 @@ describe('LogList', () => {
     expect(wrapper.get('.row .author').attributes('title')).toBe('Ada Lovelace')
   })
 
-  it('FR-UX-10 hovering the date shows its exact date and time, not the relative text again', async () => {
+  it('hovering the date shows its exact date and time, not the relative text again', async () => {
     vi.useFakeTimers({ now: new Date('2026-09-24T12:00:00Z') })
     const authorAt = Date.now() / 1000 - 3 * 24 * 3600
 
@@ -236,7 +237,7 @@ describe('LogList', () => {
     expect(date.attributes('title')).toBe(exactDate(authorAt))
   })
 
-  it('FR-LOG-09 the visible rows not yet cached load in one LogRows call', async () => {
+  it('the visible rows not yet cached load in one LogRows call', async () => {
     await mountInBody(LogList, { props: { wt: '/repo' } })
     useLogStore().loaded = 3
     await flushPromises()
@@ -245,7 +246,7 @@ describe('LogList', () => {
     expect(Facade.LogRows).toHaveBeenCalledWith('/repo', 0, 3)
   })
 
-  it('FR-LOG-01 a row shows its short hash', async () => {
+  it('a row shows its short hash', async () => {
     const { wrapper } = await mountWithRows([
       commitRow({ sha: 'abcdef0123456789', shortSha: 'abcdef0' }),
     ])
@@ -262,7 +263,7 @@ describe('LogList', () => {
       'HEAD, main, origin/main, v1.0',
     ],
   ])(
-    'FR-LOG-01 a row shows at most two ref labels, then "+N" with every label in its title (%j)',
+    'a row shows at most two ref labels, then "+N" with every label in its title (%j)',
     async (names, shown, more, allTitles) => {
       const refs = names.map((name) => ({ name, kind: RefKind.BranchRef }))
       const { wrapper } = await mountWithRows([commitRow({ refs })])
@@ -276,7 +277,7 @@ describe('LogList', () => {
     },
   )
 
-  it('FR-CMP-01 ctrl/cmd-click selects two rows to compare; a plain click exits compare and selects the row', async () => {
+  it('ctrl/cmd-click selects two rows to compare; a plain click exits compare and selects the row', async () => {
     const { rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
     expect(rowEls.length).toBe(3)
@@ -293,26 +294,23 @@ describe('LogList', () => {
   it.each([
     ['shift-click', { shiftKey: true }],
     ['ctrl-click', { ctrlKey: true }],
-  ])(
-    'FR-LOG-13 FR-CMP-01 %s on the next row selects both, in order, and compares them',
-    async (_name, modifier) => {
-      const { rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
-      const log = useLogStore()
-      const compare = useCompareStore()
+  ])('%s on the next row selects both, in order, and compares them', async (_name, modifier) => {
+    const { rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
+    const log = useLogStore()
+    const compare = useCompareStore()
 
-      await rowEls[0]!.trigger('click')
-      await rowEls[1]!.trigger('click', modifier)
+    await rowEls[0]!.trigger('click')
+    await rowEls[1]!.trigger('click', modifier)
 
-      expect(log.selection.map((r) => r.sha)).toEqual(['sha-a', 'sha-b'])
-      expect(compare.active).toBe(true)
-      expect(compare.from?.sha).toBe('sha-a')
-      expect(compare.to?.sha).toBe('sha-b')
-      expect(rowEls[0]!.classes()).toContain('compare-from')
-      expect(rowEls[1]!.classes()).toContain('compare-to')
-    },
-  )
+    expect(log.selection.map((r) => r.sha)).toEqual(['sha-a', 'sha-b'])
+    expect(compare.active).toBe(true)
+    expect(compare.from?.sha).toBe('sha-a')
+    expect(compare.to?.sha).toBe('sha-b')
+    expect(rowEls[0]!.classes()).toContain('compare-from')
+    expect(rowEls[1]!.classes()).toContain('compare-to')
+  })
 
-  it('FR-LOG-13 shift-click down a range selects and marks the whole range, in order, with no comparison; ctrl-click takes one out and adds another', async () => {
+  it('shift-click down a range selects and marks the whole range, in order, with no comparison; ctrl-click takes one out and adds another', async () => {
     const { rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c', 'sha-d', 'sha-e'])
     const log = useLogStore()
     const compare = useCompareStore()
@@ -331,7 +329,7 @@ describe('LogList', () => {
     expect(rowEls.map((r) => r.classes('selected'))).toEqual([true, true, false, true, true])
   })
 
-  it('FR-CMP-05 a comparison marks the row clicked first compare-from, the one clicked second compare-to, whatever their log order', async () => {
+  it('a comparison marks the row clicked first compare-from, the one clicked second compare-to, whatever their log order', async () => {
     const shas = Array.from({ length: 8 }, (_, i) => `sha-${i}`)
     const { wrapper, rowEls } = await mountWithRows(shas)
 
@@ -343,7 +341,7 @@ describe('LogList', () => {
     expect(wrapper.findAll('.row').some((r) => r.classes('selected'))).toBe(false)
   })
 
-  it('FR-CMP-03 swap moves the log view marks to the other row', async () => {
+  it('swap moves the log view marks to the other row', async () => {
     const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
     const compare = useCompareStore()
 
@@ -357,7 +355,7 @@ describe('LogList', () => {
     expect(rowEls[1]!.classes()).toContain('compare-from') // sha-b's mark moved
   })
 
-  it('FR-CP-01, FR-LOG-11 click then shift-click then right-click acts directly on the whole range', async () => {
+  it('click then shift-click then right-click acts directly on the whole range', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
 
     await rowEls[0]!.trigger('click')
@@ -373,7 +371,7 @@ describe('LogList', () => {
     )
   })
 
-  it('FR-CP-01 a plain click outside the range collapses it before acting', async () => {
+  it('a plain click outside the range collapses it before acting', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c', 'sha-d'])
 
     await rowEls[0]!.trigger('click')
@@ -385,7 +383,7 @@ describe('LogList', () => {
     expect(Facade.CherryPick).toHaveBeenCalledWith('/repo', ['sha-d'], gitDefaults)
   })
 
-  it('FR-CP-01 clears the multi-select once the cherry-pick resolves', async () => {
+  it('clears the multi-select once the cherry-pick resolves', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
 
@@ -400,7 +398,7 @@ describe('LogList', () => {
     expect(log.selection).toEqual([])
   })
 
-  it("FR-CP-04 a rejection renders in LogList's own ErrorBanner and keeps the multi-select", async () => {
+  it("a rejection renders in LogList's own ErrorBanner and keeps the multi-select", async () => {
     Facade.CherryPick.mockRejectedValueOnce(wailsError('would be overwritten by merge'))
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
@@ -416,7 +414,7 @@ describe('LogList', () => {
     expect(log.selection).toHaveLength(3)
   })
 
-  it('FR-CONF-09 a cherry-pick that stops on conflicts opens the diff window and shows no error', async () => {
+  it('a cherry-pick that stops on conflicts opens the diff window and shows no error', async () => {
     Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a'])
 
@@ -434,7 +432,7 @@ describe('LogList', () => {
     expect(wrapper.text()).not.toContain('conflicts')
   })
 
-  it('FR-LOG-11 "Revert" acts directly, the pre-existing call path', async () => {
+  it('"Revert" acts directly, the pre-existing call path', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
 
     await rowEls[0]!.trigger('click')
@@ -445,7 +443,7 @@ describe('LogList', () => {
     expect(Facade.Revert).toHaveBeenCalledWith('/repo', ['sha-a'], gitDefaults)
   })
 
-  it("FR-CP-05 a merge commit's refusal shows in the error banner; no dialog opens", async () => {
+  it("a merge commit's refusal shows in the error banner; no dialog opens", async () => {
     Facade.CherryPick.mockRejectedValueOnce(
       new Error('boom', {
         cause: {
@@ -469,7 +467,7 @@ describe('LogList', () => {
     )
   })
 
-  it('FR-CP-06 "Cherry-pick…" opens PickDialog with the current selection', async () => {
+  it('"Cherry-pick…" opens PickDialog with the current selection', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
 
     await rowEls[0]!.trigger('click')
@@ -486,7 +484,7 @@ describe('LogList', () => {
     )
   })
 
-  it('FR-RV-04 "Revert…" opens PickDialog with the current selection', async () => {
+  it('"Revert…" opens PickDialog with the current selection', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
 
     await rowEls[0]!.trigger('click')
@@ -498,7 +496,7 @@ describe('LogList', () => {
     expect(Facade.Revert).toHaveBeenCalledWith('/repo', ['sha-a'], gitDefaults)
   })
 
-  it('FR-CP-06 closing PickDialog after a "…" pick clears the multi-select', async () => {
+  it('closing PickDialog after a "…" pick clears the multi-select', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
 
@@ -512,7 +510,7 @@ describe('LogList', () => {
     expect(log.selection).toEqual([])
   })
 
-  it('FR-CMP-01, FR-LOG-11 right-click B after selecting A: B alone selected, menu offers "Compare with <A short>"', async () => {
+  it('right-click B after selecting A: B alone selected, menu offers "Compare with <A short>"', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
     const log = useLogStore()
 
@@ -523,7 +521,7 @@ describe('LogList', () => {
     expect(log.selection.map((r) => r.sha)).toEqual(['sha-b'])
   })
 
-  it('FR-CMP-01 choosing "Compare with <A short>" compares A and B, A (selected before) from', async () => {
+  it('choosing "Compare with <A short>" compares A and B, A (selected before) from', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
     const log = useLogStore()
     const compare = useCompareStore()
@@ -538,7 +536,7 @@ describe('LogList', () => {
     expect(compare.to?.sha).toBe('sha-b')
   })
 
-  it('FR-CMP-04 right-click a row and clicking "Compare with working tree" starts it', async () => {
+  it('right-click a row and clicking "Compare with working tree" starts it', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a'])
     const compare = useCompareStore()
 
@@ -551,7 +549,7 @@ describe('LogList', () => {
   it.each([
     ['with nothing selected yet', false],
     ['on the already-selected row', true],
-  ])('FR-CMP-01 right-click %s shows no "Compare with …" item', async (_name, selectFirst) => {
+  ])('right-click %s shows no "Compare with …" item', async (_name, selectFirst) => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
 
     if (selectFirst) await rowEls[0]!.trigger('click')
@@ -564,7 +562,7 @@ describe('LogList', () => {
     ).toBe(false)
   })
 
-  it('FR-LOG-13 ctrl-clicks add commits: three are all marked selected, with no comparison; one taken out leaves a comparison', async () => {
+  it('ctrl-clicks add commits: three are all marked selected, with no comparison; one taken out leaves a comparison', async () => {
     const { rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
 
@@ -582,7 +580,7 @@ describe('LogList', () => {
     expect(rowEls[1]!.classes()).toContain('compare-to')
   })
 
-  it('FR-LOG-13 ctrl-click after "Show in log" adds to the commit it selected', async () => {
+  it('ctrl-click after "Show in log" adds to the commit it selected', async () => {
     const { rowEls } = await mountWithRows(['A', 'B', 'C', 'D'])
     const log = useLogStore()
     await rowEls[0]!.trigger('click')
@@ -595,7 +593,7 @@ describe('LogList', () => {
     expect(log.selection.map((p) => p.sha)).toEqual(['B', 'C', 'D'])
   })
 
-  it('FR-LOG-13 ctrl-click taking out one of two picked commits leaves the other selected and shown', async () => {
+  it('ctrl-click taking out one of two picked commits leaves the other selected and shown', async () => {
     const { rowEls } = await mountWithRows(['A', 'B'])
     const log = useLogStore()
 
@@ -608,7 +606,7 @@ describe('LogList', () => {
     expect(log.selectedRow?.sha).toBe('B')
   })
 
-  it('FR-LOG-13 ctrl-click on the only selected commit takes it out: nothing stays selected', async () => {
+  it('ctrl-click on the only selected commit takes it out: nothing stays selected', async () => {
     const { rowEls } = await mountWithRows(['sha-a', 'sha-b'])
     const log = useLogStore()
 
@@ -630,7 +628,7 @@ describe('LogList', () => {
     'Copy 3 hashes',
   ]
 
-  it('FR-LOG-11 right-click inside three commits selected by shift-click opens the menu for three, no swap', async () => {
+  it('right-click inside three commits selected by shift-click opens the menu for three, no swap', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
 
     await rowEls[0]!.trigger('click')
@@ -641,7 +639,7 @@ describe('LogList', () => {
     expect(Facade.SquashCheck).toHaveBeenCalledWith('/repo', ['sha-a', 'sha-b', 'sha-c'])
   })
 
-  it('FR-LOG-11 right-click one of three commits selected by ctrl-click opens the same menu as a shift-click range', async () => {
+  it('right-click one of three commits selected by ctrl-click opens the same menu as a shift-click range', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c', 'sha-d'])
     await rowEls[0]!.trigger('click')
     await rowEls[1]!.trigger('click', { ctrlKey: true })
@@ -653,7 +651,7 @@ describe('LogList', () => {
     expect(Facade.SquashCheck).toHaveBeenCalledWith('/repo', ['sha-a', 'sha-b', 'sha-d'])
   })
 
-  it('FR-LOG-17 a blocker replaces squash and fixup with one disabled item saying why', async () => {
+  it('a blocker replaces squash and fixup with one disabled item saying why', async () => {
     Facade.SquashCheck.mockResolvedValue({
       pushed: false,
       message: '',
@@ -670,7 +668,7 @@ describe('LogList', () => {
     expect(labels.some((l) => l.startsWith('Squash 3') || l.startsWith('Fixup 3'))).toBe(false)
   })
 
-  it('FR-LOG-14 "Squash 3 commits…" opens the squash dialog with the proposed message', async () => {
+  it('"Squash 3 commits…" opens the squash dialog with the proposed message', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     await rowEls[0]!.trigger('click')
     await rowEls[2]!.trigger('click', { shiftKey: true })
@@ -683,7 +681,7 @@ describe('LogList', () => {
     expect(field.element.value).toBe('A\n\nB')
   })
 
-  it('FR-LOG-18 a fixup asks first, then clears the selection once done', async () => {
+  it('a fixup asks first, then clears the selection once done', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const log = useLogStore()
     await rowEls[0]!.trigger('click')
@@ -701,7 +699,7 @@ describe('LogList', () => {
     expect(body.find('[data-test="squash-submit"]').exists()).toBe(false)
   })
 
-  it('FR-LOG-11 "Copy 3 hashes" copies the full hashes, one per line, in log order', async () => {
+  it('"Copy 3 hashes" copies the full hashes, one per line, in log order', async () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
@@ -714,7 +712,7 @@ describe('LogList', () => {
     expect(writeText).toHaveBeenCalledWith('sha-a\nsha-b\nsha-c')
   })
 
-  it('FR-LOG-11 right-click one of two commits selected by shift-click opens the menu for two, plus swap and stop comparing', async () => {
+  it('right-click one of two commits selected by shift-click opens the menu for two, plus swap and stop comparing', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
     const log = useLogStore()
     log.selection = [row('sha-a'), row('sha-b')]
@@ -734,7 +732,7 @@ describe('LogList', () => {
     ])
   })
 
-  it('FR-UX-05 FR-CMP-01 "Stop comparing" shows its shortcut; other entries show none', async () => {
+  it('"Stop comparing" shows its shortcut; other entries show none', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
     const log = useLogStore()
     log.selection = [row('sha-a'), row('sha-b')]
@@ -748,7 +746,7 @@ describe('LogList', () => {
     expect(swap.find('[data-test="shortcut-hint"]').exists()).toBe(false)
   })
 
-  it('FR-UX-08 double-click or Enter on a row emits open', async () => {
+  it('double-click or Enter on a row emits open', async () => {
     const { wrapper, rowEls } = await mountWithRows(['sha-a', 'sha-b'])
 
     await rowEls[0]!.trigger('dblclick')
@@ -758,7 +756,7 @@ describe('LogList', () => {
     expect(wrapper.emitted('open')).toHaveLength(2)
   })
 
-  it('FR-LOG-11 right-click a commit outside a comparison ends it and selects that commit alone', async () => {
+  it('right-click a commit outside a comparison ends it and selects that commit alone', async () => {
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a', 'sha-b', 'sha-c'])
     const compare = useCompareStore()
     const log = useLogStore()

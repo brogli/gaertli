@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-16
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import ChangedFiles from '../ChangedFiles.vue'
@@ -10,7 +11,7 @@ const files = [
 describe('ChangedFiles', () => {
   beforeEach(() => localStorage.clear())
 
-  it('FR-LOG-16 counts the files above them and starts as a flat list', () => {
+  it('counts the files above them and starts as a flat list', () => {
     const wrapper = mount(ChangedFiles, { props: { files, selected: null } })
 
     expect(wrapper.get('h3').text()).toBe('2 changed files')
@@ -18,7 +19,7 @@ describe('ChangedFiles', () => {
     expect(wrapper.find('[role="tree"]').exists()).toBe(false)
   })
 
-  it('FR-LOG-16 the toggle switches to the folder tree and back, pressed while the tree shows', async () => {
+  it('the toggle switches to the folder tree and back, pressed while the tree shows', async () => {
     const wrapper = mount(ChangedFiles, { props: { files, selected: null } })
     const toggle = () => wrapper.get('[data-test="file-tree-toggle"]')
     expect(toggle().attributes('aria-label')).toBe('Show as folder tree')
@@ -34,7 +35,7 @@ describe('ChangedFiles', () => {
     expect(wrapper.findAll('.files li')).toHaveLength(2)
   })
 
-  it('FR-LOG-16 the choice is remembered: the next mount starts as a tree', async () => {
+  it('the choice is remembered: the next mount starts as a tree', async () => {
     await mount(ChangedFiles, { props: { files, selected: null } })
       .get('[data-test="file-tree-toggle"]')
       .trigger('click')
@@ -44,7 +45,7 @@ describe('ChangedFiles', () => {
     expect(next.find('[role="tree"]').exists()).toBe(true)
   })
 
-  it('FR-LOG-16 both modes pass on select, open and open-editor', async () => {
+  it('both modes pass on select, open and open-editor', async () => {
     const wrapper = mount(ChangedFiles, { props: { files, selected: null } })
     await wrapper.findAll('.files li')[1]!.trigger('dblclick')
     await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')

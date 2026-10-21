@@ -1,3 +1,5 @@
+// Requirements: FR-ED-11, FR-REPO-02, FR-REPO-07, FR-REPO-08, FR-SYNC-06, FR-UX-04, FR-UX-06, FR-WT-16, QA-SEC-02
+
 package settings_test
 
 import (
@@ -16,7 +18,7 @@ import (
 	"github.com/brogli/nebegit/internal/settings"
 )
 
-func TestTR_13_PathIsUnderTheOSUserConfigDir(t *testing.T) {
+func TestPathIsUnderTheOSUserConfigDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	got, err := settings.Path()
@@ -59,7 +61,7 @@ func load(t *testing.T, path string) settings.Settings {
 	return s
 }
 
-func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
+func TestSaveThenLoadRoundTripsEveryField(t *testing.T) {
 	want := settings.Settings{
 		RecentRepos:    []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
 		OpenWorktrees:  []string{"/a", "/b"},
@@ -84,7 +86,7 @@ func TestFR_UX_04_SaveThenLoadRoundTripsEveryField(t *testing.T) {
 
 // An install from before the modes were set has a 0755 directory and a
 // 0644 file; its next save tightens both.
-func TestTR_29_ASavedStoreHasAFileAndDirectoryOnlyItsOwnerCanRead(t *testing.T) {
+func TestASavedStoreHasAFileAndDirectoryOnlyItsOwnerCanRead(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX file modes")
 	}
@@ -120,7 +122,7 @@ func TestTR_29_ASavedStoreHasAFileAndDirectoryOnlyItsOwnerCanRead(t *testing.T) 
 	}
 }
 
-func TestFR_UX_04_LoadOnMissingFileReturnsDefault(t *testing.T) {
+func TestLoadOnMissingFileReturnsDefault(t *testing.T) {
 	got := load(t, filepath.Join(t.TempDir(), "does-not-exist.json"))
 
 	if !reflect.DeepEqual(got, settings.Default()) {
@@ -128,7 +130,7 @@ func TestFR_UX_04_LoadOnMissingFileReturnsDefault(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_06_AFreshInstallProtectsMainAndMaster(t *testing.T) {
+func TestAFreshInstallProtectsMainAndMaster(t *testing.T) {
 	got := load(t, filepath.Join(t.TempDir(), "does-not-exist.json"))
 
 	if want := []string{"main", "master"}; !slices.Equal(got.ProtectedBranches, want) {
@@ -136,7 +138,7 @@ func TestFR_SYNC_06_AFreshInstallProtectsMainAndMaster(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_06_AnExistingFileKeepsTheProtectedBranchesItStores(t *testing.T) {
+func TestAnExistingFileKeepsTheProtectedBranchesItStores(t *testing.T) {
 	got := loadJSON(t, `{"protectedBranches": null}`)
 
 	if len(got.ProtectedBranches) != 0 {
@@ -144,7 +146,7 @@ func TestFR_SYNC_06_AnExistingFileKeepsTheProtectedBranchesItStores(t *testing.T
 	}
 }
 
-func TestFR_UX_06_ThemeRoundTrips(t *testing.T) {
+func TestThemeRoundTrips(t *testing.T) {
 	got := saveAndLoad(t, settings.Settings{Preferences: settings.Preferences{Theme: settings.DarkTheme}})
 
 	if got.Theme != settings.DarkTheme {
@@ -152,7 +154,7 @@ func TestFR_UX_06_ThemeRoundTrips(t *testing.T) {
 	}
 }
 
-func TestFR_UX_06_LoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
+func TestLoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
 	got := loadJSON(t, `{}`)
 
 	if got.Theme != "" {
@@ -160,7 +162,7 @@ func TestFR_UX_06_LoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
 	}
 }
 
-func TestFR_UX_06_LoadAcceptsTheFourDarkThemesAndFallsBackToSystemOnAnUnknownValue(t *testing.T) {
+func TestLoadAcceptsTheFourDarkThemesAndFallsBackToSystemOnAnUnknownValue(t *testing.T) {
 	if got := loadJSON(t, `{"theme": "dracula"}`).Theme; got != settings.DraculaTheme {
 		t.Errorf("Theme = %q, want %q", got, settings.DraculaTheme)
 	}
@@ -169,7 +171,7 @@ func TestFR_UX_06_LoadAcceptsTheFourDarkThemesAndFallsBackToSystemOnAnUnknownVal
 	}
 }
 
-func TestFR_REPO_02_AddRecentMovesToFrontAndDedupes(t *testing.T) {
+func TestAddRecentMovesToFrontAndDedupes(t *testing.T) {
 	s := settings.Settings{}
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Hour)
@@ -188,7 +190,7 @@ func TestFR_REPO_02_AddRecentMovesToFrontAndDedupes(t *testing.T) {
 	}
 }
 
-func TestFR_WT_16_AddRecentListsARepoOnceAcrossItsWorktrees(t *testing.T) {
+func TestAddRecentListsARepoOnceAcrossItsWorktrees(t *testing.T) {
 	s := settings.Settings{}
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Hour)
@@ -202,7 +204,7 @@ func TestFR_WT_16_AddRecentListsARepoOnceAcrossItsWorktrees(t *testing.T) {
 	}
 }
 
-func TestFR_WT_16_AddRecentKeepsSameRepoKeyInTwoDistrosApart(t *testing.T) {
+func TestAddRecentKeepsSameRepoKeyInTwoDistrosApart(t *testing.T) {
 	s := settings.Settings{}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -214,7 +216,7 @@ func TestFR_WT_16_AddRecentKeepsSameRepoKeyInTwoDistrosApart(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_02_AddRecentCapsAtTen(t *testing.T) {
+func TestAddRecentCapsAtTen(t *testing.T) {
 	s := settings.Settings{}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -235,7 +237,7 @@ func TestFR_REPO_02_AddRecentCapsAtTen(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_08_RemoveRecentDropsTheMatchingEntry(t *testing.T) {
+func TestRemoveRecentDropsTheMatchingEntry(t *testing.T) {
 	s := settings.Settings{}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s.AddRecent(settings.RecentRepo{Path: "/a"}, now)
@@ -254,7 +256,7 @@ func TestFR_REPO_08_RemoveRecentDropsTheMatchingEntry(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_08_RemoveRecentKeepsAnotherDistrosSamePathEntry(t *testing.T) {
+func TestRemoveRecentKeepsAnotherDistrosSamePathEntry(t *testing.T) {
 	s := settings.Settings{}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s.AddRecent(settings.RecentRepo{Path: "/r/main", RepoKey: "K"}, now)
@@ -267,7 +269,7 @@ func TestFR_REPO_08_RemoveRecentKeepsAnotherDistrosSamePathEntry(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_07_AddRecentRoundTripsDistroOmittingItForLocal(t *testing.T) {
+func TestAddRecentRoundTripsDistroOmittingItForLocal(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s := settings.Settings{}
@@ -323,7 +325,7 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 	}
 }
 
-func TestFR_ED_11_EditorProfileRoundTrips(t *testing.T) {
+func TestEditorProfileRoundTrips(t *testing.T) {
 	want := settings.Settings{Preferences: settings.Preferences{
 		EditorProfile: core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}", FileCmd: "alpha {path}", FileAtLineCmd: "alpha {path}:{line}"},
 	}}
@@ -333,7 +335,7 @@ func TestFR_ED_11_EditorProfileRoundTrips(t *testing.T) {
 	}
 }
 
-func TestFR_ED_11_LoadMigratesTheLocalEntryOfOldPerEnvironmentProfiles(t *testing.T) {
+func TestLoadMigratesTheLocalEntryOfOldPerEnvironmentProfiles(t *testing.T) {
 	got := loadJSON(t, `{"editorProfiles": {"": {"name": "Zed", "folderCmd": "zed {path}"}, "Ubuntu": {"name": "VS Code", "folderCmd": "code {path}"}}}`)
 
 	if got.EditorProfile.Name != "Zed" {
@@ -341,7 +343,7 @@ func TestFR_ED_11_LoadMigratesTheLocalEntryOfOldPerEnvironmentProfiles(t *testin
 	}
 }
 
-func TestFR_ED_11_LoadMigratesTheFirstFilledEntryWhenTheLocalOneIsEmpty(t *testing.T) {
+func TestLoadMigratesTheFirstFilledEntryWhenTheLocalOneIsEmpty(t *testing.T) {
 	got := loadJSON(t, `{"editorProfiles": {"": {}, "Ubuntu": {"name": "VS Code", "folderCmd": "code {path}"}}}`)
 
 	if got.EditorProfile.Name != "VS Code" {
@@ -349,7 +351,7 @@ func TestFR_ED_11_LoadMigratesTheFirstFilledEntryWhenTheLocalOneIsEmpty(t *testi
 	}
 }
 
-func TestFR_ED_11_LoadKeepsTheSingleProfileOverOldEntries(t *testing.T) {
+func TestLoadKeepsTheSingleProfileOverOldEntries(t *testing.T) {
 	got := loadJSON(t, `{"editorProfile": {"name": "Zed", "folderCmd": "zed {path}"}, "editorProfiles": {"": {"name": "VS Code", "folderCmd": "code {path}"}}}`)
 
 	if got.EditorProfile.Name != "Zed" {
@@ -358,7 +360,7 @@ func TestFR_ED_11_LoadKeepsTheSingleProfileOverOldEntries(t *testing.T) {
 }
 
 // encoding/json ignores an older settings file's bare "editor" key.
-func TestFR_ED_11_LoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
+func TestLoadIgnoresTheOldBareEditorStringKey(t *testing.T) {
 	if got := loadJSON(t, `{"editor": "alpha"}`); got.EditorProfile != (core.EditorProfile{}) {
 		t.Errorf("EditorProfile = %+v, want empty", got.EditorProfile)
 	}

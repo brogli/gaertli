@@ -1,3 +1,4 @@
+// Requirements: FR-WT-02, FR-WT-04, FR-WT-07
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
@@ -59,7 +60,7 @@ function branchTip(git: Git, repo: string, branch: string): string {
   return git(repo, 'for-each-ref', '--format=%(objectname)', `refs/heads/${branch}`).trim()
 }
 
-test("FR-WT-04 Open in editor on another worktree's row opens that folder in one click", async ({
+test("Open in editor on another worktree's row opens that folder in one click", async ({
   app,
   repos,
   editorCalls,
@@ -71,7 +72,7 @@ test("FR-WT-04 Open in editor on another worktree's row opens that folder in one
   await expect.poll(editorCalls).toEqual([`stand-in-editor ${repos.work2}`])
 })
 
-test('FR-WT-02 a new worktree on a new branch starts that branch at the branch picked as its start', async ({
+test('a new worktree on a new branch starts that branch at the branch picked as its start', async ({
   app,
   repos,
   sandbox,
@@ -85,7 +86,7 @@ test('FR-WT-02 a new worktree on a new branch starts that branch at the branch p
   expect(branchTip(git, repos.work, 'fresh')).toBe(branchTip(git, repos.work, 'feature'))
 })
 
-test('FR-WT-07 a worktree changed after the picker listed it is refused by git, then removed only after a second confirmation', async ({
+test('a worktree changed after the picker listed it is refused by git, then removed only after a second confirmation', async ({
   openApp,
   repos,
   sandbox,

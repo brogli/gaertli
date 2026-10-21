@@ -1,9 +1,10 @@
+// Requirements: FR-UX-12
 import { test, expect } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
 // happy-dom computes no layout, so this needs a real browser: it checks
 // that starting and ending a job never resizes the toolbar.
-test('FR-UX-12 starting and ending a job never moves the log view', async ({ page }) => {
+test('starting and ending a job never moves the log view', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
   await openMockRepo(page)
   const log = page.locator('.log-column')

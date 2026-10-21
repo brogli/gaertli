@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-01, FR-LOG-09
 import { test, expect, type Page } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
@@ -27,9 +28,7 @@ async function waitForLogRowsSettle(page: Page): Promise<void> {
   )
 }
 
-test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful', async ({
-  page,
-}) => {
+test('scrolling the log loads further rows beyond the first screenful', async ({ page }) => {
   await openMockRepo(page)
   await waitForLogRowsSettle(page)
 
@@ -44,9 +43,7 @@ test('FR-LOG-09 scrolling the log loads further rows beyond the first screenful'
 
 // A streamed load must leave the list at its top, newest commit first: the
 // virtualizer must not shift scrollTop while rows arrive.
-test('FR-LOG-01 after a streamed load the list is still at the top with row 0 visible', async ({
-  page,
-}) => {
+test('after a streamed load the list is still at the top with row 0 visible', async ({ page }) => {
   await openMockRepo(page)
   await page.waitForFunction(() => window.__e2eLogRowsCalls.length > 0)
   await waitForLogRowsSettle(page)

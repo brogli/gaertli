@@ -1,3 +1,5 @@
+// Requirements: FR-SYNC-07, FR-UPD-01, QA-RESP-01
+
 package jobs
 
 import (
@@ -61,7 +63,7 @@ func (u *updateLog) terminalFor(id ID) (Job, bool) {
 	return Job{}, false
 }
 
-func TestQA_RESP_01_StartReturnsImmediatelyWithARunningJobRecorded(t *testing.T) {
+func TestStartReturnsImmediatelyWithARunningJobRecorded(t *testing.T) {
 	release := make(chan struct{})
 	var log updateLog
 	m := NewManager(log.record)
@@ -92,7 +94,7 @@ func TestQA_RESP_01_StartReturnsImmediatelyWithARunningJobRecorded(t *testing.T)
 	close(release)
 }
 
-func TestFR_SYNC_07_ProgressEmitsImmediatelyThenThrottled(t *testing.T) {
+func TestProgressEmitsImmediatelyThenThrottled(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var log updateLog
 		m := NewManager(log.record)
@@ -141,7 +143,7 @@ func TestFR_SYNC_07_ProgressEmitsImmediatelyThenThrottled(t *testing.T) {
 	})
 }
 
-func TestFR_SYNC_07_CancelledJobEndsInCancelledNotFailed(t *testing.T) {
+func TestCancelledJobEndsInCancelledNotFailed(t *testing.T) {
 	var log updateLog
 	m := NewManager(log.record)
 
@@ -174,7 +176,7 @@ func TestFR_SYNC_07_CancelledJobEndsInCancelledNotFailed(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_07_CancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
+func TestCancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
 	calls := 0
 	m := NewManager(func(Job) { calls++ })
 
@@ -186,7 +188,7 @@ func TestFR_SYNC_07_CancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_07_FnErrorEndsFailedFnNilEndsDone(t *testing.T) {
+func TestFnErrorEndsFailedFnNilEndsDone(t *testing.T) {
 	var log updateLog
 	m := NewManager(log.record)
 
@@ -209,7 +211,7 @@ func TestFR_SYNC_07_FnErrorEndsFailedFnNilEndsDone(t *testing.T) {
 	}
 }
 
-func TestTR_29_AJobOutlivesItsRequestContextAndKeepsItsValues(t *testing.T) {
+func TestAJobOutlivesItsRequestContextAndKeepsItsValues(t *testing.T) {
 	type requestKey struct{}
 	var log updateLog
 	m := NewManager(log.record)
@@ -229,7 +231,7 @@ func TestTR_29_AJobOutlivesItsRequestContextAndKeepsItsValues(t *testing.T) {
 	}
 }
 
-func TestQA_RESP_01_NoManagerImposedConcurrencyCap(t *testing.T) {
+func TestNoManagerImposedConcurrencyCap(t *testing.T) {
 	m := NewManager(func(Job) {})
 	block := make(chan struct{})
 
@@ -254,7 +256,7 @@ func TestQA_RESP_01_NoManagerImposedConcurrencyCap(t *testing.T) {
 	close(block)
 }
 
-func TestFR_SYNC_07_StartDedupesAKindAlreadyRunning(t *testing.T) {
+func TestStartDedupesAKindAlreadyRunning(t *testing.T) {
 	var calls atomic.Int32
 	done := make(chan Job, 1)
 	m := NewManager(func(j Job) {
@@ -289,7 +291,7 @@ func TestFR_SYNC_07_StartDedupesAKindAlreadyRunning(t *testing.T) {
 	}
 }
 
-func TestFR_UPD_01_StartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
+func TestStartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
 	m := NewManager(func(Job) {})
 	release := make(chan struct{})
 	defer close(release)
@@ -315,7 +317,7 @@ func TestFR_UPD_01_StartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_07_ListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing.T) {
+func TestListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing.T) {
 	m := NewManager(func(Job) {})
 
 	for range historyCap + 3 {

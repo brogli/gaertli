@@ -1,3 +1,5 @@
+// Requirements: FR-LOG-09, QA-PERF-02
+
 package services
 
 import (
@@ -7,7 +9,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestQA_PERF_02_FR_LOG_09_FirstRowObservableWhileLoadingWellUnderFullStreamDuration(t *testing.T) {
+func TestFirstRowObservableWhileLoadingWellUnderFullStreamDuration(t *testing.T) {
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
 	streamFakeLog(t, c, id, 5, 200) // 5 records * 200ms = 1s unstreamed

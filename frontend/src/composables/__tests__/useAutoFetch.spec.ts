@@ -1,3 +1,4 @@
+// Requirements: FR-SYNC-10
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -20,7 +21,7 @@ describe('useAutoFetch', () => {
     vi.useRealTimers()
   })
 
-  it('FR-SYNC-10 with autoFetchIntervalMinutes 0, advancing 30 minutes never calls Facade.Fetch', async () => {
+  it('with autoFetchIntervalMinutes 0, advancing 30 minutes never calls Facade.Fetch', async () => {
     const settings = useSettingsStore()
     settings.settings = defaultSettingsFixture({ autoFetchIntervalMinutes: 0 })
 
@@ -30,7 +31,7 @@ describe('useAutoFetch', () => {
     expect(Facade.Fetch).not.toHaveBeenCalled()
   })
 
-  it('FR-SYNC-10 with autoFetchIntervalMinutes 5, Facade.Fetch fires once per 5-minute advance', async () => {
+  it('with autoFetchIntervalMinutes 5, Facade.Fetch fires once per 5-minute advance', async () => {
     const settings = useSettingsStore()
     settings.settings = defaultSettingsFixture({ autoFetchIntervalMinutes: 5 })
 
@@ -43,7 +44,7 @@ describe('useAutoFetch', () => {
     expect(Facade.Fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('FR-SYNC-10 the interval changing to 0 while running stops further fetches', async () => {
+  it('the interval changing to 0 while running stops further fetches', async () => {
     const settings = useSettingsStore()
     settings.settings = defaultSettingsFixture({ autoFetchIntervalMinutes: 5 })
 

@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-05, FR-CHG-08, FR-CHG-09
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
@@ -19,7 +20,7 @@ function stageNewFile(git: Git, repo: string, name: string): void {
   git(repo, 'add', name)
 }
 
-test('FR-CHG-08 the message draft survives a reload', async ({ app }) => {
+test('the message draft survives a reload', async ({ app }) => {
   const saved = app.waitForResponse((r) => !!r.request().postData()?.includes('"a draft"'))
   await messageBox(app).fill('a draft')
   await saved
@@ -28,7 +29,7 @@ test('FR-CHG-08 the message draft survives a reload', async ({ app }) => {
   await expect(messageBox(app)).toHaveValue('a draft')
 })
 
-test("FR-CHG-05 FR-CHG-09 a commit keeps the message exactly, '#' lines included, without an editor; Push after commit pushes it; Amend turns it off", async ({
+test("a commit keeps the message exactly, '#' lines included, without an editor; Push after commit pushes it; Amend turns it off", async ({
   openApp,
   repos,
   git,

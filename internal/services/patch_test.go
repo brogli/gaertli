@@ -1,3 +1,5 @@
+// Requirements: QA-COMP-01
+
 package services
 
 import (
@@ -11,7 +13,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestQA_COMP_01_HunksOfReadsGitsU0HunkHeaders(t *testing.T) {
+func TestHunksOfReadsGitsU0HunkHeaders(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		header, body string
@@ -58,7 +60,7 @@ func framingFixture(t *testing.T, dir string) {
 	writeFile(t, dir, "f.txt", "ONE\n\nthree\nFOUR\nfive\nsix\nseven\neight\n")
 }
 
-func TestQA_COMP_01_DiffWorkingAndStageLinesIgnoreConfigThatChangesThePatchFraming(t *testing.T) {
+func TestDiffWorkingAndStageLinesIgnoreConfigThatChangesThePatchFraming(t *testing.T) {
 	t.Parallel()
 	junk := writeScript(t, "echo EXTERNAL DIFF JUNK")
 	configs := [][2]string{
@@ -105,7 +107,7 @@ func modeFixture(t *testing.T, dir string) {
 	writeFile(t, dir, "f.txt", "a\nB\nc\n")
 }
 
-func TestQA_COMP_01_StageAndDiscardLinesLeaveTheFileModeAlone(t *testing.T) {
+func TestStageAndDiscardLinesLeaveTheFileModeAlone(t *testing.T) {
 	t.Parallel()
 	t.Run("stage", func(t *testing.T) {
 		repo := gittest.New(t)
@@ -161,7 +163,7 @@ func textconvFixture(t *testing.T, dir string) {
 	writeFile(t, dir, "f.txt", "hello\nthere\n")
 }
 
-func TestQA_COMP_01_DiffWorkingAndStageLinesUseTheRealTextNotTheTextconvOutput(t *testing.T) {
+func TestDiffWorkingAndStageLinesUseTheRealTextNotTheTextconvOutput(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	textconvFixture(t, repo.Dir)

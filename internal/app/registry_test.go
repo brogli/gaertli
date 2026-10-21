@@ -1,3 +1,5 @@
+// Requirements: FR-DIFF-07, FR-DIFF-12, FR-ED-11, FR-REPO-02, FR-REPO-04, FR-SYNC-07, FR-UX-08, FR-WT-05, FR-WT-08, FR-WT-11, QA-PERF-06, QA-PORT-02, QA-REL-03
+
 package app
 
 import (
@@ -143,7 +145,7 @@ func newTestRegistry() (*Registry, *fakeOpener) {
 	return r, opener
 }
 
-func TestFR_UX_08_MainWindowGetsTheMinimumWidthADiffWindowDoesNot(t *testing.T) {
+func TestMainWindowGetsTheMinimumWidthADiffWindowDoesNot(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("wt", "/wt", "")
@@ -160,7 +162,7 @@ func TestFR_UX_08_MainWindowGetsTheMinimumWidthADiffWindowDoesNot(t *testing.T) 
 	}
 }
 
-func TestFR_DIFF_12_ADiffWindowOpensAtTheDefaultSizeWithNothingStored(t *testing.T) {
+func TestADiffWindowOpensAtTheDefaultSizeWithNothingStored(t *testing.T) {
 	r, opener := newTestRegistry()
 	r.SetStore(newTestStore(t))
 
@@ -174,7 +176,7 @@ func TestFR_DIFF_12_ADiffWindowOpensAtTheDefaultSizeWithNothingStored(t *testing
 // The WindowClosing hook, not a listener, reads the closing window's size:
 // a listener races Wails' own WindowClosing listener, which destroys the
 // window (reading Size/IsMaximised back as zero).
-func TestFR_DIFF_12_ClosingADiffWindowRemembersItsSizeForTheNextOne(t *testing.T) {
+func TestClosingADiffWindowRemembersItsSizeForTheNextOne(t *testing.T) {
 	r, opener := newTestRegistry()
 	store := newTestStore(t)
 	r.SetStore(store)
@@ -200,7 +202,7 @@ func TestFR_DIFF_12_ClosingADiffWindowRemembersItsSizeForTheNextOne(t *testing.T
 
 // A maximised window's size is not what the user sized it to, so closing it
 // leaves any already-stored size untouched.
-func TestFR_DIFF_12_ClosingAMaximisedDiffWindowKeepsTheStoredSize(t *testing.T) {
+func TestClosingAMaximisedDiffWindowKeepsTheStoredSize(t *testing.T) {
 	r, opener := newTestRegistry()
 	store := newTestStore(t)
 	r.SetStore(store)
@@ -219,7 +221,7 @@ func TestFR_DIFF_12_ClosingAMaximisedDiffWindowKeepsTheStoredSize(t *testing.T) 
 	}
 }
 
-func TestFR_WT_05_OpenOrFocusOpensADistinctWindowPerPath(t *testing.T) {
+func TestOpenOrFocusOpensADistinctWindowPerPath(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("/a", "/a", "")
@@ -233,7 +235,7 @@ func TestFR_WT_05_OpenOrFocusOpensADistinctWindowPerPath(t *testing.T) {
 	}
 }
 
-func TestFR_WT_08_OpenOrFocusFocusesAnExistingWindow(t *testing.T) {
+func TestOpenOrFocusFocusesAnExistingWindow(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("/a", "/a", "")
@@ -247,7 +249,7 @@ func TestFR_WT_08_OpenOrFocusFocusesAnExistingWindow(t *testing.T) {
 	}
 }
 
-func TestADR_9_DispatchTargetsTheWindowsAnEventConcerns(t *testing.T) {
+func TestDispatchTargetsTheWindowsAnEventConcerns(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("wtA", "wtA", "")
@@ -279,7 +281,7 @@ func TestADR_9_DispatchTargetsTheWindowsAnEventConcerns(t *testing.T) {
 
 // SetRepo/targets route a repo-scoped event by current selection: only the
 // window whose selection belongs to that repo.
-func TestFR_WT_11_DispatchByRepoReachesOnlyTheWindowSelectingThatRepo(t *testing.T) {
+func TestDispatchByRepoReachesOnlyTheWindowSelectingThatRepo(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("A", "/a", "")
@@ -300,7 +302,7 @@ func TestFR_WT_11_DispatchByRepoReachesOnlyTheWindowSelectingThatRepo(t *testing
 // Wails hands every event to every window: only the window an event is
 // emitted through is named as its sender, so it goes out through its own
 // window alone.
-func TestFR_SYNC_07_AJobGoesOutOnlyThroughItsWorktreesWindow(t *testing.T) {
+func TestAJobGoesOutOnlyThroughItsWorktreesWindow(t *testing.T) {
 	r, opener := newTestRegistry()
 	r.OpenOrFocus("/a", "/a", "")
 	r.OpenOrFocus("/b", "/b", "")
@@ -321,7 +323,7 @@ func TestFR_SYNC_07_AJobGoesOutOnlyThroughItsWorktreesWindow(t *testing.T) {
 // A server-mode page is no window of the registry's: its calls name it,
 // and from its first call on it gets the events of the worktree it asked
 // for, and of that worktree's repo, through itself.
-func TestFR_REPO_04_APageGetsTheEventsOfTheWorktreeItCallsFor(t *testing.T) {
+func TestAPageGetsTheEventsOfTheWorktreeItCallsFor(t *testing.T) {
 	r, opener := newTestRegistry()
 	r.OpenOrFocus("/a", "/a", "")
 	r.OpenOrFocus("/b", "/b", "")
@@ -347,7 +349,7 @@ func TestFR_REPO_04_APageGetsTheEventsOfTheWorktreeItCallsFor(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_02_ClosingAWindowLetsOpenOrFocusCreateANewOne(t *testing.T) {
+func TestClosingAWindowLetsOpenOrFocusCreateANewOne(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("X", "/x", "")
@@ -364,7 +366,7 @@ func TestFR_REPO_02_ClosingAWindowLetsOpenOrFocusCreateANewOne(t *testing.T) {
 
 // An empty selection ("" = the panel's empty state) is just another
 // selection, deduped by findSelectingLocked the same way a worktree id is.
-func TestADR_9_OpenOrFocusDedupsTheEmptySelection(t *testing.T) {
+func TestOpenOrFocusDedupsTheEmptySelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("", "", "")
@@ -378,7 +380,7 @@ func TestADR_9_OpenOrFocusDedupsTheEmptySelection(t *testing.T) {
 	}
 }
 
-func TestADR_9_OpenOrFocusReopensTheEmptySelectionAfterItIsClosed(t *testing.T) {
+func TestOpenOrFocusReopensTheEmptySelectionAfterItIsClosed(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("", "", "")
@@ -390,7 +392,7 @@ func TestADR_9_OpenOrFocusReopensTheEmptySelectionAfterItIsClosed(t *testing.T) 
 	}
 }
 
-func TestFR_REPO_02_OpenWorktreePathsListsOpenWindows(t *testing.T) {
+func TestOpenWorktreePathsListsOpenWindows(t *testing.T) {
 	r, _ := newTestRegistry()
 
 	r.OpenOrFocus("a", "/a", "")
@@ -406,7 +408,7 @@ func TestFR_REPO_02_OpenWorktreePathsListsOpenWindows(t *testing.T) {
 // A WSL window's path comes back as its UNC form, so restore's OpenWorktree
 // call routes through Registry.CoreFor to the same distro instead of the
 // local core.
-func TestFR_REPO_02_OpenWorktreePathsBuildsUNCForADistroWindow(t *testing.T) {
+func TestOpenWorktreePathsBuildsUNCForADistroWindow(t *testing.T) {
 	r, _ := newTestRegistry()
 
 	r.OpenOrFocus("wt", "/home/u/r", "Ubuntu")
@@ -417,7 +419,7 @@ func TestFR_REPO_02_OpenWorktreePathsBuildsUNCForADistroWindow(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_02_OpenOrFocusBuildsAURLWithTheDistro(t *testing.T) {
+func TestOpenOrFocusBuildsAURLWithTheDistro(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("wt", "/home/u/r", "Ubuntu")
@@ -427,7 +429,7 @@ func TestFR_REPO_02_OpenOrFocusBuildsAURLWithTheDistro(t *testing.T) {
 	}
 }
 
-func TestQA_PERF_06_ClosingAWindowCallsCloseWorktreeOnTheLocalCore(t *testing.T) {
+func TestClosingAWindowCallsCloseWorktreeOnTheLocalCore(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
 	r.SetLocal(fakeAPI{closed: &closed})
@@ -440,7 +442,7 @@ func TestQA_PERF_06_ClosingAWindowCallsCloseWorktreeOnTheLocalCore(t *testing.T)
 	}
 }
 
-func TestFR_REPO_02_OpenWorktreePathsDropsAClosedWindow(t *testing.T) {
+func TestOpenWorktreePathsDropsAClosedWindow(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("a", "/a", "")
@@ -451,7 +453,7 @@ func TestFR_REPO_02_OpenWorktreePathsDropsAClosedWindow(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_02_ClosingAWindowForgetsItForTheNextLaunch(t *testing.T) {
+func TestClosingAWindowForgetsItForTheNextLaunch(t *testing.T) {
 	r, opener := newTestRegistry()
 	store := newTestStore(t)
 	r.SetStore(store)
@@ -466,7 +468,7 @@ func TestFR_REPO_02_ClosingAWindowForgetsItForTheNextLaunch(t *testing.T) {
 }
 
 // Closing the last window quits the app: that window was open at quit.
-func TestFR_REPO_02_ClosingTheLastWindowKeepsItForTheNextLaunch(t *testing.T) {
+func TestClosingTheLastWindowKeepsItForTheNextLaunch(t *testing.T) {
 	r, opener := newTestRegistry()
 	store := newTestStore(t)
 	r.SetStore(store)
@@ -484,7 +486,7 @@ func TestFR_REPO_02_ClosingTheLastWindowKeepsItForTheNextLaunch(t *testing.T) {
 
 // Quitting closes every window through the same close event a user's close
 // fires; the app's shutdown hook runs first.
-func TestFR_REPO_02_QuittingKeepsEveryOpenWindowForTheNextLaunch(t *testing.T) {
+func TestQuittingKeepsEveryOpenWindowForTheNextLaunch(t *testing.T) {
 	r, opener := newTestRegistry()
 	store := newTestStore(t)
 	r.SetStore(store)
@@ -544,7 +546,7 @@ func (f *fakeDistroCore) LiveClient() (*remote.Client, bool) {
 	return f.client, f.calls > 0
 }
 
-func TestADR_3_CoreForRoutesAWSLPathToItsDistro(t *testing.T) {
+func TestCoreForRoutesAWSLPathToItsDistro(t *testing.T) {
 	r, _ := newTestRegistry()
 	serveDistroCores(t, r, fakeAPI{})
 
@@ -565,7 +567,7 @@ func TestADR_3_CoreForRoutesAWSLPathToItsDistro(t *testing.T) {
 	}
 }
 
-func TestADR_3_CoreOfRoutesByTheIDAlone(t *testing.T) {
+func TestCoreOfRoutesByTheIDAlone(t *testing.T) {
 	r, _ := newTestRegistry()
 	distroClient := serveDistroCores(t, r, fakeAPI{})
 
@@ -612,7 +614,7 @@ func newTwoDistroShell(t *testing.T) (sh shell, opener *fakeOpener, calls map[st
 	return sh, opener, calls, sinks
 }
 
-func TestFR_WT_11_SamePathInTwoDistrosOpensTwoWindowsEachOnItsOwnCore(t *testing.T) {
+func TestSamePathInTwoDistrosOpensTwoWindowsEachOnItsOwnCore(t *testing.T) {
 	sh, opener, calls, _ := newTwoDistroShell(t)
 
 	if len(opener.windows) != 2 {
@@ -629,7 +631,7 @@ func TestFR_WT_11_SamePathInTwoDistrosOpensTwoWindowsEachOnItsOwnCore(t *testing
 	}
 }
 
-func TestFR_WT_11_ADistroCoresEventsReachOnlyItsOwnWindow(t *testing.T) {
+func TestADistroCoresEventsReachOnlyItsOwnWindow(t *testing.T) {
 	_, opener, _, sinks := newTwoDistroShell(t)
 	windowA, windowB := opener.windows[0], opener.windows[1]
 
@@ -644,7 +646,7 @@ func TestFR_WT_11_ADistroCoresEventsReachOnlyItsOwnWindow(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_04_FocusReachesTheWindowsCurrentSelection(t *testing.T) {
+func TestFocusReachesTheWindowsCurrentSelection(t *testing.T) {
 	calls := make(chan routedCall, 1)
 	sh, opener := newLocalShell(t, nil, calls)
 	ctx := t.Context()
@@ -661,7 +663,7 @@ func TestFR_REPO_04_FocusReachesTheWindowsCurrentSelection(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_04_AWSLWindowsFocusReachesItsDistroCore(t *testing.T) {
+func TestAWSLWindowsFocusReachesItsDistroCore(t *testing.T) {
 	_, opener, calls, _ := newTwoDistroShell(t)
 
 	opener.windows[0].fire(events.Common.WindowFocus)
@@ -679,7 +681,7 @@ func eventNames(w *fakeWindow) []string {
 	return names
 }
 
-func TestADR_4_CoreOfReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
+func TestCoreOfReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	var mu sync.Mutex
@@ -721,7 +723,7 @@ func TestADR_4_CoreOfReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
 // A path call (opening another folder of the distro) can be the first to
 // find the core dead; the distro's windows are reopened and told all the
 // same.
-func TestADR_4_CoreForReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
+func TestCoreForReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
 	r, opener := newTestRegistry()
 	var mu sync.Mutex
 	var opened []string
@@ -747,7 +749,7 @@ func TestADR_4_CoreForReopensEveryWindowOnItsDistroAfterARespawn(t *testing.T) {
 	}
 }
 
-func TestADR_9_SelectInWindowMovesTheWindowsSelection(t *testing.T) {
+func TestSelectInWindowMovesTheWindowsSelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("A", "/a", "")
@@ -761,7 +763,7 @@ func TestADR_9_SelectInWindowMovesTheWindowsSelection(t *testing.T) {
 	}
 }
 
-func TestADR_9_SwitchingReleasesThePreviousSelectionThroughItsOwnCore(t *testing.T) {
+func TestSwitchingReleasesThePreviousSelectionThroughItsOwnCore(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
 	serveDistroCores(t, r, fakeAPI{closed: &closed})
@@ -779,7 +781,7 @@ func TestADR_9_SwitchingReleasesThePreviousSelectionThroughItsOwnCore(t *testing
 }
 
 // Two windows sharing a selection both receive a worktree-scoped event.
-func TestADR_9_DispatchReachesEveryWindowSharingASelection(t *testing.T) {
+func TestDispatchReachesEveryWindowSharingASelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("A", "/a", "")
@@ -796,7 +798,7 @@ func TestADR_9_DispatchReachesEveryWindowSharingASelection(t *testing.T) {
 }
 
 // A switch releases a worktree only when inUse is false.
-func TestADR_9_InUseIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
+func TestInUseIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
 	r, opener := newTestRegistry()
 
 	r.OpenOrFocus("A", "/a", "")
@@ -815,7 +817,7 @@ func TestADR_9_InUseIsTrueWhenAnotherWindowSharesTheSelection(t *testing.T) {
 
 // Closing a window's own OS window (not a switch) releases its selection
 // through the real core too, exercised through a real WindowClosing.
-func TestADR_9_ClosingAWindowClosesItsSelectionThroughTheRealCore(t *testing.T) {
+func TestClosingAWindowClosesItsSelectionThroughTheRealCore(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
 	serveDistroCores(t, r, fakeAPI{closed: &closed})
@@ -831,7 +833,7 @@ func TestADR_9_ClosingAWindowClosesItsSelectionThroughTheRealCore(t *testing.T) 
 // Closing one window sharing a selection does not release it, and
 // leaves the other window's own entry untouched — it still receives events
 // for that selection afterwards.
-func TestADR_9_ClosingAWindowDoesNotCloseASelectionStillHeldElsewhere(t *testing.T) {
+func TestClosingAWindowDoesNotCloseASelectionStillHeldElsewhere(t *testing.T) {
 	r, opener := newTestRegistry()
 	var closed []core.WorktreeID
 	r.SetLocal(fakeAPI{closed: &closed})
@@ -868,7 +870,7 @@ func openDiffFrom(t *testing.T, sh shell, mainWindow *fakeWindow, wt core.Worktr
 	s.OpenDiff(callFrom(mainWindow.ID()), wt, DiffTarget{Kind: WorkingDiff, Path: "f"})
 }
 
-func TestFR_DIFF_07_ADiffWindowOutlivesItsMainWindowAndGetsItsWorktreesEvents(t *testing.T) {
+func TestADiffWindowOutlivesItsMainWindowAndGetsItsWorktreesEvents(t *testing.T) {
 	var closed []core.WorktreeID
 	sh, opener := newLocalShell(t, &closed, nil)
 	sh.open(t.Context(), "/wt")
@@ -900,7 +902,7 @@ func TestFR_DIFF_07_ADiffWindowOutlivesItsMainWindowAndGetsItsWorktreesEvents(t 
 	}
 }
 
-func TestFR_DIFF_07_RetargetingTheDiffWindowToAnotherWorktreeReleasesTheOneLeft(t *testing.T) {
+func TestRetargetingTheDiffWindowToAnotherWorktreeReleasesTheOneLeft(t *testing.T) {
 	var closed []core.WorktreeID
 	sh, opener := newLocalShell(t, &closed, nil)
 	ctx := t.Context()
@@ -928,7 +930,7 @@ func TestFR_DIFF_07_RetargetingTheDiffWindowToAnotherWorktreeReleasesTheOneLeft(
 
 // A main window and its diff window hand focus to each other in either
 // order; the worktree's status poller runs while either has focus.
-func TestFR_REPO_04_FocusingTheDiffWindowKeepsItsWorktreePolled(t *testing.T) {
+func TestFocusingTheDiffWindowKeepsItsWorktreePolled(t *testing.T) {
 	calls := make(chan routedCall, 1)
 	sh, opener := newLocalShell(t, nil, calls)
 	sh.open(t.Context(), "/wt")
@@ -966,7 +968,7 @@ func setEditorProfile(t *testing.T, store *settings.Store, profile core.EditorPr
 	}
 }
 
-func TestTR_13_PushEditorProfilePushesTheProfileToTheLocalCore(t *testing.T) {
+func TestPushEditorProfilePushesTheProfileToTheLocalCore(t *testing.T) {
 	r, _ := newTestRegistry()
 	var pushed []core.EditorProfile
 	r.SetLocal(fakeAPI{editorProfiles: &pushed})
@@ -981,7 +983,7 @@ func TestTR_13_PushEditorProfilePushesTheProfileToTheLocalCore(t *testing.T) {
 	}
 }
 
-func TestFR_ED_11_CoreForPushesTheOneProfileToADistroOnFirstConnect(t *testing.T) {
+func TestCoreForPushesTheOneProfileToADistroOnFirstConnect(t *testing.T) {
 	r, _ := newTestRegistry()
 	var pushed []core.EditorProfile
 	serveDistroCores(t, r, fakeAPI{editorProfiles: &pushed})
@@ -998,7 +1000,7 @@ func TestFR_ED_11_CoreForPushesTheOneProfileToADistroOnFirstConnect(t *testing.T
 	}
 }
 
-func TestFR_ED_11_PushEditorProfileReachesLocalAndConnectedDistrosOnly(t *testing.T) {
+func TestPushEditorProfileReachesLocalAndConnectedDistrosOnly(t *testing.T) {
 	r, _ := newTestRegistry()
 	var pushedLocal, pushedConnected []core.EditorProfile
 	r.SetLocal(fakeAPI{editorProfiles: &pushedLocal})

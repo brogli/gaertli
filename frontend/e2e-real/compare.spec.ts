@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-01
 import type { Locator } from '@playwright/test'
 import { test, expect } from './fixtures'
 import { logRow, shortRev } from './helpers'
@@ -17,7 +18,7 @@ async function listedFiles(view: Locator): Promise<string[]> {
   return rows.map((row) => row.replace(/\s+/g, ' ').trim()).sort()
 }
 
-test('FR-CMP-01 a click, then a Ctrl-click on another commit, compares them and lists the changed files with their type', async ({
+test('a click, then a Ctrl-click on another commit, compares them and lists the changed files with their type', async ({
   app,
   git,
   repos,

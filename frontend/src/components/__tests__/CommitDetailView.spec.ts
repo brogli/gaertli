@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-02, FR-CMP-04, FR-ED-02, FR-LOG-03, FR-LOG-04, FR-LOG-13, FR-LOG-15, FR-UX-10
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -52,13 +53,13 @@ describe('CommitDetailView', () => {
     AppService.OpenDiff.mockReset()
   })
 
-  it('FR-LOG-03 renders nothing before a selection', () => {
+  it('renders nothing before a selection', () => {
     const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
 
     expect(wrapper.text()).toBe('')
   })
 
-  it('FR-LOG-03 renders the message, author/committer, parents, and changed files once selected', async () => {
+  it('renders the message, author/committer, parents, and changed files once selected', async () => {
     const wrapper = await mountSelected({
       parents: ['parent1', 'parent2'],
       body: 'Fix the bug\n\nSome more detail.',
@@ -78,7 +79,7 @@ describe('CommitDetailView', () => {
     expect(wrapper.text()).toContain('b.txt')
   })
 
-  it('FR-LOG-15 splits a commit, starting in the middle: message and fields above, changed files below', async () => {
+  it('splits a commit, starting in the middle: message and fields above, changed files below', async () => {
     const wrapper = await mountSelected({ files: [{ path: 'a.txt', status: 'M' }] })
 
     const splitter = wrapper.getComponent(Splitter)
@@ -90,7 +91,7 @@ describe('CommitDetailView', () => {
     expect(files!.findAll('.files li')).toHaveLength(1)
   })
 
-  it('FR-LOG-04 a double-click on a file row opens it in the diff window', async () => {
+  it('a double-click on a file row opens it in the diff window', async () => {
     const wrapper = await mountSelected({
       files: [
         { path: 'a.txt', status: 'M' },
@@ -109,7 +110,7 @@ describe('CommitDetailView', () => {
     })
   })
 
-  it('FR-LOG-03 selecting a file lists it as selected and opens no diff in the main window', async () => {
+  it('selecting a file lists it as selected and opens no diff in the main window', async () => {
     const wrapper = await mountSelected({ files: [{ path: 'a.txt', status: 'M' }] })
     await wrapper.get('.files li').trigger('click')
 
@@ -118,7 +119,7 @@ describe('CommitDetailView', () => {
     expect(AppService.OpenDiff).not.toHaveBeenCalled()
   })
 
-  it('FR-ED-02 opening a file that is gone from the worktree shows the banner naming it', async () => {
+  it('opening a file that is gone from the worktree shows the banner naming it', async () => {
     Facade.OpenFile.mockRejectedValue(
       new Error('boom', {
         cause: {
@@ -138,7 +139,7 @@ describe('CommitDetailView', () => {
     )
   })
 
-  it('FR-UX-10 labels Author and Committer with dates when they differ, and shows short-hash parents with the full SHA in title', async () => {
+  it('labels Author and Committer with dates when they differ, and shows short-hash parents with the full SHA in title', async () => {
     const wrapper = await mountSelected({
       sha: 'a'.repeat(40),
       parents: ['b'.repeat(40), 'c'.repeat(40)],
@@ -160,7 +161,7 @@ describe('CommitDetailView', () => {
     expect(committerField!.attributes('title')).toBe(exactDate(1_700_000_100))
   })
 
-  it('FR-UX-10 hides the Committer field when author and committer match', async () => {
+  it('hides the Committer field when author and committer match', async () => {
     const wrapper = await mountSelected({
       sha: 'a'.repeat(40),
       authorAt: 1_700_000_000,
@@ -173,7 +174,7 @@ describe('CommitDetailView', () => {
     expect(wrapper.text()).not.toContain('Committer')
   })
 
-  it("FR-CMP-02 shows the comparison instead of the selected commit's fields once two commits are compared", async () => {
+  it("shows the comparison instead of the selected commit's fields once two commits are compared", async () => {
     const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
     const log = useLogStore()
     await log.select(commitRow())
@@ -185,7 +186,7 @@ describe('CommitDetailView', () => {
     expect(wrapper.find('.commit-details').exists()).toBe(false)
   })
 
-  it("FR-CMP-04 shows the working-tree comparison instead of the selected commit's fields while one is active", async () => {
+  it("shows the working-tree comparison instead of the selected commit's fields while one is active", async () => {
     const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
     const log = useLogStore()
     await log.select(commitRow())
@@ -198,7 +199,7 @@ describe('CommitDetailView', () => {
     expect(wrapper.find('.commit-details').exists()).toBe(false)
   })
 
-  it("FR-LOG-13 says how many commits are selected instead of a commit's fields when three or more are picked", async () => {
+  it("says how many commits are selected instead of a commit's fields when three or more are picked", async () => {
     const wrapper = mount(CommitDetailView, { props: { wt: '/repo' } })
     const log = useLogStore()
     await log.select(commitRow())

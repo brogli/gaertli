@@ -1,3 +1,5 @@
+// Requirements: FR-SYNC-01, FR-SYNC-02, FR-SYNC-03, FR-SYNC-04, FR-SYNC-05, FR-SYNC-08, FR-SYNC-09, FR-SYNC-12, FR-SYNC-13, FR-UPD-01, FR-UPD-03, FR-UPD-04, FR-UPD-05, FR-UX-11, QA-COMP-01, QA-SEC-02
+
 package services
 
 import (
@@ -82,7 +84,7 @@ func lastCommand(t *testing.T, rec *commandRecorder, verb string) git.Entry {
 	return git.Entry{}
 }
 
-func TestFR_SYNC_04_ClassifyPushRejectionClassifiesByReason(t *testing.T) {
+func TestClassifyPushRejectionClassifiesByReason(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
@@ -116,7 +118,7 @@ func TestFR_SYNC_04_ClassifyPushRejectionClassifiesByReason(t *testing.T) {
 	}
 }
 
-func TestFR_UPD_03_ClassifyDivergedFetchReclassifiesNonFastForward(t *testing.T) {
+func TestClassifyDivergedFetchReclassifiesNonFastForward(t *testing.T) {
 	t.Parallel()
 	classify := func(stderr string) error {
 		return classifyDivergedFetch(&core.Error{Code: core.GitFailed}, git.Result{Stderr: []byte(stderr)}, "B")
@@ -135,7 +137,7 @@ func TestFR_UPD_03_ClassifyDivergedFetchReclassifiesNonFastForward(t *testing.T)
 	}
 }
 
-func TestFR_SYNC_08_QA_SEC_02_RemapAuthFailedClassifiesVerifiedPrefixes(t *testing.T) {
+func TestRemapAuthFailedClassifiesVerifiedPrefixes(t *testing.T) {
 	t.Parallel()
 	const url = "https://user:s3cret@example.com/repo.git"
 	tests := []struct {
@@ -173,7 +175,7 @@ func TestFR_SYNC_08_QA_SEC_02_RemapAuthFailedClassifiesVerifiedPrefixes(t *testi
 	}
 }
 
-func TestFR_SYNC_09_ClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals(t *testing.T) {
+func TestClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
@@ -195,7 +197,7 @@ func TestFR_SYNC_09_ClassifyDirtyIntegrateReclassifiesRebaseAndMergeRefusals(t *
 
 // Only a local change to a file the incoming commits also touch blocks a
 // fast-forward pull.
-func TestFR_SYNC_09_PullReclassifiesAFastForwardBlockedByLocalChangesAsDirtyWorktree(t *testing.T) {
+func TestPullReclassifiesAFastForwardBlockedByLocalChangesAsDirtyWorktree(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	remoteAppendCommit(t, origin, "seed.txt", "upstream change\n", "upstream commit")
@@ -215,7 +217,7 @@ func TestFR_SYNC_09_PullReclassifiesAFastForwardBlockedByLocalChangesAsDirtyWork
 	}
 }
 
-func TestFR_SYNC_09_PullWithStashStashesIntegratesAndPopsBackOnSuccess(t *testing.T) {
+func TestPullWithStashStashesIntegratesAndPopsBackOnSuccess(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")
@@ -241,7 +243,7 @@ func TestFR_SYNC_09_PullWithStashStashesIntegratesAndPopsBackOnSuccess(t *testin
 
 // On a clean worktree git stash push creates no entry; a pop would take the
 // user's own stash.
-func TestFR_SYNC_09_PullWithStashSkipsThePopWhenThereIsNothingToStash(t *testing.T) {
+func TestPullWithStashSkipsThePopWhenThereIsNothingToStash(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")
@@ -281,7 +283,7 @@ func pullWithStashConflictFixture(t *testing.T) (repo *gittest.Repo, origin stri
 	return repo, origin
 }
 
-func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) {
+func TestPullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) {
 	t.Parallel()
 	repo, _ := pullWithStashConflictFixture(t)
 
@@ -337,7 +339,7 @@ func TestFR_SYNC_09_PullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) 
 }
 
 // A conflicting stash pop leaves no state file, so it is plain GitFailed.
-func TestFR_SYNC_09_PopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *testing.T) {
+func TestPopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
@@ -360,7 +362,7 @@ func TestFR_SYNC_09_PopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *
 }
 
 // A stash pushed after the marker shifts the stash@{n} indices.
-func TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
+func TestDropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
@@ -384,7 +386,7 @@ func TestFR_SYNC_09_DropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *tes
 	}
 }
 
-func TestFR_SYNC_09_PopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
+func TestPopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
@@ -413,7 +415,7 @@ func TestFR_SYNC_09_PopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *t
 }
 
 // A SHA already popped or dropped elsewhere is a stale ID: Code Internal.
-func TestFR_SYNC_09_PopStashWithAnUnknownSHAReturnsAClearError(t *testing.T) {
+func TestPopStashWithAnUnknownSHAReturnsAClearError(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
@@ -425,7 +427,7 @@ func TestFR_SYNC_09_PopStashWithAnUnknownSHAReturnsAClearError(t *testing.T) {
 	coretest.AssertCode(t, err, core.Internal)
 }
 
-func TestFR_SYNC_02_QA_COMP_01_PullIntegrateArgsMapsModeAndPullFFToGitArgs(t *testing.T) {
+func TestPullIntegrateArgsMapsModeAndPullFFToGitArgs(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
@@ -457,7 +459,7 @@ func TestFR_SYNC_02_QA_COMP_01_PullIntegrateArgsMapsModeAndPullFFToGitArgs(t *te
 	coretest.AssertCode(t, err, core.Internal)
 }
 
-func TestQA_COMP_01_PullIntegrateArgsFailsOnAConfigReadErrorOtherThanUnset(t *testing.T) {
+func TestPullIntegrateArgsFailsOnAConfigReadErrorOtherThanUnset(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	f, err := os.OpenFile(filepath.Join(repo.Dir, ".git", "config"), os.O_APPEND|os.O_WRONLY, 0)
@@ -482,7 +484,7 @@ func headParents(t *testing.T, dir string) []string {
 	return strings.Fields(gittest.Out(t, dir, "log", "-1", "--format=%P", "HEAD"))
 }
 
-func TestQA_COMP_01_PullMergeWithPullFFFalseMakesAMergeCommitWhenBehind(t *testing.T) {
+func TestPullMergeWithPullFFFalseMakesAMergeCommitWhenBehind(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Run(t, repo.Dir, "config", "pull.ff", "false")
@@ -496,7 +498,7 @@ func TestQA_COMP_01_PullMergeWithPullFFFalseMakesAMergeCommitWhenBehind(t *testi
 	}
 }
 
-func TestQA_COMP_01_PullMergeWithPullFFTrueFastForwardsDespiteMergeFFFalse(t *testing.T) {
+func TestPullMergeWithPullFFTrueFastForwardsDespiteMergeFFFalse(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Run(t, repo.Dir, "config", "pull.ff", "true")
@@ -511,7 +513,7 @@ func TestQA_COMP_01_PullMergeWithPullFFTrueFastForwardsDespiteMergeFFFalse(t *te
 	}
 }
 
-func TestFR_SYNC_01_FetchOneRemotePrunesGoneBranchesLeavesOthersUntouched(t *testing.T) {
+func TestFetchOneRemotePrunesGoneBranchesLeavesOthersUntouched(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -542,7 +544,7 @@ func TestFR_SYNC_01_FetchOneRemotePrunesGoneBranchesLeavesOthersUntouched(t *tes
 	}
 }
 
-func TestFR_SYNC_01_FetchAllUpdatesEveryRemote(t *testing.T) {
+func TestFetchAllUpdatesEveryRemote(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -582,7 +584,7 @@ func pullMergeFixture(t *testing.T) (repo *gittest.Repo, origin string) {
 	return repo, origin
 }
 
-func TestFR_SYNC_02_PullMergeFastForwardsWhenUpstreamIsAhead(t *testing.T) {
+func TestPullMergeFastForwardsWhenUpstreamIsAhead(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	upstreamTip := remoteAppendCommit(t, origin, "upstream.txt", "u", "upstream commit")
@@ -595,7 +597,7 @@ func TestFR_SYNC_02_PullMergeFastForwardsWhenUpstreamIsAhead(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_02_PullMergeCreatesMergeCommitForNonConflictingDivergence(t *testing.T) {
+func TestPullMergeCreatesMergeCommitForNonConflictingDivergence(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	remoteAppendCommit(t, origin, "upstream-only.txt", "u", "upstream commit")
@@ -615,7 +617,7 @@ func TestFR_SYNC_02_PullMergeCreatesMergeCommitForNonConflictingDivergence(t *te
 	}
 }
 
-func TestFR_SYNC_02_PullMergeLeavesMergeHeadOnConflict(t *testing.T) {
+func TestPullMergeLeavesMergeHeadOnConflict(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	// both sides edit seed.txt differently: a real content conflict
@@ -633,7 +635,7 @@ func TestFR_SYNC_02_PullMergeLeavesMergeHeadOnConflict(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_02_PullMergeRefusesWhileDetached(t *testing.T) {
+func TestPullMergeRefusesWhileDetached(t *testing.T) {
 	t.Parallel()
 	repo, _ := pullMergeFixture(t)
 	sha := gittest.HeadSHA(t, repo.Dir)
@@ -650,7 +652,7 @@ func TestFR_SYNC_02_PullMergeRefusesWhileDetached(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_02_PullMergeRefusesWithNoUpstreamConfigured(t *testing.T) {
+func TestPullMergeRefusesWithNoUpstreamConfigured(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -664,7 +666,7 @@ func TestFR_SYNC_02_PullMergeRefusesWithNoUpstreamConfigured(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_02_PullRebaseLinearisesNonConflictingDivergence(t *testing.T) {
+func TestPullRebaseLinearisesNonConflictingDivergence(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	upstreamTip := remoteAppendCommit(t, origin, "upstream-only.txt", "u", "upstream commit")
@@ -687,7 +689,7 @@ func TestFR_SYNC_02_PullRebaseLinearisesNonConflictingDivergence(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_02_PullRebaseLeavesRebaseDirOnConflict(t *testing.T) {
+func TestPullRebaseLeavesRebaseDirOnConflict(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	remoteAppendCommit(t, origin, "seed.txt", "upstream change\n", "upstream commit")
@@ -718,7 +720,7 @@ func remoteAmendTip(t *testing.T, remoteDir, file, content string) string {
 	return gittest.HeadSHA(t, clone)
 }
 
-func TestQA_COMP_01_PullRebaseAfterAnUpstreamRewriteReplaysOnlyTheLocalCommit(t *testing.T) {
+func TestPullRebaseAfterAnUpstreamRewriteReplaysOnlyTheLocalCommit(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	remoteAppendCommit(t, origin, "upstream.txt", "first version\n", "upstream commit")
@@ -737,7 +739,7 @@ func TestQA_COMP_01_PullRebaseAfterAnUpstreamRewriteReplaysOnlyTheLocalCommit(t 
 	}
 }
 
-func TestFR_SYNC_03_PushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
+func TestPushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Commit(t, repo.Dir, "local.txt", "x", "local commit")
@@ -755,11 +757,11 @@ func TestFR_SYNC_03_PushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
 	}
 }
 
-// TestFR_SYNC_12_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway
+// TestPushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway
 // covers a caller that named a branch (PushTarget, or a dialog) before HEAD
 // switched elsewhere: Push must still push and track that named branch, not
 // whatever is current now.
-func TestFR_SYNC_12_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *testing.T) {
+func TestPushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -784,11 +786,11 @@ func TestFR_SYNC_12_PushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *te
 	}
 }
 
-// TestFR_SYNC_12_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue covers
+// TestPushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue covers
 // push.autoSetupRemote's three outcomes: exit 1 with nothing configured
 // means false, a true spelling means true, and a bad value is git's own
 // refusal (Code GitFailed, naming the bad value).
-func TestFR_SYNC_12_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue(t *testing.T) {
+func TestPushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -812,11 +814,11 @@ func TestFR_SYNC_12_PushTargetReadsAutoSetupRemoteUnsetTrueAndBadValue(t *testin
 	}
 }
 
-// TestFR_SYNC_12_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote
+// TestPushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote
 // covers %(push:remotename)'s own three configured levels, in git's
 // priority order, with three remotes so none of them is the sole-remote
 // fallback.
-func TestFR_SYNC_12_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote(t *testing.T) {
+func TestPushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRemote(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -849,10 +851,10 @@ func TestFR_SYNC_12_PushTargetRemoteFollowsPushRemoteThenPushDefaultThenBranchRe
 	}
 }
 
-// TestFR_SYNC_12_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured
+// TestPushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured
 // covers the two fallbacks %(push:remotename) does not apply itself: the
 // sole remote, and giving up (empty) once a second, unnamed remote exists.
-func TestFR_SYNC_12_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured(t *testing.T) {
+func TestPushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigured(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -869,7 +871,7 @@ func TestFR_SYNC_12_PushTargetFallsBackToTheSoleRemoteThenEmptyWithTwoUnconfigur
 	}
 }
 
-func TestFR_SYNC_12_PushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
+func TestPushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -884,11 +886,11 @@ func TestFR_SYNC_12_PushTargetOnDetachedHeadFailsGitFailed(t *testing.T) {
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
-// TestFR_SYNC_12_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange
+// TestPushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange
 // covers a `git branch -u` run outside the app, which only edits
 // .git/config: PushTarget must reflect it immediately, unlike a cached refs
 // store the UI would otherwise rely on.
-func TestFR_SYNC_12_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange(t *testing.T) {
+func TestPushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChange(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -912,7 +914,7 @@ func TestFR_SYNC_12_PushTargetReadsBranchAndHasUpstreamFreshAfterAConfigOnlyChan
 	}
 }
 
-func TestFR_SYNC_04_PushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
+func TestPushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	remoteAppendCommit(t, origin, "elsewhere.txt", "x", "pushed from elsewhere") // never fetched here
@@ -933,7 +935,7 @@ func TestFR_SYNC_04_PushBehindUpstreamIsRejectedNotFastForward(t *testing.T) {
 }
 
 // A rejection reason other than the fast-forward ones: PushRejected.
-func TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason(t *testing.T) {
+func TestPushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	hookPath := filepath.Join(origin, "hooks", "pre-receive")
@@ -956,12 +958,12 @@ func TestFR_SYNC_04_PushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	}
 }
 
-// TestFR_SYNC_13_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing
+// TestPushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing
 // covers a first push (a remote given, no upstream configured yet) whose
 // remote already has a same-named branch with commits this branch lacks: it
 // still classifies NotFastForward, but with its own message, naming neither
 // pull nor force push, since neither applies without an upstream.
-func TestFR_SYNC_13_PushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing(t *testing.T) {
+func TestPushWithARemoteGivenRejectedNotFastForwardNamesNoUpstreamAndOffersNothing(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -997,7 +999,7 @@ func forcePushRewriteFixture(t *testing.T) (repo *gittest.Repo, origin string) {
 	return repo, origin
 }
 
-func TestFR_SYNC_05_ForcePushSucceedsAfterProperlyIncorporatingUpstream(t *testing.T) {
+func TestForcePushSucceedsAfterProperlyIncorporatingUpstream(t *testing.T) {
 	t.Parallel()
 	repo, origin := forcePushRewriteFixture(t)
 	rewrittenTip := gittest.HeadSHA(t, repo.Dir)
@@ -1010,7 +1012,7 @@ func TestFR_SYNC_05_ForcePushSucceedsAfterProperlyIncorporatingUpstream(t *testi
 	}
 }
 
-func TestFR_SYNC_05_ForcePushRefusedWhenRemoteGainedAnUnfetchedCommit(t *testing.T) {
+func TestForcePushRefusedWhenRemoteGainedAnUnfetchedCommit(t *testing.T) {
 	t.Parallel()
 	repo, origin := forcePushRewriteFixture(t)
 	remoteAppendCommit(t, origin, "elsewhere.txt", "e", "elsewhere commit") // never fetched here
@@ -1043,7 +1045,7 @@ func requireHTTPTransport(t *testing.T) {
 	}
 }
 
-func TestQA_SEC_02_FR_SYNC_08_FetchJobClassifiesAFailedSignIn(t *testing.T) {
+func TestFetchJobClassifiesAFailedSignIn(t *testing.T) {
 	t.Parallel()
 	requireHTTPTransport(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -1089,7 +1091,7 @@ func updateBranchResult(t *testing.T, job core.JobInfo) core.UpdateBranchResult 
 	return *job.Result
 }
 
-func TestFR_UPD_01_02_03_05_UpdateBranchFastForwardsABranchNotCheckedOutAnywhere(t *testing.T) {
+func Test02_03_05_UpdateBranchFastForwardsABranchNotCheckedOutAnywhere(t *testing.T) {
 	t.Parallel()
 	repo, origin := updateBranchFixture(t)
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")
@@ -1123,7 +1125,7 @@ func TestFR_UPD_01_02_03_05_UpdateBranchFastForwardsABranchNotCheckedOutAnywhere
 	}
 }
 
-func TestFR_UPD_05_UpdateBranchReportsTheBranchNotATagOfTheSameName(t *testing.T) {
+func TestUpdateBranchReportsTheBranchNotATagOfTheSameName(t *testing.T) {
 	t.Parallel()
 	repo, origin := updateBranchFixture(t)
 	gittest.Commit(t, repo.Dir, "tagged.txt", "t", "tagged")
@@ -1138,7 +1140,7 @@ func TestFR_UPD_05_UpdateBranchReportsTheBranchNotATagOfTheSameName(t *testing.T
 	}
 }
 
-func TestFR_UPD_01_UpdateBranchFastForwardsABranchTrackingALocalBranch(t *testing.T) {
+func TestUpdateBranchFastForwardsABranchTrackingALocalBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -1153,7 +1155,7 @@ func TestFR_UPD_01_UpdateBranchFastForwardsABranchTrackingALocalBranch(t *testin
 	}
 }
 
-func TestFR_UPD_03_UpdateBranchDivergedFromUpstreamFailsNotFastForward(t *testing.T) {
+func TestUpdateBranchDivergedFromUpstreamFailsNotFastForward(t *testing.T) {
 	t.Parallel()
 	repo, origin := updateBranchFixture(t)
 	remoteAppendCommitOnBranch(t, origin, "B", "upstream-only.txt", "u", "upstream commit")
@@ -1173,7 +1175,7 @@ func TestFR_UPD_03_UpdateBranchDivergedFromUpstreamFailsNotFastForward(t *testin
 	}
 }
 
-func TestFR_UPD_05_FR_UX_11_UpdateBranchWithNoUpstreamFailsBeforeAnyJobNamingTheBranch(t *testing.T) {
+func TestUpdateBranchWithNoUpstreamFailsBeforeAnyJobNamingTheBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -1209,7 +1211,7 @@ func updateBranchElsewhereFixture(t *testing.T) (repo *gittest.Repo, origin, oth
 	return repo, origin, otherDir
 }
 
-func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
+func TestUpdateBranchCheckedOutElsewhereRefusesBeforeAnyGitCall(t *testing.T) {
 	t.Parallel()
 	repo, origin, otherDir := updateBranchElsewhereFixture(t)
 	otherPath := gitPath(t, otherDir)
@@ -1252,7 +1254,7 @@ func TestFR_UPD_04_UpdateBranchCheckedOutElsewhereRefusesBeforeAnyGitCall(t *tes
 	}
 }
 
-func TestFR_UPD_01_UpdateBranchCheckedOutInThisWindowRefusesNamingItsOwnPath(t *testing.T) {
+func TestUpdateBranchCheckedOutInThisWindowRefusesNamingItsOwnPath(t *testing.T) {
 	t.Parallel()
 	repo, origin := updateBranchFixture(t)
 	gittest.Run(t, repo.Dir, "checkout", "B")
@@ -1305,10 +1307,10 @@ func rebaseInProgressFixture(t *testing.T) (repo *gittest.Repo, wtDir string) {
 	return repo, wtDir
 }
 
-// TestFR_UPD_04_UpdateBranchRefusesABranchBeingRebasedOrBisectedElsewhere runs
+// TestUpdateBranchRefusesABranchBeingRebasedOrBisectedElsewhere runs
 // one worktree through every in-progress state UpdateBranch refuses on; each
 // refusal starts no job, runs no fetch and changes nothing.
-func TestFR_UPD_04_UpdateBranchRefusesABranchBeingRebasedOrBisectedElsewhere(t *testing.T) {
+func TestUpdateBranchRefusesABranchBeingRebasedOrBisectedElsewhere(t *testing.T) {
 	t.Parallel()
 	repo, wtDir := rebaseInProgressFixture(t)
 	wtPath := gitPath(t, wtDir)
@@ -1408,7 +1410,7 @@ func bisectInProgressFixture(t *testing.T) (repo *gittest.Repo, wtDir string) {
 	return repo, wtDir
 }
 
-func TestFR_UPD_04_UpdateBranchRebasingInMainWorktreeRefusesNamingIt(t *testing.T) {
+func TestUpdateBranchRebasingInMainWorktreeRefusesNamingIt(t *testing.T) {
 	t.Parallel()
 	repo, origin := updateBranchFixture(t)
 	gittest.Run(t, repo.Dir, "checkout", "B")
@@ -1452,7 +1454,7 @@ func rewriteGitDirRelative(t *testing.T, worktreeDir string) {
 	}
 }
 
-func TestFR_SYNC_09_PullWithStashGivesTheEntryBackWhenTheMergeNeverStarted(t *testing.T) {
+func TestPullWithStashGivesTheEntryBackWhenTheMergeNeverStarted(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")

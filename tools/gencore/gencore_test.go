@@ -1,3 +1,5 @@
+// Requirements: QA-PORT-02
+
 package main
 
 import (
@@ -10,7 +12,7 @@ import (
 
 var update = flag.Bool("update", false, "rewrite golden files")
 
-func TestTR_28_GeneratesFacadeClientDispatcher(t *testing.T) {
+func TestGeneratesFacadeClientDispatcher(t *testing.T) {
 	files, err := Generate("testdata/fixture")
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +34,7 @@ func TestTR_28_GeneratesFacadeClientDispatcher(t *testing.T) {
 	}
 }
 
-func TestTR_28_RejectsNonJSONSignatures(t *testing.T) {
+func TestRejectsNonJSONSignatures(t *testing.T) {
 	cases := map[string]string{
 		"noctx":      "Version: first parameter must be context.Context",
 		"chanparam":  "Stream: parameter out: chan string is not JSON-serialisable",
@@ -55,7 +57,7 @@ func TestTR_28_RejectsNonJSONSignatures(t *testing.T) {
 	}
 }
 
-func TestTR_28_GeneratedCodeIsCurrent(t *testing.T) {
+func TestGeneratedCodeIsCurrent(t *testing.T) {
 	files, err := Generate("../../internal/core")
 	if err != nil {
 		t.Fatal(err)

@@ -1,3 +1,4 @@
+// Requirements: FR-UX-20
 import { h } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -5,7 +6,7 @@ import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 
 describe('openvuePassThrough', () => {
-  it('FR-UX-20 a cancelable mousedown on a splitter gutter is default-prevented and resizing still works', () => {
+  it('a cancelable mousedown on a splitter gutter is default-prevented and resizing still works', () => {
     const wrapper = mount(Splitter, {
       slots: {
         default: () => [

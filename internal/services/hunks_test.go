@@ -1,3 +1,5 @@
+// Requirements: FR-CHG-03
+
 package services
 
 import (
@@ -37,7 +39,7 @@ func shown(t *testing.T, c *Core, id core.WorktreeID, path string, staged bool, 
 	return core.LineSelection{Old: oldLines, New: newLines, Fingerprint: diff.Fingerprint}
 }
 
-func TestFR_CHG_03_StageLinesRefusesLinesThatChangedSinceTheyWereShown(t *testing.T) {
+func TestStageLinesRefusesLinesThatChangedSinceTheyWereShown(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name, base, displayed, now string
@@ -86,7 +88,7 @@ func twinBlocks(extra, first, second string) string {
 
 const tenLines = "n1\nn2\nn3\nn4\nn5\nn6\nn7\nn8\nn9\nn10\n"
 
-func TestFR_CHG_03_StageLinesOfTheSecondHunkAloneChangesItsOwnBlockNotAnIdenticalOne(t *testing.T) {
+func TestStageLinesOfTheSecondHunkAloneChangesItsOwnBlockNotAnIdenticalOne(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", twinBlocks("", "TARGET", "TARGET"), "base")
@@ -109,7 +111,7 @@ func partial(frag *gitdiff.TextFragment, selected map[int]bool, reverse bool) st
 	return string(buildPartialPatch(frag, selected, reverse))
 }
 
-func TestFR_CHG_03_BuildPartialPatchStartsTheProducedSideWhereTheOtherSideStarts(t *testing.T) {
+func TestBuildPartialPatchStartsTheProducedSideWhereTheOtherSideStarts(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 10, OldLines: 3,
@@ -135,7 +137,7 @@ func TestFR_CHG_03_BuildPartialPatchStartsTheProducedSideWhereTheOtherSideStarts
 	}
 }
 
-func TestFR_CHG_03_StageLinesOfLinesAddedAfterALastLineWithoutNewlineGivesThatLineANewline(t *testing.T) {
+func TestStageLinesOfLinesAddedAfterALastLineWithoutNewlineGivesThatLineANewline(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "first\nlast", "base")
@@ -163,7 +165,7 @@ func indexBytes(t *testing.T, dir, name string) string {
 
 // A replacement's selected new line comes with the old line the UI pairs
 // it with (see DiffView's selectedLines).
-func TestFR_CHG_03_StageLinesOfAReplacementStagesItAsOneChange(t *testing.T) {
+func TestStageLinesOfAReplacementStagesItAsOneChange(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "a\nb", "base")
@@ -179,7 +181,7 @@ func TestFR_CHG_03_StageLinesOfAReplacementStagesItAsOneChange(t *testing.T) {
 	}
 }
 
-func TestFR_CHG_03_StageLinesStagesAHunkOnABlankLineExactly(t *testing.T) {
+func TestStageLinesStagesAHunkOnABlankLineExactly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "a\n\nb\n", "base")
@@ -205,7 +207,7 @@ func fragmentOf(t *testing.T, hunk string) *gitdiff.TextFragment {
 	return file.TextFragments[0]
 }
 
-func TestFR_CHG_03_BuildPartialPatchOfLastLinesWithoutNewlineBlankLinesAndEmptyFiles(t *testing.T) {
+func TestBuildPartialPatchOfLastLinesWithoutNewlineBlankLinesAndEmptyFiles(t *testing.T) {
 	t.Parallel()
 	const noEOL = "\\ No newline at end of file\n"
 	tests := []struct {
@@ -269,7 +271,7 @@ func TestFR_CHG_03_BuildPartialPatchOfLastLinesWithoutNewlineBlankLinesAndEmptyF
 	}
 }
 
-func TestFR_CHG_03_BuildPartialPatchKeepsSelectedFoldsUnselectedRemovalToContextDropsUnselectedAddition(t *testing.T) {
+func TestBuildPartialPatchKeepsSelectedFoldsUnselectedRemovalToContextDropsUnselectedAddition(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 4,
@@ -298,7 +300,7 @@ func TestFR_CHG_03_BuildPartialPatchKeepsSelectedFoldsUnselectedRemovalToContext
 	}
 }
 
-func TestFR_CHG_03_BuildPartialPatchSelectingEveryChangedLineKeepsAllOfThem(t *testing.T) {
+func TestBuildPartialPatchSelectingEveryChangedLineKeepsAllOfThem(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 2,
@@ -320,7 +322,7 @@ func TestFR_CHG_03_BuildPartialPatchSelectingEveryChangedLineKeepsAllOfThem(t *t
 	}
 }
 
-func TestFR_CHG_03_BuildPartialPatchFoldedNoEOLLineKeepsItsOwnMarkerDroppedLineLosesIt(t *testing.T) {
+func TestBuildPartialPatchFoldedNoEOLLineKeepsItsOwnMarkerDroppedLineLosesIt(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 1,
@@ -344,7 +346,7 @@ func TestFR_CHG_03_BuildPartialPatchFoldedNoEOLLineKeepsItsOwnMarkerDroppedLineL
 
 // In a reverse (unstage) patch, applied with --reverse, "+" is the removal
 // side.
-func TestFR_CHG_03_BuildPartialPatchReverseFoldsTheOppositeSide(t *testing.T) {
+func TestBuildPartialPatchReverseFoldsTheOppositeSide(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 2,
@@ -370,7 +372,7 @@ func TestFR_CHG_03_BuildPartialPatchReverseFoldsTheOppositeSide(t *testing.T) {
 }
 
 // git lists adjacent changed lines as every "-" line, then every "+" line.
-func TestFR_CHG_03_BuildPartialPatchPairsABlockOfDeletesThenAddsByPosition(t *testing.T) {
+func TestBuildPartialPatchPairsABlockOfDeletesThenAddsByPosition(t *testing.T) {
 	t.Parallel()
 	frag := &gitdiff.TextFragment{
 		OldPosition: 1, OldLines: 2,
@@ -395,7 +397,7 @@ func TestFR_CHG_03_BuildPartialPatchPairsABlockOfDeletesThenAddsByPosition(t *te
 	}
 }
 
-func TestFR_CHG_03_FileHeaderLinesStopsBeforeTheFirstHunk(t *testing.T) {
+func TestFileHeaderLinesStopsBeforeTheFirstHunk(t *testing.T) {
 	t.Parallel()
 	diff := []byte("diff --git a/f b/f\nindex abc..def 100644\n--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n-old\n+new\n")
 
@@ -419,7 +421,7 @@ func twoHunksFixture(t *testing.T, dir string) string {
 	return changed
 }
 
-func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedHunk(t *testing.T) {
+func TestStageLinesStagesAndUnstagesOnlyTheSelectedHunk(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	changed := twoHunksFixture(t, repo.Dir)
@@ -459,7 +461,7 @@ func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedHunk(t *testing.T) 
 	}
 }
 
-func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedChangeEvenWhenGitMergesTwoChangesIntoOneHunk(t *testing.T) {
+func TestStageLinesStagesAndUnstagesOnlyTheSelectedChangeEvenWhenGitMergesTwoChangesIntoOneHunk(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	// Lines 3 and 5 replaced: git diff -U3 reports one hunk, each line at the
@@ -506,7 +508,7 @@ func TestFR_CHG_03_StageLinesStagesAndUnstagesOnlyTheSelectedChangeEvenWhenGitMe
 
 // A selection naming lines the diff does not change, or lines already
 // staged, is Internal, not a git failure, and applies nothing.
-func TestFR_CHG_03_StageLinesSelectingLinesTheDiffDoesNotChangeIsInternal(t *testing.T) {
+func TestStageLinesSelectingLinesTheDiffDoesNotChangeIsInternal(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "a\nb\nc\n", "base")
@@ -541,7 +543,7 @@ func TestFR_CHG_03_StageLinesSelectingLinesTheDiffDoesNotChangeIsInternal(t *tes
 }
 
 // The re-diff of an untracked path lists no file.
-func TestFR_CHG_03_StageLinesOnAPathWithNoDiffIsAClearInternalError(t *testing.T) {
+func TestStageLinesOnAPathWithNoDiffIsAClearInternalError(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "tracked.txt", "a\n", "base")
@@ -563,7 +565,7 @@ func TestFR_CHG_03_StageLinesOnAPathWithNoDiffIsAClearInternalError(t *testing.T
 	}
 }
 
-func TestFR_CHG_03_StageLinesPreservesTheFinalLineExactlyWhenItsChangeIsNotSelected(t *testing.T) {
+func TestStageLinesPreservesTheFinalLineExactlyWhenItsChangeIsNotSelected(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "line1\nline2\nlast", "base") // no trailing newline
@@ -594,7 +596,7 @@ func TestFR_CHG_03_StageLinesPreservesTheFinalLineExactlyWhenItsChangeIsNotSelec
 	}
 }
 
-func TestFR_CHG_03_StageLinesPreservesCRLFLineEndingsExactly(t *testing.T) {
+func TestStageLinesPreservesCRLFLineEndingsExactly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "line1\r\nline2\r\nline3\r\n", "base")
@@ -625,7 +627,7 @@ func TestFR_CHG_03_StageLinesPreservesCRLFLineEndingsExactly(t *testing.T) {
 	}
 }
 
-func TestFR_CHG_03_StageLinesStagesAHistogramHunkExactlyAsGitShowsIt(t *testing.T) {
+func TestStageLinesStagesAHistogramHunkExactlyAsGitShowsIt(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	movedLineFixture(t, repo.Dir)
@@ -646,7 +648,7 @@ func TestFR_CHG_03_StageLinesStagesAHistogramHunkExactlyAsGitShowsIt(t *testing.
 	}
 }
 
-func TestFR_CHG_03_StageLinesUnderAutocrlfStagesTheCleanFormAndKeepsTheWorkingFileCRLF(t *testing.T) {
+func TestStageLinesUnderAutocrlfStagesTheCleanFormAndKeepsTheWorkingFileCRLF(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	autocrlfFixture(t, repo.Dir)
@@ -678,7 +680,7 @@ func patternTwins(t *testing.T, dir string) {
 	}
 }
 
-func TestFR_CHG_03_StageLinesOfAPatternNamedFileStagesOnlyThatFile(t *testing.T) {
+func TestStageLinesOfAPatternNamedFileStagesOnlyThatFile(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	patternTwins(t, repo.Dir)

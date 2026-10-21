@@ -1,3 +1,4 @@
+// Requirements: DIST-03, FR-DIFF-06, FR-ED-04, FR-ED-07, FR-ED-11, FR-ED-13, FR-REPO-07, FR-SYNC-06, FR-UX-01, FR-UX-02, FR-UX-04, FR-UX-06, FR-UX-17
 import { flushPromises, mount, type BaseWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -59,7 +60,7 @@ describe('SettingsPanel', () => {
     document.documentElement.classList.remove('nebegit-dark')
   })
 
-  it('FR-UX-04, FR-DIFF-06, FR-SYNC-06, FR-UX-06 loads the stored settings and submits every edited field, keeping the system theme', async () => {
+  it('loads the stored settings and submits every edited field, keeping the system theme', async () => {
     SettingsService.Get.mockResolvedValue(
       defaultSettingsFixture({ protectedBranches: ['main', 'master'] }),
     )
@@ -88,7 +89,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-UX-04 the form appears only once it holds the stored settings, so no early choice is overwritten', async () => {
+  it('the form appears only once it holds the stored settings, so no early choice is overwritten', async () => {
     let resolve!: (settings: typeof filled) => void
     SettingsService.Get.mockReturnValueOnce(new Promise((r) => (resolve = r)))
     const wrapper = mount(SettingsPanel)
@@ -112,14 +113,14 @@ describe('SettingsPanel', () => {
       { path: '', error: 'permission denied' },
       'App log could not be opened: permission denied',
     ],
-  ])('FR-UX-02 shows %s', async (_name, logPath, text) => {
+  ])('shows %s', async (_name, logPath, text) => {
     AppService.LogPath.mockResolvedValue(logPath)
     const wrapper = await mountPanel()
 
     expect(wrapper.text()).toContain(text)
   })
 
-  it('FR-UX-04 saving successfully emits close', async () => {
+  it('saving successfully emits close', async () => {
     const wrapper = await mountPanel()
 
     await submit(wrapper)
@@ -127,7 +128,7 @@ describe('SettingsPanel', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  it('FR-ED-04, FR-ED-11 renders the stored editor profile in one form, submitting the edited profile', async () => {
+  it('renders the stored editor profile in one form, submitting the edited profile', async () => {
     SettingsService.Get.mockResolvedValue(
       defaultSettingsFixture({
         editorProfile: {
@@ -151,7 +152,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-ED-11 with WSL distros installed Settings still shows one editor form', async () => {
+  it('with WSL distros installed Settings still shows one editor form', async () => {
     AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04', 'Debian'])
 
     const wrapper = await mountPanel()
@@ -161,7 +162,7 @@ describe('SettingsPanel', () => {
     expect(wrapper.get('legend').text()).toBe('Open in editor')
   })
 
-  it('FR-ED-11 picking a preset with WSL distros installed saves it as the one profile', async () => {
+  it('picking a preset with WSL distros installed saves it as the one profile', async () => {
     AppService.ListWSLDistros.mockResolvedValue(['Ubuntu-22.04', 'Debian'])
 
     const wrapper = await mountPanel()
@@ -174,7 +175,7 @@ describe('SettingsPanel', () => {
     expect(sent.editorProfiles).toBeUndefined()
   })
 
-  it('FR-ED-13 on a Windows host the Zed preset opens files in a window of their own', async () => {
+  it('on a Windows host the Zed preset opens files in a window of their own', async () => {
     System.IsWindows.mockReturnValue(true)
     SettingsService.Get.mockResolvedValue(
       defaultSettingsFixture({
@@ -194,7 +195,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-ED-13 on a Linux host the Zed preset opens files in the last used window', async () => {
+  it('on a Linux host the Zed preset opens files in the last used window', async () => {
     const wrapper = await mountPanel()
 
     await pickPreset(wrapper, 'Zed')
@@ -206,7 +207,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-REPO-07 on a host without WSL, Settings shows no error and no distro controls', async () => {
+  it('on a host without WSL, Settings shows no error and no distro controls', async () => {
     AppService.ListWSLDistros.mockResolvedValue(null)
 
     const wrapper = await mountPanel()
@@ -216,7 +217,7 @@ describe('SettingsPanel', () => {
     expect(wrapper.get('legend').text()).toBe('Open in editor')
   })
 
-  it('FR-UX-01 a rejected save renders ErrorBanner with the error', async () => {
+  it('a rejected save renders ErrorBanner with the error', async () => {
     SettingsService.Set.mockRejectedValueOnce(wailsError('settings write failed'))
     const wrapper = await mountPanel()
 
@@ -227,7 +228,7 @@ describe('SettingsPanel', () => {
     expect(error.props('error')).toEqual({ message: 'settings write failed' })
   })
 
-  it('FR-UX-06 the theme select lists the seven entries in order', async () => {
+  it('the theme select lists the seven entries in order', async () => {
     const { wrapper, body } = await mountInBody(SettingsPanel)
 
     await wrapper.get('[data-test="theme-select"]').trigger('click')
@@ -242,7 +243,7 @@ describe('SettingsPanel', () => {
     ])
   })
 
-  it('FR-UX-06 the credits list the four dark themes by name, copyright and MIT licence, linking to their repo', async () => {
+  it('the credits list the four dark themes by name, copyright and MIT licence, linking to their repo', async () => {
     const wrapper = await mountPanel()
 
     const credits = wrapper.findAll('[data-test="theme-credit"]')
@@ -255,7 +256,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-UX-17 the editor is a fieldset of its own; every field has its own label on its own row', async () => {
+  it('the editor is a fieldset of its own; every field has its own label on its own row', async () => {
     const wrapper = await mountPanel()
 
     const fieldset = wrapper.get('.p-fieldset')
@@ -279,7 +280,7 @@ describe('SettingsPanel', () => {
     ])
   })
 
-  it('FR-UX-06 picking Dark and saving persists it and applies the theme immediately', async () => {
+  it('picking Dark and saving persists it and applies the theme immediately', async () => {
     const { wrapper, body } = await mountInBody(SettingsPanel)
 
     await chooseOption(body, 'theme-select', 'Dark')
@@ -290,7 +291,7 @@ describe('SettingsPanel', () => {
     expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
   })
 
-  it('FR-ED-07 a preset fills all three commands, and the next preset fully overwrites rather than merges', async () => {
+  it('a preset fills all three commands, and the next preset fully overwrites rather than merges', async () => {
     const wrapper = await mountPanel()
     const fieldset = wrapper.get('fieldset')
     const fields = () => ({
@@ -314,7 +315,7 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('FR-UX-04 a base folder for new worktrees per environment, local and each WSL distro; saving drops empty ones', async () => {
+  it('a base folder for new worktrees per environment, local and each WSL distro; saving drops empty ones', async () => {
     AppService.ListWSLDistros.mockResolvedValue(['Ubuntu', 'Debian'])
     SettingsService.Get.mockResolvedValue(
       defaultSettingsFixture({ worktreeFolders: { Debian: '/srv/wt' } }),
@@ -341,7 +342,7 @@ describe('SettingsPanel', () => {
     [{ app: '0.1.57', commit: 'abc1234', protocol: 1 }, 'nebegit 0.1.57 (abc1234)'],
     [{ app: 'dev', commit: '', protocol: 1 }, 'nebegit dev'],
   ])(
-    'DIST-03 shows the app version fetched on mount, with the commit when there is one',
+    'shows the app version fetched on mount, with the commit when there is one',
     async (version, text) => {
       Facade.Version.mockResolvedValue(version)
       const wrapper = await mountPanel()
@@ -350,7 +351,7 @@ describe('SettingsPanel', () => {
     },
   )
 
-  it('FR-SYNC-06 the stored protected branches show as chips', async () => {
+  it('the stored protected branches show as chips', async () => {
     const wrapper = await mountPanel()
 
     const chips = wrapper.findAll('.p-autocomplete-chip-item')

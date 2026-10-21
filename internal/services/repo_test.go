@@ -1,3 +1,5 @@
+// Requirements: FR-ED-03, FR-REPO-01, FR-REPO-03, FR-REPO-04, FR-REPO-05, QA-REL-02
+
 package services
 
 import (
@@ -53,7 +55,7 @@ func recordCommands(t *testing.T, c *Core, wt core.WorktreeID) *commandRecorder 
 	return rec
 }
 
-func TestFR_REPO_01_OpenWorktreeReusesSessionForSameToplevel(t *testing.T) {
+func TestOpenWorktreeReusesSessionForSameToplevel(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	sub := filepath.Join(repo.Dir, "sub", "dir")
@@ -73,7 +75,7 @@ func TestFR_REPO_01_OpenWorktreeReusesSessionForSameToplevel(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_01_OpenWorktreeGivesLinkedWorktreesDistinctIDsSameRepoKey(t *testing.T) {
+func TestOpenWorktreeGivesLinkedWorktreesDistinctIDsSameRepoKey(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -92,7 +94,7 @@ func TestFR_REPO_01_OpenWorktreeGivesLinkedWorktreesDistinctIDsSameRepoKey(t *te
 	}
 }
 
-func TestFR_REPO_05_OpenWorktreeRejectsPlainDirectory(t *testing.T) {
+func TestOpenWorktreeRejectsPlainDirectory(t *testing.T) {
 	t.Parallel()
 	c := New(func(core.Event) {})
 
@@ -101,7 +103,7 @@ func TestFR_REPO_05_OpenWorktreeRejectsPlainDirectory(t *testing.T) {
 	coretest.AssertCode(t, err, core.NotARepo)
 }
 
-func TestFR_REPO_05_OpenWorktreeRejectsMissingPath(t *testing.T) {
+func TestOpenWorktreeRejectsMissingPath(t *testing.T) {
 	t.Parallel()
 	c := New(func(core.Event) {})
 
@@ -110,7 +112,7 @@ func TestFR_REPO_05_OpenWorktreeRejectsMissingPath(t *testing.T) {
 	coretest.AssertCode(t, err, core.NotARepo)
 }
 
-func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
+func TestSummaryReportsBranch(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -127,7 +129,7 @@ func TestFR_REPO_03_SummaryReportsBranch(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_03_SummaryReportsTheBranchByItsNameWhenATagSharesIt(t *testing.T) {
+func TestSummaryReportsTheBranchByItsNameWhenATagSharesIt(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -145,7 +147,7 @@ func TestFR_REPO_03_SummaryReportsTheBranchByItsNameWhenATagSharesIt(t *testing.
 	}
 }
 
-func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
+func TestSummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -172,7 +174,7 @@ func TestFR_ED_03_SummaryReportsTheEffectiveEditorProfileName(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
+func TestSummaryReportsMergeInProgress(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -194,7 +196,7 @@ func TestFR_REPO_03_SummaryReportsMergeInProgress(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
+func TestSummaryReportsRebaseInProgress(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -212,7 +214,7 @@ func TestFR_REPO_03_SummaryReportsRebaseInProgress(t *testing.T) {
 	}
 }
 
-func TestQA_REL_02_SummaryReportsHeadSHA(t *testing.T) {
+func TestSummaryReportsHeadSHA(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -230,7 +232,7 @@ func TestQA_REL_02_SummaryReportsHeadSHA(t *testing.T) {
 	}
 }
 
-func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
+func TestSummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	c, id := openWorktree(t, repo.Dir)
@@ -244,7 +246,7 @@ func TestQA_REL_02_SummaryReportsEmptySHAOnAnUnbornHEAD(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_03_SummaryReportsDetachedHEADWithItsSHA(t *testing.T) {
+func TestSummaryReportsDetachedHEADWithItsSHA(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -267,7 +269,7 @@ func TestFR_REPO_03_SummaryReportsDetachedHEADWithItsSHA(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_04_SetFocusedTrueRunsAnImmediatePollerCheck(t *testing.T) {
+func TestSetFocusedTrueRunsAnImmediatePollerCheck(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -305,7 +307,7 @@ func countCommandEvents(events chan core.Event) int {
 	}
 }
 
-func TestFR_REPO_04_RefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
+func TestRefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")

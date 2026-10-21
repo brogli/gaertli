@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-05, FR-LOG-06, FR-LOG-07, FR-LOG-08, FR-REPO-04
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import { commitFiles, commitSha, logRow, pickRefAction } from './helpers'
@@ -34,7 +35,7 @@ async function refNames(row: Locator): Promise<string[]> {
   return row.locator('.ref-label').allTextContents()
 }
 
-test('FR-LOG-05 a search combines with an active filter: a hash outside it is "No match", one inside is highlighted and the filtered history still shows in full', async ({
+test('a search combines with an active filter: a hash outside it is "No match", one inside is highlighted and the filtered history still shows in full', async ({
   app,
   git,
   repos,
@@ -56,7 +57,7 @@ test('FR-LOG-05 a search combines with an active filter: a hash outside it is "N
   await expectSubjects(app, v1History) // still the whole filtered history
 })
 
-test('FR-LOG-06 FR-LOG-07 FR-LOG-08 branch and path filters narrow the log, combine to their intersection and clear one by one', async ({
+test('branch and path filters narrow the log, combine to their intersection and clear one by one', async ({
   app,
 }) => {
   const path = app.getByPlaceholder('Path')
@@ -86,7 +87,7 @@ test('FR-LOG-06 FR-LOG-07 FR-LOG-08 branch and path filters narrow the log, comb
   await expectSubjects(app, ['initial: add base files', 'docs and func b'])
 })
 
-test('FR-REPO-04 a commit, and a tag created or deleted, outside the app show in the log by themselves', async ({
+test('a commit, and a tag created or deleted, outside the app show in the log by themselves', async ({
   app,
   git,
   repos,

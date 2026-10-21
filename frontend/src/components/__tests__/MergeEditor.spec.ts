@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({
@@ -79,7 +80,7 @@ function markedLines(view: EditorView): number[] {
 }
 
 describe('MergeEditor layout', () => {
-  it('FR-CONF-05 shows the current side, the result holding the base text in each conflict with no marker line, and the incoming side', async () => {
+  it('shows the current side, the result holding the base text in each conflict with no marker line, and the incoming side', async () => {
     const file = conflictFileFixture()
     const wrapper = await mountEditor(file)
 
@@ -95,7 +96,7 @@ describe('MergeEditor layout', () => {
     expect(result.dom.querySelectorAll('.cm-conflict-unresolved')).toHaveLength(2)
   })
 
-  it('FR-CONF-05 the side panes tint conflicts red and show lines both sides changed alike as handled', async () => {
+  it('the side panes tint conflicts red and show lines both sides changed alike as handled', async () => {
     const file = conflictFileFixture({
       currentChanges: [{ lines: { start: 1, lines: 1 }, added: true }],
       incomingChanges: [{ lines: { start: 5, lines: 1 }, added: false }],
@@ -118,7 +119,7 @@ describe('MergeEditor layout', () => {
     ])
   })
 
-  it('FR-CONF-05 an unresolved conflict with no lines in the result shows a placeholder until it holds lines', async () => {
+  it('an unresolved conflict with no lines in the result shows a placeholder until it holds lines', async () => {
     const base = conflictFileFixture()
     const file = {
       ...base,
@@ -141,7 +142,7 @@ describe('MergeEditor layout', () => {
     expect(result.state.doc.toString()).toBe('a\nb\nc2\nz')
   })
 
-  it('FR-CONF-05 a region git trimmed to the differing lines holds the base lines of those only', async () => {
+  it('a region git trimmed to the differing lines holds the base lines of those only', async () => {
     const base = conflictFileFixture()
     const file: ConflictFile = {
       ...base,
@@ -171,7 +172,7 @@ describe('MergeEditor layout', () => {
     expect(result.state.doc.toString()).toBe('A\nY\nC\nx')
   })
 
-  it('FR-CONF-10 pressing the placeholder of a region the incoming side deleted selects it', async () => {
+  it('pressing the placeholder of a region the incoming side deleted selects it', async () => {
     const base = conflictFileFixture()
     const file = {
       ...base,
@@ -218,7 +219,7 @@ function selectedLineCount(view: EditorView): number {
 }
 
 describe('MergeEditor actions and navigation', () => {
-  it('FR-CONF-10 next moves to the next conflict, and the takes resolve both', async () => {
+  it('next moves to the next conflict, and the takes resolve both', async () => {
     const wrapper = await mountEditor()
 
     await click(wrapper, 'Next change · Alt+Down')
@@ -239,7 +240,7 @@ describe('MergeEditor actions and navigation', () => {
   it.each([
     ['Take right', 'a\ni1\nb\no2\nz'],
     ['Both, left first', 'a\nc1\ni1\nb\no2\nz'],
-  ])('FR-CONF-10 "%s" acts on the selected conflict', async (label, text) => {
+  ])('"%s" acts on the selected conflict', async (label, text) => {
     const wrapper = await mountEditor()
 
     await click(wrapper, label)
@@ -247,7 +248,7 @@ describe('MergeEditor actions and navigation', () => {
     expect(viewAt(wrapper, RESULT).state.doc.toString()).toBe(text)
   })
 
-  it('FR-CONF-10 take incoming resolves the region in every pane', async () => {
+  it('take incoming resolves the region in every pane', async () => {
     const wrapper = await mountEditor()
 
     await click(wrapper, 'Take right')
@@ -259,7 +260,7 @@ describe('MergeEditor actions and navigation', () => {
     expect(position(wrapper)).toBe('Change 1 of 2 · 1 left')
   })
 
-  it('FR-CONF-10 a hand edit leaves the region unresolved until Mark done, which undo reverts', async () => {
+  it('a hand edit leaves the region unresolved until Mark done, which undo reverts', async () => {
     const wrapper = await mountEditor()
     const result = viewAt(wrapper, RESULT)
     result.dispatch({ changes: { from: result.state.doc.line(2).to, insert: ' mine' } })
@@ -277,7 +278,7 @@ describe('MergeEditor actions and navigation', () => {
     expect(result.state.doc.line(2).text).toBe('o1 mine')
   })
 
-  it('FR-CONF-10 clicking a conflict in the incoming pane selects it everywhere', async () => {
+  it('clicking a conflict in the incoming pane selects it everywhere', async () => {
     const wrapper = await mountEditor(threeRegionFile())
     const incoming = viewAt(wrapper, INCOMING)
 
@@ -298,7 +299,7 @@ describe('MergeEditor actions and navigation', () => {
     expect(position(wrapper)).toBe('Change 2 of 3 · 3 left')
   })
 
-  it('FR-CONF-10 clicking a side conflict the restored result lacks leaves the selection alone and logs no error', async () => {
+  it('clicking a side conflict the restored result lacks leaves the selection alone and logs no error', async () => {
     const file = threeRegionFile()
     useMergeDrafts().set('/repo', 'a.txt', '', () => ({
       text: 'a\no1\nb\no2\nc\no3\nz',
@@ -320,7 +321,7 @@ describe('MergeEditor actions and navigation', () => {
     logged.mockRestore()
   })
 
-  it('FR-CONF-10 the result cursor entering a conflict selects it', async () => {
+  it('the result cursor entering a conflict selects it', async () => {
     const wrapper = await mountEditor(threeRegionFile())
     const result = viewAt(wrapper, RESULT)
 
@@ -330,7 +331,7 @@ describe('MergeEditor actions and navigation', () => {
     expect(position(wrapper)).toBe('Change 3 of 3 · 3 left')
   })
 
-  it('FR-CONF-10 Alt+Down in the result moves to the next conflict, not the line', async () => {
+  it('Alt+Down in the result moves to the next conflict, not the line', async () => {
     const wrapper = await mountEditor(threeRegionFile())
     const result = viewAt(wrapper, RESULT)
 
@@ -350,7 +351,7 @@ describe('MergeEditor saving', () => {
     Facade.SaveConflict.mockReset().mockResolvedValue('fp2')
   })
 
-  it('FR-CONF-06 saving waits for the last conflict, and says so', async () => {
+  it('saving waits for the last conflict, and says so', async () => {
     const wrapper = await mountEditor()
 
     const resolve = findButton(wrapper, SAVE_AND_RESOLVE)!
@@ -362,7 +363,7 @@ describe('MergeEditor saving', () => {
     expect(Facade.SaveConflict).not.toHaveBeenCalled()
   })
 
-  it('FR-CONF-06 once every conflict is resolved the button and Ctrl+S save and mark resolved', async () => {
+  it('once every conflict is resolved the button and Ctrl+S save and mark resolved', async () => {
     const wrapper = await mountEditor()
     await click(wrapper, 'Take left')
     await click(wrapper, 'Next change · Alt+Down')
@@ -391,7 +392,7 @@ describe('MergeEditor saving', () => {
     )
   })
 
-  it('FR-CONF-06 any other save error shows as an error', async () => {
+  it('any other save error shows as an error', async () => {
     Facade.SaveConflict.mockRejectedValue(new Error('disk full'))
     const wrapper = await mountEditor()
     await resolveBothConflicts(wrapper)
@@ -404,7 +405,7 @@ describe('MergeEditor saving', () => {
 })
 
 describe('MergeEditor toolbar and lifecycle', () => {
-  it('FR-CONF-06 a stray marker line explains the disabled Save and mark resolved', async () => {
+  it('a stray marker line explains the disabled Save and mark resolved', async () => {
     const wrapper = await mountEditor()
     await resolveBothConflicts(wrapper)
     const result = viewAt(wrapper, RESULT)
@@ -419,7 +420,7 @@ describe('MergeEditor toolbar and lifecycle', () => {
     )
   })
 
-  it('FR-CONF-06 creates no editor when it unmounts before the editor extensions load', async () => {
+  it('creates no editor when it unmounts before the editor extensions load', async () => {
     let created = 0
     let destroyed = 0
     const counting = ViewPlugin.define(() => {
@@ -442,7 +443,7 @@ describe('MergeEditor toolbar and lifecycle', () => {
 })
 
 describe('MergeEditor saving while typing', () => {
-  it('FR-CONF-11 typing during a save keeps the draft with the saved fingerprint', async () => {
+  it('typing during a save keeps the draft with the saved fingerprint', async () => {
     let finish: (fingerprint: string) => void = () => {}
     Facade.SaveConflict.mockReset().mockReturnValue(
       new Promise<string>((resolve) => (finish = resolve)),
@@ -474,7 +475,7 @@ describe('MergeEditor unsaved results', () => {
     await flushPromises()
   }
 
-  it('FR-CONF-11 a result edited and left unsaved comes back when the file is shown again', async () => {
+  it('a result edited and left unsaved comes back when the file is shown again', async () => {
     const file = conflictFileFixture()
     const first = await mountEditor(file)
     await editResult(first)
@@ -486,7 +487,7 @@ describe('MergeEditor unsaved results', () => {
     expect(position(wrapper)).toBe('Change 1 of 2 · 2 left')
   })
 
-  it('FR-CONF-11 resolved regions are still resolved when the file is shown again', async () => {
+  it('resolved regions are still resolved when the file is shown again', async () => {
     const file = conflictFileFixture()
     const first = await mountEditor(file)
     await click(first, 'Take right')
@@ -500,7 +501,7 @@ describe('MergeEditor unsaved results', () => {
     expect(viewAt(wrapper, INCOMING).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
   })
 
-  it('FR-CONF-11 a saved result leaves nothing to restore', async () => {
+  it('a saved result leaves nothing to restore', async () => {
     const file = conflictFileFixture()
     const first = await mountEditor(file)
     await resolveBothConflicts(first)
@@ -513,7 +514,7 @@ describe('MergeEditor unsaved results', () => {
     expect(useMergeDrafts().get('/repo', 'a.txt', '')).toBeUndefined()
   })
 
-  it('FR-CONF-11 closing the editor writes nothing the core already has', async () => {
+  it('closing the editor writes nothing the core already has', async () => {
     vi.useFakeTimers()
     try {
       Facade.SetMergeDraft.mockClear()
@@ -529,7 +530,7 @@ describe('MergeEditor unsaved results', () => {
     }
   })
 
-  it('FR-CONF-11 an edit the core failed to keep shows the error', async () => {
+  it('an edit the core failed to keep shows the error', async () => {
     Facade.SetMergeDraft.mockRejectedValueOnce(new Error('no session'))
     const wrapper = await mountEditor()
 
@@ -540,7 +541,7 @@ describe('MergeEditor unsaved results', () => {
 })
 
 describe('MergeEditor changes only one side made', () => {
-  it('FR-CONF-05 the result starts as the base text with every change open, tinted on the sides', async () => {
+  it('the result starts as the base text with every change open, tinted on the sides', async () => {
     const wrapper = await mountEditor(changesFileFixture())
 
     expect(viewAt(wrapper, RESULT).state.doc.toString()).toBe('a\no1\nb\no2\nc\no3\nz')
@@ -569,22 +570,19 @@ describe('MergeEditor changes only one side made', () => {
   it.each([
     ['Take right', 'a\no1\nb\no2\nc\no3\nz'],
     ['Take left', 'a\nc1\nb\no2\nc\no3\nz'],
-  ])(
-    'FR-CONF-10 "%s" on a change the current side made resolves it in every pane',
-    async (label, text) => {
-      const wrapper = await mountEditor(changesFileFixture())
+  ])('"%s" on a change the current side made resolves it in every pane', async (label, text) => {
+    const wrapper = await mountEditor(changesFileFixture())
 
-      await click(wrapper, label)
+    await click(wrapper, label)
 
-      expect(viewAt(wrapper, RESULT).state.doc.toString()).toBe(text)
-      expect(position(wrapper)).toBe('Change 1 of 4 · 3 left')
-      for (const pane of [CURRENT, RESULT, INCOMING] as const) {
-        expect(viewAt(wrapper, pane).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
-      }
-    },
-  )
+    expect(viewAt(wrapper, RESULT).state.doc.toString()).toBe(text)
+    expect(position(wrapper)).toBe('Change 1 of 4 · 3 left')
+    for (const pane of [CURRENT, RESULT, INCOMING] as const) {
+      expect(viewAt(wrapper, pane).dom.querySelectorAll('.cm-conflict-resolved')).toHaveLength(1)
+    }
+  })
 
-  it('FR-CONF-10 Apply non-conflicting changes takes the changed side of every open one-side change in one undo step', async () => {
+  it('Apply non-conflicting changes takes the changed side of every open one-side change in one undo step', async () => {
     const wrapper = await mountEditor(changesFileFixture())
     const result = viewAt(wrapper, RESULT)
 
@@ -602,7 +600,7 @@ describe('MergeEditor changes only one side made', () => {
     expect(position(wrapper)).toBe('Change 1 of 4 · 4 left')
   })
 
-  it('FR-CONF-10 the selected change is outlined in every pane and marked in the gutter', async () => {
+  it('the selected change is outlined in every pane and marked in the gutter', async () => {
     const wrapper = await mountEditor(changesFileFixture())
 
     for (const pane of [CURRENT, RESULT, INCOMING] as const) {
@@ -615,7 +613,7 @@ describe('MergeEditor changes only one side made', () => {
     }
   })
 
-  it('FR-CONF-06 saving waits until the changes only one side made are handled too', async () => {
+  it('saving waits until the changes only one side made are handled too', async () => {
     const wrapper = await mountEditor(changesFileFixture())
     await click(wrapper, 'Next change · Alt+Down')
     await click(wrapper, 'Take left')

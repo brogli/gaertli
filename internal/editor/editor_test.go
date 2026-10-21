@@ -1,3 +1,5 @@
+// Requirements: FR-ED-01, FR-ED-04, FR-ED-06, FR-UX-02, FR-UX-11
+
 package editor
 
 import (
@@ -20,7 +22,7 @@ func TestMain(m *testing.M) {
 	testbin.Main(m, testbin.Bin{Path: &argvWriterBin, Pkg: "./testdata/argvwriter"})
 }
 
-func TestFR_ED_04_FillPlaceholders(t *testing.T) {
+func TestFillPlaceholders(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
@@ -43,7 +45,7 @@ func TestFR_ED_04_FillPlaceholders(t *testing.T) {
 	}
 }
 
-func TestFR_ED_04_BuildCommandViaOpenFileSelectsTheRightTemplate(t *testing.T) {
+func TestBuildCommandViaOpenFileSelectsTheRightTemplate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -83,7 +85,7 @@ func TestFR_ED_04_BuildCommandViaOpenFileSelectsTheRightTemplate(t *testing.T) {
 	}
 }
 
-func TestFR_ED_06_OpenFolderReturnsEditorNotFoundWhenNotOnPath(t *testing.T) {
+func TestOpenFolderReturnsEditorNotFoundWhenNotOnPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // empty: nothing resolves
 	profile := core.EditorProfile{FolderCmd: "definitely-not-a-real-editor {path}"}
 
@@ -92,7 +94,7 @@ func TestFR_ED_06_OpenFolderReturnsEditorNotFoundWhenNotOnPath(t *testing.T) {
 	coretest.AssertCode(t, err, core.EditorNotFound)
 }
 
-func TestFR_UX_11_OpenFolderNamesTheFailedCommandInArgs(t *testing.T) {
+func TestOpenFolderNamesTheFailedCommandInArgs(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // empty: nothing resolves
 	profile := core.EditorProfile{FolderCmd: "definitely-not-a-real-editor {path}"}
 
@@ -107,7 +109,7 @@ func TestFR_UX_11_OpenFolderNamesTheFailedCommandInArgs(t *testing.T) {
 	}
 }
 
-func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
+func TestOpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	t.Parallel()
 	cmd, outFile := argvWriterCmd(t)
 	profile := core.EditorProfile{FolderCmd: cmd}
@@ -124,7 +126,7 @@ func TestFR_ED_01_OpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_OpenFileReturnsTheResolvedArgv(t *testing.T) {
+func TestOpenFileReturnsTheResolvedArgv(t *testing.T) {
 	t.Parallel()
 	cmd, outFile := argvWriterCmd(t)
 	profile := core.EditorProfile{FileCmd: cmd}
@@ -139,7 +141,7 @@ func TestFR_UX_02_OpenFileReturnsTheResolvedArgv(t *testing.T) {
 	awaitArgv(t, outFile)
 }
 
-func TestFR_ED_01_ALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
+func TestALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
 	t.Parallel()
 	cmd, outFile := argvWriterCmd(t)
 	profile := core.EditorProfile{FileCmd: cmd}

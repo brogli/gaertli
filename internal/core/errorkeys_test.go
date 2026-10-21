@@ -1,3 +1,5 @@
+// Requirements: FR-UX-11
+
 package core_test
 
 import (
@@ -50,10 +52,10 @@ func walkGoFiles(t *testing.T, fn func(path, source string)) {
 	}
 }
 
-// TestFR_UX_11_EveryErrorKeyLiteralIsInTheTable greps every .go file for
+// TestEveryErrorKeyLiteralIsInTheTable greps every .go file for
 // ErrorfArgs and Retag call sites, so it catches a key typo or a stale
 // table entry without having to exercise every site.
-func TestFR_UX_11_EveryErrorKeyLiteralIsInTheTable(t *testing.T) {
+func TestEveryErrorKeyLiteralIsInTheTable(t *testing.T) {
 	used := map[string]bool{}
 	walkGoFiles(t, func(path, source string) {
 		for _, m := range errorKeyLiteral.FindAllStringSubmatch(source, -1) {
@@ -76,10 +78,10 @@ func TestFR_UX_11_EveryErrorKeyLiteralIsInTheTable(t *testing.T) {
 	}
 }
 
-// TestFR_UX_11_EveryErrorKeyHasACatalogueEntryWithItsArgs fails if the
+// TestEveryErrorKeyHasACatalogueEntryWithItsArgs fails if the
 // frontend's en.json lacks an errors.<key> entry for a key of ErrorKeys, or
 // the entry's {placeholders} are not exactly that key's args.
-func TestFR_UX_11_EveryErrorKeyHasACatalogueEntryWithItsArgs(t *testing.T) {
+func TestEveryErrorKeyHasACatalogueEntryWithItsArgs(t *testing.T) {
 	data, err := os.ReadFile("../../frontend/src/locales/en.json")
 	if err != nil {
 		t.Fatal(err)
@@ -110,12 +112,12 @@ func TestFR_UX_11_EveryErrorKeyHasACatalogueEntryWithItsArgs(t *testing.T) {
 	}
 }
 
-// TestFR_UX_11_NoDirectMessageOrKeyAssignmentOutsideCore fails if code
+// TestNoDirectMessageOrKeyAssignmentOutsideCore fails if code
 // outside this package assigns .Message or .Key on some *core.Error
 // directly (ce.Message = ...): every such write must go through
 // core.ErrorfArgs or (*core.Error).Retag, so a message and its key never
 // drift apart.
-func TestFR_UX_11_NoDirectMessageOrKeyAssignmentOutsideCore(t *testing.T) {
+func TestNoDirectMessageOrKeyAssignmentOutsideCore(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)

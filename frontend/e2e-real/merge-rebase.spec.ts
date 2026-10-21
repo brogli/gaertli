@@ -1,3 +1,4 @@
+// Requirements: FR-BR-11, FR-BR-12
 import { test, expect } from './fixtures'
 import type { Git, Repos } from './repos'
 import { commitFiles, currentBranch, logRow, notice, parents, pickRefAction, rev } from './helpers'
@@ -14,7 +15,7 @@ function divergeFromMain(git: Git, repos: Repos, branch: string): void {
   commitFiles(git, repos.work, 'main: add m.txt', { 'm.txt': 'm\n' })
 }
 
-test('FR-BR-11 Merge into main merges the branch and says so', async ({ openApp, repos, git }) => {
+test('Merge into main merges the branch and says so', async ({ openApp, repos, git }) => {
   divergeFromMain(git, repos, 'dev1')
   const app = await openApp(repos.work)
 
@@ -24,7 +25,7 @@ test('FR-BR-11 Merge into main merges the branch and says so', async ({ openApp,
   await expect(logRow(app, "Merge branch 'dev1'")).toBeVisible()
 })
 
-test('FR-BR-12 Rebase onto main replays the current branch on main and says so', async ({
+test('Rebase onto main replays the current branch on main and says so', async ({
   openApp,
   repos,
   git,

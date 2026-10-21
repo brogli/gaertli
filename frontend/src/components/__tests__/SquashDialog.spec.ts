@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-14, FR-LOG-18, FR-LOG-19, FR-LOG-20
 import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -57,7 +58,7 @@ describe('SquashDialog', () => {
     AppService.OpenDiff.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-LOG-14 squash shows the combined message for editing and squashes with the edited one; a blank message disables Squash', async () => {
+  it('squash shows the combined message for editing and squashes with the edited one; a blank message disables Squash', async () => {
     const { wrapper, body } = await mountDialog()
     const field = body.get<HTMLTextAreaElement>('[data-test="squash-message"]')
     expect(field.element.value).toBe('A\n\nB')
@@ -72,7 +73,7 @@ describe('SquashDialog', () => {
     expect(wrapper.emitted('done')).toHaveLength(1)
   })
 
-  it('FR-LOG-18 fixup asks first, with no message field, and keeps the oldest message', async () => {
+  it('fixup asks first, with no message field, and keeps the oldest message', async () => {
     const { body } = await mountDialog({}, true)
 
     expect(body.find('[data-test="squash-message"]').exists()).toBe(false)
@@ -85,7 +86,7 @@ describe('SquashDialog', () => {
     expect(Facade.Fixup).toHaveBeenCalledWith('/repo', shas)
   })
 
-  it('FR-LOG-18 a pushed commit is named, with the protected-branch warning on a protected branch', async () => {
+  it('a pushed commit is named, with the protected-branch warning on a protected branch', async () => {
     const unpushed = await mountDialog()
     expect(unpushed.body.text()).not.toContain('already pushed')
     unpushed.wrapper.unmount()
@@ -97,7 +98,7 @@ describe('SquashDialog', () => {
     expect(body.text()).toContain('"main" is a protected branch.')
   })
 
-  it('FR-LOG-20 success leaves a notice naming the branch and the previous commit', async () => {
+  it('success leaves a notice naming the branch and the previous commit', async () => {
     const notice = await mountNotices()
     const { body } = await mountDialog()
 
@@ -125,7 +126,7 @@ describe('SquashDialog', () => {
       closes: false,
       shows: 'hook said no',
     },
-  ] as const)('FR-LOG-19 $outcome', async ({ error, closes, shows }) => {
+  ] as const)('$outcome', async ({ error, closes, shows }) => {
     Facade.Squash.mockRejectedValueOnce(wailsError(error.message, error.code))
     const notice = await mountNotices()
     const { wrapper, body } = await mountDialog()

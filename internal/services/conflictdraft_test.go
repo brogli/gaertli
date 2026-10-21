@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-11
+
 package services
 
 import (
@@ -17,7 +19,7 @@ func sampleMergeDraft(t *testing.T, c *Core, wt core.WorktreeID, path string) *c
 	}
 }
 
-func TestFR_CONF_11_MergeDraftReadsBackWhatWasSet(t *testing.T) {
+func TestMergeDraftReadsBackWhatWasSet(t *testing.T) {
 	t.Parallel()
 	c, wt, _ := stoppedOn(t, "merge", "a.txt", version("one\nbase\n"), version("one\ncurrent\n"), version("one\nincoming\n"))
 	want := sampleMergeDraft(t, c, wt, "a.txt")
@@ -41,7 +43,7 @@ func TestFR_CONF_11_MergeDraftReadsBackWhatWasSet(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_11_MergeDraftIsDroppedOnceTheFileIsNoLongerConflicted(t *testing.T) {
+func TestMergeDraftIsDroppedOnceTheFileIsNoLongerConflicted(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("one\nbase\n"), version("one\ncurrent\n"), version("one\nincoming\n"))
 	if err := c.SetMergeDraft(t.Context(), wt, "a.txt", sampleMergeDraft(t, c, wt, "a.txt")); err != nil {
@@ -58,7 +60,7 @@ func TestFR_CONF_11_MergeDraftIsDroppedOnceTheFileIsNoLongerConflicted(t *testin
 	}
 }
 
-func TestFR_CONF_11_MergeDraftOfAnEarlierConflictIsDropped(t *testing.T) {
+func TestMergeDraftOfAnEarlierConflictIsDropped(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("one\nbase\n"), version("one\ncurrent\n"), version("one\nincoming\n"))
 	if err := c.SetMergeDraft(t.Context(), wt, "a.txt", sampleMergeDraft(t, c, wt, "a.txt")); err != nil {
@@ -82,7 +84,7 @@ func TestFR_CONF_11_MergeDraftOfAnEarlierConflictIsDropped(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_11_MergeDraftWrittenLateForAnEarlierConflictIsRefused(t *testing.T) {
+func TestMergeDraftWrittenLateForAnEarlierConflictIsRefused(t *testing.T) {
 	t.Parallel()
 	dir := gittest.New(t).Dir
 	commitVersion(t, dir, "a.txt", version("one\ntwo\n"), "base")

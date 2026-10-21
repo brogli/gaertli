@@ -1,3 +1,5 @@
+// Requirements: FR-CHG-01, FR-CHG-02, FR-CHG-04, FR-CONF-03
+
 package services
 
 import (
@@ -15,7 +17,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_CHG_01_ParseStatusGroupsByXAndYAndHandlesRenameHeaderUnmergedUntracked(t *testing.T) {
+func TestParseStatusGroupsByXAndYAndHandlesRenameHeaderUnmergedUntracked(t *testing.T) {
 	t.Parallel()
 	data := []byte(
 		"# branch.oid abc123\x00" +
@@ -39,7 +41,7 @@ func TestFR_CHG_01_ParseStatusGroupsByXAndYAndHandlesRenameHeaderUnmergedUntrack
 	}
 }
 
-func TestFR_CHG_01_ParseStatusRenameWithUnstagedEditKeepsGroupsSeparate(t *testing.T) {
+func TestParseStatusRenameWithUnstagedEditKeepsGroupsSeparate(t *testing.T) {
 	t.Parallel()
 	data := []byte(
 		"2 RM N... 100644 100644 100644 bbbb bbbb R100 newpath.txt\x00" +
@@ -109,7 +111,7 @@ func indexBlob(t *testing.T, dir, name string) string {
 	return gittest.Out(t, dir, "show", ":"+name)
 }
 
-func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflictAndAFileChangedBothWaysAndAStagedRename(t *testing.T) {
+func TestStatusListsAllFourGroupsIncludingARealConflictAndAFileChangedBothWaysAndAStagedRename(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "conflict.txt", "base\n", "base")
@@ -161,7 +163,7 @@ func TestFR_CHG_01_StatusListsAllFourGroupsIncludingARealConflictAndAFileChanged
 	}
 }
 
-func TestFR_CHG_02_StageFileStagesAnUntrackedFile(t *testing.T) {
+func TestStageFileStagesAnUntrackedFile(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a\n", "add a.txt")
@@ -181,7 +183,7 @@ func TestFR_CHG_02_StageFileStagesAnUntrackedFile(t *testing.T) {
 	}
 }
 
-func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T) {
+func TestUnstageFileReturnsAStagedModificationToUnstaged(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "orig\n", "add a.txt")
@@ -208,7 +210,7 @@ func TestFR_CHG_02_UnstageFileReturnsAStagedModificationToUnstaged(t *testing.T)
 // git restore --staged is a silent no-op on a clean tracked file; it
 // refuses a path with no index entry at all, so the race is a
 // never-tracked path.
-func TestFR_CHG_02_UnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
+func TestUnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "clean\n", "add a.txt")
@@ -225,7 +227,7 @@ func TestFR_CHG_02_UnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
 	}
 }
 
-func TestFR_CHG_02_StageAllStagesEveryChangeAndUnstageAllReturnsEveryFileToItsOwnGroup(t *testing.T) {
+func TestStageAllStagesEveryChangeAndUnstageAllReturnsEveryFileToItsOwnGroup(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "tracked.txt", "orig\n", "add tracked.txt")
@@ -262,7 +264,7 @@ func TestFR_CHG_02_StageAllStagesEveryChangeAndUnstageAllReturnsEveryFileToItsOw
 	}
 }
 
-func TestFR_CHG_04_DiffWorkingReturnsTheSidesOfEachKindOfChange(t *testing.T) {
+func TestDiffWorkingReturnsTheSidesOfEachKindOfChange(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	base := strings.Repeat("line unchanged\n", 20)
@@ -309,7 +311,7 @@ func TestFR_CHG_04_DiffWorkingReturnsTheSidesOfEachKindOfChange(t *testing.T) {
 	}
 }
 
-func TestFR_CHG_04_DiffWorkingUnstagedCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
+func TestDiffWorkingUnstagedCapsHugeFilesWithAForceReloadBypass(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "big.txt", strings.Repeat("a", maxDiffFileSize+1), "add big file")
@@ -337,7 +339,7 @@ func TestFR_CHG_04_DiffWorkingUnstagedCapsHugeFilesWithAForceReloadBypass(t *tes
 	}
 }
 
-func TestFR_CHG_04_DiffWorkingShowsAFileWhoseNameHoldsANewline(t *testing.T) {
+func TestDiffWorkingShowsAFileWhoseNameHoldsANewline(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows file names cannot hold a newline")
@@ -371,7 +373,7 @@ func globRepo(t *testing.T) string {
 	return dir
 }
 
-func TestFR_CONF_03_FR_CHG_02_StageFileAndUnstageFileTakeAGlobLikeNameLiterally(t *testing.T) {
+func TestStageFileAndUnstageFileTakeAGlobLikeNameLiterally(t *testing.T) {
 	t.Parallel()
 	dir := globRepo(t)
 	writeFile(t, dir, "a.txt", "changed\n")
@@ -396,7 +398,7 @@ func TestFR_CONF_03_FR_CHG_02_StageFileAndUnstageFileTakeAGlobLikeNameLiterally(
 	}
 }
 
-func TestFR_CHG_04_DiffWorkingOfAPatternNamedFileShowsItsOwnContent(t *testing.T) {
+func TestDiffWorkingOfAPatternNamedFileShowsItsOwnContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "one\n", "add f.txt")
@@ -415,7 +417,7 @@ func TestFR_CHG_04_DiffWorkingOfAPatternNamedFileShowsItsOwnContent(t *testing.T
 	}
 }
 
-func TestFR_CHG_04_DiffWorkingOfAPathLikeAStageNumberShowsItsOwnContent(t *testing.T) {
+func TestDiffWorkingOfAPathLikeAStageNumberShowsItsOwnContent(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows file names cannot hold a colon")

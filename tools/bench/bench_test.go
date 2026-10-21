@@ -1,5 +1,7 @@
 //go:build bench
 
+// Requirements: QA-PERF-02, QA-PERF-06, QA-PERF-07
+
 // Package bench proves the literal performance numbers against the real
 // reference repo, through the in-process services.Core: the same call path
 // the shell uses, no mock.
@@ -42,7 +44,7 @@ func openReference(t *testing.T) (*services.Core, core.WorktreeID) {
 	return c, wt.ID
 }
 
-func TestQA_PERF_02_FirstLogRowUnder1s(t *testing.T) {
+func TestFirstLogRowUnder1s(t *testing.T) {
 	c, id := openReference(t)
 	start := time.Now()
 	if err := c.LoadLog(t.Context(), id); err != nil {
@@ -73,7 +75,7 @@ func firstRowAfter(t *testing.T, c *services.Core, id core.WorktreeID, start tim
 	}
 }
 
-func TestQA_PERF_07_MemoryUnder500MB(t *testing.T) {
+func TestMemoryUnder500MB(t *testing.T) {
 	c, id := openReference(t)
 	var before, after runtime.MemStats
 	runtime.GC()
@@ -91,7 +93,7 @@ func TestQA_PERF_07_MemoryUnder500MB(t *testing.T) {
 	}
 }
 
-func TestQA_PERF_06_RefreshUnder1s(t *testing.T) {
+func TestRefreshUnder1s(t *testing.T) {
 	c, id := openReference(t)
 	start := time.Now()
 	if err := c.Refresh(t.Context(), id); err != nil {

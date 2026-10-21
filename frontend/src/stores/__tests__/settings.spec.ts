@@ -1,3 +1,4 @@
+// Requirements: FR-REPO-07, FR-UX-06
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises } from '@vue/test-utils'
@@ -28,7 +29,7 @@ describe('settings store', () => {
     Events.On.mockReset()
   })
 
-  it('FR-UX-06 a settings change saved in any window reloads the settings here and applies its theme', async () => {
+  it('a settings change saved in any window reloads the settings here and applies its theme', async () => {
     SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: Theme.LightTheme }))
     const store = useSettingsStore()
     await store.load()
@@ -41,7 +42,7 @@ describe('settings store', () => {
     expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
   })
 
-  it('FR-UX-06 with System, the theme follows the OS setting as it changes', async () => {
+  it('with System, the theme follows the OS setting as it changes', async () => {
     let handler: ((event: { matches: boolean }) => void) | undefined
     const matchMediaSpy = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
       const fake = {
@@ -72,7 +73,7 @@ describe('settings store', () => {
     matchMediaSpy.mockRestore()
   })
 
-  it('FR-REPO-07 lists the WSL distros once and reuses the answer', async () => {
+  it('lists the WSL distros once and reuses the answer', async () => {
     const store = useSettingsStore()
 
     const first = await store.loadDistros()

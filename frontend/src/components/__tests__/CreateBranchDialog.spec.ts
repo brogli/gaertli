@@ -1,3 +1,4 @@
+// Requirements: FR-BR-01
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -37,7 +38,7 @@ describe('CreateBranchDialog', () => {
     Facade.CreateBranch.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-BR-01 a fixed start (a commit) shows its label, not a list, and submits the name, the commit and checkout true', async () => {
+  it('a fixed start (a commit) shows its label, not a list, and submits the name, the commit and checkout true', async () => {
     const { body } = await mountDialog({ rev: 'abc123456', label: 'abc1234' })
 
     const start = field(body, 'Start point')
@@ -48,7 +49,7 @@ describe('CreateBranchDialog', () => {
     expect(Facade.CreateBranch).toHaveBeenCalledWith('/repo', 'feature', 'abc123456', true)
   })
 
-  it('FR-BR-01 unchecking "Check out after creation" submits checkout false', async () => {
+  it('unchecking "Check out after creation" submits checkout false', async () => {
     const { body } = await mountDialog({ rev: 'abc123456', label: 'abc1234' })
 
     await body.get('input[type=checkbox]').setValue(false)
@@ -57,7 +58,7 @@ describe('CreateBranchDialog', () => {
     expect(Facade.CreateBranch).toHaveBeenCalledWith('/repo', 'later', 'abc123456', false)
   })
 
-  it('FR-BR-01 a start is preselected in a list of the local branches, remote branches and tags; the one picked is sent by its full ref name', async () => {
+  it('a start is preselected in a list of the local branches, remote branches and tags; the one picked is sent by its full ref name', async () => {
     const { body } = await mountDialog({ ref: 'refs/heads/feat' })
 
     expect(body.get('[data-test="start-branch"]').text()).toBe('feat')
@@ -78,7 +79,7 @@ describe('CreateBranchDialog', () => {
     expect(Facade.CreateBranch).toHaveBeenCalledWith('/repo', 'feature', 'refs/tags/v1', true)
   })
 
-  it('FR-BR-01 shows the rejection message and keeps the dialog open on failure', async () => {
+  it('shows the rejection message and keeps the dialog open on failure', async () => {
     Facade.CreateBranch.mockRejectedValueOnce(wailsError('"-bad" is not a valid branch name'))
     const { wrapper, body } = await mountDialog({ ref: 'refs/heads/main' })
 

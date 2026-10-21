@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-02, FR-CHG-04, FR-CHG-08, FR-CHG-10, FR-CHG-13, FR-CONF-02, FR-CONF-03, FR-CONF-08, FR-ED-02, FR-ED-06
 import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -69,7 +70,7 @@ describe('ChangesView', () => {
     localStorage.clear()
   })
 
-  it("FR-CHG-08 switching worktree remounts CommitBox, so worktree A's typed text never carries into worktree B's draft", async () => {
+  it("switching worktree remounts CommitBox, so worktree A's typed text never carries into worktree B's draft", async () => {
     const wrapper = mount(ChangesView, { props })
     await wrapper.get('textarea').setValue('worktree A text')
 
@@ -92,7 +93,7 @@ describe('ChangesView', () => {
       },
     ]),
   )(
-    "FR-CHG-02 $mode: a row's $button button calls the facade with its path",
+    "$mode: a row's $button button calls the facade with its path",
     async ({ mode, files, call }) => {
       const wrapper = await mountIn(mode, files)
 
@@ -104,7 +105,7 @@ describe('ChangesView', () => {
   )
 
   it.each(modes)(
-    'FR-CHG-04 %s: a click only marks a row; a double-click or Enter opens its side of the change in the diff window',
+    '%s: a click only marks a row; a double-click or Enter opens its side of the change in the diff window',
     async (mode) => {
       const wrapper = await mountIn(mode, {
         staged: [{ path: 'a.txt', status: 'M' }],
@@ -129,7 +130,7 @@ describe('ChangesView', () => {
     },
   )
 
-  it('FR-ED-02 clicking a row\'s "Open in editor" control, also a conflicted one\'s, calls Facade.OpenFile, not select', async () => {
+  it('clicking a row\'s "Open in editor" control, also a conflicted one\'s, calls Facade.OpenFile, not select', async () => {
     const wrapper = mountWith({
       unstaged: [{ path: 'a.txt', status: 'M' }],
       conflicted: [{ path: 'c.txt', status: 'UU' }],
@@ -145,7 +146,7 @@ describe('ChangesView', () => {
     expect(wrapper.findAll('li.selected')).toHaveLength(0)
   })
 
-  it('FR-ED-06 OpenFile failing EDITOR_NOT_FOUND reaches the notice area, no banner', async () => {
+  it('OpenFile failing EDITOR_NOT_FOUND reaches the notice area, no banner', async () => {
     Facade.OpenFile.mockRejectedValueOnce(editorNotFound('myed'))
     const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
     const notice = await mountNotices()
@@ -157,7 +158,7 @@ describe('ChangesView', () => {
     expect(wrapper.find('.error-banner').exists()).toBe(false)
   })
 
-  it('FR-CHG-02 "Stage all" calls Facade.StageAll once and leaves reloading the list to the index event', async () => {
+  it('"Stage all" calls Facade.StageAll once and leaves reloading the list to the index event', async () => {
     const wrapper = mountWith({ unstaged: [{ path: 'a.txt', status: 'M' }] })
     await findButton(wrapper, 'Stage all')!.trigger('click')
     await flushPromises()
@@ -167,7 +168,7 @@ describe('ChangesView', () => {
   })
 
   it.each(modes)(
-    'FR-CONF-02 %s: double-clicking a conflicted row opens the diff window on it as a conflict; a click does not select it',
+    '%s: double-clicking a conflicted row opens the diff window on it as a conflict; a click does not select it',
     async (mode) => {
       const wrapper = await mountIn(mode, { conflicted: [{ path: 'c.txt', status: 'UU' }] })
       const row = rowIn(wrapper, mode, 0)
@@ -186,7 +187,7 @@ describe('ChangesView', () => {
     },
   )
 
-  it('FR-CONF-08 only a staged row of a resolved file has "Reopen conflict"; it confirms, then reopens', async () => {
+  it('only a staged row of a resolved file has "Reopen conflict"; it confirms, then reopens', async () => {
     const wrapper = mountWith({
       staged: [
         { path: 'r.txt', status: 'M' },
@@ -210,7 +211,7 @@ describe('ChangesView', () => {
     expect(Facade.ReopenConflict).toHaveBeenCalledWith('/repo', 'r.txt')
   })
 
-  it('FR-CONF-08 a resolved file without changes is listed under Conflicted and can be reopened', async () => {
+  it('a resolved file without changes is listed under Conflicted and can be reopened', async () => {
     const wrapper = mountWith({ resolved: ['f.txt'] })
     const sections = wrapper.findAll('section section')
     const conflicted = sections[sections.length - 1]!
@@ -226,14 +227,14 @@ describe('ChangesView', () => {
     expect(Facade.ReopenConflict).toHaveBeenCalledWith('/repo', 'f.txt')
   })
 
-  it('FR-CONF-08 a resolved file with a staged change is listed only under Staged', () => {
+  it('a resolved file with a staged change is listed only under Staged', () => {
     const wrapper = mountWith({ staged: [{ path: 'f.txt', status: 'M' }], resolved: ['f.txt'] })
 
     expect(wrapper.findAll('li')).toHaveLength(1)
   })
 
   it.each(modes)(
-    'FR-CONF-03 %s: a conflicted row\'s "Mark resolved" button calls Facade.StageFile with its path',
+    '%s: a conflicted row\'s "Mark resolved" button calls Facade.StageFile with its path',
     async (mode) => {
       const wrapper = await mountIn(mode, { conflicted: [{ path: 'c.txt', status: 'UU' }] })
       expect(wrapper.get('[data-test="action"]').attributes('aria-label')).toBe('Mark resolved')
@@ -260,7 +261,7 @@ describe('ChangesView', () => {
       },
     ]),
   )(
-    'FR-CHG-10 $mode: "Discard" of $file confirms before calling Facade.DiscardFile untracked=$untracked',
+    '$mode: "Discard" of $file confirms before calling Facade.DiscardFile untracked=$untracked',
     async ({ mode, file, files, wording, untracked }) => {
       const wrapper = await mountIn(mode, files)
       await wrapper.get('[data-test="second-action"]').trigger('click')
@@ -276,13 +277,13 @@ describe('ChangesView', () => {
     },
   )
 
-  it('FR-CHG-10 the Staged group offers no Discard button', () => {
+  it('the Staged group offers no Discard button', () => {
     const wrapper = mountWith({ staged: [{ path: 'a.txt', status: 'M' }] })
 
     expect(wrapper.findAll('[data-test="second-action"]').length).toBe(0)
   })
 
-  it('FR-CHG-13 the header toggle switches every group between flat lists and folder trees, folders first, each group showing only its own files', async () => {
+  it('the header toggle switches every group between flat lists and folder trees, folders first, each group showing only its own files', async () => {
     const wrapper = mountWith({
       staged: [{ path: 'sub/a.ts', status: 'M' }],
       unstaged: [{ path: 'b.txt', status: 'M' }],
@@ -310,7 +311,7 @@ describe('ChangesView', () => {
     expect(treeLabels(trees[3]!)).toEqual(['c.txt'])
   })
 
-  it('FR-CHG-13 the changes view shares its choice with ChangedFiles, and a fresh mount starts from the remembered choice', async () => {
+  it('the changes view shares its choice with ChangedFiles, and a fresh mount starts from the remembered choice', async () => {
     const wrapper = mountWith({ staged: [{ path: 'a.txt', status: 'M' }] })
     const other = mount(ChangedFiles, {
       props: { files: [{ path: 'x.txt', status: 'M' }], selected: null },

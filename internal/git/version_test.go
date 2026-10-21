@@ -1,3 +1,5 @@
+// Requirements: QA-COMP-04
+
 package git
 
 import (
@@ -7,7 +9,7 @@ import (
 	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
-func TestTR_04_CheckVersionAcceptsInstalledGit(t *testing.T) {
+func TestCheckVersionAcceptsInstalledGit(t *testing.T) {
 	v, err := (Runner{}).CheckVersion(t.Context())
 	if err != nil {
 		t.Fatalf("CheckVersion() err = %v, want nil", err)
@@ -17,7 +19,7 @@ func TestTR_04_CheckVersionAcceptsInstalledGit(t *testing.T) {
 	}
 }
 
-func TestTR_04_CheckVersionRejectsTooOldGit(t *testing.T) {
+func TestCheckVersionRejectsTooOldGit(t *testing.T) {
 	clearVersionCache(t)
 	t.Setenv("FAKEGIT_STDOUT", "git version 2.30.0\n")
 	_, err := (Runner{Git: fakegit}).CheckVersion(t.Context())
@@ -30,7 +32,7 @@ func TestTR_04_CheckVersionRejectsTooOldGit(t *testing.T) {
 	}
 }
 
-func TestTR_04_CheckVersionRejectsMissingGit(t *testing.T) {
+func TestCheckVersionRejectsMissingGit(t *testing.T) {
 	_, err := (Runner{Git: "/does/not/exist"}).CheckVersion(t.Context())
 	coretest.AssertCode(t, err, core.GitTooOld)
 }
@@ -43,7 +45,7 @@ func clearVersionCache(t *testing.T) {
 	t.Cleanup(versions.Clear)
 }
 
-func TestTR_04_CheckVersionRunsGitOncePerProcess(t *testing.T) {
+func TestCheckVersionRunsGitOncePerProcess(t *testing.T) {
 	clearVersionCache(t)
 	t.Setenv("FAKEGIT_STDOUT", "git version 2.50.0\n")
 	calls := 0
@@ -58,7 +60,7 @@ func TestTR_04_CheckVersionRunsGitOncePerProcess(t *testing.T) {
 	}
 }
 
-func TestTR_04_CheckVersionDoesNotCacheAFailure(t *testing.T) {
+func TestCheckVersionDoesNotCacheAFailure(t *testing.T) {
 	clearVersionCache(t)
 	t.Setenv("FAKEGIT_STDOUT", "git version 2.30.0\n")
 	calls := 0

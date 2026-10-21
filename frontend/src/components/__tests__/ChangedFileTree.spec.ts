@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-13, FR-ED-02, FR-LOG-16, FR-UX-13
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import ChangedFileTree from '../ChangedFileTree.vue'
@@ -15,7 +16,7 @@ const labels = (wrapper: VueWrapper) =>
   wrapper.findAll('[role="treeitem"]').map((n) => n.attributes('aria-label'))
 
 describe('ChangedFileTree', () => {
-  it('FR-LOG-16 starts with every folder unfolded; a click on a folder folds it, another unfolds it', async () => {
+  it('starts with every folder unfolded; a click on a folder folds it, another unfolds it', async () => {
     const wrapper = mount(ChangedFileTree, { props: { files } })
     expect(labels(wrapper)).toEqual(['src', 'a.ts', 'b.ts'])
 
@@ -27,7 +28,7 @@ describe('ChangedFileTree', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
   })
 
-  it('FR-LOG-16 Enter on a folder folds it', async () => {
+  it('Enter on a folder folds it', async () => {
     const wrapper = mount(ChangedFileTree, { props: { files } })
 
     await node(wrapper, 'src').trigger('keydown', { key: 'Enter', code: 'Enter' })
@@ -36,7 +37,7 @@ describe('ChangedFileTree', () => {
     expect(wrapper.emitted('open')).toBeUndefined()
   })
 
-  it('FR-LOG-16 a click on a file selects it; the selected file shows selected', async () => {
+  it('a click on a file selects it; the selected file shows selected', async () => {
     const wrapper = mount(ChangedFileTree, { props: { files } })
 
     await row(wrapper, 'b.ts').trigger('click')
@@ -47,7 +48,7 @@ describe('ChangedFileTree', () => {
     expect(row(wrapper, 'a.ts').attributes('data-p-selected')).toBe('false')
   })
 
-  it('FR-LOG-16 a double-click or Enter on a file opens it', async () => {
+  it('a double-click or Enter on a file opens it', async () => {
     const wrapper = mount(ChangedFileTree, { props: { files } })
 
     await row(wrapper, 'b.ts').trigger('dblclick')
@@ -56,7 +57,7 @@ describe('ChangedFileTree', () => {
     expect(wrapper.emitted('open')).toEqual([[b], [b]])
   })
 
-  it('FR-ED-02 a file\'s "Open in editor", which a folder has not, emits open-editor with that file, not select', async () => {
+  it('a file\'s "Open in editor", which a folder has not, emits open-editor with that file, not select', async () => {
     const wrapper = mount(ChangedFileTree, { props: { files } })
 
     const button = node(wrapper, 'b.ts').get('[data-test="open-editor"]')
@@ -68,7 +69,7 @@ describe('ChangedFileTree', () => {
     expect(row(wrapper, 'src').find('[data-test="open-editor"]').exists()).toBe(false)
   })
 
-  it("FR-UX-13 a file shows its status as an icon with the status as tooltip; a rename names its old path; the name's title is the full path", () => {
+  it("a file shows its status as an icon with the status as tooltip; a rename names its old path; the name's title is the full path", () => {
     const wrapper = mount(ChangedFileTree, { props: { files } })
 
     const statuses = wrapper.findAll('.status')
@@ -79,7 +80,7 @@ describe('ChangedFileTree', () => {
     expect(name.attributes('title')).toBe('src/b.ts')
   })
 
-  it("FR-CHG-13 a file node's label holds, in order, the action button, the status icon, the name, open in editor and the second action; a folder node has no button", () => {
+  it("a file node's label holds, in order, the action button, the status icon, the name, open in editor and the second action; a folder node has no button", () => {
     const wrapper = mount(ChangedFileTree, {
       props: { files, action: 'stage', secondAction: () => 'discard' },
     })
@@ -99,7 +100,7 @@ describe('ChangedFileTree', () => {
     )
   })
 
-  it("FR-CHG-13 clicking a file's action button, then its second action, emits action and second-action with that file, not select or open", async () => {
+  it("clicking a file's action button, then its second action, emits action and second-action with that file, not select or open", async () => {
     const wrapper = mount(ChangedFileTree, {
       props: { files, action: 'stage', secondAction: () => 'discard' },
     })
@@ -113,7 +114,7 @@ describe('ChangedFileTree', () => {
     expect(wrapper.emitted('open')).toBeUndefined()
   })
 
-  it("FR-CHG-13 Enter on a file's action button does not select or open the file, or fold the tree", async () => {
+  it("Enter on a file's action button does not select or open the file, or fold the tree", async () => {
     const wrapper = mount(ChangedFileTree, {
       props: { files, action: 'stage', secondAction: () => 'discard' },
     })

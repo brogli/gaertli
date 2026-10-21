@@ -1,3 +1,4 @@
+// Requirements: FR-BR-01, FR-BR-05, FR-BR-08, FR-BR-09, FR-CHG-01, FR-ED-01, FR-ED-05, FR-ED-06, FR-REPO-04, FR-UX-01, FR-UX-05, FR-UX-09, FR-WT-02, QA-PORT-02, QA-REL-03
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -50,7 +51,7 @@ describe('WorktreeContent', () => {
     Events.On.mockReset()
   })
 
-  it('FR-ED-06 Open in editor failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
+  it('Open in editor failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
     Facade.OpenFolder.mockRejectedValueOnce(editorNotFound('myed'))
     const wrapper = await mountView({ path: '/repo' })
     const notice = await mountNotices()
@@ -62,13 +63,13 @@ describe('WorktreeContent', () => {
     expect(wrapper.find('.toolbar .error-banner').exists()).toBe(false)
   })
 
-  it('FR-UX-09 Settings is icon-only with title and aria-label', async () => {
+  it('Settings is icon-only with title and aria-label', async () => {
     const wrapper = await mountView({ path: '/repo' })
 
     expectIconOnly(wrapper.get('[data-test="open-settings"]'), 'Settings')
   })
 
-  it('FR-UX-01 a Summary rejection renders the error banner with its message', async () => {
+  it('a Summary rejection renders the error banner with its message', async () => {
     Facade.Summary.mockRejectedValueOnce(wailsError('not a git repository'))
 
     const wrapper = await mountView()
@@ -76,7 +77,7 @@ describe('WorktreeContent', () => {
     expect(wrapper.get('.error-banner').text()).toContain('not a git repository')
   })
 
-  it('FR-REPO-04 clicking Refresh calls the Refresh binding with the worktree id', async () => {
+  it('clicking Refresh calls the Refresh binding with the worktree id', async () => {
     const wrapper = await mountView()
 
     const refreshButton = findButton(wrapper, 'Refresh')
@@ -86,7 +87,7 @@ describe('WorktreeContent', () => {
     expect(Facade.Refresh).toHaveBeenCalledWith('/home/user/project')
   })
 
-  it("ADR-9 a WSL worktree's calls carry its shell id, the UNC path, not the POSIX path it shows", async () => {
+  it("a WSL worktree's calls carry its shell id, the UNC path, not the POSIX path it shows", async () => {
     const wrapper = await mountView({ path: '/home/u/r', distro: 'D' })
 
     const shellId = '\\\\wsl.localhost\\D\\home\\u\\r'
@@ -98,7 +99,7 @@ describe('WorktreeContent', () => {
     expect(wrapper.get('[data-test="worktree-picker"]').text()).toContain('r')
   })
 
-  it('FR-BR-08 checking out a commit warns, then confirming calls CheckoutCommit once', async () => {
+  it('checking out a commit warns, then confirming calls CheckoutCommit once', async () => {
     const { wrapper, body } = await mountInBody(WorktreeContent, {
       props: { path: '/home/user/project' },
     })
@@ -113,7 +114,7 @@ describe('WorktreeContent', () => {
     expect(Facade.CheckoutCommit).toHaveBeenCalledWith('/home/user/project', 'abc123')
   })
 
-  it('FR-BR-08 shows "Create branch here" while detached, opening the dialog with HEAD\'s own sha', async () => {
+  it('shows "Create branch here" while detached, opening the dialog with HEAD\'s own sha', async () => {
     Facade.Summary.mockResolvedValue(summaryFixture({ branch: '', detached: true, sha: 'abc123' }))
     const wrapper = await mountView()
 
@@ -127,14 +128,14 @@ describe('WorktreeContent', () => {
     expect(dialog.props('start')).toEqual({ rev: 'abc123', label: 'abc123' })
   })
 
-  it('FR-BR-08 shows no "Create branch here" button while attached to a branch', async () => {
+  it('shows no "Create branch here" button while attached to a branch', async () => {
     Facade.Summary.mockResolvedValue(summaryFixture())
     const wrapper = await mountView()
 
     expect(findButton(wrapper, 'Create branch here')).toBeUndefined()
   })
 
-  it('FR-UX-09 "Create branch here" shows its icon', async () => {
+  it('"Create branch here" shows its icon', async () => {
     Facade.Summary.mockResolvedValue(summaryFixture({ branch: '', detached: true, sha: 'abc123' }))
     const wrapper = await mountView()
 
@@ -143,7 +144,7 @@ describe('WorktreeContent', () => {
     )
   })
 
-  it('FR-BR-08 cancelling the warning never calls CheckoutCommit and closes the dialog', async () => {
+  it('cancelling the warning never calls CheckoutCommit and closes the dialog', async () => {
     const { wrapper, body } = await mountInBody(WorktreeContent, {
       props: { path: '/home/user/project' },
     })
@@ -157,7 +158,7 @@ describe('WorktreeContent', () => {
     expect(body.find('[data-test="detach-confirm"]').exists()).toBe(false)
   })
 
-  it('FR-ED-01 "Open in {name}" is labelled with the editor name and calls OpenFolder with the path', async () => {
+  it('"Open in {name}" is labelled with the editor name and calls OpenFolder with the path', async () => {
     Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'Beta' }))
     const wrapper = await mountView()
 
@@ -170,7 +171,7 @@ describe('WorktreeContent', () => {
     expect(Facade.OpenFolder).toHaveBeenCalledWith('/home/user/project')
   })
 
-  it('FR-ED-05 a saved editor change relabels "Open in …" without a refresh', async () => {
+  it('a saved editor change relabels "Open in …" without a refresh', async () => {
     Facade.Summary.mockResolvedValue(summaryFixture({ editorName: 'Alpha' }))
     const wrapper = await mountView()
     expect(findButton(wrapper, 'Open in Alpha')).toBeTruthy()
@@ -220,7 +221,7 @@ describe('WorktreeContent', () => {
     expect(wrapper.findComponent(dialog).props()).toMatchObject(expectedProps)
   })
 
-  it('FR-WT-02 "New worktree from here…" in the branch picker opens the dialog with its start', async () => {
+  it('"New worktree from here…" in the branch picker opens the dialog with its start', async () => {
     const wrapper = await mountView()
 
     wrapper
@@ -235,7 +236,7 @@ describe('WorktreeContent', () => {
     })
   })
 
-  it('FR-BR-01 "New branch from here…" in the branch picker opens the dialog at that start point', async () => {
+  it('"New branch from here…" in the branch picker opens the dialog at that start point', async () => {
     const wrapper = await mountView()
 
     wrapper.findComponent(BranchPicker).vm.$emit('create-branch', { ref: 'refs/remotes/origin/x' })
@@ -246,7 +247,7 @@ describe('WorktreeContent', () => {
     })
   })
 
-  it('FR-BR-09 a tag picked in the branch picker warns, then checks out detached', async () => {
+  it('a tag picked in the branch picker warns, then checks out detached', async () => {
     const { wrapper, body } = await mountInBody(WorktreeContent, {
       props: { path: '/home/user/project' },
     })
@@ -260,7 +261,7 @@ describe('WorktreeContent', () => {
     expect(Facade.CheckoutCommit).toHaveBeenCalledWith('/home/user/project', 'sha-v1')
   })
 
-  it('FR-BR-05 a branch picked that is checked out elsewhere shows the dialog with that branch and path', async () => {
+  it('a branch picked that is checked out elsewhere shows the dialog with that branch and path', async () => {
     const { wrapper, body } = await mountInBody(WorktreeContent, {
       props: { path: '/home/user/project' },
     })
@@ -321,7 +322,7 @@ describe('WorktreeContent', () => {
     expect(wrapper.findComponent(DiffView).exists()).toBe(false)
   })
 
-  it("FR-UX-05 F5 refreshes and prevents the WebView's own reload", async () => {
+  it("F5 refreshes and prevents the WebView's own reload", async () => {
     await mountView()
 
     const event = new KeyboardEvent('keydown', { key: 'F5', cancelable: true })
@@ -332,7 +333,7 @@ describe('WorktreeContent', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it('FR-CHG-01 a repo:changed index-scope event calls changes.load again', async () => {
+  it('a repo:changed index-scope event calls changes.load again', async () => {
     const changes = useChangesStore()
     const loadSpy = vi.spyOn(changes, 'load')
 
@@ -346,7 +347,7 @@ describe('WorktreeContent', () => {
     expect(loadSpy).toHaveBeenLastCalledWith('/home/user/project')
   })
 
-  it("FR-REPO-04 another window's repo:changed reloads no changes; this window's does", async () => {
+  it("another window's repo:changed reloads no changes; this window's does", async () => {
     await mountView({ path: '/repo' })
     Facade.Status.mockClear()
 
@@ -359,7 +360,7 @@ describe('WorktreeContent', () => {
     expect(Facade.Status).toHaveBeenCalledWith('/repo')
   })
 
-  it('ADR-4 after a WSL core restart the typed commit message goes to the new core, then the window reloads', async () => {
+  it('after a WSL core restart the typed commit message goes to the new core, then the window reloads', async () => {
     const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {})
     let draftSaved!: () => void
     await mountView({ path: '/repo' })

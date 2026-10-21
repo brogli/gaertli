@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-05
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { mockConflictUrl } from './helpers'
 
@@ -40,7 +41,7 @@ async function offsetBetween(
   return Math.abs((await lineTop(scrollerA, textA)) - (await lineTop(scrollerB, textB)))
 }
 
-test('FR-CONF-05 scrolling a pane keeps the other panes at the same conflict', async ({ page }) => {
+test('scrolling a pane keeps the other panes at the same conflict', async ({ page }) => {
   await page.goto(mockConflictUrl)
   const { current, result, incoming } = panes(page)
   await result.locator('.cm-line').first().waitFor()

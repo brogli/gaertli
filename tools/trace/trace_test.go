@@ -1,3 +1,5 @@
+// Requirements: QA-MNT-02
+
 package main
 
 import (
@@ -90,7 +92,7 @@ const qualityFixture = `# Quality attributes (QA)
 | QA-EF-01 | a quality requirement |
 `
 
-func TestQA_MNT_02_RequiredIDsAreTheMustFRFromEveryFunctionalFile(t *testing.T) {
+func TestRequiredIDsAreTheMustFRFromEveryFunctionalFile(t *testing.T) {
 	dir := t.TempDir()
 	functionalDir := filepath.Join(dir, "functional")
 	writeFile(t, filepath.Join(functionalDir, "ab.md"), functionalFixture)
@@ -109,7 +111,7 @@ func TestQA_MNT_02_RequiredIDsAreTheMustFRFromEveryFunctionalFile(t *testing.T) 
 	}
 }
 
-func TestQA_MNT_02_FunctionalDirWithoutRequirementFilesIsAnError(t *testing.T) {
+func TestFunctionalDirWithoutRequirementFilesIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "quality.md"), qualityFixture)
 
@@ -127,17 +129,18 @@ const noRows = `| ID | Requirement |
 |---|---|
 `
 
-func TestQA_MNT_02_EachSourceKindCoversRequiredID(t *testing.T) {
+func TestEachSourceKindCoversRequiredID(t *testing.T) {
 	goRoot := func(c Config) string { return c.GoRoot }
 	frontendRoot := func(c Config) string { return c.FrontendRoot }
+	const header = "// Requirements: FR-AB-01\n"
 	cases := []struct {
 		name, file, content string
 		root                func(Config) string
 	}{
-		{"go test", "foo_test.go", "package foo_test\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n", goRoot},
-		{"vitest", "src/components/__tests__/foo.spec.ts", "import { it } from 'vitest'\n\nit('FR-AB-01 does a thing', () => {})\n", frontendRoot},
-		{"vitest each", "src/components/__tests__/foo.spec.ts", "import { it } from 'vitest'\n\nit.each([\n  { name: 'a' },\n  { name: 'b' },\n])(`FR-AB-01 does a thing with $name`, () => {})\n", frontendRoot},
-		{"playwright", "e2e-real/foo.spec.ts", "import { test } from './fixtures'\n\ntest('FR-AB-01 does a thing', async () => {})\n", frontendRoot},
+		{"go test", "foo_test.go", header + "\npackage foo_test\n", goRoot},
+		{"vitest", "src/components/__tests__/foo.spec.ts", header + "\nimport { it } from 'vitest'\n", frontendRoot},
+		{"playwright", "e2e-real/foo.spec.ts", header + "\nimport { test } from './fixtures'\n", frontendRoot},
+		{"several lines union", "foo_test.go", "// Requirements: FR-CD-01\n// Requirements: FR-XX-01, FR-AB-01\n\npackage foo_test\n", goRoot},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -149,44 +152,48 @@ func TestQA_MNT_02_EachSourceKindCoversRequiredID(t *testing.T) {
 	}
 }
 
-func TestQA_MNT_02_GoTestNameDigitBoundaryDoesNotFalseMatch(t *testing.T) {
-	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
-	writeFile(t, filepath.Join(cfg.GoRoot, "foo_test.go"),
-		"package foo_test\n\nfunc TestFR_AB_010_Other(t *testing.T) {}\n")
-
-	out, code := runFixture(t, cfg)
-	if code != 1 {
-		t.Errorf("code = %d, want 1", code)
+func TestIDsOutsideTheLeadingCommentBlockProveNothing(t *testing.T) {
+	cases := []struct{ name, file, content string }{
+		{"go after package", "foo_test.go", "package foo_test\n\n// Requirements: FR-AB-01\n"},
+		{"ts after import", "foo.spec.ts", "import { it } from 'vitest'\n// Requirements: FR-AB-01\n"},
+		{"go test name", "foo_test.go", "package foo_test\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n"},
+		{"vitest title", "foo.spec.ts", "it('FR-AB-01 does a thing', () => {})\n"},
 	}
-	if !strings.Contains(out, "FR-AB-01") {
-		t.Errorf("output = %q, want it to mention FR-AB-01", out)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
+			writeFile(t, filepath.Join(cfg.GoRoot, c.file), c.content)
+			writeFile(t, filepath.Join(cfg.FrontendRoot, c.file), c.content)
+
+			assertReport(t, cfg, "FR-AB-01: no requirements header and no manual checklist entry\n")
+		})
 	}
 }
 
-func TestQA_MNT_02_ManualChecklistCoversRequiredID(t *testing.T) {
+func TestManualChecklistCoversRequiredID(t *testing.T) {
 	checklist := "| FR-AB-01 | some manual check | all |\n"
 	cfg := newConfig(t, oneMustFR, noRows, noRows, checklist)
 
 	assertReport(t, cfg, "")
 }
 
-func TestQA_MNT_02_ManualChecklistRowCoversMultipleIDs(t *testing.T) {
+func TestManualChecklistRowCoversMultipleIDs(t *testing.T) {
 	checklist := "| FR-AB-01, FR-CD-01 | some manual check | all |\n"
 	cfg := newConfig(t, twoMustFR, noRows, noRows, checklist)
 
 	assertReport(t, cfg, "")
 }
 
-func TestQA_MNT_02_UncoveredMustFRIsReportedMissing(t *testing.T) {
+func TestUncoveredMustFRIsReportedMissing(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 
-	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n")
+	assertReport(t, cfg, "FR-AB-01: no requirements header and no manual checklist entry\n")
 }
 
-func TestQA_MNT_02_UncoveredQualityAndDistributionIDsAreNotRequired(t *testing.T) {
+func TestUncoveredQualityAndDistributionIDsAreNotRequired(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, qualityFixture, oneDistID, noRows)
 
-	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n")
+	assertReport(t, cfg, "FR-AB-01: no requirements header and no manual checklist entry\n")
 }
 
 const oneDistID = `| ID | Requirement |
@@ -194,12 +201,12 @@ const oneDistID = `| ID | Requirement |
 | DIST-01 | a two-segment id |
 `
 
-func TestQA_MNT_02_TestNamedForNonexistentIDLeavesRealIDReportedMissing(t *testing.T) {
+func TestHeaderForNonexistentIDLeavesRealIDReportedMissing(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, filepath.Join(cfg.GoRoot, "foo_test.go"),
-		"package foo_test\n\nfunc TestFR_AB_99_Thing(t *testing.T) {}\n")
+		"// Requirements: FR-AB-99\n\npackage foo_test\n")
 
-	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n")
+	assertReport(t, cfg, "FR-AB-01: no requirements header and no manual checklist entry\n")
 }
 
 const oneShouldFR = `| ID | Prio | Requirement |
@@ -207,7 +214,7 @@ const oneShouldFR = `| ID | Prio | Requirement |
 | FR-CD-01 | SHOULD | a should requirement |
 `
 
-func TestQA_MNT_02_UncoveredShouldFRIsNotReported(t *testing.T) {
+func TestUncoveredShouldFRIsNotReported(t *testing.T) {
 	cfg := newConfig(t, oneShouldFR, noRows, noRows, noRows)
 
 	assertReport(t, cfg, "")
@@ -219,39 +226,39 @@ const twoMustFR = `| ID | Prio | Requirement |
 | FR-CD-01 | MUST | another must requirement |
 `
 
-func TestQA_MNT_02_EachUncoveredIDGetsExactlyOneSortedLine(t *testing.T) {
+func TestEachUncoveredIDGetsExactlyOneSortedLine(t *testing.T) {
 	cfg := newConfig(t, twoMustFR, noRows, noRows, noRows)
 
-	assertReport(t, cfg, "FR-AB-01: no test name and no manual checklist entry\n"+
-		"FR-CD-01: no test name and no manual checklist entry\n")
+	assertReport(t, cfg, "FR-AB-01: no requirements header and no manual checklist entry\n"+
+		"FR-CD-01: no requirements header and no manual checklist entry\n")
 }
 
-func TestTR_30_PendingEntrySuppressesMissingID(t *testing.T) {
+func TestPendingEntrySuppressesMissingID(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, cfg.PendingPath, "FR-AB-01\n")
 
 	assertReport(t, cfg, "")
 }
 
-func TestTR_30_PendingIgnoresBlankAndCommentLines(t *testing.T) {
+func TestPendingIgnoresBlankAndCommentLines(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 	writeFile(t, cfg.PendingPath, "# header\n\nFR-AB-01\n\n# trailer\n")
 
 	assertReport(t, cfg, "")
 }
 
-func TestTR_30_MissingPendingFileIsAnEmptyList(t *testing.T) {
+func TestMissingPendingFileIsAnEmptyList(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
 
 	out, code := runFixture(t, cfg)
-	if code != 1 || !strings.Contains(out, "FR-AB-01: no test name") {
+	if code != 1 || !strings.Contains(out, "FR-AB-01: no requirements header") {
 		t.Errorf("code = %d, output = %q; want 1 and the missing line", code, out)
 	}
 }
 
-func TestTR_30_StalePendingEntryIsReported(t *testing.T) {
+func TestStalePendingEntryIsReported(t *testing.T) {
 	cfg := newConfig(t, oneMustFR, noRows, noRows, noRows)
-	writeFile(t, filepath.Join(cfg.GoRoot, "a_test.go"), "package a\n\nfunc TestFR_AB_01_Thing(t *testing.T) {}\n")
+	writeFile(t, filepath.Join(cfg.GoRoot, "a_test.go"), "// Requirements: FR-AB-01\n\npackage a\n")
 	writeFile(t, cfg.PendingPath, "FR-AB-01\n")
 
 	assertReport(t, cfg, "FR-AB-01: no longer missing; remove it from "+cfg.PendingPath+"\n")

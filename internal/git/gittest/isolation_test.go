@@ -1,3 +1,5 @@
+// Requirements: QA-PORT-01
+
 package gittest
 
 import (
@@ -5,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestQA_PORT_01_IsolationErrorReportsWhenNotIsolated(t *testing.T) {
+func TestIsolationErrorReportsWhenNotIsolated(t *testing.T) {
 	env := map[string]string{}
 	get := func(key string) string { return env[key] }
 

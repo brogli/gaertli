@@ -1,3 +1,4 @@
+// Requirements: FR-DIFF-11
 import { expect, test, type Page } from '@playwright/test'
 import { contrastRatio, deltaEOK, parseColor } from '../src/testing/colour'
 import { mockDiffUrl } from './helpers'
@@ -94,7 +95,7 @@ async function measure(
 }
 
 for (const theme of THEMES) {
-  test(`FR-DIFF-11 ${theme} theme: added and removed lines are visibly distinct, unified and side-by-side`, async ({
+  test(`${theme} theme: added and removed lines are visibly distinct, unified and side-by-side`, async ({
     page,
   }) => {
     for (const mode of MODES) {

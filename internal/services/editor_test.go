@@ -1,3 +1,5 @@
+// Requirements: FR-ED-02, FR-UX-02, FR-WT-04
+
 package services
 
 import (
@@ -64,7 +66,7 @@ func assertNoEditorStarted(t *testing.T, outFile string) {
 	}
 }
 
-func TestFR_WT_04_OpenFolderAtStartsTheEditorOnTheWorktreesToplevelWithNoPriorSession(t *testing.T) {
+func TestOpenFolderAtStartsTheEditorOnTheWorktreesToplevelWithNoPriorSession(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
@@ -85,7 +87,7 @@ func TestFR_WT_04_OpenFolderAtStartsTheEditorOnTheWorktreesToplevelWithNoPriorSe
 	}
 }
 
-func TestFR_WT_04_OpenFolderAtRejectsANonRepoPathStartingNoEditor(t *testing.T) {
+func TestOpenFolderAtRejectsANonRepoPathStartingNoEditor(t *testing.T) {
 	t.Parallel()
 	c := New(func(core.Event) {})
 	outFile := pushArgvWriter(t, c)
@@ -96,7 +98,7 @@ func TestFR_WT_04_OpenFolderAtRejectsANonRepoPathStartingNoEditor(t *testing.T) 
 	assertNoEditorStarted(t, outFile)
 }
 
-func TestFR_ED_02_OpenFileJoinsThePathAgainstTheToplevelLogsTheStartAndRefusesMissingOrEscapingPaths(t *testing.T) {
+func TestOpenFileJoinsThePathAgainstTheToplevelLogsTheStartAndRefusesMissingOrEscapingPaths(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	if err := os.MkdirAll(filepath.Join(repo.Dir, "sub"), 0o755); err != nil {
@@ -138,7 +140,7 @@ func TestFR_ED_02_OpenFileJoinsThePathAgainstTheToplevelLogsTheStartAndRefusesMi
 	assertNoEditorStarted(t, outFile)
 }
 
-func TestFR_UX_02_OpenFileWithACommandNotOnPathLogsTheArgvAndTheError(t *testing.T) {
+func TestOpenFileWithACommandNotOnPathLogsTheArgvAndTheError(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 

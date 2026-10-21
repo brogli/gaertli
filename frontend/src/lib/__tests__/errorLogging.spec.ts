@@ -1,3 +1,4 @@
+// Requirements: FR-UX-02
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { App } from 'vue'
 
@@ -21,7 +22,7 @@ describe('installErrorLogging', () => {
     LogService.Error.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-UX-02 a component error reaches the app log', () => {
+  it('a component error reaches the app log', () => {
     const app = fakeApp()
     installErrorLogging(app)
 
@@ -30,7 +31,7 @@ describe('installErrorLogging', () => {
     expect(LogService.Error).toHaveBeenCalledWith(expect.stringContaining('boom'))
   })
 
-  it('FR-UX-02 an uncaught window error reaches the app log', () => {
+  it('an uncaught window error reaches the app log', () => {
     installErrorLogging(fakeApp())
 
     window.dispatchEvent(new ErrorEvent('error', { message: 'window boom' }))
@@ -38,7 +39,7 @@ describe('installErrorLogging', () => {
     expect(LogService.Error).toHaveBeenCalledWith(expect.stringContaining('window boom'))
   })
 
-  it('FR-UX-02 an unhandled promise rejection reaches the app log', () => {
+  it('an unhandled promise rejection reaches the app log', () => {
     installErrorLogging(fakeApp())
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- test double stands in for PromiseRejectionEvent, which happy-dom does not implement
     const event = new Event('unhandledrejection') as PromiseRejectionEvent

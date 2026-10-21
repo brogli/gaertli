@@ -1,3 +1,5 @@
+// Requirements: FR-BR-11, FR-BR-12, FR-SYNC-09
+
 package services
 
 import (
@@ -38,7 +40,7 @@ func divergedConflictRepo(t *testing.T) *gittest.Repo {
 	return diverge(t, "base\n", edit{"base.txt", "side\n"}, edit{"base.txt", "main\n"})
 }
 
-func TestFR_BR_11_FR_BR_12_MergeAndRebaseRefuseBeforeGitRunsWithAnOperationOrDetachedHead(t *testing.T) {
+func TestMergeAndRebaseRefuseBeforeGitRunsWithAnOperationOrDetachedHead(t *testing.T) {
 	t.Parallel()
 	repo := divergedConflictRepo(t)
 	c, wt := openWorktree(t, repo.Dir)
@@ -75,7 +77,7 @@ func TestFR_BR_11_FR_BR_12_MergeAndRebaseRefuseBeforeGitRunsWithAnOperationOrDet
 	}
 }
 
-func TestFR_BR_11_MergeFastForwards(t *testing.T) {
+func TestMergeFastForwards(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "base.txt", "base\n", "base")
@@ -97,7 +99,7 @@ func TestFR_BR_11_MergeFastForwards(t *testing.T) {
 	}
 }
 
-func TestFR_BR_11_MergeMakesAMergeCommitRunsHooksAndIgnoresHostileConfig(t *testing.T) {
+func TestMergeMakesAMergeCommitRunsHooksAndIgnoresHostileConfig(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
 	gittest.Run(t, repo.Dir, "config", "merge.ff", "only")
@@ -130,7 +132,7 @@ func TestFR_BR_11_MergeMakesAMergeCommitRunsHooksAndIgnoresHostileConfig(t *test
 	}
 }
 
-func TestFR_BR_11_MergeNamesAFullRefWhenTheShortNameIsAmbiguous(t *testing.T) {
+func TestMergeNamesAFullRefWhenTheShortNameIsAmbiguous(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
 	gittest.Run(t, repo.Dir, "branch", "x", "side")
@@ -149,7 +151,7 @@ func TestFR_BR_11_MergeNamesAFullRefWhenTheShortNameIsAmbiguous(t *testing.T) {
 	}
 }
 
-func TestFR_BR_11_MergeAcceptsRemoteBranchesAndTags(t *testing.T) {
+func TestMergeAcceptsRemoteBranchesAndTags(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
 	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/origin/side", "side")
@@ -171,7 +173,7 @@ func TestFR_BR_11_MergeAcceptsRemoteBranchesAndTags(t *testing.T) {
 	}
 }
 
-func TestFR_BR_11_MergeOfAContainedBranchIsUpToDate(t *testing.T) {
+func TestMergeOfAContainedBranchIsUpToDate(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "base.txt", "base\n", "base")
@@ -192,7 +194,7 @@ func TestFR_BR_11_MergeOfAContainedBranchIsUpToDate(t *testing.T) {
 	}
 }
 
-func TestFR_BR_11_MergeBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
+func TestMergeBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
 	t.Parallel()
 	for _, diverged := range []bool{false, true} {
 		repo := gittest.New(t)
@@ -220,7 +222,7 @@ func TestFR_BR_11_MergeBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
 	}
 }
 
-func TestFR_BR_11_MergeStopsAsConflictsOrStopped(t *testing.T) {
+func TestMergeStopsAsConflictsOrStopped(t *testing.T) {
 	t.Parallel()
 	repo := divergedConflictRepo(t)
 	c, wt := openWorktree(t, repo.Dir)
@@ -237,7 +239,7 @@ func TestFR_BR_11_MergeStopsAsConflictsOrStopped(t *testing.T) {
 	coretest.AssertCode(t, err, core.Stopped)
 }
 
-func TestFR_BR_12_RebaseFlattensMergesAndMovesNoOtherBranch(t *testing.T) {
+func TestRebaseFlattensMergesAndMovesNoOtherBranch(t *testing.T) {
 	t.Parallel()
 	for _, backend := range []string{"apply", "merge"} {
 		t.Run(backend, func(t *testing.T) {
@@ -277,7 +279,7 @@ func TestFR_BR_12_RebaseFlattensMergesAndMovesNoOtherBranch(t *testing.T) {
 	}
 }
 
-func TestFR_BR_12_RebaseOntoAnAncestorIsUpToDate(t *testing.T) {
+func TestRebaseOntoAnAncestorIsUpToDate(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "base.txt", "base\n", "base")
@@ -298,7 +300,7 @@ func TestFR_BR_12_RebaseOntoAnAncestorIsUpToDate(t *testing.T) {
 	}
 }
 
-func TestFR_BR_12_RebaseBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
+func TestRebaseBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
 	gittest.Run(t, repo.Dir, "checkout", "side")
@@ -315,7 +317,7 @@ func TestFR_BR_12_RebaseBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
 	}
 }
 
-func TestFR_BR_12_RebaseStopsOnConflictsLeavingTheRebase(t *testing.T) {
+func TestRebaseStopsOnConflictsLeavingTheRebase(t *testing.T) {
 	t.Parallel()
 	repo := divergedConflictRepo(t)
 	gittest.Run(t, repo.Dir, "checkout", "side")
@@ -343,7 +345,7 @@ func distantEditsFixture(t *testing.T) *gittest.Repo {
 
 const mergedWithLocalChange = "one\n2\n3\n4\n5\n6\n7\n8\n9\nten\n"
 
-func TestFR_BR_11_MergeWithStashRestoresTheLocalChange(t *testing.T) {
+func TestMergeWithStashRestoresTheLocalChange(t *testing.T) {
 	t.Parallel()
 	repo := distantEditsFixture(t)
 
@@ -364,7 +366,7 @@ func TestFR_BR_11_MergeWithStashRestoresTheLocalChange(t *testing.T) {
 	}
 }
 
-func TestFR_BR_11_MergeWithStashKeepsTheEntryOnConflicts(t *testing.T) {
+func TestMergeWithStashKeepsTheEntryOnConflicts(t *testing.T) {
 	t.Parallel()
 	repo := divergedConflictRepo(t)
 	gittest.Commit(t, repo.Dir, "other.txt", "original\n", "add other.txt")
@@ -387,7 +389,7 @@ func TestFR_BR_11_MergeWithStashKeepsTheEntryOnConflicts(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_09_WaitingStashFindsAnEntryWithTheOlderPullSubject(t *testing.T) {
+func TestWaitingStashFindsAnEntryWithTheOlderPullSubject(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
@@ -405,7 +407,7 @@ func TestFR_SYNC_09_WaitingStashFindsAnEntryWithTheOlderPullSubject(t *testing.T
 	}
 }
 
-func TestFR_BR_12_RebaseWithStashRestoresTheLocalChange(t *testing.T) {
+func TestRebaseWithStashRestoresTheLocalChange(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
 	gittest.Run(t, repo.Dir, "checkout", "side")
@@ -428,7 +430,7 @@ func TestFR_BR_12_RebaseWithStashRestoresTheLocalChange(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_09_RebaseWithStashKeepsTheEntryWhenAFailedRebaseLeftTheTreeChanged(t *testing.T) {
+func TestRebaseWithStashKeepsTheEntryWhenAFailedRebaseLeftTheTreeChanged(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
 	gittest.Run(t, repo.Dir, "checkout", "side")
@@ -449,7 +451,7 @@ func TestFR_SYNC_09_RebaseWithStashKeepsTheEntryWhenAFailedRebaseLeftTheTreeChan
 	}
 }
 
-func TestFR_SYNC_09_RebaseWithStashGivesTheEntryBackWhenTheFailedRebaseOnlyTouchedFiles(t *testing.T) {
+func TestRebaseWithStashGivesTheEntryBackWhenTheFailedRebaseOnlyTouchedFiles(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
 	gittest.Run(t, repo.Dir, "checkout", "side")
@@ -470,7 +472,7 @@ func TestFR_SYNC_09_RebaseWithStashGivesTheEntryBackWhenTheFailedRebaseOnlyTouch
 	}
 }
 
-func TestFR_BR_11_MergeWithStashGivesTheEntryBackWhenTheMergeNeverStarted(t *testing.T) {
+func TestMergeWithStashGivesTheEntryBackWhenTheMergeNeverStarted(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f", "base\n", "base")

@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-01, FR-CONF-03, FR-CONF-04, FR-CONF-06, FR-CONF-07, FR-CONF-10
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
@@ -53,7 +54,7 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
     commitFiles(git, repos.work, 'main: hunks line 1', { 'hunks.txt': hunksText({ 1: 'main' }) })
   })
 
-  test('FR-CONF-01 FR-CONF-03 FR-CONF-04 the banner names the merge and Conflicted lists both files; a file marked resolved leaves Conflicted; with every file resolved, Continue commits the merge without an editor', async ({
+  test('the banner names the merge and Conflicted lists both files; a file marked resolved leaves Conflicted; with every file resolved, Continue commits the merge without an editor', async ({
     app,
     repos,
     git,
@@ -87,7 +88,7 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
   })
 })
 
-test("FR-CONF-07 a modify/delete conflict offers a side in the diff window; taking the current side's version stages it and enables Continue", async ({
+test("a modify/delete conflict offers a side in the diff window; taking the current side's version stages it and enables Continue", async ({
   app,
   openDiff,
   repos,
@@ -108,7 +109,7 @@ test("FR-CONF-07 a modify/delete conflict offers a side in the diff window; taki
   await expect(conflictBanner(app).getByRole('button', { name: 'Continue' })).toBeEnabled()
 })
 
-test('FR-CONF-01 a rebase stopped on conflicts is named in the banner and can be aborted', async ({
+test('a rebase stopped on conflicts is named in the banner and can be aborted', async ({
   app,
   repos,
   git,
@@ -124,7 +125,7 @@ test('FR-CONF-01 a rebase stopped on conflicts is named in the banner and can be
   expect(fs.existsSync(path.join(repos.work, '.git', 'rebase-merge'))).toBe(false)
 })
 
-test('FR-CONF-01 a pull that stops on conflicts shows the merge in the banner; Abort undoes it', async ({
+test('a pull that stops on conflicts shows the merge in the banner; Abort undoes it', async ({
   app,
   repos,
   git,
@@ -148,7 +149,7 @@ test('FR-CONF-01 a pull that stops on conflicts shows the merge in the banner; A
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 
-test('FR-CONF-10 FR-CONF-06 a merge conflict resolves in the merge editor: a side taken, changes only one side made applied, a region edited by hand and kept across closing the window, marked done, saved and staged with no markers', async ({
+test('a merge conflict resolves in the merge editor: a side taken, changes only one side made applied, a region edited by hand and kept across closing the window, marked done, saved and staged with no markers', async ({
   app,
   openDiff,
   repos,

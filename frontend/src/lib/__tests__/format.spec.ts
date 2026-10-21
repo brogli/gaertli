@@ -1,3 +1,4 @@
+// Requirements: FR-UX-10, FR-UX-11
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/i18n'
 import { exactDate, timeAgo } from '../format'
@@ -11,7 +12,7 @@ describe('timeAgo', () => {
     vi.useRealTimers()
   })
 
-  it('FR-UX-11 a relative date is in the UI language', () => {
+  it('a relative date is in the UI language', () => {
     vi.useFakeTimers({ now: NOW })
 
     expect(timeAgo(threeDaysAgo)).toBe('3 days ago')
@@ -20,7 +21,7 @@ describe('timeAgo', () => {
     expect(timeAgo(threeDaysAgo)).toBe('vor 3 Tagen')
   })
 
-  it('FR-UX-11 a date under a minute old is "just now", from the catalogue', () => {
+  it('a date under a minute old is "just now", from the catalogue', () => {
     vi.useFakeTimers({ now: NOW })
 
     expect(timeAgo(NOW.getTime() / 1000 - 20)).toBe('just now')
@@ -28,7 +29,7 @@ describe('timeAgo', () => {
 })
 
 describe('exactDate', () => {
-  it('FR-UX-10 formats the date and time in the system date format', () => {
+  it('formats the date and time in the system date format', () => {
     const date = new Date('2026-09-24T12:34:56Z')
     const expected = new Intl.DateTimeFormat(undefined, {
       dateStyle: 'medium',

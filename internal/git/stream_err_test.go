@@ -1,3 +1,5 @@
+// Requirements: FR-SYNC-07
+
 package git
 
 import (
@@ -14,7 +16,7 @@ import (
 	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
-func TestFR_SYNC_07_StreamErrCallsOnLinePerRecordStdoutUntouched(t *testing.T) {
+func TestStreamErrCallsOnLinePerRecordStdoutUntouched(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "stderr-records")
 	data := "remote: Enumerating objects: 90, done.\n" +
 		"remote: Counting objects:   1% (1/90)   \rremote: Counting objects:  50% (45/90)   \rremote: Counting objects: 100% (90/90), done.\n"
@@ -51,7 +53,7 @@ func TestFR_SYNC_07_StreamErrCallsOnLinePerRecordStdoutUntouched(t *testing.T) {
 	}
 }
 
-func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
+func TestStreamErrCancelKillsProcess(t *testing.T) {
 	heartbeat := sleepWithHeartbeat(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(50*time.Millisecond, cancel)
@@ -69,14 +71,14 @@ func TestFR_SYNC_07_StreamErrCancelKillsProcess(t *testing.T) {
 
 // A grandchild that inherited git's stderr and outlives the interrupt,
 // e.g. a stalled ssh transport, keeps the pipe open after git itself is gone.
-func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsStderr(t *testing.T) {
+func TestStreamErrCancelReturnsWhileAGrandchildHoldsStderr(t *testing.T) {
 	t.Parallel()
 	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6) & wait")
 }
 
 // The shape of a delayed transport: the grandchild holds git's stderr but
 // not its stdout, so stdout ends as soon as git is gone.
-func TestFR_SYNC_07_StreamErrCancelReturnsWhileAGrandchildHoldsOnlyStderr(t *testing.T) {
+func TestStreamErrCancelReturnsWhileAGrandchildHoldsOnlyStderr(t *testing.T) {
 	t.Parallel()
 	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6 >/dev/null) & wait")
 }
@@ -99,7 +101,7 @@ func assertCancelReturnsDespiteGrandchild(t *testing.T, script string) {
 	}
 }
 
-func TestFR_SYNC_07_StreamErrKeepsStderrForAFailedCall(t *testing.T) {
+func TestStreamErrKeepsStderrForAFailedCall(t *testing.T) {
 	t.Setenv("FAKEGIT_STDERR", "fatal: could not read from remote\n")
 	t.Setenv("FAKEGIT_EXIT", "128")
 

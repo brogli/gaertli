@@ -1,3 +1,5 @@
+// Requirements: QA-USE-03
+
 package repocheck_test
 
 import (
@@ -93,7 +95,7 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-func TestQA_USE_03_GlossaryTermsUsedConsistently(t *testing.T) {
+func TestGlossaryTermsUsedConsistently(t *testing.T) {
 	root := repoRoot(t)
 
 	t.Run("fixture", func(t *testing.T) {

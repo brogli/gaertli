@@ -1,3 +1,5 @@
+// Requirements: QA-PERF-02
+
 package git
 
 import (
@@ -13,7 +15,7 @@ import (
 	"github.com/brogli/nebegit/internal/core/coretest"
 )
 
-func TestADR_5_StreamCallsOnRecordAsRecordsArrive(t *testing.T) {
+func TestStreamCallsOnRecordAsRecordsArrive(t *testing.T) {
 	streamSlowly(t, "A\x00\nB\x00\nC\x00\n")
 
 	start := time.Now()
@@ -38,7 +40,7 @@ func TestADR_5_StreamCallsOnRecordAsRecordsArrive(t *testing.T) {
 	}
 }
 
-func TestADR_5_StreamOnRecordErrorKillsProcessAndReturnsIt(t *testing.T) {
+func TestStreamOnRecordErrorKillsProcessAndReturnsIt(t *testing.T) {
 	streamSlowly(t, "A\x00\nB\x00\nC\x00\n")
 
 	calls := 0
@@ -56,7 +58,7 @@ func TestADR_5_StreamOnRecordErrorKillsProcessAndReturnsIt(t *testing.T) {
 	}
 }
 
-func TestADR_5_StreamCapturesStderrAndExitCode(t *testing.T) {
+func TestStreamCapturesStderrAndExitCode(t *testing.T) {
 	t.Setenv("FAKEGIT_STDERR", "warning: x")
 	t.Setenv("FAKEGIT_EXIT", "1")
 

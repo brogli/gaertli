@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-13, FR-LOG-14, FR-LOG-17
 import { test, expect } from './fixtures'
 import { contextMenuItems, logRow, notice, pickFromContextMenu, rev, shortRev } from './helpers'
 
@@ -5,7 +6,7 @@ import { contextMenuItems, logRow, notice, pickFromContextMenu, rev, shortRev } 
 // component tests mock the core, so only here does a menu choice run the
 // rebase and the watcher bring the rewritten log back.
 
-test('FR-LOG-17 a merge commit between the selected commits blocks squash and fixup, and the menu says so', async ({
+test('a merge commit between the selected commits blocks squash and fixup, and the menu says so', async ({
   app,
   repos,
   git,
@@ -30,7 +31,7 @@ test('FR-LOG-17 a merge commit between the selected commits blocks squash and fi
 test.describe('a repo with no remote', () => {
   test.use({ open: ['scratch'] })
 
-  test('FR-LOG-13, FR-LOG-14 three ctrl-picked commits squash into one with the edited message', async ({
+  test('three ctrl-picked commits squash into one with the edited message', async ({
     openApp,
     repos,
     git,

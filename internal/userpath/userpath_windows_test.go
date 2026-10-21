@@ -1,5 +1,7 @@
 //go:build windows
 
+// Requirements: DIST-04
+
 package userpath
 
 import (
@@ -8,7 +10,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-func TestDIST_04_AddAndRemoveEditPathUnderAGivenKeyAndKeepItsType(t *testing.T) {
+func TestAddAndRemoveEditPathUnderAGivenKeyAndKeepItsType(t *testing.T) {
 	key := scratchKey(t)
 	dir := `C:\Apps\nebegit\bin`
 	add := func(path string) string { return withEntry(path, dir) }

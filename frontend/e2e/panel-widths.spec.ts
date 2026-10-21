@@ -1,3 +1,4 @@
+// Requirements: FR-UX-22
 import { test, expect, type Page } from '@playwright/test'
 import { openMockRepo } from './helpers'
 
@@ -31,7 +32,7 @@ function expectClose(actual: number, expected: number): void {
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(2)
 }
 
-test('FR-UX-22 a dragged panel width is kept per layout, across a reload', async ({ page }) => {
+test('a dragged panel width is kept per layout, across a reload', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 800 })
   await openMockRepo(page)
   await waitForGutterCount(page, 2)

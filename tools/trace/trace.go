@@ -1,6 +1,6 @@
 // Command trace checks requirement traceability: every MUST functional
-// requirement ID must be named by a Go test, a Vitest or Playwright test,
-// or a manual checklist entry.
+// requirement ID must be named in the "// Requirements:" header comment of a
+// Go, Vitest or Playwright test file, or in a manual checklist entry.
 package main
 
 import (
@@ -30,10 +30,7 @@ const idExpr = `[A-Z]{2,6}(?:-[A-Z]{2,6})?-[0-9]{2,3}`
 var (
 	idPattern     = regexp.MustCompile(`^` + idExpr + `$`)
 	separatorCell = regexp.MustCompile(`^:?-+:?$`)
-	goTestFunc    = regexp.MustCompile(`(?m)^func (Test[A-Za-z0-9_]*)\(`)
-	goTestID      = regexp.MustCompile(`^Test([A-Z]+)(?:_([A-Z]+))?_([0-9]+)(?:_|$)`)
-	vitestCall    = regexp.MustCompile("\\b(?:it|test)(?:\\.each\\([\\s\\S]*?\\))?\\(\\s*['\"`]([^'\"`]*)['\"`]")
-	vitestID      = regexp.MustCompile(`^(` + idExpr + `)(?:\s|$)`)
+	headerLine    = regexp.MustCompile(`^// Requirements: (` + idExpr + `(?:, ` + idExpr + `)*)$`)
 )
 
 // run computes the required IDs and their coverage, and reports the
@@ -133,40 +130,32 @@ func coverage(cfg Config) (map[string]bool, error) {
 	return covered, nil
 }
 
-// goCoverage returns the requirement IDs named by Go test functions below
-// root.
+// goCoverage returns the requirement IDs named in the header comments of Go
+// test files below root.
 func goCoverage(root string) (map[string]bool, error) {
-	return coverageInFiles(root, []string{"_test.go"}, func(src string, covered map[string]bool) {
-		for _, m := range goTestFunc.FindAllStringSubmatch(src, -1) {
-			if id, ok := idFromGoTestName(m[1]); ok {
+	return coverageInFiles(root, []string{"_test.go"}, collectHeaderIDs)
+}
+
+// frontendCoverage returns the requirement IDs named in the header comments
+// of Vitest and Playwright files (both *.spec.ts) below root.
+func frontendCoverage(root string) (map[string]bool, error) {
+	return coverageInFiles(root, []string{".spec.ts"}, collectHeaderIDs)
+}
+
+// collectHeaderIDs adds the IDs of every "// Requirements: A, B" line in the
+// leading comment block of src: the lines before the first one that is
+// neither blank nor a // comment (the package clause in Go).
+func collectHeaderIDs(src string, covered map[string]bool) {
+	for line := range strings.SplitSeq(src, "\n") {
+		line = strings.TrimSpace(line)
+		if m := headerLine.FindStringSubmatch(line); m != nil {
+			for id := range strings.SplitSeq(m[1], ", ") {
 				covered[id] = true
 			}
+		} else if line != "" && !strings.HasPrefix(line, "//") {
+			return
 		}
-	})
-}
-
-func idFromGoTestName(name string) (string, bool) {
-	m := goTestID.FindStringSubmatch(name)
-	if m == nil {
-		return "", false
 	}
-	if m[2] == "" {
-		return m[1] + "-" + m[3], true
-	}
-	return m[1] + "-" + m[2] + "-" + m[3], true
-}
-
-// frontendCoverage returns the requirement IDs named by the first string
-// argument of an it(...), test(...), it.each(...)(...) or test.each(...)(...)
-// call in Vitest and Playwright files (both *.spec.ts) below root.
-func frontendCoverage(root string) (map[string]bool, error) {
-	return coverageInFiles(root, []string{".spec.ts"}, func(src string, covered map[string]bool) {
-		for _, m := range vitestCall.FindAllStringSubmatch(src, -1) {
-			if id := vitestID.FindStringSubmatch(m[1]); id != nil {
-				covered[id[1]] = true
-			}
-		}
-	})
 }
 
 // coverageInFiles walks root, skipping node_modules, bin and hidden dirs,
@@ -247,7 +236,7 @@ func report(out io.Writer, required, covered, pending map[string]bool, pendingPa
 	problems := map[string]string{}
 	for id := range required {
 		if !covered[id] && !pending[id] {
-			problems[id] = "no test name and no manual checklist entry"
+			problems[id] = "no requirements header and no manual checklist entry"
 		}
 	}
 	for id := range pending {

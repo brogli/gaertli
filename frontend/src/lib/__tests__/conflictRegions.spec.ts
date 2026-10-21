@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-05, FR-CONF-10
 import { describe, expect, it } from 'vitest'
 import { EditorState, Text } from '@codemirror/state'
 import { EditorView, type DecorationSet } from '@codemirror/view'
@@ -75,7 +76,7 @@ function lineOf(state: EditorState, content: string): { from: number; to: number
 }
 
 describe('conflictRegions result pane', () => {
-  it('FR-CONF-05 reads the regions back as line ranges, empty ones as the line before', () => {
+  it('reads the regions back as line ranges, empty ones as the line before', () => {
     expect(lineRanges(resultState())).toEqual(ranges)
     const empty = [
       { start: 1, lines: 0 },
@@ -84,14 +85,14 @@ describe('conflictRegions result pane', () => {
     expect(lineRanges(resultState('a\nb\nc', empty))).toEqual(empty)
   })
 
-  it('FR-CONF-05 converts line ranges to offsets', () => {
+  it('converts line ranges to offsets', () => {
     const doc = Text.of(text.split('\n'))
     const regions = ranges.map((range) => regionFromLineRange(doc, range))
     expect(text.slice(regions[0]?.from, regions[0]?.to)).toBe('o1')
     expect(text.slice(regions[1]?.from, regions[1]?.to)).toBe('o2')
   })
 
-  it('FR-CONF-10 every region starts unresolved, and a hand edit leaves it so', () => {
+  it('every region starts unresolved, and a hand edit leaves it so', () => {
     const state = resultState()
     expect(unresolvedCount(state)).toBe(2)
 
@@ -102,7 +103,7 @@ describe('conflictRegions result pane', () => {
     expect(unresolvedCount(typed)).toBe(2)
   })
 
-  it('FR-CONF-10 take incoming replaces the region, resolves it and keeps its range', () => {
+  it('take incoming replaces the region, resolves it and keeps its range', () => {
     const state = resultState()
     const next = state.update(takeRegion(state, 0, ['i1', 'i1b'])).state
     expect(next.doc.toString().split('\n')).toEqual(['a', 'i1', 'i1b', 'b', 'o2', 'z'])
@@ -116,12 +117,12 @@ describe('conflictRegions result pane', () => {
     expect(selectedRegion(next)).toBe(0)
   })
 
-  it('FR-CONF-10 a take is one change', () => {
+  it('a take is one change', () => {
     const state = resultState()
     expect(Array.isArray(takeRegion(state, 1, ['x', 'y']).changes)).toBe(false)
   })
 
-  it('FR-CONF-10 an empty take removes the region lines', () => {
+  it('an empty take removes the region lines', () => {
     const state = resultState()
     const next = state.update(takeRegion(state, 0, [])).state
     expect(next.doc.toString()).toBe('a\nb\no2\nz')
@@ -129,7 +130,7 @@ describe('conflictRegions result pane', () => {
     expect(lineRanges(next)[0]).toEqual({ start: 1, lines: 0 })
   })
 
-  it('FR-CONF-10 a take fills an empty region, at the end of the text too', () => {
+  it('a take fills an empty region, at the end of the text too', () => {
     const middle = resultState('a\nb', [{ start: 1, lines: 0 }])
     expect(middle.update(takeRegion(middle, 0, ['x', 'y'])).state.doc.toString()).toBe('a\nx\ny\nb')
     expect(lineRanges(middle.update(takeRegion(middle, 0, ['x', 'y'])).state)).toEqual([
@@ -147,7 +148,7 @@ describe('conflictRegions result pane', () => {
     ['text', ['foo'], 'a\nX\nfooc\n'],
     ['text, then a line break', ['foo', '\n'], 'a\nX\nfoo\nc\n'],
   ])(
-    'FR-CONF-10 %s typed at the start of the line after an empty region stays outside it',
+    '%s typed at the start of the line after an empty region stays outside it',
     (_, keys, taken) => {
       let edited = resultState('a\nc\n', [{ start: 1, lines: 0 }])
       let at = 2
@@ -161,14 +162,14 @@ describe('conflictRegions result pane', () => {
     },
   )
 
-  it('FR-CONF-10 text typed at the end of a text without a final line break stays outside an empty region there', () => {
+  it('text typed at the end of a text without a final line break stays outside an empty region there', () => {
     const state = resultState('a\nb', [{ start: 2, lines: 0 }])
     const edited = state.update({ changes: { from: 3, insert: 'foo' } }).state
 
     expect(edited.update(takeRegion(edited, 0, ['X'])).state.doc.toString()).toBe('a\nbfoo\nX')
   })
 
-  it('FR-CONF-10 mark done resolves the region as it stands', () => {
+  it('mark done resolves the region as it stands', () => {
     const state = resultState()
     const edited = state.update({ changes: { from: lineOf(state, 'o2').to, insert: '!' } }).state
 
@@ -180,7 +181,7 @@ describe('conflictRegions result pane', () => {
     expect(selectedRegion(done)).toBe(1)
   })
 
-  it('FR-CONF-10 undoing a take or a mark restores the unresolved region and its text', () => {
+  it('undoing a take or a mark restores the unresolved region and its text', () => {
     const state = resultState()
     const taken = state.update(takeRegion(state, 0, ['i1'])).state
     const marked = taken.update(markDone(1)).state
@@ -197,7 +198,7 @@ describe('conflictRegions result pane', () => {
   it.each([
     ['in the middle', 'a\no\nb'],
     ['at the end without a final line break', 'a\no'],
-  ])('FR-CONF-10 undoing an empty take restores the region exactly, %s', (_, doc) => {
+  ])('undoing an empty take restores the region exactly, %s', (_, doc) => {
     const state = resultState(doc, [{ start: 2, lines: 1 }])
     const taken = state.update(takeRegion(state, 0, [])).state
     expect(isUnresolved(taken, 0)).toBe(false)
@@ -209,7 +210,7 @@ describe('conflictRegions result pane', () => {
     expect(isUnresolved(back, 0)).toBe(true)
   })
 
-  it('FR-CONF-10 restores the region states it was created with', () => {
+  it('restores the region states it was created with', () => {
     const state = EditorState.create({
       doc: text,
       extensions: regionsExtension(
@@ -224,7 +225,7 @@ describe('conflictRegions result pane', () => {
     expect(unresolvedCount(state)).toBe(1)
   })
 
-  it('FR-CONF-10 next and previous skip resolved regions', () => {
+  it('next and previous skip resolved regions', () => {
     const state = resultState()
     const afterTake = state.update(takeRegion(state, 1, ['x'])).state
     expect(nextUnresolved(state, 0, 1)).toBe(1)
@@ -234,14 +235,14 @@ describe('conflictRegions result pane', () => {
     expect(nextUnresolved(state, -1, 1)).toBe(0)
   })
 
-  it('FR-CONF-10 a region starts where its first line starts, following edits', () => {
+  it('a region starts where its first line starts, following edits', () => {
     const state = resultState()
     expect(regionStart(state, 1)).toBe(state.doc.line(4).from)
     const typed = state.update({ changes: { from: 0, insert: 'xy' } }).state
     expect(regionStart(typed, 1)).toBe(regionStart(state, 1) + 2)
   })
 
-  it('FR-CONF-10 the cursor moving into a region selects it; outside, the selection stays', () => {
+  it('the cursor moving into a region selects it; outside, the selection stays', () => {
     const state = resultState()
     const inside = state.update({ selection: { anchor: lineOf(state, 'o2').from } }).state
     expect(selectedRegion(inside)).toBe(1)
@@ -249,14 +250,14 @@ describe('conflictRegions result pane', () => {
     expect(selectedRegion(outside)).toBe(1)
   })
 
-  it('FR-CONF-10 selecting a region the result does not have is ignored', () => {
+  it('selecting a region the result does not have is ignored', () => {
     const state = resultState().update({ effects: selectRegion.of(1) }).state
     const next = state.update({ effects: selectRegion.of(7) }).state
 
     expect(selectedRegion(next)).toBe(1)
   })
 
-  it('FR-CONF-10 tints unresolved regions red and resolved ones muted, the selected one stronger', () => {
+  it('tints unresolved regions red and resolved ones muted, the selected one stronger', () => {
     const state = resultState()
     expect(lineClasses(state)).toEqual({
       2: 'cm-conflict-unresolved',
@@ -273,7 +274,7 @@ describe('conflictRegions result pane', () => {
     expect(lineClasses(resolved)[2]).toBe('cm-conflict-unresolved')
   })
 
-  it('FR-CONF-05 tints a change by its kind and outlines a selected multi-line region', () => {
+  it('tints a change by its kind and outlines a selected multi-line region', () => {
     const state = EditorState.create({
       doc: 'a\nb\nc\nd\ne',
       extensions: regionsExtension(
@@ -295,7 +296,7 @@ describe('conflictRegions result pane', () => {
     })
   })
 
-  it('FR-CONF-10 takeRegions takes several regions in one undo step', () => {
+  it('takeRegions takes several regions in one undo step', () => {
     const state = resultState()
     const taken = state.update(
       takeRegions(state, [
@@ -310,7 +311,7 @@ describe('conflictRegions result pane', () => {
     expect(undone(taken).doc.toString()).toBe(text)
   })
 
-  it('FR-CONF-05 finds marker lines anywhere in the result', () => {
+  it('finds marker lines anywhere in the result', () => {
     const state = resultState()
     expect(hasStrayMarkers(state)).toBe(false)
     expect(
@@ -331,7 +332,7 @@ describe('conflictRegions side panes', () => {
     { lines: { start: 6, lines: 2 }, added: true },
   ]
 
-  it('FR-CONF-05 shows changed lines no region covers as handled, region lines over them', () => {
+  it('shows changed lines no region covers as handled, region lines over them', () => {
     const state = EditorState.create({
       doc: sideDoc,
       extensions: sideRegionsExtension(sideRanges, changes),
@@ -345,7 +346,7 @@ describe('conflictRegions side panes', () => {
     })
   })
 
-  it('FR-CONF-05 tints a side pane region by the kind it was given', () => {
+  it('tints a side pane region by the kind it was given', () => {
     const state = EditorState.create({
       doc: sideDoc,
       extensions: sideRegionsExtension(sideRanges, [], 'Unresolved change', [
@@ -356,7 +357,7 @@ describe('conflictRegions side panes', () => {
     expect(lineClasses(state)).toEqual({ 2: 'cm-change-changed' })
   })
 
-  it('FR-CONF-10 shows resolved and selected regions once told', () => {
+  it('shows resolved and selected regions once told', () => {
     const state = EditorState.create({
       doc: sideDoc,
       extensions: sideRegionsExtension(sideRanges, []),
@@ -370,7 +371,7 @@ describe('conflictRegions side panes', () => {
     })
   })
 
-  it('FR-CONF-10 finds the side region at a position', () => {
+  it('finds the side region at a position', () => {
     const state = EditorState.create({
       doc: sideDoc,
       extensions: sideRegionsExtension(sideRanges, []),

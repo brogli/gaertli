@@ -1,3 +1,5 @@
+// Requirements: OSS-01
+
 package main
 
 import (
@@ -8,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestOSS_01_ParseGoLicensesReadsTheReportAndSkipsOwnModule(t *testing.T) {
+func TestParseGoLicensesReadsTheReportAndSkipsOwnModule(t *testing.T) {
 	report := []byte("github.com/adrg/xdg\tv0.5.3\tMIT\t/mod/xdg/LICENSE\n" +
 		"github.com/brogli/nebegit\t\tBSD-3-Clause\t/repo/LICENSE\n" +
 		"golang.org/x/sys/unix\tv0.48.0\tBSD-3-Clause\t/mod/sys/LICENSE\n")
@@ -26,7 +28,7 @@ func TestOSS_01_ParseGoLicensesReadsTheReportAndSkipsOwnModule(t *testing.T) {
 	}
 }
 
-func TestOSS_01_ParsePnpmLicensesFlattensEveryVersion(t *testing.T) {
+func TestParsePnpmLicensesFlattensEveryVersion(t *testing.T) {
 	report := []byte(`{
   "MIT": [{"name": "vue", "versions": ["3.5.42"], "paths": ["/nm/vue"], "license": "MIT"}],
   "ISC": [{"name": "picocolors", "versions": ["1.1.0", "1.1.1"], "paths": ["/nm/pc0", "/nm/pc1"], "license": "ISC"}]
@@ -46,7 +48,7 @@ func TestOSS_01_ParsePnpmLicensesFlattensEveryVersion(t *testing.T) {
 	}
 }
 
-func TestOSS_01_LoadTextsReadsALicenceFileOrFindsOneInAPackageDir(t *testing.T) {
+func TestLoadTextsReadsALicenceFileOrFindsOneInAPackageDir(t *testing.T) {
 	dir := t.TempDir()
 	goLicence := filepath.Join(dir, "LICENSE")
 	pkgDir := filepath.Join(dir, "pkg")
@@ -69,7 +71,7 @@ func TestOSS_01_LoadTextsReadsALicenceFileOrFindsOneInAPackageDir(t *testing.T) 
 	}
 }
 
-func TestOSS_01_LoadTextsFailsWhenAPackageHasNoLicenceFile(t *testing.T) {
+func TestLoadTextsFailsWhenAPackageHasNoLicenceFile(t *testing.T) {
 	_, err := loadTexts([]Dependency{{Name: "nolicence", File: t.TempDir()}})
 
 	if err == nil || !strings.Contains(err.Error(), "nolicence") {
@@ -77,7 +79,7 @@ func TestOSS_01_LoadTextsFailsWhenAPackageHasNoLicenceFile(t *testing.T) {
 	}
 }
 
-func TestOSS_01_LoadTextsUsesTheEmbeddedTextForAKnownPackageWithoutOne(t *testing.T) {
+func TestLoadTextsUsesTheEmbeddedTextForAKnownPackageWithoutOne(t *testing.T) {
 	restore := noLicenceFileText
 	noLicenceFileText = map[string]string{"pkg-without-licence": "MIT, embedded"}
 	t.Cleanup(func() { noLicenceFileText = restore })
@@ -91,7 +93,7 @@ func TestOSS_01_LoadTextsUsesTheEmbeddedTextForAKnownPackageWithoutOne(t *testin
 	}
 }
 
-func TestOSS_01_LoadTextsUsesTheSameLicenceTextForAPackageWithoutOne(t *testing.T) {
+func TestLoadTextsUsesTheSameLicenceTextForAPackageWithoutOne(t *testing.T) {
 	licence := filepath.Join(t.TempDir(), "LICENSE")
 	if err := os.WriteFile(licence, []byte("MIT, Wails authors"), 0o644); err != nil {
 		t.Fatal(err)

@@ -1,3 +1,4 @@
+// Requirements: FR-CP-01, FR-CP-03, FR-CP-06, FR-CP-07, FR-RV-02
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import {
@@ -19,7 +20,7 @@ async function selectRange(page: Page, first: string, last: string): Promise<voi
   await logRow(page, last).click({ modifiers: ['Shift'] })
 }
 
-test('FR-CP-01 cherry-picking a commit adds a commit with its message on top of the branch', async ({
+test('cherry-picking a commit adds a commit with its message on top of the branch', async ({
   app,
   repos,
   git,
@@ -32,11 +33,7 @@ test('FR-CP-01 cherry-picking a commit adds a commit with its message on top of 
   expect(git(repos.work, 'log', '-1', '--format=%s').trim()).toBe('feature: add feature.txt')
 })
 
-test('FR-CP-06 "Cherry-pick…" can apply the change without committing', async ({
-  app,
-  repos,
-  git,
-}) => {
+test('"Cherry-pick…" can apply the change without committing', async ({ app, repos, git }) => {
   const head = rev(git, repos.work, 'HEAD')
   await pickFromContextMenu(app, logRow(app, 'feature: add feature.txt'), 'Cherry-pick…')
   const dialog = app.getByRole('dialog')
@@ -56,7 +53,7 @@ test.describe('with three new commits on main', () => {
     }
   })
 
-  test('FR-RV-02 reverting a selected range makes one revert per commit, newest first', async ({
+  test('reverting a selected range makes one revert per commit, newest first', async ({
     openApp,
     repos,
     git,
@@ -73,7 +70,7 @@ test.describe('with three new commits on main', () => {
   })
 })
 
-test('FR-CP-03 FR-CP-07 a pick that stops on conflicts shows the operation and the conflicted file; Skip drops the conflicting commit and applies the rest', async ({
+test('a pick that stops on conflicts shows the operation and the conflicted file; Skip drops the conflicting commit and applies the rest', async ({
   openApp,
   repos,
   git,

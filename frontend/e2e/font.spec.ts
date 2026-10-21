@@ -1,3 +1,4 @@
+// Requirements: FR-UX-18
 import { test, expect, type Page } from '@playwright/test'
 import { mockDiffUrl, openMockRepo } from './helpers'
 
@@ -12,7 +13,7 @@ function family(page: Page, selector: string): Promise<string> {
     .evaluate((el) => getComputedStyle(el).fontFamily)
 }
 
-test('FR-UX-18 the UI, OpenVue components included, uses the bundled font; hashes and diffs the bundled fixed-width font', async ({
+test('the UI, OpenVue components included, uses the bundled font; hashes and diffs the bundled fixed-width font', async ({
   page,
 }) => {
   const fixedWidth = /^"JetBrains Mono Variable"/

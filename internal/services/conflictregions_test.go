@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-05
+
 package services
 
 import (
@@ -12,7 +14,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_CONF_05_ParseMarkerBlocksInEachStyle(t *testing.T) {
+func TestParseMarkerBlocksInEachStyle(t *testing.T) {
 	t.Parallel()
 	merge := "pre\n<<<<<<< HEAD\ncur\n=======\ninc\n>>>>>>> side\npost\n"
 	diff3 := "pre\n<<<<<<< HEAD\ncur\n||||||| base\nbas\n=======\ninc\n>>>>>>> side\npost\n"
@@ -35,7 +37,7 @@ func TestFR_CONF_05_ParseMarkerBlocksInEachStyle(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_05_ParseMarkerBlocksHonoursTheMarkerSize(t *testing.T) {
+func TestParseMarkerBlocksHonoursTheMarkerSize(t *testing.T) {
 	t.Parallel()
 	text := "<<<<<<<<<< HEAD\ncur\n==========\ninc\n>>>>>>>>>> side\n<<<<<<< x\n=======\n>>>>>>> y\n"
 
@@ -46,7 +48,7 @@ func TestFR_CONF_05_ParseMarkerBlocksHonoursTheMarkerSize(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_05_ParseMarkerBlocksIgnoresIncompleteBlocks(t *testing.T) {
+func TestParseMarkerBlocksIgnoresIncompleteBlocks(t *testing.T) {
 	t.Parallel()
 	text := "<<<<<<< HEAD\ncur\n=======\ninc\n<<<<<<< HEAD\na\n=======\nb\n>>>>>>> side\n<<<<<<< HEAD\nno end\n"
 
@@ -57,7 +59,7 @@ func TestFR_CONF_05_ParseMarkerBlocksIgnoresIncompleteBlocks(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_05_ParseMarkerBlocksIgnoresALoneSeparator(t *testing.T) {
+func TestParseMarkerBlocksIgnoresALoneSeparator(t *testing.T) {
 	t.Parallel()
 
 	blocks := parseMarkerBlocks("title\n=======\ntext\n<<<<<<<< not a marker\n", 7)
@@ -112,7 +114,7 @@ const (
 	twoConflictsIncoming = "top\ni1\nf1\nf2\nf3\nf4\nM1\nM2\nM3\nf5\nf6\nf7\nf8\ni2\nbottom\n"
 )
 
-func TestFR_CONF_05_ConflictRegionsWithZdiff3AndAnIncomingOnlyChangeBetween(t *testing.T) {
+func TestConflictRegionsWithZdiff3AndAnIncomingOnlyChangeBetween(t *testing.T) {
 	t.Parallel()
 	dir := divergedRepo(t, "a.txt", version(twoConflictsBase), version(twoConflictsCurrent), version(twoConflictsIncoming))
 	gittest.Run(t, dir, "config", "merge.conflictStyle", "zdiff3")
@@ -124,7 +126,7 @@ func TestFR_CONF_05_ConflictRegionsWithZdiff3AndAnIncomingOnlyChangeBetween(t *t
 	assertRegions(t, got, wantRegion{"x1\n", "c1\n", "i1\n"}, wantRegion{"x2\n", "c2a\nc2b\n", "i2\n"})
 }
 
-func TestFR_CONF_05_ConflictRegionsSkipABlockTheUserResolved(t *testing.T) {
+func TestConflictRegionsSkipABlockTheUserResolved(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version(twoConflictsBase), version(twoConflictsCurrent), version(twoConflictsIncoming))
 	path := filepath.Join(dir, "a.txt")
@@ -144,7 +146,7 @@ func TestFR_CONF_05_ConflictRegionsSkipABlockTheUserResolved(t *testing.T) {
 	assertRegions(t, got, wantRegion{"x2\n", "c2a\nc2b\n", "i2\n"})
 }
 
-func TestFR_CONF_05_ConflictRegionsUseTheMarkerSizeAttribute(t *testing.T) {
+func TestConflictRegionsUseTheMarkerSizeAttribute(t *testing.T) {
 	t.Parallel()
 	dir := gittest.New(t).Dir
 	commitVersion(t, dir, ".gitattributes", version("* conflict-marker-size=10\n"), "attributes")
@@ -164,7 +166,7 @@ func TestFR_CONF_05_ConflictRegionsUseTheMarkerSizeAttribute(t *testing.T) {
 	assertRegions(t, got, wantRegion{"base\n", "current\n", "incoming\n"})
 }
 
-func TestFR_CONF_05_ConflictRegionsIgnoreTheDiffAttribute(t *testing.T) {
+func TestConflictRegionsIgnoreTheDiffAttribute(t *testing.T) {
 	t.Parallel()
 	dir := gittest.New(t).Dir
 	commitVersion(t, dir, ".gitattributes", version("* -diff\n"), "attributes")

@@ -1,3 +1,4 @@
+// Requirements: FR-BR-05
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -24,7 +25,7 @@ describe('BranchInWorktreeDialog', () => {
     AppService.SelectWorktree.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-BR-05 names the branch and the worktree, and shows the full path', async () => {
+  it('names the branch and the worktree, and shows the full path', async () => {
     const { body } = await mountDialog()
 
     expect(body.get('.p-dialog').text()).toContain('/home/u/r-side')
@@ -50,18 +51,15 @@ describe('BranchInWorktreeDialog', () => {
       title: 'Branch in use elsewhere',
       sentence: 'side is being bisected in the worktree r-side',
     },
-  ])(
-    'FR-BR-05 names the branch $state in the other worktree',
-    async ({ inUse, title, sentence }) => {
-      const { body } = await mountDialog({ inUse })
+  ])('names the branch $state in the other worktree', async ({ inUse, title, sentence }) => {
+    const { body } = await mountDialog({ inUse })
 
-      const text = body.get('.p-dialog').text()
-      expect(text).toContain(title)
-      expect(text).toContain(sentence)
-    },
-  )
+    const text = body.get('.p-dialog').text()
+    expect(text).toContain(title)
+    expect(text).toContain(sentence)
+  })
 
-  it('FR-BR-05 switches to the worktree and closes', async () => {
+  it('switches to the worktree and closes', async () => {
     const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="branch-in-worktree-confirm"]').trigger('click')
@@ -71,7 +69,7 @@ describe('BranchInWorktreeDialog', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  it("FR-BR-05 a WSL window switches by the branch's worktree UNC path", async () => {
+  it("a WSL window switches by the branch's worktree UNC path", async () => {
     const { body } = await mountDialog({ distro: 'Ubuntu' })
 
     await body.get('[data-test="branch-in-worktree-confirm"]').trigger('click')
@@ -82,7 +80,7 @@ describe('BranchInWorktreeDialog', () => {
     )
   })
 
-  it('FR-BR-05 a rejection shows in the banner and keeps the dialog open', async () => {
+  it('a rejection shows in the banner and keeps the dialog open', async () => {
     AppService.SelectWorktree.mockRejectedValueOnce(wailsError('worktree is gone'))
     const { wrapper, body } = await mountDialog()
 
@@ -93,7 +91,7 @@ describe('BranchInWorktreeDialog', () => {
     expect(wrapper.emitted('close')).toBeUndefined()
   })
 
-  it('FR-BR-05 Cancel closes without calling SelectWorktree', async () => {
+  it('Cancel closes without calling SelectWorktree', async () => {
     const { wrapper, body } = await mountDialog()
 
     await body.get('[data-test="branch-in-worktree-cancel"]').trigger('click')

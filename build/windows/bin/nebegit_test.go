@@ -1,3 +1,5 @@
+// Requirements: FR-REPO-06
+
 // Package bin_test runs the nebegit and nebegit.cmd wrapper scripts under a
 // fake nebegit.exe and a fake wslpath, without a real Windows or WSL setup.
 package bin_test
@@ -114,7 +116,7 @@ func readArgvEventually(t *testing.T, dir string) string {
 	return ""
 }
 
-func TestFR_REPO_06_ScriptArgv(t *testing.T) {
+func TestScriptArgv(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -166,7 +168,7 @@ func TestFR_REPO_06_ScriptArgv(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_06_ScriptExitsWithoutWaitingForTheApp(t *testing.T) {
+func TestScriptExitsWithoutWaitingForTheApp(t *testing.T) {
 	t.Parallel()
 	skipOnWindows(t)
 	dir, _ := newApp(t, "nebegit", 0o755)
@@ -180,7 +182,7 @@ func TestFR_REPO_06_ScriptExitsWithoutWaitingForTheApp(t *testing.T) {
 	readArgvEventually(t, dir)
 }
 
-func TestFR_REPO_06_ScriptFailsWhenWslpathFails(t *testing.T) {
+func TestScriptFailsWhenWslpathFails(t *testing.T) {
 	t.Parallel()
 	skipOnWindows(t)
 	dir, _ := newApp(t, "nebegit", 0o755)

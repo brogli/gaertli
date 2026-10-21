@@ -1,3 +1,5 @@
+// Requirements: DIST-03
+
 package services
 
 import (
@@ -6,7 +8,7 @@ import (
 	"github.com/brogli/nebegit/internal/buildinfo"
 )
 
-func TestDIST_03_VersionReturnsAppAndCommit(t *testing.T) {
+func TestVersionReturnsAppAndCommit(t *testing.T) {
 	origApp, origCommit := buildinfo.App, buildinfo.Commit
 	buildinfo.App, buildinfo.Commit = "0.1.57", "abc1234"
 	t.Cleanup(func() { buildinfo.App, buildinfo.Commit = origApp, origCommit })

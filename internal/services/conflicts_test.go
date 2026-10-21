@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-01, FR-CONF-03, FR-CONF-04, FR-CP-03, FR-CP-07, FR-RV-03, QA-COMP-01
+
 package services
 
 import (
@@ -91,7 +93,7 @@ func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.Operat
 	}
 }
 
-func TestFR_CONF_04_FR_CP_03_FR_RV_03_ContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
+func TestContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
@@ -124,7 +126,7 @@ var operationStateFile = map[string]string{
 	"revert":      "REVERT_HEAD",
 }
 
-func TestFR_CONF_04_AbortOperationRestoresTheFreshStop(t *testing.T) {
+func TestAbortOperationRestoresTheFreshStop(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
@@ -154,7 +156,7 @@ func TestFR_CONF_04_AbortOperationRestoresTheFreshStop(t *testing.T) {
 // An abort never commits, so it runs in the user's editor environment.
 // Every abort runs the reference-transaction hook, which sees the
 // environment the call got.
-func TestTR_09_AbortOperationKeepsTheUsersEditorEnvironment(t *testing.T) {
+func TestAbortOperationKeepsTheUsersEditorEnvironment(t *testing.T) {
 	unsetEditorEnv(t)
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
@@ -178,7 +180,7 @@ func TestTR_09_AbortOperationKeepsTheUsersEditorEnvironment(t *testing.T) {
 // A sequence started outside the app with --edit keeps that choice: a
 // skip commits each remaining commit with a message, and must not wait on
 // the user's editor for it.
-func TestTR_09_SkipOperationNeverWaitsOnAnEditorTheSequenceAsksFor(t *testing.T) {
+func TestSkipOperationNeverWaitsOnAnEditorTheSequenceAsksFor(t *testing.T) {
 	unsetEditorEnv(t)
 	repo := gittest.New(t)
 	dir := repo.Dir
@@ -222,7 +224,7 @@ func unsetEditorEnv(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_04_ContinueAbortAndSkipOperationSayNoOperationIsInProgress(t *testing.T) {
+func TestContinueAbortAndSkipOperationSayNoOperationIsInProgress(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "a.txt", "a", "first")
@@ -250,7 +252,7 @@ var unresolvedMessage = map[string]string{
 	"revert":      "unresolved conflict",
 }
 
-func TestFR_CONF_04_ContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
+func TestContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
@@ -274,7 +276,7 @@ func TestFR_CONF_04_ContinueOperationRefusesWhileAConflictedFileRemains(t *testi
 	}
 }
 
-func TestFR_CONF_04_AContinueThatStopsForAnotherReasonThanAConflictIsAStop(t *testing.T) {
+func TestAContinueThatStopsForAnotherReasonThanAConflictIsAStop(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -294,7 +296,7 @@ func TestFR_CONF_04_AContinueThatStopsForAnotherReasonThanAConflictIsAStop(t *te
 	}
 }
 
-func TestFR_CONF_01_SummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T) {
+func TestSummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
 		t.Run(kind, func(t *testing.T) {
@@ -311,7 +313,7 @@ func TestFR_CONF_01_SummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T
 	}
 }
 
-func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *testing.T) {
+func TestStageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "conflict.txt", "base\n", "base")
@@ -353,7 +355,7 @@ func TestFR_CONF_03_StageFileResolvesAnOrdinaryConflictAndContinueCompletes(t *t
 	assertOperation(t, c, wt, "")
 }
 
-func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *testing.T) {
+func TestStageFileResolvesADeleteConflictAndContinueCompletes(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "shared.txt", "base\n", "base")
@@ -396,7 +398,7 @@ func TestFR_CONF_03_StageFileResolvesADeleteConflictAndContinueCompletes(t *test
 	assertOperation(t, c, wt, "")
 }
 
-func TestFR_CP_07_SkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheSurvivor(t *testing.T) {
+func TestSkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheSurvivor(t *testing.T) {
 	repo := gittest.New(t)
 	dir := repo.Dir
 	gittest.Commit(t, dir, "conflict.txt", "orig\n", "base")
@@ -437,7 +439,7 @@ func TestFR_CP_07_SkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheS
 	}
 }
 
-func TestFR_CP_07_SkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvivor(t *testing.T) {
+func TestSkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvivor(t *testing.T) {
 	repo := gittest.New(t)
 	dir := repo.Dir
 	gittest.Commit(t, dir, "conflict.txt", "base\n", "base")
@@ -477,7 +479,7 @@ func TestFR_CP_07_SkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvi
 	}
 }
 
-func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
+func TestSkipOperationOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
 	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "cherry-pick")
 
@@ -494,7 +496,7 @@ func TestFR_CP_07_SkipOperationOnTheLastPendingCommitClearsTheOperationWithNothi
 	assertOperation(t, c, wt, "")
 }
 
-func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
+func TestSkipOperationRevertOnTheLastPendingCommitClearsTheOperationWithNothingLeftToApply(t *testing.T) {
 	t.Parallel()
 	dir, c, wt, beforeHEAD := stoppedRepo(t, "revert")
 
@@ -511,7 +513,7 @@ func TestFR_CP_07_SkipOperationRevertOnTheLastPendingCommitClearsTheOperationWit
 	assertOperation(t, c, wt, "")
 }
 
-func TestFR_CP_07_SkipOperationMidMergeSaysAMergeCannotBeSkipped(t *testing.T) {
+func TestSkipOperationMidMergeSaysAMergeCannotBeSkipped(t *testing.T) {
 	t.Parallel()
 	dir, c, wt, _ := stoppedRepo(t, "merge")
 	rec := recordCommands(t, c, wt)

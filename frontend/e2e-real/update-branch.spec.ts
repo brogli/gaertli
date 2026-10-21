@@ -1,3 +1,4 @@
+// Requirements: FR-UPD-01, FR-UPD-02, FR-UPD-05
 import fs from 'node:fs'
 import path from 'node:path'
 import { test, expect } from './fixtures'
@@ -15,7 +16,7 @@ import {
 // Updating local branches other than work's own from their upstreams,
 // with other pushing the new commits to the remote.
 
-test('FR-UPD-01 FR-UPD-05 Update from upstream fast-forwards a branch that is not checked out and names the result; the current branch and files stay; a second update says up to date', async ({
+test('Update from upstream fast-forwards a branch that is not checked out and names the result; the current branch and files stay; a second update says up to date', async ({
   openApp,
   repos,
   git,
@@ -44,7 +45,7 @@ test('FR-UPD-01 FR-UPD-05 Update from upstream fast-forwards a branch that is no
   await expect(notice(app)).toContainText('B is up to date')
 })
 
-test('FR-UPD-02 an update runs as a background job while the app stays usable', async ({
+test('an update runs as a background job while the app stays usable', async ({
   openApp,
   repos,
   git,

@@ -1,3 +1,5 @@
+// Requirements: FR-REPO-04
+
 package watch
 
 import (
@@ -7,7 +9,7 @@ import (
 	"github.com/brogli/nebegit/internal/core"
 )
 
-func TestFR_REPO_04_ClassifyMapsPathsToTheirScope(t *testing.T) {
+func TestClassifyMapsPathsToTheirScope(t *testing.T) {
 	commonDir := "/repo/.git"
 	cases := []struct {
 		path      string

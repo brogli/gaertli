@@ -1,3 +1,4 @@
+// Requirements: FR-DIFF-07
 import { describe, expect, it } from 'vitest'
 import { DiffKind, diffWindowQuery } from '../diffTarget'
 
@@ -57,15 +58,12 @@ describe('diffWindowQuery', () => {
         oldPath: '',
       },
     ],
-  ])(
-    'FR-DIFF-07 reads the worktree and the target from the URL the shell builds: %s',
-    (search, target) => {
-      expect(diffWindowQuery(query(search))).toEqual({ wt: '/repo', target })
-    },
-  )
+  ])('reads the worktree and the target from the URL the shell builds: %s', (search, target) => {
+    expect(diffWindowQuery(query(search))).toEqual({ wt: '/repo', target })
+  })
 
   it.each(['path=/repo', 'view=diff&kind=commit&sha=abc', 'view=diff&wt=/repo&kind=bogus'])(
-    'FR-DIFF-07 %s is no diff window',
+    '%s is no diff window',
     (search) => {
       expect(diffWindowQuery(query(search))).toBeNull()
     },

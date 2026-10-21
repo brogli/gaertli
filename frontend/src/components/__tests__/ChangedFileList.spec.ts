@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-02, FR-CHG-10, FR-CMP-02, FR-DIFF-07, FR-ED-02, FR-UX-09, FR-UX-11, FR-UX-13
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import ChangedFileList from '../ChangedFileList.vue'
@@ -8,7 +9,7 @@ const files = [
 ]
 
 describe('ChangedFileList', () => {
-  it('FR-CMP-02 clicking a file row emits select with that file', async () => {
+  it('clicking a file row emits select with that file', async () => {
     const wrapper = mount(ChangedFileList, { props: { files } })
 
     await wrapper.findAll('li')[1]!.trigger('click')
@@ -16,7 +17,7 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('select')?.[0]).toEqual([files[1]])
   })
 
-  it('FR-CMP-02 marks the selected file with a selected class', () => {
+  it('marks the selected file with a selected class', () => {
     const wrapper = mount(ChangedFileList, { props: { files, selected: files[1]! } })
 
     const rows = wrapper.findAll('li')
@@ -24,7 +25,7 @@ describe('ChangedFileList', () => {
     expect(rows[1]!.classes()).toContain('selected')
   })
 
-  it('FR-CMP-02 double-clicking a file row emits open with that file', async () => {
+  it('double-clicking a file row emits open with that file', async () => {
     const wrapper = mount(ChangedFileList, { props: { files } })
 
     await wrapper.findAll('li')[1]!.trigger('dblclick')
@@ -32,7 +33,7 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('open')?.[0]).toEqual([files[1]])
   })
 
-  it('FR-DIFF-07 Enter on a focused row emits open with that file; Enter on its button does not', async () => {
+  it('Enter on a focused row emits open with that file; Enter on its button does not', async () => {
     const wrapper = mount(ChangedFileList, { props: { files } })
     const row = wrapper.findAll('li')[1]!
 
@@ -43,7 +44,7 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('open')).toEqual([[files[1]]])
   })
 
-  it('FR-ED-02 clicking a file row\'s "Open in editor" control emits open-editor with that file, not select', async () => {
+  it('clicking a file row\'s "Open in editor" control emits open-editor with that file, not select', async () => {
     const wrapper = mount(ChangedFileList, { props: { files } })
 
     await wrapper.findAll('[data-test="open-editor"]')[1]!.trigger('click')
@@ -52,13 +53,13 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
   })
 
-  it('FR-CHG-02 renders no action button without an action kind', () => {
+  it('renders no action button without an action kind', () => {
     const wrapper = mount(ChangedFileList, { props: { files } })
 
     expect(wrapper.find('[data-test="action"]').exists()).toBe(false)
   })
 
-  it("FR-CHG-02 clicking a row's action button emits action with that file, not select", async () => {
+  it("clicking a row's action button emits action with that file, not select", async () => {
     const wrapper = mount(ChangedFileList, { props: { files, action: 'stage' } })
 
     await wrapper.findAll('[data-test="action"]')[1]!.trigger('click')
@@ -67,13 +68,13 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
   })
 
-  it('FR-CHG-10 renders no second action button without a second action kind', () => {
+  it('renders no second action button without a second action kind', () => {
     const wrapper = mount(ChangedFileList, { props: { files, action: 'stage' } })
 
     expect(wrapper.find('[data-test="second-action"]').exists()).toBe(false)
   })
 
-  it("FR-CHG-10 clicking a row's second action button emits second-action with that file, not select or action", async () => {
+  it("clicking a row's second action button emits second-action with that file, not select or action", async () => {
     const wrapper = mount(ChangedFileList, {
       props: { files, action: 'stage', secondAction: () => 'discard' },
     })
@@ -85,7 +86,7 @@ describe('ChangedFileList', () => {
     expect(wrapper.emitted('action')).toBeUndefined()
   })
 
-  it("FR-UX-09 every action button has a title and aria-label naming it, and the name's title is the full path", () => {
+  it("every action button has a title and aria-label naming it, and the name's title is the full path", () => {
     const wrapper = mount(ChangedFileList, {
       props: { files, action: 'stage', secondAction: () => 'discard' },
     })
@@ -103,7 +104,7 @@ describe('ChangedFileList', () => {
     expect(row.get('.path').attributes('title')).toBe('b.txt')
   })
 
-  it("FR-CHG-02 the action button is the row's first element, before the status icon; open-in-editor and the second action stay at its end; a row with no action kind starts with the status icon", () => {
+  it("the action button is the row's first element, before the status icon; open-in-editor and the second action stay at its end; a row with no action kind starts with the status icon", () => {
     const withActions = mount(ChangedFileList, {
       props: { files, action: 'unstage', secondAction: () => 'discard' },
     })
@@ -122,7 +123,7 @@ describe('ChangedFileList', () => {
     expect(plain.findAll('li')[1]!.element.children[0]!.className).toContain('status')
   })
 
-  it('FR-UX-11 the action button icon and label come from the action kind, not the caller’s own text', () => {
+  it('the action button icon and label come from the action kind, not the caller’s own text', () => {
     const stage = mount(ChangedFileList, { props: { files, action: 'stage' } })
     const markResolved = mount(ChangedFileList, { props: { files, action: 'markResolved' } })
 
@@ -134,7 +135,7 @@ describe('ChangedFileList', () => {
     expect(resolveButton.attributes('aria-label')).toBe('Mark resolved')
   })
 
-  it('FR-UX-13 each row shows its status as an icon with the label as its tooltip, not the status letter', () => {
+  it('each row shows its status as an icon with the label as its tooltip, not the status letter', () => {
     const wrapper = mount(ChangedFileList, {
       props: { files: [{ path: 'a.txt', status: 'M' }, files[1]!] },
     })

@@ -1,5 +1,7 @@
 //go:build server
 
+// Requirements: QA-MNT-02
+
 package app
 
 import (
@@ -74,7 +76,7 @@ func waitFor(t *testing.T, cond func() bool) {
 	}
 }
 
-func TestTR_31_ServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
+func TestServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
 	f := &fakeBrowser{}
 	hold := newTestHold(f)
 
@@ -101,7 +103,7 @@ func TestTR_31_ServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
 	}
 }
 
-func TestTR_31_ServerPageDropsHeldEventsOfAGonePage(t *testing.T) {
+func TestServerPageDropsHeldEventsOfAGonePage(t *testing.T) {
 	f := &fakeBrowser{}
 	hold := newTestHold(f)
 	hold.giveUp = 20 * time.Millisecond

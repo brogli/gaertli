@@ -1,3 +1,4 @@
+// Requirements: FR-CMP-01, FR-CMP-02, FR-CMP-03, FR-CMP-05, FR-ED-02, FR-LOG-16
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,7 +41,7 @@ describe('CompareView', () => {
     Facade.OpenFile.mockReset().mockResolvedValue(undefined)
   })
 
-  it('FR-CMP-01, FR-CMP-03 shows both commits short SHAs in from->to order and the changed files', async () => {
+  it('shows both commits short SHAs in from->to order and the changed files', async () => {
     const { wrapper } = await mountComparing([
       { path: 'a.txt', status: 'M' },
       { path: 'b.txt', status: 'A' },
@@ -52,7 +53,7 @@ describe('CompareView', () => {
     expect(wrapper.findAll('.files li')).toHaveLength(2)
   })
 
-  it("FR-CMP-05 each side's box holds its short hash in its colour, not older or newer", async () => {
+  it("each side's box holds its short hash in its colour, not older or newer", async () => {
     const { wrapper } = await mountComparing()
 
     const fromTag = wrapper.get('[data-test="from-tag"]')
@@ -66,7 +67,7 @@ describe('CompareView', () => {
     expect(wrapper.get('header').text()).not.toMatch(/older|newer/)
   })
 
-  it('FR-CMP-03 clicking swap reverses the comparison direction; the boxes keep their colours, the hashes in them swap', async () => {
+  it('clicking swap reverses the comparison direction; the boxes keep their colours, the hashes in them swap', async () => {
     const { wrapper } = await mountComparing()
     Facade.CompareCommits.mockClear()
 
@@ -82,7 +83,7 @@ describe('CompareView', () => {
     expect(toTag.classes()).toContain('to')
   })
 
-  it('FR-CMP-01 the close button names its shortcut in the tooltip, not in aria-label; pressing Escape exits the comparison', async () => {
+  it('the close button names its shortcut in the tooltip, not in aria-label; pressing Escape exits the comparison', async () => {
     const { wrapper, log } = await mountComparing()
 
     const exit = wrapper.get('[data-test="exit"]')
@@ -94,7 +95,7 @@ describe('CompareView', () => {
     expect(log.selection).toEqual([])
   })
 
-  it('FR-CMP-02 a double-click on a file opens it in the diff window', async () => {
+  it('a double-click on a file opens it in the diff window', async () => {
     const { wrapper } = await mountComparing([
       { path: 'a.txt', status: 'M' },
       { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
@@ -112,7 +113,7 @@ describe('CompareView', () => {
     })
   })
 
-  it("FR-LOG-16 a comparison's files switch to the folder tree, where a double-click opens a file", async () => {
+  it("a comparison's files switch to the folder tree, where a double-click opens a file", async () => {
     const { wrapper } = await mountComparing([{ path: 'src/b.txt', status: 'M' }])
 
     await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
@@ -129,7 +130,7 @@ describe('CompareView', () => {
     })
   })
 
-  it('FR-ED-02 an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
+  it('an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
     const { wrapper } = await mountComparing([
       { path: 'a.txt', status: 'M' },
       { path: 'b.txt', status: 'A' },

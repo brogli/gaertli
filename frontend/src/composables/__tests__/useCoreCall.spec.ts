@@ -1,10 +1,11 @@
+// Requirements: FR-UX-16
 import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { Code } from '../../../bindings/github.com/brogli/nebegit/internal/core'
 import { useCoreCall } from '../useCoreCall'
 
 describe('useCoreCall', () => {
-  it('FR-UX-16 a LOCKED rejection carries a retry that re-runs the same call', async () => {
+  it('a LOCKED rejection carries a retry that re-runs the same call', async () => {
     const call = vi
       .fn()
       .mockRejectedValueOnce({ cause: { code: Code.Locked, message: 'locked' } })
@@ -22,7 +23,7 @@ describe('useCoreCall', () => {
     expect(error.value).toBeNull()
   })
 
-  it('FR-UX-16 a non-LOCKED rejection carries no retry', async () => {
+  it('a non-LOCKED rejection carries no retry', async () => {
     const call = vi.fn().mockRejectedValueOnce({ cause: { code: Code.GitFailed, message: 'x' } })
     const { error, run } = useCoreCall()
 

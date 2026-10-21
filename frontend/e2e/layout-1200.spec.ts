@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-12, FR-DIFF-02, FR-UX-07, FR-UX-08, FR-UX-09, FR-UX-14
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { expectNoOverlap, mockDiffUrl, openMockRepo, switchToChanges } from './helpers'
 
@@ -36,7 +37,7 @@ function expectInWindow(box: { x: number; y: number; width: number; height: numb
   expect(box.y + box.height).toBeLessThanOrEqual(800)
 }
 
-test('FR-UX-07 FR-UX-14 each picker opens inside the window, scrolls only vertically, its rows on one line each, and Escape closes it', async ({
+test('each picker opens inside the window, scrolls only vertically, its rows on one line each, and Escape closes it', async ({
   page,
 }) => {
   await openMockRepo(page)
@@ -60,7 +61,7 @@ test('FR-UX-07 FR-UX-14 each picker opens inside the window, scrolls only vertic
   }
 })
 
-test('FR-UX-08 the log is the left column; a switch above it picks Details or Changes to its right', async ({
+test('the log is the left column; a switch above it picks Details or Changes to its right', async ({
   page,
 }) => {
   await openMockRepo(page)
@@ -76,7 +77,7 @@ test('FR-UX-08 the log is the left column; a switch above it picks Details or Ch
   expect(changes.y + changes.height).toBeLessThanOrEqual(800)
 })
 
-test('FR-UX-09 the diff toolbar shares one row', async ({ page }) => {
+test('the diff toolbar shares one row', async ({ page }) => {
   await openDiffWindow(page)
 
   const tops = await Promise.all(
@@ -87,7 +88,7 @@ test('FR-UX-09 the diff toolbar shares one row', async ({ page }) => {
   expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(4)
 })
 
-test('FR-UX-09 commit-box checkboxes align with their label text', async ({ page }) => {
+test('commit-box checkboxes align with their label text', async ({ page }) => {
   await openMockRepo(page)
   await switchToChanges(page)
   await page.locator('.commit-box label').first().waitFor()
@@ -100,9 +101,7 @@ test('FR-UX-09 commit-box checkboxes align with their label text', async ({ page
   }
 })
 
-test('FR-CHG-12 the commit message field shows at least six lines without scrolling', async ({
-  page,
-}) => {
+test('the commit message field shows at least six lines without scrolling', async ({ page }) => {
   await openMockRepo(page)
   await switchToChanges(page)
 
@@ -120,7 +119,7 @@ test('FR-CHG-12 the commit message field shows at least six lines without scroll
   expect(textHeight).toBeGreaterThanOrEqual(6 * Math.floor(lineHeight))
 })
 
-test('FR-DIFF-02 the diff toolbar stays in sight while a long diff scrolls', async ({ page }) => {
+test('the diff toolbar stays in sight while a long diff scrolls', async ({ page }) => {
   await openDiffWindow(page)
 
   await page.locator('.diff-view').evaluate((el) => (el.scrollTop = el.scrollHeight))
@@ -130,7 +129,7 @@ test('FR-DIFF-02 the diff toolbar stays in sight while a long diff scrolls', asy
   expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(view.y + view.height)
 })
 
-test('FR-UX-09 opening Settings shows a dialog without moving the log view', async ({ page }) => {
+test('opening Settings shows a dialog without moving the log view', async ({ page }) => {
   await openMockRepo(page)
   const beforeY = (await stableBox(page.locator('.log-column'))).y
 
@@ -141,9 +140,7 @@ test('FR-UX-09 opening Settings shows a dialog without moving the log view', asy
   expect(afterY).toBe(beforeY)
 })
 
-test('FR-UX-09 the log filter bar keeps its four fields on one row, none overlapping', async ({
-  page,
-}) => {
+test('the log filter bar keeps its four fields on one row, none overlapping', async ({ page }) => {
   await openMockRepo(page)
 
   const fields = page.locator('.filter-bar > *')

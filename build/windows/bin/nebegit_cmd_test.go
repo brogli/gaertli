@@ -1,5 +1,7 @@
 //go:build windows
 
+// Requirements: FR-REPO-06
+
 // This file builds only on Windows: it runs nebegit.cmd through cmd.exe,
 // which the other CI jobs do not have.
 package bin_test
@@ -11,7 +13,7 @@ import (
 	"testing"
 )
 
-func TestFR_REPO_06_CmdScriptStartsTheAppDetached(t *testing.T) {
+func TestCmdScriptStartsTheAppDetached(t *testing.T) {
 	t.Parallel()
 	dir, scriptPath := newApp(t, "nebegit.cmd", 0o644)
 

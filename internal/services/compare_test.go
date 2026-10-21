@@ -1,3 +1,5 @@
+// Requirements: FR-CMP-01, FR-CMP-02, FR-CMP-03, FR-CMP-04
+
 package services
 
 import (
@@ -27,7 +29,7 @@ func openCompareRepo(t *testing.T) (*gittest.Repo, *Core, core.WorktreeID) {
 	return repo, c, wt
 }
 
-func TestFR_CMP_01_FR_CMP_03_CompareCommitsListsEveryStatusAndSwappingMirrorsThem(t *testing.T) {
+func TestCompareCommitsListsEveryStatusAndSwappingMirrorsThem(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
@@ -84,7 +86,7 @@ func TestFR_CMP_01_FR_CMP_03_CompareCommitsListsEveryStatusAndSwappingMirrorsThe
 	}
 }
 
-func TestFR_CMP_01_CompareCommitsSameCommitIsEmpty(t *testing.T) {
+func TestCompareCommitsSameCommitIsEmpty(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
@@ -99,7 +101,7 @@ func TestFR_CMP_01_CompareCommitsSameCommitIsEmpty(t *testing.T) {
 	}
 }
 
-func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
+func TestDiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "other", "unrelated", "add other")
@@ -119,7 +121,7 @@ func TestFR_CMP_02_DiffRangeOnFileAddedBetweenTheTwoCommits(t *testing.T) {
 // A rename git detects, with binary old content and text new content: the
 // binary check diffs old.dat against new.dat (binary if either side is), not
 // new.dat alone (an add, plain text).
-func TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTheNewOne(t *testing.T) {
+func TestDiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTheNewOne(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	base := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 50)[:2000]
@@ -138,7 +140,7 @@ func TestFR_CMP_04_DiffAgainstWorkingOnARenameChecksTheOldPathForBinaryNotJustTh
 	}
 }
 
-func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesAndLeavesOutUntrackedFiles(t *testing.T) {
+func TestCompareWithWorkingListsCommitsAndUnstagedChangesAndLeavesOutUntrackedFiles(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "f1", "one", "add f1")
@@ -163,7 +165,7 @@ func TestFR_CMP_04_CompareWithWorkingListsCommitsAndUnstagedChangesAndLeavesOutU
 	}
 }
 
-func TestFR_CMP_02_DiffRangeOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
+func TestDiffRangeOnEmbeddedNULByteIsBinaryWithNoContent(t *testing.T) {
 	t.Parallel()
 	repo, c, id := openCompareRepo(t)
 	gittest.Commit(t, repo.Dir, "bin.dat", "abc\x00def", "add binary file")

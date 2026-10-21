@@ -1,3 +1,5 @@
+// Requirements: FR-REPO-04, QA-COMP-02, QA-PERF-06
+
 package watch
 
 import (
@@ -25,7 +27,7 @@ func setInterval(t *testing.T, v *time.Duration, d time.Duration) {
 	t.Cleanup(func() { *v = orig })
 }
 
-func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
+func TestDebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		setInterval(t, &DebounceInterval, 20*time.Millisecond)
 
@@ -53,7 +55,7 @@ func TestFR_REPO_04_DebounceCoalescesBurstsIntoOncePerScope(t *testing.T) {
 	})
 }
 
-func TestQA_PERF_06_FallbackTickerCallsCheckNowAtABoundedRate(t *testing.T) {
+func TestFallbackTickerCallsCheckNowAtABoundedRate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		const interval = 20 * time.Millisecond
 		var count atomic.Int32
@@ -69,7 +71,7 @@ func TestQA_PERF_06_FallbackTickerCallsCheckNowAtABoundedRate(t *testing.T) {
 	})
 }
 
-func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromOutside(t *testing.T) {
+func TestRepoWatcherFiresOnRefsChangeFromOutside(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	_, got := watchRepo(t, repo)
@@ -92,10 +94,10 @@ func watchRepo(t *testing.T, repo *gittest.Repo) (*RepoWatcher, chan core.Change
 	return w, got
 }
 
-// TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromAConfigEditFromOutside
+// TestRepoWatcherFiresOnRefsChangeFromAConfigEditFromOutside
 // covers a terminal `git remote add` or `git branch -u`, which writes only
 // .git/config: PushTarget and Refs must reload to pick it up.
-func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromAConfigEditFromOutside(t *testing.T) {
+func TestRepoWatcherFiresOnRefsChangeFromAConfigEditFromOutside(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	_, got := watchRepo(t, repo)
@@ -105,7 +107,7 @@ func TestFR_REPO_04_RepoWatcherFiresOnRefsChangeFromAConfigEditFromOutside(t *te
 	waitForScope(t, got, core.RefsChanged)
 }
 
-func TestFR_REPO_04_RepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
+func TestRepoWatcherFiresOnStateDirCreatedDirectly(t *testing.T) {
 	repo := gittest.New(t)
 	_, got := watchRepo(t, repo)
 
@@ -127,7 +129,7 @@ func pollOnly(t *testing.T, commonDir string) (*RepoWatcher, chan core.ChangeSco
 	return w, got
 }
 
-func TestFR_REPO_04_FallbackPollReportsEachKindOfChange(t *testing.T) {
+func TestFallbackPollReportsEachKindOfChange(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		before func(gitDir string) error // the state the poll starts from
@@ -179,7 +181,7 @@ func TestFR_REPO_04_FallbackPollReportsEachKindOfChange(t *testing.T) {
 	}
 }
 
-func TestQA_COMP_02_RepoWatcherToleratesConcurrentReadsWhileWriting(t *testing.T) {
+func TestRepoWatcherToleratesConcurrentReadsWhileWriting(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
 	w, got := watchRepo(t, repo)

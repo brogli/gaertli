@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-01, FR-LOG-05, FR-LOG-08, FR-LOG-09, FR-REPO-04
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -47,7 +48,7 @@ describe('log store', () => {
     Events.On.mockReset()
   })
 
-  it('FR-LOG-01 rows(from, to) caches its window: a repeated request does not call LogRows again', async () => {
+  it('rows(from, to) caches its window: a repeated request does not call LogRows again', async () => {
     const log = useLogStore()
     await log.load('/repo')
 
@@ -73,7 +74,7 @@ describe('log store', () => {
     expect(Facade.LogRows).toHaveBeenCalledTimes(1)
   })
 
-  it("FR-LOG-09 a failed load's error shows for its own view until a newer progress", async () => {
+  it("a failed load's error shows for its own view until a newer progress", async () => {
     const log = useLogStore()
     await log.load('/repo')
     const failure = { code: 'GIT_FAILED', message: 'bad object HEAD' }
@@ -97,7 +98,7 @@ describe('log store', () => {
     expect(log.error).toBeNull()
   })
 
-  it("FR-LOG-09 another window's log:progress leaves this window's load as it is", async () => {
+  it("another window's log:progress leaves this window's load as it is", async () => {
     const log = useLogStore()
     await log.load('/repo')
     await log.rows(0, 1)
@@ -113,7 +114,7 @@ describe('log store', () => {
     expect(state()).toEqual(before)
   })
 
-  it('FR-REPO-04 calls ReloadLog on a refs repo:changed event, not on state', async () => {
+  it('calls ReloadLog on a refs repo:changed event, not on state', async () => {
     const log = useLogStore()
     await log.load('/repo')
 
@@ -125,7 +126,7 @@ describe('log store', () => {
     expect(Facade.ReloadLog).toHaveBeenCalledWith('/repo')
   })
 
-  it('FR-REPO-04 drops the row cache when Generation changes', async () => {
+  it('drops the row cache when Generation changes', async () => {
     const log = useLogStore()
     await log.load('/repo')
 
@@ -141,7 +142,7 @@ describe('log store', () => {
     expect(log.rowCache.has(0)).toBe(false)
   })
 
-  it('FR-REPO-04 a log:progress naming a new generation drops the cached rows, even at the same count', async () => {
+  it('a log:progress naming a new generation drops the cached rows, even at the same count', async () => {
     const log = useLogStore()
     await log.load('/repo')
     await log.rows(0, 1)
@@ -155,7 +156,7 @@ describe('log store', () => {
     expect(log.rowCache.get(0)?.sha).toBe('b')
   })
 
-  it('FR-REPO-04 rows fetched before a reload do not refill the cache after it', async () => {
+  it('rows fetched before a reload do not refill the cache after it', async () => {
     const log = useLogStore()
     await log.load('/repo')
     let resolve!: (value: unknown) => void
@@ -170,7 +171,7 @@ describe('log store', () => {
     expect(log.rowCache.has(0)).toBe(false)
   })
 
-  it('FR-LOG-01 jumpTo selects the row and sets pendingScrollTo when the sha is found', async () => {
+  it('jumpTo selects the row and sets pendingScrollTo when the sha is found', async () => {
     const log = useLogStore()
     await log.load('/repo')
     Facade.LogIndexOf.mockResolvedValue({ index: 7, found: true })
@@ -183,7 +184,7 @@ describe('log store', () => {
     expect(log.pendingScrollTo).toBe(7)
   })
 
-  it('FR-LOG-01 jumpTo is a no-op when the sha is not found', async () => {
+  it('jumpTo is a no-op when the sha is not found', async () => {
     const log = useLogStore()
     await log.load('/repo')
     Facade.LogIndexOf.mockResolvedValue({ index: 7, found: true })
@@ -198,7 +199,7 @@ describe('log store', () => {
     expect(log.pendingScrollTo).toBe(7)
   })
 
-  it('FR-LOG-05 knownAuthors dedupes and sorts every author seen in fetched rows', async () => {
+  it('knownAuthors dedupes and sorts every author seen in fetched rows', async () => {
     const log = useLogStore()
     await log.load('/repo')
     Facade.LogRows.mockResolvedValueOnce(
@@ -214,7 +215,7 @@ describe('log store', () => {
     expect(log.knownAuthors).toEqual(['Alice', 'Bob'])
   })
 
-  it('FR-REPO-04 a filtered log:progress naming a new generation drops the cached rows, even at the same count', async () => {
+  it('a filtered log:progress naming a new generation drops the cached rows, even at the same count', async () => {
     const log = useLogStore()
     await log.load('/repo')
     await log.applyFilter({ path: 'x' })
@@ -228,7 +229,7 @@ describe('log store', () => {
     expect(log.rowCache.size).toBe(0)
   })
 
-  it('FR-LOG-08 clearing a filter shows the base rows already fetched without refetching', async () => {
+  it('clearing a filter shows the base rows already fetched without refetching', async () => {
     const log = useLogStore()
     await log.load('/repo')
     await log.rows(0, 1)
@@ -241,7 +242,7 @@ describe('log store', () => {
     expect(Facade.LogRows).toHaveBeenCalledTimes(2)
   })
 
-  it('FR-LOG-05 a resolved search selects its first match and scrolls to it', async () => {
+  it('a resolved search selects its first match and scrolls to it', async () => {
     vi.useFakeTimers()
     try {
       const log = useLogStore()
@@ -261,7 +262,7 @@ describe('log store', () => {
     }
   })
 
-  it('FR-LOG-05 drops a stale search answer whose generation is older than the current view', async () => {
+  it('drops a stale search answer whose generation is older than the current view', async () => {
     vi.useFakeTimers()
     try {
       const log = useLogStore()
@@ -294,7 +295,7 @@ describe('log store', () => {
     }
   })
 
-  it('FR-LOG-05 drops a base-view search answer once a filter is active, even at a higher raw generation number', async () => {
+  it('drops a base-view search answer once a filter is active, even at a higher raw generation number', async () => {
     vi.useFakeTimers()
     try {
       const log = useLogStore()
@@ -334,7 +335,7 @@ describe('log store', () => {
     }
   })
 
-  it('FR-LOG-05 re-runs the search once the active view finishes loading, catching matches in rows that streamed in after', async () => {
+  it('re-runs the search once the active view finishes loading, catching matches in rows that streamed in after', async () => {
     vi.useFakeTimers()
     try {
       const log = useLogStore()
@@ -358,7 +359,7 @@ describe('log store', () => {
     }
   })
 
-  it('FR-LOG-05 nextMatch and prevMatch wrap at the ends', async () => {
+  it('nextMatch and prevMatch wrap at the ends', async () => {
     vi.useFakeTimers()
     try {
       const log = useLogStore()

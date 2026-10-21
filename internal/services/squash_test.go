@@ -1,3 +1,5 @@
+// Requirements: FR-LOG-14, FR-LOG-17, FR-LOG-19
+
 package services
 
 import (
@@ -56,7 +58,7 @@ func rawMessage(t *testing.T, dir, rev string) string {
 	return msg
 }
 
-func TestFR_LOG_14_SquashTodoPicksTheOldestFixesUpTheOthersAmendsThenReplaysTheRest(t *testing.T) {
+func TestSquashTodoPicksTheOldestFixesUpTheOthersAmendsThenReplaysTheRest(t *testing.T) {
 	t.Parallel()
 	chain := []string{"b", "c", "d", "e"}
 	selected := map[string]bool{"b": true, "d": true}
@@ -69,7 +71,7 @@ func TestFR_LOG_14_SquashTodoPicksTheOldestFixesUpTheOthersAmendsThenReplaysTheR
 	}
 }
 
-func TestFR_LOG_19_AnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
+func TestAnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
 	t.Parallel()
 	timedOut := core.Errorf(core.Cancelled, "context deadline exceeded")
 
@@ -77,7 +79,7 @@ func TestFR_LOG_19_AnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
 	coretest.AssertCode(t, asStop(core.Errorf(core.GitFailed, "could not apply"), true), core.Conflicts)
 }
 
-func TestFR_LOG_14_SquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldestsAuthor(t *testing.T) {
+func TestSquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldestsAuthor(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -103,7 +105,7 @@ func TestFR_LOG_14_SquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageA
 	}
 }
 
-func TestFR_LOG_14_FixupKeepsTheOldestMessageWhateverOrderTheShasCome(t *testing.T) {
+func TestFixupKeepsTheOldestMessageWhateverOrderTheShasCome(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -119,7 +121,7 @@ func TestFR_LOG_14_FixupKeepsTheOldestMessageWhateverOrderTheShasCome(t *testing
 	}
 }
 
-func TestFR_LOG_14_FixupIntoTheRootCommit(t *testing.T) {
+func TestFixupIntoTheRootCommit(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -138,7 +140,7 @@ func TestFR_LOG_14_FixupIntoTheRootCommit(t *testing.T) {
 const uncleanMessage = "amend! Subject\n\n# hash line\n; semicolon line\n\n\n\ntrailing  \t\n" +
 	"# ------------------------ >8 ------------------------\nbelow the scissors"
 
-func TestFR_LOG_14_TheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T) {
+func TestTheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T) {
 	t.Parallel()
 	original := gittest.New(t)
 	l := lineFixture(t, original.Dir)
@@ -165,7 +167,7 @@ func TestFR_LOG_14_TheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T)
 	}
 }
 
-func TestFR_LOG_14_FixupKeepsTheOldestMessageExactly(t *testing.T) {
+func TestFixupKeepsTheOldestMessageExactly(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	shas := gittest.History(t, repo.Dir,
@@ -198,7 +200,7 @@ func conflictLine(t *testing.T, dir string) (b, d string) {
 	return shas[1], shas[3]
 }
 
-func TestFR_LOG_19_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
+func TestAConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
@@ -245,7 +247,7 @@ func TestFR_LOG_19_AConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T
 	}
 }
 
-func TestFR_LOG_17_SquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
+func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -371,7 +373,7 @@ func TestFR_LOG_17_SquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing
 	})
 }
 
-func TestFR_LOG_14_SquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *testing.T) {
+func TestSquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *testing.T) {
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	gittest.Run(t, repo.Dir, "branch", "stacked", l.C)
@@ -398,7 +400,7 @@ func TestFR_LOG_14_SquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *
 	}
 }
 
-func TestFR_LOG_19_AStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
+func TestAStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name    string
@@ -456,7 +458,7 @@ func TestFR_LOG_19_AStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testin
 // reuses another's message (-C), as the todo's amend does.
 const refuseAmendHook = "[ \"$2\" = commit ] && { echo refusing >&2; exit 1; }\nexit 0\n"
 
-func TestFR_LOG_19_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
+func TestAFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
@@ -478,7 +480,7 @@ func TestFR_LOG_19_AFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 	assertHistory(t, repo.Dir, "E subject: e.txt", "C subject: c.txt", "Folded: b.txt d.txt", "base subject: base.txt")
 }
 
-func TestFR_LOG_19_ACommitMadeAfterTheCheckStopsTheRebaseInsteadOfBeingDropped(t *testing.T) {
+func TestACommitMadeAfterTheCheckStopsTheRebaseInsteadOfBeingDropped(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)

@@ -1,3 +1,4 @@
+// Requirements: FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-21
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -69,7 +70,7 @@ describe('WorktreeContent layouts', () => {
     window.innerWidth = DEFAULT_WIDTH
   })
 
-  it('FR-UX-08 wide (1600): all three views show side by side, no switch', async () => {
+  it('wide (1600): all three views show side by side, no switch', async () => {
     const wrapper = await mountAt(1600)
     await clickRow(wrapper)
 
@@ -79,7 +80,7 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
   })
 
-  it('FR-UX-21 medium (1200): the log shows beside a "Views" tablist [Details, Changes (4)] defaulting to Details; clicking Changes shows the changes view', async () => {
+  it('medium (1200): the log shows beside a "Views" tablist [Details, Changes (4)] defaulting to Details; clicking Changes shows the changes view', async () => {
     Facade.Status.mockResolvedValue(
       changedFilesFixture({
         unstaged: [
@@ -107,7 +108,7 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(true)
   })
 
-  it('FR-UX-08 medium (1200): clicking a commit switches the side panel back to Details', async () => {
+  it('medium (1200): clicking a commit switches the side panel back to Details', async () => {
     const wrapper = await mountAt(1200)
     await switchTo(wrapper, 'Changes')
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(true)
@@ -118,7 +119,7 @@ describe('WorktreeContent layouts', () => {
     expect(wrapper.findComponent(ChangesView).isVisible()).toBe(false)
   })
 
-  it('FR-UX-08 narrow (600): only the log view shows, switch [Log, Details, Changes] starting on Log', async () => {
+  it('narrow (600): only the log view shows, switch [Log, Details, Changes] starting on Log', async () => {
     const wrapper = await mountAt(600)
     await clickRow(wrapper)
 
@@ -134,7 +135,7 @@ describe('WorktreeContent layouts', () => {
     ])
   })
 
-  it('FR-UX-08 narrow (600): a click keeps the log view; a double-click switches to Details', async () => {
+  it('narrow (600): a click keeps the log view; a double-click switches to Details', async () => {
     const wrapper = await mountAt(600)
     await clickRow(wrapper)
     expect(wrapper.findComponent(LogView).isVisible()).toBe(true)
@@ -162,7 +163,7 @@ describe('WorktreeContent layouts', () => {
     },
   )
 
-  it('FR-UX-09 medium (1200): Fetch and Open in editor show icon only, with title and aria-label', async () => {
+  it('medium (1200): Fetch and Open in editor show icon only, with title and aria-label', async () => {
     Facade.Refs.mockResolvedValue({
       branches: [],
       remotes: [{ name: 'origin', branches: [] }],
@@ -178,7 +179,7 @@ describe('WorktreeContent layouts', () => {
     }
   })
 
-  it('FR-UX-05 Refresh names its shortcut in the tooltip, not in aria-label', async () => {
+  it('Refresh names its shortcut in the tooltip, not in aria-label', async () => {
     const wrapper = await mountAt(1200)
 
     const button = findButton(wrapper, 'Refresh')!
@@ -186,7 +187,7 @@ describe('WorktreeContent layouts', () => {
     expect(button.attributes('aria-label')).toBe('Refresh')
   })
 
-  it('FR-UX-09 medium (1200): "Create branch here" also shows icon only, with title and aria-label', async () => {
+  it('medium (1200): "Create branch here" also shows icon only, with title and aria-label', async () => {
     Facade.Summary.mockResolvedValue(summaryFixture({ branch: '', detached: true }))
     const wrapper = await mountAt(1200)
 
@@ -195,7 +196,7 @@ describe('WorktreeContent layouts', () => {
     expectIconOnly(button, 'Create branch here')
   })
 
-  it('FR-UX-21 narrow (600): switching to Changes and back keeps the commit message and the log list scroll position', async () => {
+  it('narrow (600): switching to Changes and back keeps the commit message and the log list scroll position', async () => {
     const wrapper = await mountAt(600)
     const logList = wrapper.get('.log-list').element
     logList.scrollTop = 42

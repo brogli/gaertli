@@ -1,3 +1,5 @@
+// Requirements: FR-SYNC-07, QA-RESP-01, QA-SAFE-04
+
 package session
 
 import (
@@ -12,7 +14,7 @@ import (
 	"github.com/brogli/nebegit/internal/jobs"
 )
 
-func TestFR_SYNC_07_RepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
+func TestRepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 	repo := gittest.New(t)
 	events := make(chan core.Event, 16)
 	m := NewManager(func(e core.Event) { events <- e })
@@ -57,7 +59,7 @@ func TestFR_SYNC_07_RepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 
 // A job whose fn takes the worktree lock is no bypass: a concurrent direct
 // Lock() waits for it.
-func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
+func TestJobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
 	// Real time: a goroutine blocked on the mutex keeps a synctest clock from advancing.
 	const hold = 60 * time.Millisecond
 	wt := &Worktree{}
@@ -85,7 +87,7 @@ func TestQA_SAFE_04_JobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T
 }
 
 // fetch and push touch refs and objects only, so their jobs take no lock.
-func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing.T) {
+func TestJobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
 
@@ -106,7 +108,7 @@ func TestQA_RESP_01_JobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing
 }
 
 // The fn's deferred Unlock runs once ctx.Done() unblocks it.
-func TestQA_SAFE_04_CancelReleasesAWorktreeLockHeldByTheJob(t *testing.T) {
+func TestCancelReleasesAWorktreeLockHeldByTheJob(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
 

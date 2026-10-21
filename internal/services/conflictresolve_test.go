@@ -1,3 +1,5 @@
+// Requirements: FR-CONF-07, FR-CONF-08
+
 package services
 
 import (
@@ -26,7 +28,7 @@ func unmergedList(t *testing.T, dir, path string) string {
 	return gittest.Out(t, dir, "ls-files", "-u", "--", path)
 }
 
-func TestFR_CONF_07_ResolveConflictRefusesAFileNoLongerConflicted(t *testing.T) {
+func TestResolveConflictRefusesAFileNoLongerConflicted(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "f", version("a\nbase\nz\n"), version("a\ncur\nz\n"), version("a\ninc\nz\n"))
 	gittest.Run(t, dir, "add", "--", "f")
@@ -42,7 +44,7 @@ func TestFR_CONF_07_ResolveConflictRefusesAFileNoLongerConflicted(t *testing.T) 
 	}
 }
 
-func TestFR_CONF_08_ReopenConflictRestoresASymlinkAsGitLeftIt(t *testing.T) {
+func TestReopenConflictRestoresASymlinkAsGitLeftIt(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("git on Windows does not create symlinks in the working tree")
@@ -79,7 +81,7 @@ func TestFR_CONF_08_ReopenConflictRestoresASymlinkAsGitLeftIt(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_08_ReopenConflictRefusesAFileStillConflicted(t *testing.T) {
+func TestReopenConflictRefusesAFileStillConflicted(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "f", version("base\n"), nil, version("incoming\n"))
 	gittest.Run(t, dir, "rm", "-q", "--", "f")
@@ -98,7 +100,7 @@ func TestFR_CONF_08_ReopenConflictRefusesAFileStillConflicted(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_08_ReopenConflictRestoresAFileTheCurrentSideDeletedAsGitLeftIt(t *testing.T) {
+func TestReopenConflictRestoresAFileTheCurrentSideDeletedAsGitLeftIt(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("base\n"), nil, version("incoming\n"))
 	gittest.Run(t, dir, "rm", "-q", "--", "a.txt")
@@ -132,7 +134,7 @@ func stoppedDir(t *testing.T, op, path string, base, current, incoming version) 
 	return dir
 }
 
-func TestFR_CONF_07_ResolveConflictTakesASideOrDeletes(t *testing.T) {
+func TestResolveConflictTakesASideOrDeletes(t *testing.T) {
 	t.Parallel()
 	shapes := map[string][3]version{
 		"binary UU": {version("a\x00b"), version("a\x00c"), version("a\x00d")},
@@ -186,7 +188,7 @@ func TestFR_CONF_07_ResolveConflictTakesASideOrDeletes(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_07_ResolveConflictRefusesAnUnknownChoice(t *testing.T) {
+func TestResolveConflictRefusesAnUnknownChoice(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := stoppedOn(t, "merge", "a.txt", version("a\nbase\n"), version("a\ncur\n"), version("a\ninc\n"))
 
@@ -221,7 +223,7 @@ func twoConflictsStopped(t *testing.T) (*Core, core.WorktreeID, string) {
 	return c, wt, dir
 }
 
-func TestFR_CONF_08_StatusListsResolvedFilesAndReopenConflictRestoresThem(t *testing.T) {
+func TestStatusListsResolvedFilesAndReopenConflictRestoresThem(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := twoConflictsStopped(t)
 	writeFile(t, dir, "t.txt", "resolved\n")
@@ -257,7 +259,7 @@ func TestFR_CONF_08_StatusListsResolvedFilesAndReopenConflictRestoresThem(t *tes
 	}
 }
 
-func TestFR_CONF_08_AConcludedMergeLeavesNothingToReopen(t *testing.T) {
+func TestAConcludedMergeLeavesNothingToReopen(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := twoConflictsStopped(t)
 	writeFile(t, dir, "t.txt", "resolved\n")
@@ -282,7 +284,7 @@ func TestFR_CONF_08_AConcludedMergeLeavesNothingToReopen(t *testing.T) {
 	}
 }
 
-func TestFR_CONF_08_ReopenConflictRefusesAFileThatNeverConflicted(t *testing.T) {
+func TestReopenConflictRefusesAFileThatNeverConflicted(t *testing.T) {
 	t.Parallel()
 	c, wt, dir := twoConflictsStopped(t)
 	writeFile(t, dir, "new.txt", "new\n")

@@ -1,3 +1,5 @@
+// Requirements: FR-ED-04, FR-ED-12
+
 package editor
 
 import (
@@ -5,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestFR_ED_04_SplitCommand(t *testing.T) {
+func TestSplitCommand(t *testing.T) {
 	tests := []struct {
 		name    string
 		in      string
@@ -37,7 +39,7 @@ func TestFR_ED_04_SplitCommand(t *testing.T) {
 	}
 }
 
-func TestFR_ED_12_SplitCommandWindowsRule(t *testing.T) {
+func TestSplitCommandWindowsRule(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string

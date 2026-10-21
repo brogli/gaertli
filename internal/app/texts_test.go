@@ -1,3 +1,5 @@
+// Requirements: FR-UX-11, QA-PORT-02
+
 package app
 
 import (
@@ -5,14 +7,14 @@ import (
 	"testing"
 )
 
-func TestFR_UX_11_TextFillsNamedPlaceholders(t *testing.T) {
+func TestTextFillsNamedPlaceholders(t *testing.T) {
 	got := text(worktreeTitle, map[string]string{"name": "project", "branch": "main"})
 	if want := "project [main]"; got != want {
 		t.Errorf("text(worktreeTitle, ...) = %q, want %q", got, want)
 	}
 }
 
-func TestQA_PORT_02_TheConsentNamesTheDistroAndOnlyTheHelper(t *testing.T) {
+func TestTheConsentNamesTheDistroAndOnlyTheHelper(t *testing.T) {
 	got := consentMessage("Ubuntu")
 
 	if !strings.Contains(got, "Ubuntu") {
@@ -25,7 +27,7 @@ func TestQA_PORT_02_TheConsentNamesTheDistroAndOnlyTheHelper(t *testing.T) {
 	}
 }
 
-func TestFR_UX_11_TextWithNoArgsReturnsThePlainEntry(t *testing.T) {
+func TestTextWithNoArgsReturnsThePlainEntry(t *testing.T) {
 	if got := text(appName, nil); got != "nebegit" {
 		t.Errorf("text(appName, nil) = %q, want %q", got, "nebegit")
 	}

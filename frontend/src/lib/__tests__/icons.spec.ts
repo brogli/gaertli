@@ -1,3 +1,4 @@
+// Requirements: FR-UX-13, QA-USE-04
 import { globSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { statusIcon } from '../icons'
@@ -15,11 +16,11 @@ describe('statusIcon', () => {
     ['T', 'sync', 'Type changed', 'muted'],
     ['?', 'question-circle', 'Untracked', 'muted'],
     ['U', 'exclamation-triangle', 'Conflicted', 'orange'],
-  ])('FR-UX-13 status %s maps to its icon, label and tone', (status, icon, label, tone) => {
+  ])('status %s maps to its icon, label and tone', (status, icon, label, tone) => {
     expect(statusIcon(status, t)).toEqual({ icon, label, tone })
   })
 
-  it('FR-UX-13 a two-letter conflict code (as git reports one) maps to Conflicted', () => {
+  it('a two-letter conflict code (as git reports one) maps to Conflicted', () => {
     expect(statusIcon('AU', t)).toEqual({
       icon: 'exclamation-triangle',
       label: 'Conflicted',
@@ -27,7 +28,7 @@ describe('statusIcon', () => {
     })
   })
 
-  it('FR-UX-13 an unrecognised status falls back to a file icon labelled with the code itself', () => {
+  it('an unrecognised status falls back to a file icon labelled with the code itself', () => {
     expect(statusIcon('X', t)).toEqual({ icon: 'file', label: 'X', tone: 'muted' })
   })
 })
@@ -84,8 +85,8 @@ function entityGlyphs(content: string): string[] {
 
 const OI_CLASS = /\boi-[a-z0-9-]+/
 
-describe('TR-34 icon guard', () => {
-  it('TR-34 no template uses a symbol glyph, emoji or HTML entity as an icon', () => {
+describe('icon guard', () => {
+  it('no template uses a symbol glyph, emoji or HTML entity as an icon', () => {
     const offenders = files.filter((f) => {
       const content = readFileSync(f, 'utf-8')
       return (
@@ -97,7 +98,7 @@ describe('TR-34 icon guard', () => {
     expect(offenders).toEqual([])
   })
 
-  it('TR-34 no template spells its own oi- class instead of using lib/icons.ts', () => {
+  it('no template spells its own oi- class instead of using lib/icons.ts', () => {
     const offenders = files.filter((f) => OI_CLASS.test(readFileSync(f, 'utf-8')))
     expect(offenders).toEqual([])
   })

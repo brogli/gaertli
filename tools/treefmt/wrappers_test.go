@@ -1,3 +1,5 @@
+// Requirements: QA-MNT-05
+
 package treefmt_test
 
 import (
@@ -45,7 +47,7 @@ func run(t *testing.T, script string, args ...string) {
 	}
 }
 
-func TestTR_38_FrontendWrapperRunsTheToolInFrontendOnRelativePaths(t *testing.T) {
+func TestFrontendWrapperRunsTheToolInFrontendOnRelativePaths(t *testing.T) {
 	log := fakeTool(t, "pnpm")
 	frontend, err := filepath.Abs("../../frontend")
 	if err != nil {
@@ -63,7 +65,7 @@ func TestTR_38_FrontendWrapperRunsTheToolInFrontendOnRelativePaths(t *testing.T)
 
 // Editors format through `treefmt --stdin`, which passes a temporary copy
 // outside the repo; the frontend's linters have no config for it.
-func TestTR_38_FrontendWrapperSkipsFilesOutsideFrontend(t *testing.T) {
+func TestFrontendWrapperSkipsFilesOutsideFrontend(t *testing.T) {
 	log := fakeTool(t, "pnpm")
 
 	run(t, "./frontend", "eslint", "--fix", "--", "/tmp/buffer.ts", "frontend/src/a.ts")
@@ -75,7 +77,7 @@ func TestTR_38_FrontendWrapperSkipsFilesOutsideFrontend(t *testing.T) {
 	}
 }
 
-func TestTR_38_FrontendWrapperFailsWithoutNodeModules(t *testing.T) {
+func TestFrontendWrapperFailsWithoutNodeModules(t *testing.T) {
 	fakeTool(t, "pnpm")
 	repo := t.TempDir()
 	script := filepath.Join(repo, "tools", "treefmt", "frontend")
@@ -99,7 +101,7 @@ func TestTR_38_FrontendWrapperFailsWithoutNodeModules(t *testing.T) {
 	}
 }
 
-func TestTR_38_GoLintWrapperLintsEachPackageOnce(t *testing.T) {
+func TestGoLintWrapperLintsEachPackageOnce(t *testing.T) {
 	log := fakeTool(t, "golangci-lint")
 
 	run(t, "./lint-go-packages", "internal/app/a.go", "internal/app/b.go", "cmd/nebegit/main.go")

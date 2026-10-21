@@ -1,3 +1,5 @@
+// Requirements: FR-ED-11, FR-REPO-07, FR-UX-02, QA-PORT-02, QA-REL-03
+
 package remote_test
 
 import (
@@ -109,7 +111,7 @@ func newDistroCore(t *testing.T, bin string, log *slog.Logger) (*remote.DistroCo
 
 // A declined consent is not remembered: the next open asks again, and
 // accepting then deploys and spawns as any other first open would.
-func TestQA_PORT_02_ADeclinedConsentAsksAgainOnTheNextOpen(t *testing.T) {
+func TestADeclinedConsentAsksAgainOnTheNextOpen(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	wsl := &fakeWSL{bin: coreBin}
 	consent := &toggleConsent{accept: false}
@@ -128,7 +130,7 @@ func TestQA_PORT_02_ADeclinedConsentAsksAgainOnTheNextOpen(t *testing.T) {
 	}
 }
 
-func TestADR_3_EnsureSpawnsOnceThenReusesTheLiveClient(t *testing.T) {
+func TestEnsureSpawnsOnceThenReusesTheLiveClient(t *testing.T) {
 	dc, wsl := newDistroCore(t, coreBin, slog.Default())
 
 	client1, respawned1, err := dc.Ensure(t.Context())
@@ -155,7 +157,7 @@ func TestADR_3_EnsureSpawnsOnceThenReusesTheLiveClient(t *testing.T) {
 	}
 }
 
-func TestADR_3_EnsureForcesARedeployOnAProtocolMismatch(t *testing.T) {
+func TestEnsureForcesARedeployOnAProtocolMismatch(t *testing.T) {
 	dc, _ := newDistroCore(t, badBin, slog.Default())
 
 	_, _, err := dc.Ensure(t.Context())
@@ -179,7 +181,7 @@ func distroPath(repo string) string {
 	return strings.TrimPrefix(repo, filepath.VolumeName(repo))
 }
 
-func TestADR_3_OpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
+func TestOpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
 	const distro = "Ubuntu-22.04"
 	repo := gitPath(t, gittest.New(t).Dir)
 	dc, _ := newDistroCore(t, coreBin, slog.Default())
@@ -204,7 +206,7 @@ func TestADR_3_OpeningWSLWorktreeTranslatesTheUNCPath(t *testing.T) {
 	}
 }
 
-func TestADR_4_EnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
+func TestEnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
 	const distro = "Ubuntu-22.04"
 	repo := gitPath(t, gittest.New(t).Dir)
 	dc, wsl := newDistroCore(t, coreBin, slog.Default())
@@ -235,7 +237,7 @@ func TestADR_4_EnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
 	}
 }
 
-func TestTR_13_OnConnectFiresOnceForAFreshConnectNotOnAReusedClient(t *testing.T) {
+func TestOnConnectFiresOnceForAFreshConnectNotOnAReusedClient(t *testing.T) {
 	dc, _ := newDistroCore(t, coreBin, slog.Default())
 	var got []*remote.Client
 	dc.OnConnect(func(_ context.Context, c *remote.Client) { got = append(got, c) })
@@ -260,7 +262,7 @@ func TestTR_13_OnConnectFiresOnceForAFreshConnectNotOnAReusedClient(t *testing.T
 	}
 }
 
-func TestADR_4_LiveClientReportsTheCurrentConnectionState(t *testing.T) {
+func TestLiveClientReportsTheCurrentConnectionState(t *testing.T) {
 	dc, _ := newDistroCore(t, coreBin, slog.Default())
 
 	if _, ok := dc.LiveClient(); ok {
@@ -329,7 +331,7 @@ func lastError(results []reflect.Value) error {
 	return last.Interface().(error)
 }
 
-func TestFR_REPO_07_TranslatesEveryRepoPathMethod(t *testing.T) {
+func TestTranslatesEveryRepoPathMethod(t *testing.T) {
 	const uncPath = `\\wsl.localhost\Ubuntu-22.04\home\u\r`
 	const uncTarget = `\\wsl.localhost\Ubuntu-22.04\home\u\r\wt`
 
@@ -356,7 +358,7 @@ func TestFR_REPO_07_TranslatesEveryRepoPathMethod(t *testing.T) {
 	}
 }
 
-func TestFR_REPO_07_RejectsAPathForAnotherDistroOrLocal(t *testing.T) {
+func TestRejectsAPathForAnotherDistroOrLocal(t *testing.T) {
 	cases := []struct{ name, path string }{
 		{"another distro", `\\wsl.localhost\Debian\home\u\r`},
 		{"local path", `C:\Users\u\r`},
@@ -400,7 +402,7 @@ func waitForRespawn(t *testing.T, dc *remote.DistroCore) *remote.Client {
 	return nil
 }
 
-func TestFR_UX_02_EnsureLogsAFailedCoreStartAtWarn(t *testing.T) {
+func TestEnsureLogsAFailedCoreStartAtWarn(t *testing.T) {
 	logger, text := bufLogger()
 	dc, _ := newDistroCore(t, badBin, logger)
 
@@ -412,7 +414,7 @@ func TestFR_UX_02_EnsureLogsAFailedCoreStartAtWarn(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_EnsureLogsAReconnectAtWarn(t *testing.T) {
+func TestEnsureLogsAReconnectAtWarn(t *testing.T) {
 	logger, text := bufLogger()
 	dc, wsl := newDistroCore(t, coreBin, logger)
 	if _, _, err := dc.Ensure(t.Context()); err != nil {
@@ -429,7 +431,7 @@ func TestFR_UX_02_EnsureLogsAReconnectAtWarn(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_TheCoresStderrReachesTheLogAtWarnMasked(t *testing.T) {
+func TestTheCoresStderrReachesTheLogAtWarnMasked(t *testing.T) {
 	logger, text := bufLogger()
 	dc, _ := newDistroCore(t, stderrBin, logger)
 
@@ -468,7 +470,7 @@ func exitingCore(t *testing.T, sink core.EventSink, log *slog.Logger) {
 
 // Output the client cannot read ends its reading; the rest of the core's
 // output must not keep the core's exit from being noticed.
-func TestADR_4_ACoreThatExitsAfterUnreadableOutputIsRespawned(t *testing.T) {
+func TestACoreThatExitsAfterUnreadableOutputIsRespawned(t *testing.T) {
 	dc, _ := newDistroCore(t, exitBin, slog.Default())
 	client, _, err := dc.Ensure(t.Context())
 	if err != nil {
@@ -484,7 +486,7 @@ func TestADR_4_ACoreThatExitsAfterUnreadableOutputIsRespawned(t *testing.T) {
 
 // A stderr line too long to log ends the logging; the rest of the core's
 // stderr must not keep the core's exit from being noticed.
-func TestADR_4_ACoreThatExitsAfterAnOverlongStderrLineIsRespawned(t *testing.T) {
+func TestACoreThatExitsAfterAnOverlongStderrLineIsRespawned(t *testing.T) {
 	dc, _ := newDistroCore(t, exitBin, slog.Default())
 	client, _, err := dc.Ensure(t.Context())
 	if err != nil {
@@ -507,7 +509,7 @@ func waitFor(done func() bool) bool {
 	return done()
 }
 
-func TestADR_3_EveryEventACoreSendsBeforeItExitsArrives(t *testing.T) {
+func TestEveryEventACoreSendsBeforeItExitsArrives(t *testing.T) {
 	var events atomic.Int64
 
 	exitingCore(t, func(core.Event) { events.Add(1) }, slog.Default())
@@ -517,7 +519,7 @@ func TestADR_3_EveryEventACoreSendsBeforeItExitsArrives(t *testing.T) {
 	}
 }
 
-func TestFR_UX_02_EveryStderrLineACoreWritesBeforeItExitsReachesTheLog(t *testing.T) {
+func TestEveryStderrLineACoreWritesBeforeItExitsReachesTheLog(t *testing.T) {
 	logger, text := bufLogger()
 
 	exitingCore(t, nil, logger)

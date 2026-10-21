@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-02, FR-CONF-06, FR-CONF-07, FR-CONF-11
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { undo } from '@codemirror/commands'
 import { createPinia, setActivePinia } from 'pinia'
@@ -54,7 +55,7 @@ describe('ConflictView', () => {
     document.body.innerHTML = ''
   })
 
-  it('FR-CONF-07 a file the current side deleted offers the incoming version and deletion', async () => {
+  it('a file the current side deleted offers the incoming version and deletion', async () => {
     const wrapper = await mountView({
       kind: ConflictKind.ConflictDeleted,
       current: { ...conflictFileFixture().current, present: false },
@@ -71,7 +72,7 @@ describe('ConflictView', () => {
     expect(findButton(wrapper, 'Delete file…')).toBeDefined()
   })
 
-  it('FR-CONF-07 a file the incoming side deleted offers the current version', async () => {
+  it('a file the incoming side deleted offers the current version', async () => {
     const wrapper = await mountView({
       kind: ConflictKind.ConflictDeleted,
       incoming: { ...conflictFileFixture().incoming, present: false },
@@ -147,21 +148,18 @@ describe('ConflictView', () => {
     [ConflictKind.ConflictNotUTF8, 'This file is not UTF-8 text.'],
     [ConflictKind.ConflictRename, 'The two sides renamed this file differently.'],
     [ConflictKind.ConflictSubmodule, 'This is a submodule.'],
-  ])(
-    'FR-CONF-02 a %s conflict says why, offers the editor and Mark resolved',
-    async (kind, reason) => {
-      const wrapper = await mountView({ kind })
+  ])('a %s conflict says why, offers the editor and Mark resolved', async (kind, reason) => {
+    const wrapper = await mountView({ kind })
 
-      expect(wrapper.text()).toContain(reason)
-      await findButton(wrapper, 'Open in editor')!.trigger('click')
-      expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
-      await findButton(wrapper, 'Mark resolved')!.trigger('click')
-      expect(Facade.StageFile).toHaveBeenCalledWith('/repo', 'a.txt')
-    },
-  )
+    expect(wrapper.text()).toContain(reason)
+    await findButton(wrapper, 'Open in editor')!.trigger('click')
+    expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'a.txt', 0)
+    await findButton(wrapper, 'Mark resolved')!.trigger('click')
+    expect(Facade.StageFile).toHaveBeenCalledWith('/repo', 'a.txt')
+  })
 
   it.each([ConflictKind.ConflictBinary, ConflictKind.ConflictText])(
-    'FR-CONF-02 previous and next file ask the parent on a %s conflict',
+    'previous and next file ask the parent on a %s conflict',
     async (kind) => {
       const wrapper = await mountView({ kind })
 
@@ -173,7 +171,7 @@ describe('ConflictView', () => {
     },
   )
 
-  it('FR-CONF-06 reloading after a refused save shows the file as it is on disk, without the edits', async () => {
+  it('reloading after a refused save shows the file as it is on disk, without the edits', async () => {
     Facade.SaveConflict.mockRejectedValue(
       Object.assign(new Error('rejected'), {
         cause: { message: 'changed', key: 'fileChangedSinceOpened', args: { path: 'a.txt' } },
@@ -202,7 +200,7 @@ describe('ConflictView', () => {
       await flushPromises()
     }
 
-    it('FR-CONF-11 the same fingerprint keeps the editor as it is', async () => {
+    it('the same fingerprint keeps the editor as it is', async () => {
       const wrapper = await mountView()
       const before = resultView(wrapper)
       before.dispatch({ changes: { from: 0, insert: 'typed ' } })
@@ -214,7 +212,7 @@ describe('ConflictView', () => {
       expect(wrapper.text()).not.toContain('changed on disk')
     })
 
-    it('FR-CONF-11 a save keeps the editor, its edits and undo through the reload it causes', async () => {
+    it('a save keeps the editor, its edits and undo through the reload it causes', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView()
       await resolveBothConflicts(wrapper)
@@ -231,7 +229,7 @@ describe('ConflictView', () => {
       expect(before.state.doc.toString()).toMatch(/^a\n/)
     })
 
-    it('FR-CONF-11 a read that started before a save does not undo the save', async () => {
+    it('a read that started before a save does not undo the save', async () => {
       Facade.SaveConflict.mockResolvedValue('fpSaved')
       const wrapper = await mountView()
       await resolveBothConflicts(wrapper)
@@ -252,7 +250,7 @@ describe('ConflictView', () => {
       expect(resultView(wrapper)).toBe(before)
     })
 
-    it('FR-CONF-11 a read that fails after a newer read started shows no error', async () => {
+    it('a read that fails after a newer read started shows no error', async () => {
       const wrapper = await mountView()
       let failStaleRead: (e: Error) => void = () => undefined
       Facade.Conflict.mockReturnValueOnce(
@@ -269,7 +267,7 @@ describe('ConflictView', () => {
       expect(wrapper.find('.error-banner').exists()).toBe(false)
     })
 
-    it('FR-CONF-11 a read of a file that is no longer conflicted shows no error', async () => {
+    it('a read of a file that is no longer conflicted shows no error', async () => {
       const wrapper = await mountView()
       Facade.Conflict.mockRejectedValue(
         Object.assign(new Error('rejected'), {
@@ -282,7 +280,7 @@ describe('ConflictView', () => {
       expect(wrapper.find('.error-banner').exists()).toBe(false)
     })
 
-    it('FR-CONF-06 a save that ends after a switch to another file leaves that file shown', async () => {
+    it('a save that ends after a switch to another file leaves that file shown', async () => {
       let finishSave: (fingerprint: string) => void = () => undefined
       Facade.SaveConflict.mockReturnValueOnce(
         new Promise<string>((resolve) => (finishSave = resolve)),
@@ -305,7 +303,7 @@ describe('ConflictView', () => {
       expect(resultView(wrapper).state.doc.toString()).toBe('other')
     })
 
-    it('FR-CONF-11 a changed file shows as it is now, but keeps unsaved edits and says so; Reload drops them', async () => {
+    it('a changed file shows as it is now, but keeps unsaved edits and says so; Reload drops them', async () => {
       const wrapper = await mountView()
       await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
@@ -326,7 +324,7 @@ describe('ConflictView', () => {
       ['a changed file', { result: 'on disk', regions: [], fingerprint: 'fp2' }],
       ['the same file', {}],
     ])(
-      'FR-CONF-11 %s read as a new conflict in the path shows afresh, without the edits made for the earlier one',
+      '%s read as a new conflict in the path shows afresh, without the edits made for the earlier one',
       async (_, file) => {
         const wrapper = await mountView({ conflictId: 'c1' })
         resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
@@ -340,7 +338,7 @@ describe('ConflictView', () => {
       },
     )
 
-    it('FR-CONF-11 Reload reads the draft only after the core dropped it', async () => {
+    it('Reload reads the draft only after the core dropped it', async () => {
       const wrapper = await mountView()
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       const [, , stored] = Facade.SetMergeDraft.mock.lastCall!
@@ -366,7 +364,7 @@ describe('ConflictView', () => {
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
     })
 
-    it('FR-CONF-11 a taken region and the edits survive a new page: the core returns them', async () => {
+    it('a taken region and the edits survive a new page: the core returns them', async () => {
       const wrapper = await mountView()
       await findButton(wrapper, 'Take left')!.trigger('click')
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
@@ -384,7 +382,7 @@ describe('ConflictView', () => {
       expect(reopened.text()).toContain('1 left')
     })
 
-    it('FR-CONF-11 edits reach the core while typing: the first at once, a burst after a pause', async () => {
+    it('edits reach the core while typing: the first at once, a burst after a pause', async () => {
       vi.useFakeTimers()
       try {
         const wrapper = await mountView()
@@ -402,7 +400,7 @@ describe('ConflictView', () => {
       }
     })
 
-    it('FR-CONF-11 edits still waiting reach the core when the window closes', async () => {
+    it('edits still waiting reach the core when the window closes', async () => {
       vi.useFakeTimers()
       try {
         const wrapper = await mountView()

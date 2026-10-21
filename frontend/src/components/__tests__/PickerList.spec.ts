@@ -1,3 +1,4 @@
+// Requirements: FR-WT-13, FR-WT-15
 import { h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { MenuItem } from 'openvue/menuitem'
@@ -38,7 +39,7 @@ async function mountList(
 }
 
 describe('PickerList', () => {
-  it('FR-WT-15 a button in a row runs its own action and does not activate the row', async () => {
+  it('a button in a row runs its own action and does not activate the row', async () => {
     const action = vi.fn()
     const { wrapper } = await mountList(action)
 
@@ -48,7 +49,7 @@ describe('PickerList', () => {
     expect(wrapper.emitted('activate')).toBeUndefined()
   })
 
-  it('FR-WT-13 a click on a row activates it; a header row does nothing', async () => {
+  it('a click on a row activates it; a header row does nothing', async () => {
     const { wrapper } = await mountList()
 
     await wrapper.findAll('li')[0]!.get('.main').trigger('click')
@@ -57,7 +58,7 @@ describe('PickerList', () => {
     expect(wrapper.emitted('activate')).toEqual([[rows[2]]])
   })
 
-  it('FR-WT-13 the filter has focus; arrows move the active row past headers and Enter activates it', async () => {
+  it('the filter has focus; arrows move the active row past headers and Enter activates it', async () => {
     const { wrapper } = await mountList()
     const filter = wrapper.get('input')
     expect(document.activeElement).toBe(filter.element)
@@ -72,7 +73,7 @@ describe('PickerList', () => {
     expect(wrapper.get('li.active').text()).toBe('alpha')
   })
 
-  it('FR-WT-15 each non-header row gets an "Actions" button opening a menu; the header gets none', async () => {
+  it('each non-header row gets an "Actions" button opening a menu; the header gets none', async () => {
     const { wrapper } = await mountList(vi.fn(), rows, { menu: menuFor, menuButton: true })
 
     const items = wrapper.findAll('li')
@@ -85,7 +86,7 @@ describe('PickerList', () => {
     }
   })
 
-  it('FR-WT-15 clicking a row\'s "…" opens its menu, makes the row active, and does not activate it', async () => {
+  it('clicking a row\'s "…" opens its menu, makes the row active, and does not activate it', async () => {
     const { wrapper, body } = await mountList(vi.fn(), rows, { menu: menuFor, menuButton: true })
 
     await wrapper.findAll('li')[2]!.get('[data-test="row-actions"]').trigger('click')
@@ -95,7 +96,7 @@ describe('PickerList', () => {
     expect(wrapper.emitted('activate')).toBeUndefined()
   })
 
-  it('FR-WT-15 a right-click, then Shift+F10, open each active row\'s menu; no "…" buttons; a header\'s right-click opens none', async () => {
+  it('a right-click, then Shift+F10, open each active row\'s menu; no "…" buttons; a header\'s right-click opens none', async () => {
     const { wrapper, body } = await mountList(vi.fn(), rows, { menu: menuFor })
 
     expect(wrapper.find('[data-test="row-actions"]').exists()).toBe(false)
@@ -112,7 +113,7 @@ describe('PickerList', () => {
     expect(menuLabels(body)).toEqual(['a-item'])
   })
 
-  it('FR-WT-13 a long list renders only the rows in view', async () => {
+  it('a long list renders only the rows in view', async () => {
     const many = Array.from({ length: 2000 }, (_, i) => ({ key: `r${i}`, label: `ref ${i}` }))
     const { wrapper } = await mountList(vi.fn(), many)
 
@@ -122,7 +123,7 @@ describe('PickerList', () => {
     expect(rendered[0]!.text()).toBe('ref 0')
   })
 
-  it('FR-WT-13 typing emits the query and makes the first row active again', async () => {
+  it('typing emits the query and makes the first row active again', async () => {
     const { wrapper } = await mountList()
     const filter = wrapper.get('input')
     await filter.trigger('keydown', { key: 'ArrowDown' })

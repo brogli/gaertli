@@ -1,3 +1,4 @@
+// Requirements: FR-REPO-07, FR-UX-19, FR-WT-13, FR-WT-16
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,7 +26,7 @@ describe('MainView', () => {
     resetMainWindowApp()
   })
 
-  it('FR-WT-16 with no path, the repo list is the page, not WorktreeContent', async () => {
+  it('with no path, the repo list is the page, not WorktreeContent', async () => {
     AppService.RecentRepos.mockResolvedValue([
       { path: '/repoA', lastOpened: '2026-01-01T00:00:00Z' },
     ])
@@ -37,7 +38,7 @@ describe('MainView', () => {
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(false)
   })
 
-  it('FR-WT-16 Ctrl+Shift+N opens a new window', async () => {
+  it('Ctrl+Shift+N opens a new window', async () => {
     mount(MainView, { props: { path: '' } })
     await flushPromises()
 
@@ -64,7 +65,7 @@ describe('MainView', () => {
     expect(wrapper.findComponent(WorktreeContent).exists()).toBe(path !== '')
   })
 
-  it('FR-WT-13, FR-REPO-07 with a path, renders WorktreeContent with the path and distro', async () => {
+  it('with a path, renders WorktreeContent with the path and distro', async () => {
     const wrapper = mount(MainView, {
       props: { path: '/home/u/r', distro: 'Ubuntu' },
       global: { stubs: { WorktreeContent: true } },
@@ -75,14 +76,14 @@ describe('MainView', () => {
     expect(content.props()).toMatchObject({ path: '/home/u/r', distro: 'Ubuntu' })
   })
 
-  it('FR-UX-19 with debug mode off (the default), no debug strip shows', async () => {
+  it('with debug mode off (the default), no debug strip shows', async () => {
     const wrapper = mount(MainView, { props: { path: '' } })
     await flushPromises()
 
     expect(wrapper.findComponent(DebugArea).exists()).toBe(false)
   })
 
-  it('FR-UX-19 with debug mode on, the debug strip shows along the bottom, worktree or not', async () => {
+  it('with debug mode on, the debug strip shows along the bottom, worktree or not', async () => {
     SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ debugMode: true }))
     // MainView reads the settings store rather than loading it itself: a
     // real window's App.vue loads it once for every view.

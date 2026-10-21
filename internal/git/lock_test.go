@@ -1,3 +1,5 @@
+// Requirements: FR-UX-16
+
 package git_test
 
 import (
@@ -13,7 +15,7 @@ import (
 
 // Every kind of write against a held lock gets the same code and key, and
 // succeeds once the lock is gone.
-func TestFR_UX_16_AnotherProgramsLockIsDetected(t *testing.T) {
+func TestAnotherProgramsLockIsDetected(t *testing.T) {
 	cases := []struct {
 		name  string
 		setup func(t *testing.T, dir string) []string // returns the call's args

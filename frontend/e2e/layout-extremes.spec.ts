@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-11, FR-UX-09
 import { test, expect, type Page } from '@playwright/test'
 import { expectNoOverlap, openMockRepo } from './helpers'
 
@@ -5,7 +6,7 @@ import { expectNoOverlap, openMockRepo } from './helpers'
 // browser: wide's changes view scrolling, and the toolbar at each layout's
 // width down to the window's own minimum.
 
-test('FR-CHG-11 wide (1600), 60 changed files: scrolling the change list never moves the Commit button', async ({
+test('wide (1600), 60 changed files: scrolling the change list never moves the Commit button', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1600, height: 900 })
@@ -42,14 +43,12 @@ async function assertToolbarFitsOneRow(page: Page, width: number, query = ''): P
   expectNoOverlap(known)
 }
 
-test('FR-UX-09 narrow (400 x 800, the window minimum): the toolbar stays one row, a branch with an upstream (Pull/Push)', async ({
+test('narrow (400 x 800, the window minimum): the toolbar stays one row, a branch with an upstream (Pull/Push)', async ({
   page,
 }) => {
   await assertToolbarFitsOneRow(page, 400, '&upstream=1')
 })
 
-test('FR-UX-09 wide (1400 x 800): the toolbar still stays one row, no overlap', async ({
-  page,
-}) => {
+test('wide (1400 x 800): the toolbar still stays one row, no overlap', async ({ page }) => {
   await assertToolbarFitsOneRow(page, 1400, '&upstream=1')
 })

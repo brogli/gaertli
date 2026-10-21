@@ -1,3 +1,4 @@
+// Requirements: FR-LOG-09, FR-UX-08, FR-WT-02
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -28,7 +29,7 @@ describe('LogView', () => {
     Facade.LogRows.mockReset().mockResolvedValue({ rows: [], loaded: 0, done: true })
   })
 
-  it('FR-UX-08 renders the filter bar above the commit list', async () => {
+  it('renders the filter bar above the commit list', async () => {
     const wrapper = mount(LogView, { props: { wt: '/repo' } })
     await flushPromises()
 
@@ -38,7 +39,7 @@ describe('LogView', () => {
     expect(html.indexOf('filter-bar')).toBeLessThan(html.indexOf('log-list'))
   })
 
-  it("FR-LOG-09 a failed load shows its error between the filter bar and the list, git's message behind details", async () => {
+  it("a failed load shows its error between the filter bar and the list, git's message behind details", async () => {
     const wrapper = mount(LogView, { props: { wt: '/repo' } })
     await flushPromises()
     expect(wrapper.findComponent(ErrorBanner).exists()).toBe(false)
@@ -64,7 +65,7 @@ describe('LogView', () => {
     expect(html.indexOf('error-banner')).toBeLessThan(html.indexOf('log-list'))
   })
 
-  it("FR-UX-08 forwards LogList's open event", async () => {
+  it("forwards LogList's open event", async () => {
     const wrapper = mount(LogView, { props: { wt: '/repo' } })
     const log = useLogStore()
     log.rowCache.set(0, commitRow())
@@ -76,7 +77,7 @@ describe('LogView', () => {
     expect(wrapper.emitted('open')).toHaveLength(1)
   })
 
-  it("FR-WT-02 forwards LogList's create-worktree event with the row's sha", () => {
+  it("forwards LogList's create-worktree event with the row's sha", () => {
     const wrapper = mount(LogView, { props: { wt: '/repo' } })
 
     wrapper.findComponent(LogList).vm.$emit('create-worktree', 'abc123')

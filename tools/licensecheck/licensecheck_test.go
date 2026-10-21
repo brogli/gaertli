@@ -1,3 +1,5 @@
+// Requirements: FR-UX-18, OSS-01, OSS-05
+
 package main
 
 import (
@@ -6,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestOSS_01_CheckReportsOnlyDisallowedLicences(t *testing.T) {
+func TestCheckReportsOnlyDisallowedLicences(t *testing.T) {
 	tests := []struct {
 		name string
 		deps []Dependency
@@ -44,7 +46,7 @@ func TestOSS_01_CheckReportsOnlyDisallowedLicences(t *testing.T) {
 	}
 }
 
-func TestFR_UX_18_CheckAllowsOFLForTheBundledFontsOnly(t *testing.T) {
+func TestCheckAllowsOFLForTheBundledFontsOnly(t *testing.T) {
 	text := Dependency{Name: "@fontsource-variable/inter", Version: "5.3.0", Licence: "OFL-1.1"}
 	mono := Dependency{Name: "@fontsource-variable/jetbrains-mono", Version: "5.3.0", Licence: "OFL-1.1"}
 	other := Dependency{Name: "some-lib", Version: "1.0.0", Licence: "OFL-1.1"}
@@ -56,7 +58,7 @@ func TestFR_UX_18_CheckAllowsOFLForTheBundledFontsOnly(t *testing.T) {
 	}
 }
 
-func TestOSS_01_NoticesRendersOneParagraphPerDependency(t *testing.T) {
+func TestNoticesRendersOneParagraphPerDependency(t *testing.T) {
 	deps := []Dependency{
 		{Name: "foo", Version: "1.2.0", Licence: "MIT", Text: "Copyright foo authors"},
 		{Name: "bar", Version: "0.9.1", Licence: "BSD-3-Clause", Text: "Copyright bar authors"},
@@ -75,7 +77,7 @@ func TestOSS_01_NoticesRendersOneParagraphPerDependency(t *testing.T) {
 	}
 }
 
-func TestOSS_05_NoticesCreditCodeAdaptedFromLazygit(t *testing.T) {
+func TestNoticesCreditCodeAdaptedFromLazygit(t *testing.T) {
 	if violations := Check(adaptedCode); len(violations) > 0 {
 		t.Errorf("adapted code with a licence outside the allow-list: %v", violations)
 	}
@@ -87,7 +89,7 @@ func TestOSS_05_NoticesCreditCodeAdaptedFromLazygit(t *testing.T) {
 	}
 }
 
-func TestOSS_05_NoticesCreditTheFourDarkThemes(t *testing.T) {
+func TestNoticesCreditTheFourDarkThemes(t *testing.T) {
 	if violations := Check(themeCredits); len(violations) > 0 {
 		t.Errorf("theme credits with a licence outside the allow-list: %v", violations)
 	}

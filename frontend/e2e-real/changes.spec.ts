@@ -1,3 +1,4 @@
+// Requirements: FR-CHG-01, FR-CHG-02, FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-REPO-04
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
@@ -40,7 +41,7 @@ const cachedDiff = (git: Git, work: string) => git(work, 'diff', '--cached', '-U
 
 const unstaged = (file: string) => ({ kind: 'working', file })
 
-test('FR-CHG-01 FR-CHG-02 the changes view lists staged, unstaged, untracked and conflicted files; staging moves them between the groups and the index, singly or all at once', async ({
+test('the changes view lists staged, unstaged, untracked and conflicted files; staging moves them between the groups and the index, singly or all at once', async ({
   openApp,
   repos,
   git,
@@ -81,7 +82,7 @@ test('FR-CHG-01 FR-CHG-02 the changes view lists staged, unstaged, untracked and
   expect(stagedNames()).toBe('')
 })
 
-test('FR-CHG-03 Stage hunk stages only its own block, even one two lines from the next', async ({
+test('Stage hunk stages only its own block, even one two lines from the next', async ({
   openDiff,
   repos,
   git,
@@ -101,7 +102,7 @@ test('FR-CHG-03 Stage hunk stages only its own block, even one two lines from th
   expect(cachedDiff(git, repos.work)).not.toContain('line 18')
 })
 
-test("FR-CHG-04 FR-REPO-04 the diff window shows a changed file's diff, lists the other changes, shows an untracked file fully added, and follows an outside edit and its list", async ({
+test("the diff window shows a changed file's diff, lists the other changes, shows an untracked file fully added, and follows an outside edit and its list", async ({
   openDiff,
   repos,
   git,
@@ -143,7 +144,7 @@ async function discard(page: Page, group: string, file: string): Promise<void> {
   await clickConfirm(page)
 }
 
-test('FR-CHG-10 discarding a file asks first: an unstaged one is restored, an untracked one, also in an untracked folder, is deleted', async ({
+test('discarding a file asks first: an unstaged one is restored, an untracked one, also in an untracked folder, is deleted', async ({
   openApp,
   repos,
   git,

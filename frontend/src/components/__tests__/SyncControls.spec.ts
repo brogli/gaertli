@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-09, FR-SYNC-01, FR-SYNC-02, FR-SYNC-03, FR-SYNC-06, FR-SYNC-11, FR-UX-01, FR-UX-03, FR-UX-05, FR-UX-09, QA-SAFE-01
 import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { reactive } from 'vue'
@@ -115,7 +116,7 @@ describe('SyncControls', () => {
     })
   })
 
-  it('FR-SYNC-01 clicking Fetch calls Facade.Fetch with the worktree id and no remote', async () => {
+  it('clicking Fetch calls Facade.Fetch with the worktree id and no remote', async () => {
     const { body } = await mountControls()
 
     await findButton(body, 'Fetch')!.trigger('click')
@@ -124,7 +125,7 @@ describe('SyncControls', () => {
     expect(Facade.Fetch).toHaveBeenCalledWith('/repo', '')
   })
 
-  it('FR-CONF-09 a pull this window started that stops on conflicts opens the diff window; one it did not start opens nothing', async () => {
+  it('a pull this window started that stops on conflicts opens the diff window; one it did not start opens nothing', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
     await flushPromises()
@@ -140,7 +141,7 @@ describe('SyncControls', () => {
     expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CONF-09 a pull that stops on conflicts before its start call returns opens the diff window', async () => {
+  it('a pull that stops on conflicts before its start call returns opens the diff window', async () => {
     setRefs({ upstream: 'origin/main' })
     let answerPull: (id: string) => void = () => undefined
     Facade.Pull.mockReturnValueOnce(new Promise<string>((resolve) => (answerPull = resolve)))
@@ -156,7 +157,7 @@ describe('SyncControls', () => {
     expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-CONF-09 a pull that ended is forgotten: a later conflicted end with its id opens nothing', async () => {
+  it('a pull that ended is forgotten: a later conflicted end with its id opens nothing', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
     await flushPromises()
@@ -173,7 +174,7 @@ describe('SyncControls', () => {
     expect(AppService.OpenDiff).not.toHaveBeenCalled()
   })
 
-  it('FR-UX-09 without a remote, the disabled Pull and Push keep their icon', async () => {
+  it('without a remote, the disabled Pull and Push keep their icon', async () => {
     setRefs({}, [])
     const { body } = await mountControls()
 
@@ -182,7 +183,7 @@ describe('SyncControls', () => {
   })
 
   it.each([false, true])(
-    'FR-SYNC-11 without a remote, Fetch, Pull and Push are disabled with the no-remote tooltip; no select (compact: %s)',
+    'without a remote, Fetch, Pull and Push are disabled with the no-remote tooltip; no select (compact: %s)',
     async (compact) => {
       setRefs({}, [])
       const { body } = await mountControls({ compact })
@@ -198,7 +199,7 @@ describe('SyncControls', () => {
     },
   )
 
-  it('FR-SYNC-11 detached HEAD (a remote exists): Pull and Push disabled, tooltip names the reason', async () => {
+  it('detached HEAD (a remote exists): Pull and Push disabled, tooltip names the reason', async () => {
     setRefs({ current: false })
     const { body } = await mountControls()
 
@@ -210,7 +211,7 @@ describe('SyncControls', () => {
     }
   })
 
-  it('FR-UX-09 FR-UX-05 branch without upstream: the Push button reads "Push"; no remote select in the toolbar', async () => {
+  it('branch without upstream: the Push button reads "Push"; no remote select in the toolbar', async () => {
     setRefs({ upstream: '' }, ['origin', 'upstream'])
     const { body } = await mountControls()
 
@@ -220,7 +221,7 @@ describe('SyncControls', () => {
     expect(body.find('[data-test="upstream-remote"]').exists()).toBe(false)
   })
 
-  it('FR-UX-09 below wide, the Pull split button shows icon only, its mode in title and aria-label', async () => {
+  it('below wide, the Pull split button shows icon only, its mode in title and aria-label', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls({ compact: true })
 
@@ -234,7 +235,7 @@ describe('SyncControls', () => {
     ['with an upstream', { upstream: 'origin/main' }, ['origin']],
     ['without an upstream', { upstream: '' }, ['origin', 'upstream']],
   ])(
-    'FR-UX-09 below wide, Push shows icon only with aria-label "Push", %s',
+    'below wide, Push shows icon only with aria-label "Push", %s',
     async (_name, branch, remotes) => {
       setRefs(branch, remotes)
       const { body } = await mountControls({ compact: true })
@@ -245,7 +246,7 @@ describe('SyncControls', () => {
     },
   )
 
-  it('FR-SYNC-03, FR-SYNC-11 branch without upstream, remote with no tracking branches: Push is enabled; PushTarget cannot push straight away, so clicking it opens the dialog naming the branch; confirming pushes to it', async () => {
+  it('branch without upstream, remote with no tracking branches: Push is enabled; PushTarget cannot push straight away, so clicking it opens the dialog naming the branch; confirming pushes to it', async () => {
     setRefs({ upstream: '' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
@@ -269,7 +270,7 @@ describe('SyncControls', () => {
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'main')
   })
 
-  it('FR-SYNC-03 Ctrl+Shift+K pushes without an upstream too, when PushTarget can push straight away', async () => {
+  it('Ctrl+Shift+K pushes without an upstream too, when PushTarget can push straight away', async () => {
     setRefs({ upstream: '' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
@@ -285,7 +286,7 @@ describe('SyncControls', () => {
     expect(Facade.Push).toHaveBeenCalledWith('/repo', 'origin', 'main')
   })
 
-  it('FR-SYNC-06, FR-UX-03, QA-SAFE-01 force push on a protected branch confirms first, naming it protected', async () => {
+  it('force push on a protected branch confirms first, naming it protected', async () => {
     setRefs({ name: 'main', upstream: 'origin/main' })
     settingsStore.settings = defaultSettingsFixture({ protectedBranches: ['main'] })
     const notice = await mountNotices()
@@ -304,7 +305,7 @@ describe('SyncControls', () => {
     expect(Facade.ForcePush).toHaveBeenCalledTimes(1)
   })
 
-  it('FR-SYNC-02 the button shows and runs Settings’ default pull mode', async () => {
+  it('the button shows and runs Settings’ default pull mode', async () => {
     setRefs({ upstream: 'origin/main' })
     settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
     const { body } = await mountControls()
@@ -316,7 +317,7 @@ describe('SyncControls', () => {
     expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
   })
 
-  it('FR-SYNC-02 choosing "Pull (rebase)" in the menu saves it as the default pull mode; it does not pull', async () => {
+  it('choosing "Pull (rebase)" in the menu saves it as the default pull mode; it does not pull', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
     await flushPromises()
@@ -333,7 +334,7 @@ describe('SyncControls', () => {
     expect(pullButton.attributes('title')).toBe('Pull (rebase) · Ctrl+T')
   })
 
-  it('FR-UX-05 Ctrl+T pulls with the mode chosen in the menu', async () => {
+  it('Ctrl+T pulls with the mode chosen in the menu', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
     await flushPromises()
@@ -346,7 +347,7 @@ describe('SyncControls', () => {
     expect(Facade.Pull).toHaveBeenCalledWith('/repo', PullMode.PullRebase)
   })
 
-  it('FR-SYNC-02 the menu lists "Pull (merge)" and "Pull (rebase)"; only the current mode has an icon; the dropdown is named "Choose pull mode"', async () => {
+  it('the menu lists "Pull (merge)" and "Pull (rebase)"; only the current mode has an icon; the dropdown is named "Choose pull mode"', async () => {
     setRefs({ upstream: 'origin/main' })
     settingsStore.settings = defaultSettingsFixture({ defaultPullMode: PullMode.PullRebase })
     const { body } = await mountControls()
@@ -363,7 +364,7 @@ describe('SyncControls', () => {
     expect(dropdown.attributes('aria-label')).toBe('Choose pull mode')
   })
 
-  it('FR-SYNC-02 a failed save shows in the error banner; Facade.Pull is not called and the button keeps its mode', async () => {
+  it('a failed save shows in the error banner; Facade.Pull is not called and the button keeps its mode', async () => {
     setRefs({ upstream: 'origin/main' })
     settingsStore.save.mockRejectedValueOnce(wailsError('disk full'))
     const { body } = await mountControls()
@@ -376,7 +377,7 @@ describe('SyncControls', () => {
     expect(findButton(body, 'Pull (merge)')).toBeTruthy()
   })
 
-  it('FR-SYNC-02 a Settings default saved in another window updates the button without a remount', async () => {
+  it('a Settings default saved in another window updates the button without a remount', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
     await flushPromises()
@@ -388,7 +389,7 @@ describe('SyncControls', () => {
     expect(findButton(body, 'Pull (rebase)')).toBeTruthy()
   })
 
-  it('FR-UX-01 a rejected Fetch renders ErrorBanner with the error', async () => {
+  it('a rejected Fetch renders ErrorBanner with the error', async () => {
     Facade.Fetch.mockRejectedValueOnce(wailsError('network unreachable'))
     const { body } = await mountControls()
 
@@ -398,7 +399,7 @@ describe('SyncControls', () => {
     expect(body.get('.error-banner').text()).toContain('network unreachable')
   })
 
-  it('FR-UX-05 Ctrl+Shift+K pushes, same as clicking Push', async () => {
+  it('Ctrl+Shift+K pushes, same as clicking Push', async () => {
     setRefs({ upstream: 'origin/main' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
@@ -414,7 +415,7 @@ describe('SyncControls', () => {
     expect(Facade.Push).toHaveBeenCalledWith('/repo', '', '')
   })
 
-  it('FR-UX-05 Pull and Push tooltips name their shortcut keys; aria-labels stay the actions alone', async () => {
+  it('Pull and Push tooltips name their shortcut keys; aria-labels stay the actions alone', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
 
@@ -427,7 +428,7 @@ describe('SyncControls', () => {
   it.each([
     ['without an upstream', { upstream: '' }, ['origin']],
     ['without a remote, even with an upstream', { upstream: 'origin/main' }, []],
-  ])('FR-UX-05 Ctrl+T does nothing %s (Pull is not available)', async (_name, branch, remotes) => {
+  ])('Ctrl+T does nothing %s (Pull is not available)', async (_name, branch, remotes) => {
     setRefs(branch, remotes)
     await mountControls()
 

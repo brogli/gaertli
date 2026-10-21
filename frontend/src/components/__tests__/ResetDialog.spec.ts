@@ -1,3 +1,4 @@
+// Requirements: FR-BR-02, FR-BR-03, FR-BR-04, FR-UX-03
 import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
@@ -39,13 +40,13 @@ describe('ResetDialog', () => {
     confirmRequire.mockReset()
   })
 
-  it('FR-BR-02 the first line names the branch, the short hash and the subject', async () => {
+  it('the first line names the branch, the short hash and the subject', async () => {
     const { body } = await mountDialog()
 
     expect(body.text()).toContain('Reset main to abc123 Fix the bug')
   })
 
-  it('FR-BR-02 the four modes render one per line, each its own block, mixed preselected', async () => {
+  it('the four modes render one per line, each its own block, mixed preselected', async () => {
     const { body } = await mountDialog()
 
     const modes = body.findAll('.reset-mode')
@@ -53,7 +54,7 @@ describe('ResetDialog', () => {
     expect(body.get<HTMLInputElement>('input#reset-mode-mixed').element.checked).toBe(true)
   })
 
-  it('FR-BR-02 Reset fails: the dialog stays open with the error, no notice', async () => {
+  it('Reset fails: the dialog stays open with the error, no notice', async () => {
     Facade.Reset.mockRejectedValue(new Error('boom'))
     const { wrapper, body: dialog } = await mountDialog()
     const notice = await mountNotices()
@@ -65,14 +66,14 @@ describe('ResetDialog', () => {
     expect(notice.find('.p-toast-message').exists()).toBe(false)
   })
 
-  it('FR-BR-02 renders "HEAD" instead of a blank branch name while detached', async () => {
+  it('renders "HEAD" instead of a blank branch name while detached', async () => {
     const { body } = await mountDialog('')
 
     expect(body.text()).toContain('HEAD')
   })
 
   it.each(['mixed', 'keep'])(
-    'FR-BR-02 clicking Reset at %s mode calls Facade.Reset directly, no confirmation',
+    'clicking Reset at %s mode calls Facade.Reset directly, no confirmation',
     async (mode) => {
       Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
       const { body } = await mountDialog()
@@ -86,7 +87,7 @@ describe('ResetDialog', () => {
     },
   )
 
-  it('FR-BR-04 a successful reset closes the dialog and its notice names the previous short hash, Copy hash copies the full one', async () => {
+  it('a successful reset closes the dialog and its notice names the previous short hash, Copy hash copies the full one', async () => {
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     Facade.Reset.mockResolvedValue({ previousHead: 'deadbeefcafe' })
@@ -102,7 +103,7 @@ describe('ResetDialog', () => {
     expect(writeText).toHaveBeenCalledWith('deadbeefcafe')
   })
 
-  it("FR-BR-04 a second reset replaces the notice with its own and leaves another action's notice open", async () => {
+  it("a second reset replaces the notice with its own and leaves another action's notice open", async () => {
     const notice = await mountNotices()
     const OtherAction = defineComponent({
       setup() {
@@ -125,7 +126,7 @@ describe('ResetDialog', () => {
     expect(notice.text()).not.toContain('first00')
   })
 
-  it('FR-BR-03 hard mode confirms first, naming the uncommitted count, before calling Facade.Reset', async () => {
+  it('hard mode confirms first, naming the uncommitted count, before calling Facade.Reset', async () => {
     Facade.UncommittedCount.mockResolvedValue(4)
     Facade.Reset.mockResolvedValue({ previousHead: 'def456' })
     const { body } = await mountDialog()
@@ -144,7 +145,7 @@ describe('ResetDialog', () => {
     expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', 'hard')
   })
 
-  it('FR-UX-03 never calls Facade.Reset if the confirmation is not accepted (QA-SAFE-01)', async () => {
+  it('never calls Facade.Reset if the confirmation is not accepted (QA-SAFE-01)', async () => {
     Facade.UncommittedCount.mockResolvedValue(4)
     const { body } = await mountDialog()
 

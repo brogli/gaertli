@@ -1,3 +1,5 @@
+// Requirements: FR-ED-05, FR-ED-11, FR-UX-04, FR-UX-19
+
 package app
 
 import (
@@ -25,7 +27,7 @@ func (e *fakeEmitter) Emit(name string, data ...any) bool {
 	return false
 }
 
-func TestFR_UX_04_SettingsServiceSetThenGetRoundTrips(t *testing.T) {
+func TestSettingsServiceSetThenGetRoundTrips(t *testing.T) {
 	reg, _ := newTestRegistry()
 	s := NewSettingsService(newTestStore(t), reg, &fakeEmitter{}, &slog.LevelVar{})
 	want := settings.Preferences{
@@ -45,7 +47,7 @@ func TestFR_UX_04_SettingsServiceSetThenGetRoundTrips(t *testing.T) {
 
 // Set replaces the preferences only: a repo opened or a window closed
 // while the dialog was open survives its Save.
-func TestFR_UX_04_SettingsServiceSetKeepsTheRecentReposAndOpenWorktrees(t *testing.T) {
+func TestSettingsServiceSetKeepsTheRecentReposAndOpenWorktrees(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
 	recent := []settings.RecentRepo{{Path: "/opened/meanwhile"}}
@@ -70,7 +72,7 @@ func TestFR_UX_04_SettingsServiceSetKeepsTheRecentReposAndOpenWorktrees(t *testi
 
 // Set replaces the preferences only: the diff window's remembered size
 // (outside Preferences, like RecentRepos and OpenWorktrees) survives it too.
-func TestFR_UX_04_SettingsServiceSetKeepsTheDiffWindowSize(t *testing.T) {
+func TestSettingsServiceSetKeepsTheDiffWindowSize(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
 	want := &settings.WindowSize{Width: 900, Height: 600}
@@ -88,7 +90,7 @@ func TestFR_UX_04_SettingsServiceSetKeepsTheDiffWindowSize(t *testing.T) {
 	}
 }
 
-func TestFR_UX_19_SetSwitchesTheLogLevelAtOnce(t *testing.T) {
+func TestSetSwitchesTheLogLevelAtOnce(t *testing.T) {
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
 	level := &slog.LevelVar{} // zero value is Info
@@ -109,7 +111,7 @@ func TestFR_UX_19_SetSwitchesTheLogLevelAtOnce(t *testing.T) {
 	}
 }
 
-func TestFR_UX_19_SetKeepsDebugWhenNebegitLogForcesIt(t *testing.T) {
+func TestSetKeepsDebugWhenNebegitLogForcesIt(t *testing.T) {
 	t.Setenv("NEBEGIT_LOG", "debug")
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
@@ -128,7 +130,7 @@ func TestFR_UX_19_SetKeepsDebugWhenNebegitLogForcesIt(t *testing.T) {
 
 // An edit takes effect immediately wherever the profile is already in use,
 // not just on the next connect.
-func TestTR_13_SettingsServiceSetPushesTheNewProfileToTheLocalCore(t *testing.T) {
+func TestSettingsServiceSetPushesTheNewProfileToTheLocalCore(t *testing.T) {
 	reg, _ := newTestRegistry()
 	var pushed []core.EditorProfile
 	reg.SetLocal(fakeAPI{editorProfiles: &pushed})
@@ -148,7 +150,7 @@ func TestTR_13_SettingsServiceSetPushesTheNewProfileToTheLocalCore(t *testing.T)
 
 // Every window reloads on the event, so the new profile must already be
 // pushed when it goes out.
-func TestFR_ED_05_SettingsServiceSetEmitsSettingsChangedAfterThePush(t *testing.T) {
+func TestSettingsServiceSetEmitsSettingsChangedAfterThePush(t *testing.T) {
 	reg, _ := newTestRegistry()
 	var pushed []core.EditorProfile
 	reg.SetLocal(fakeAPI{editorProfiles: &pushed})

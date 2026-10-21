@@ -1,3 +1,5 @@
+// Requirements: FR-BR-05, FR-LOG-01
+
 package services
 
 import (
@@ -10,7 +12,7 @@ import (
 	"github.com/brogli/nebegit/internal/git/gittest"
 )
 
-func TestFR_LOG_01_ParseTrackParsesBracketedForms(t *testing.T) {
+func TestParseTrackParsesBracketedForms(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		track                 string
@@ -34,7 +36,7 @@ func TestFR_LOG_01_ParseTrackParsesBracketedForms(t *testing.T) {
 	}
 }
 
-func TestFR_LOG_01_ParseRefRecordsThenToRefsBucketsAndDereferencesTags(t *testing.T) {
+func TestParseRefRecordsThenToRefsBucketsAndDereferencesTags(t *testing.T) {
 	t.Parallel()
 	const (
 		shaMain        = "1111111111111111111111111111111111111111"
@@ -101,7 +103,7 @@ func buildForEachRefFixture(records []ref) []byte {
 	return []byte(b.String())
 }
 
-func TestFR_LOG_01_RefsListsEveryRefShape(t *testing.T) {
+func TestRefsListsEveryRefShape(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -184,7 +186,7 @@ func TestFR_LOG_01_RefsListsEveryRefShape(t *testing.T) {
 	})
 }
 
-func TestFR_LOG_01_RefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
+func TestRefsOnUnbornHEADReturnsEmptyListsNoError(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	c, wt := openWorktree(t, repo.Dir)
@@ -208,11 +210,11 @@ func findBranch(branches []core.Branch, name string) *core.Branch {
 	return nil
 }
 
-// TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere covers the
+// TestRefsMarksBranchesBeingRebasedOrBisectedElsewhere covers the
 // four linked worktrees a branch can be held by (and Y asking about itself): X stopped mid-rebase of B,
 // Y mid-bisect of C, Z mid-rebase from a detached HEAD (not attributable to
 // any branch), and W with D plainly checked out.
-func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T) {
+func TestRefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
@@ -277,11 +279,11 @@ func TestFR_BR_05_RefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T)
 	}
 }
 
-// TestFR_BR_05_RefsMarksBothARebaseAndAStaleBisectFromOneWorktree covers a
+// TestRefsMarksBothARebaseAndAStaleBisectFromOneWorktree covers a
 // worktree that started a bisect on C, then moved on: first a plain checkout
 // of D (not detached, C's BISECT_START left stale), then a rebase of D that
 // conflicts (detached again). Both checkpoints must still show C bisecting.
-func TestFR_BR_05_RefsMarksBothARebaseAndAStaleBisectFromOneWorktree(t *testing.T) {
+func TestRefsMarksBothARebaseAndAStaleBisectFromOneWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")

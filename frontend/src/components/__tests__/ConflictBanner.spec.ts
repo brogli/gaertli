@@ -1,3 +1,4 @@
+// Requirements: FR-CONF-04, FR-CONF-09, FR-CP-07, FR-UX-03, QA-SAFE-01
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -51,7 +52,7 @@ describe('ConflictBanner', () => {
       hidden: '"Resolve conflicts" once no file is conflicted',
       operation: Operation.MergeOperation,
     },
-  ])('FR-CONF-04 shows no $hidden', ({ operation }) => {
+  ])('shows no $hidden', ({ operation }) => {
     useChangesStore().files = changedFilesFixture({ conflicted: [] })
     const wrapper = mountDuring(operation)
 
@@ -61,7 +62,7 @@ describe('ConflictBanner', () => {
     expect(findButton(wrapper, 'Resolve conflicts')).toBeUndefined()
   })
 
-  it('FR-CONF-04 disables Continue while a conflicted file remains, enabling once cleared', async () => {
+  it('disables Continue while a conflicted file remains, enabling once cleared', async () => {
     const changes = useChangesStore()
     changes.files = changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] })
 
@@ -74,7 +75,7 @@ describe('ConflictBanner', () => {
     expect(findButton(wrapper, 'Continue')!.attributes('disabled')).toBeUndefined()
   })
 
-  it('FR-CONF-09 "Resolve conflicts" opens the diff window on the first conflicted file', async () => {
+  it('"Resolve conflicts" opens the diff window on the first conflicted file', async () => {
     const conflicted = [
       { path: 'a.txt', status: 'UU' },
       { path: 'b.txt', status: 'UU' },
@@ -94,7 +95,7 @@ describe('ConflictBanner', () => {
     })
   })
 
-  it('FR-CONF-04, FR-UX-03, QA-SAFE-01 clicking Abort confirms before calling Facade.AbortOperation', async () => {
+  it('clicking Abort confirms before calling Facade.AbortOperation', async () => {
     const wrapper = mountDuring(Operation.MergeOperation)
     await findButton(wrapper, 'Abort…')!.trigger('click')
 
@@ -112,7 +113,7 @@ describe('ConflictBanner', () => {
     { operation: Operation.RevertOperation, skips: true },
     { operation: Operation.MergeOperation, skips: false },
   ])(
-    'FR-CP-07 Skip is offered only while a cherry-pick or revert is stopped ($operation)',
+    'Skip is offered only while a cherry-pick or revert is stopped ($operation)',
     ({ operation, skips }) => {
       const wrapper = mountDuring(operation)
 
@@ -120,7 +121,7 @@ describe('ConflictBanner', () => {
     },
   )
 
-  it('FR-CP-07 clicking Skip calls Facade.SkipOperation', async () => {
+  it('clicking Skip calls Facade.SkipOperation', async () => {
     const wrapper = mountDuring(Operation.CherryPickOperation)
     await findButton(wrapper, 'Skip')!.trigger('click')
 

@@ -1,3 +1,5 @@
+// Requirements: QA-PORT-02
+
 package remote
 
 import (
@@ -46,7 +48,7 @@ func deployedPath(t *testing.T, version string) string {
 	return filepath.Join(os.Getenv("HOME"), strings.TrimPrefix(deployTarget(version), "$HOME"))
 }
 
-func TestQA_PORT_02_EnsureDeployedAsksOnceThenSkipsOnceDeployed(t *testing.T) {
+func TestEnsureDeployedAsksOnceThenSkipsOnceDeployed(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: true}
 	dc := newDeployer(consent)
@@ -74,7 +76,7 @@ func TestQA_PORT_02_EnsureDeployedAsksOnceThenSkipsOnceDeployed(t *testing.T) {
 	}
 }
 
-func TestQA_PORT_02_EnsureDeployedDeclinedConsentCopiesNothing(t *testing.T) {
+func TestEnsureDeployedDeclinedConsentCopiesNothing(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	consent := &fakeConsent{accept: false}
 
@@ -92,7 +94,7 @@ func TestQA_PORT_02_EnsureDeployedDeclinedConsentCopiesNothing(t *testing.T) {
 	}
 }
 
-func TestADR_3_EnsureDeployedRecopiesOnSizeMismatch(t *testing.T) {
+func TestEnsureDeployedRecopiesOnSizeMismatch(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	target := deployedPath(t, "1.0.0")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
