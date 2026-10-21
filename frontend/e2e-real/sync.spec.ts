@@ -4,7 +4,7 @@ import http from 'node:http'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test as base, expect } from './fixtures'
-import { gitAfterHistory, type Git } from './repos'
+import { gitAfterHistory, hunksText, type Git } from './repos'
 import type { Sandbox } from './sandbox'
 import {
   choosePullMode,
@@ -14,7 +14,6 @@ import {
   conflictBanner,
   fileRow,
   fileText,
-  hunksText,
   jobsMenuButton,
   notice,
   openBranchPicker,

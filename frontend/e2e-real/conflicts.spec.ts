@@ -3,14 +3,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import type { Git, Repos } from './repos'
+import { hunksText, type Git, type Repos } from './repos'
 import {
   clickConfirm,
   commitFiles,
   conflictBanner,
   fileGroup,
   fileRow,
-  hunksText,
   parents,
   pull,
   pushFromClone,

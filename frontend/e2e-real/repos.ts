@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { hunksText } from './helpers'
 
 // Repos is the scratch setup every test starts from: a bare remote, the
 // main clone "work", a second clone "other", a linked worktree "work2" of
@@ -15,6 +14,11 @@ export interface Repos {
 }
 
 export type Git = (repo: string, ...args: string[]) => string
+
+// hunksText is hunks.txt (line 1 … line 30) with the given lines replaced.
+export function hunksText(replaced: Record<number, string> = {}): string {
+  return Array.from({ length: 30 }, (_, i) => `${replaced[i + 1] ?? `line ${i + 1}`}\n`).join('')
+}
 
 export function gitWith(env: NodeJS.ProcessEnv): Git {
   return (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { env, encoding: 'utf8' })

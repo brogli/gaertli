@@ -178,11 +178,6 @@ export function parents(git: Git, repo: string): number {
   return git(repo, 'log', '-1', '--format=%P').trim().split(' ').length
 }
 
-// hunksText is hunks.txt (line 1 … line 30) with the given lines replaced.
-export function hunksText(replaced: Record<number, string> = {}): string {
-  return Array.from({ length: 30 }, (_, i) => `${replaced[i + 1] ?? `line ${i + 1}`}\n`).join('')
-}
-
 // stagedText is file's content in the index, or null while it has no stage 0
 // entry (unmerged or missing). Polls read the index through it: git show
 // exits non-zero then, and expect.poll fails at once when its callback throws.
