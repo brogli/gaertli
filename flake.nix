@@ -109,7 +109,7 @@
             # Ubuntu 24.04 permits no bwrap to an unprofiled program (its
             # profile for /usr/bin/bwrap came with 25.04).
             if ! ${bwrapShim}/bin/bwrap --ro-bind / / --unshare-user true 2>/dev/null; then
-              echo "nebegit: this host denies bwrap a user namespace, so the app built here cannot start its web-process sandbox. See CONTRIBUTING.md, 'Native Ubuntu'." >&2
+              echo "nebegit: this host denies bwrap a user namespace, so the app built here cannot start its web-process sandbox. See CONTRIBUTING.md, 'Ubuntu 24.04'." >&2
             fi
           '';
         };
