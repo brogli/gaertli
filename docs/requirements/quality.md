@@ -35,6 +35,7 @@
 | QA-COMP-01 | Results equal what the git command line would produce. The user's git config, hooks, ignore rules, attributes, and line-ending settings are respected. |
 | QA-COMP-02 | Works while other git tools (a terminal, an editor) use the same repo.                                                                                 |
 | QA-COMP-03 | The automated tests run against the oldest supported git version and against a current one.                                                            |
+| QA-COMP-04 | The app runs with git 2.42 or newer. With an older or missing git it says so at start and does nothing else.                                           |
 
 ## Portability
 
@@ -47,18 +48,20 @@
 
 ## Security and privacy
 
-| ID        | Requirement                                                                               |
-| --------- | ----------------------------------------------------------------------------------------- |
-| QA-SEC-01 | No telemetry. No network traffic except git talking to the user's remotes.                |
-| QA-SEC-02 | No credentials are stored or logged.                                                      |
-| QA-SEC-03 | Text from the repo (branch names, paths, messages) can never trigger unintended commands. |
+| ID        | Requirement                                                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| QA-SEC-01 | No telemetry. No network traffic except git talking to the user's remotes.                                                     |
+| QA-SEC-02 | No credentials are stored or logged.                                                                                           |
+| QA-SEC-03 | Text from the repo (branch names, paths, messages) can never trigger unintended commands.                                      |
+| QA-SEC-04 | Repo content (messages, names, file contents) is only ever shown, never run: the UI loads nothing but what ships with the app. |
 
 ## Reliability
 
-| ID        | Requirement                                                                                                                                 |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| QA-REL-01 | A failed git action never crashes the app.                                                                                                  |
-| QA-REL-02 | Unexpected repo states (detached HEAD, empty repo, missing worktree folder, shallow clone) are shown, not hidden, and do not break the app. |
+| ID        | Requirement                                                                                                                                                                                        |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QA-REL-01 | A failed git action never crashes the app.                                                                                                                                                         |
+| QA-REL-02 | Unexpected repo states (detached HEAD, empty repo, missing worktree folder, shallow clone) are shown, not hidden, and do not break the app.                                                        |
+| QA-REL-03 | When the app's backend for a repo stops (a crash, a WSL shutdown), nothing is lost: the next action starts it again, the window recovers without being reopened, and a typed commit message stays. |
 
 ## Usability
 
@@ -67,11 +70,14 @@
 | QA-USE-01 | Feels familiar to a user of an IDE's git tooling: same terms, similar flows.                                                                                                          |
 | QA-USE-02 | The everyday actions (open a repo, switch worktree or branch, stage, commit, pull, push, fetch, compare two commits, open in editor) are at most two steps away from the main window. |
 | QA-USE-03 | Requirements, architecture, code and UI share one ubiquitous language: each domain concept has one name, its glossary term.                                                           |
+| QA-USE-04 | The UI is consistent: the same kind of control looks and behaves the same in every view and window, and every theme covers all of it.                                                 |
 
 ## Maintainability and testability
 
-| ID        | Requirement                                                                                                                                                                                                                                                                                                                                                                                        |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| QA-MNT-01 | The requirements are the specification: every behaviour is written here before it is built, and every test names the requirement it proves.                                                                                                                                                                                                                                                        |
-| QA-MNT-02 | Every MUST functional requirement is covered by at least one automated test that names its ID. Exceptions are allowed only where automation is not practical (real WSL, real external editor, window focus, scrolling smoothness), each listed by ID in a manual test checklist. A requirement written ahead of its test is listed as owed until the test lands. An automated check enforces this. |
-| QA-MNT-03 | A test run needs no network: it never contacts a real git remote or any external service, and never touches the developer's own repos or git config. Installing dependencies beforehand may use the network.                                                                                                                                                                                       |
+| ID        | Requirement                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| QA-MNT-01 | The requirements are the specification: every behaviour is written here before it is built, and every test file names the requirements its tests prove.                                                                                                                                                                                                                                                      |
+| QA-MNT-02 | Every MUST functional requirement is covered by at least one automated test in a file that names its ID. Exceptions are allowed only where automation is not practical (real WSL, real external editor, window focus, scrolling smoothness), each listed by ID in a manual test checklist. A requirement written ahead of its test is listed as owed until the test lands. An automated check enforces this. |
+| QA-MNT-03 | A test run needs no network: it never contacts a real git remote or any external service, and never touches the developer's own repos or git config. Installing dependencies beforehand may use the network.                                                                                                                                                                                                 |
+| QA-MNT-04 | Builds are reproducible: a checkout builds with exactly the tools and dependencies it names, and each update of one is a change of its own that passes the checks.                                                                                                                                                                                                                                           |
+| QA-MNT-05 | The code reads like any project of its stack: it follows each stack's standard layout, style and idioms, and the checks enforce whatever a tool can.                                                                                                                                                                                                                                                         |

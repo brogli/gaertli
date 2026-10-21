@@ -1,30 +1,13 @@
 # ADR-6: Write queues by what they lock
 
-Status: accepted
+**Context.** Git protects the index and refs with lock files: two writes to one index at once make
+one fail. One global queue would let a slow fetch block a commit (QA-RESP-01).
 
-## Context
+**Decision.** Writes queue by what git locks. Reads never wait. Writes to a worktree's index and
+files queue per worktree, writes to a repo's shared state (worktrees, branch rename and delete) per
+repo. Ref-only writes (fetch, push, updating a branch checked out nowhere) do not queue; git's ref
+locks suffice. A pull is a fetch outside the queues and then a merge or rebase in the worktree's.
 
-Git protects the index and refs with lock files. Two app actions writing the same index at once
-would make one of them fail, but a single global queue would let a slow fetch block a commit
-(QA-RESP-01, FR-UPD-02).
-
-## Decision
-
-Writes are serialised per scope, matching what git itself locks:
-
-| Scope                 | Serialised                          | Examples                                                                                           |
-| --------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Reads                 | never, they run in parallel         | status, log, diff                                                                                  |
-| Worktree              | one at a time per worktree          | stage, commit, reset, checkout, cherry-pick, revert, squash and fixup, merge/rebase steps, discard |
-| Repo                  | one at a time per repo              | `worktree add/remove/prune`, branch delete/rename                                                  |
-| Refs and objects only | not queued; git's ref locks suffice | fetch, push, updating a branch that is not checked out                                             |
-
-- Pull is a fetch outside the queues, followed by a merge or rebase in the worktree queue.
-- Jobs are not a bypass. A job's work takes the same lock as any other write of its kind.
-- If another tool holds a git lock, git fails. The app shows the error and offers a retry.
-
-## Consequences
-
-- Network actions never block local work.
-- Reads can observe a write half-done. Views reload after every own write, and the watcher catches
-  the rest (`git-mapping.md`).
+**Consequences.** Network actions never block local work. Reads can see a write half-done, so views
+reload after every own write. A lock held by another tool fails as git fails, and the app offers a
+retry.

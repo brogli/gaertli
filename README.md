@@ -15,7 +15,8 @@ Status: pre-alpha. Windows and Linux are the targets, including repos inside WSL
 Windows window.
 
 - What it does: [docs/requirements.md](docs/requirements.md)
-- How it is built: [docs/architecture.md](docs/architecture.md)
+- How it is built: [docs/architecture.md](docs/architecture.md), its code conventions:
+  [docs/conventions.md](docs/conventions.md)
 - Developing nebegit: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## AI assisted coding disclosure

@@ -51,8 +51,8 @@ sudo apparmor_parser -r /etc/apparmor.d/nix-bwrap
 ## Pull requests
 
 - Branch off `main`. One fix or feature per PR.
-- Requirement row first, then a failing test, then the code. Test names carry the requirement ID:
-  `TestFR_LOG_01_...` in Go, `it('FR-LOG-01 ...')` in Vitest.
+- Requirement row first, then a failing test, then the code. Each test file names the requirements
+  it proves in a header line: `// Requirements: FR-LOG-01, FR-LOG-02`.
 - `task ci` passes. Every check runs offline after `task setup`.
 - Commit messages: one imperative line, a body when the why isn't obvious.
 - The PR title becomes a line of the release notes, so write it for users: what they can do now, not

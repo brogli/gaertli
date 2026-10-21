@@ -3,8 +3,10 @@
 Desktop git GUI: Go core + Wails v3 shell + Vue 3 (OpenVue). Developed spec-driven, test-driven,
 hands-off by Claude sessions.
 
-Read `docs/requirements.md` (what, an index of `docs/requirements/`) and `docs/architecture.md`
-(how, an index of `docs/architecture/`) first, then only the topic files a task needs.
+Read `docs/requirements.md` (what), `docs/architecture.md` (how it is built) and
+`docs/conventions.md` (how its code is written) first, each an index of its folder, then only the
+topic files a task needs. `docs/testing.md` is the testing strategy, `docs/releasing.md` how builds
+and releases work.
 
 ## Process
 
@@ -18,29 +20,34 @@ Read `docs/requirements.md` (what, an index of `docs/requirements/`) and `docs/a
 
 ## Docs
 
-- `docs/` holds only requirements and architecture, kept current. Plans, research notes, task lists
-  and logs stay out of the repo.
+- `docs/` holds requirements, architecture, conventions, the testing strategy and the release
+  process, kept current. Plans, research notes, task lists and logs stay out of the repo.
 - `docs/requirements/` is the only source of truth for what the app does. Every behaviour an owner
   remark, a plan or a review settles becomes a row before it is built. Rows read as requirements
   written by people: what the user can do and gets, goal first, current state. UI rows may say how
   the UI is arranged (a toolbar, a picker, a shortcut shown on its button), never library or
   component names, pixel values, log levels, file names, dates or history.
+- Cross-cutting qualities are quality attributes in `docs/requirements/quality.md`.
 - `docs/architecture/` reads like a design doc written by people: decisions and their reasons,
-  structure, UI design, git command shapes. No implementation detail (file names below package
-  level, per-method notes, mechanical flags, exit codes) and no changelog. Those live in code,
-  tests, doc comments and git.
+  structure, UI design, git command shapes. An ADR records only a decision that is costly to
+  reverse, conceptually and briefly. No implementation detail (file names below package level,
+  per-method notes, mechanical flags, exit codes) and no changelog. Those live in code, tests, doc
+  comments and git.
+- `docs/conventions/` states each implementation convention's intent, not its details: those live in
+  lint and tool configuration and in the code.
 
 ## Code
 
-- TDD: failing test first, and a new test must fail on the old code. Test names carry requirement
-  IDs: Go `TestFR_LOG_01_...`, Vitest `it('FR-LOG-01 ...')`.
+- TDD: failing test first, and a new test must fail on the old code. A test file names the
+  requirements its tests prove in one header line, `// Requirements: FR-LOG-01, QA-COMP-01`; test
+  names say what the test checks, without IDs.
 - Frontend: Vitest component tests first. Playwright only where a component test cannot cover it,
   and the PR says why.
 - Tests prove behaviour, never configuration (a flag, a version, an include list). A tooling change
   is checked once by hand on a planted fault, and the PR records the check. `tools/repocheck` holds
   working-tree scans only.
-- Comments state facts only: no ticket or plan numbers, no requirement, ADR or TR IDs as labels, no
-  research or review narration.
+- Comments state facts only: no ticket or plan numbers, no requirement or ADR IDs as labels (the
+  test file header aside), no research or review narration.
 - Anything found done ugly gets fixed, also outside the current task, in a separate `simplify:`
   commit. Skip files an in-flight worktree edits.
 - Rely on OpenVue's standard behaviour. When it misbehaves, remove what of ours defeats it (e.g.

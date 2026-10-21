@@ -191,7 +191,7 @@ func skipDir(name string) bool {
 }
 
 // manualCoverage returns the requirement IDs listed in the first cell of a
-// docs/architecture/testing.md table row, split on comma.
+// docs/testing.md table row, split on comma.
 func manualCoverage(path string) (map[string]bool, error) {
 	rows, err := tableRows(path)
 	if err != nil {
