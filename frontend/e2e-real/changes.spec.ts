@@ -4,7 +4,15 @@ import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import type { Git } from './repos'
-import { clickConfirm, confirmDialog, diffRow, diffText, fileGroup, fileRow } from './helpers'
+import {
+  clickConfirm,
+  confirmDialog,
+  diffRow,
+  diffText,
+  fileGroup,
+  fileRow,
+  fileText,
+} from './helpers'
 
 // The changes view on work's real working tree: groups, staging whole
 // files and discards; and the working tree's diff window: diffs, hunks,
@@ -158,7 +166,7 @@ test('discarding a file asks first: an unstaged one is restored, an untracked on
   const app = await openApp(repos.work)
 
   await discard(app, 'Unstaged', 'conflict.txt')
-  await expect.poll(() => fs.readFileSync(work('conflict.txt'), 'utf8')).toBe('main side\n')
+  await expect.poll(() => fileText(work('conflict.txt'))).toBe('main side\n')
   await discard(app, 'Untracked', 'junk.txt')
   await expect.poll(() => fs.existsSync(work('junk.txt'))).toBe(false)
   await discard(app, 'Untracked', 'junkdir/a.txt')
