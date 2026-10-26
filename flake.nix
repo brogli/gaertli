@@ -92,10 +92,14 @@
             export __EGL_VENDOR_LIBRARY_FILENAMES=${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json
             export GBM_BACKENDS_PATH=${pkgs.mesa}/lib/gbm
             export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri
-            if grep -qi microsoft /proc/version 2>/dev/null; then
-              # WSL renders with Mesa's software driver.
+            if grep -qi microsoft /proc/version 2>/dev/null || [ -e /proc/driver/nvidia/version ]; then
+              # WSL and NVIDIA's proprietary driver render with Mesa's software
+              # driver. NVIDIA's libraries must match the host's kernel module,
+              # so this shell cannot bring them.
               export WEBKIT_DISABLE_DMABUF_RENDERER=1
               source ${pkgs.mesa.llvmpipeHook}/nix-support/setup-hook
+            fi
+            if grep -qi microsoft /proc/version 2>/dev/null; then
               # WSLg: on its Wayland path the page loads but never paints with
               # the software driver; on X11 (XWayland) it renders.
               export GDK_BACKEND=x11
