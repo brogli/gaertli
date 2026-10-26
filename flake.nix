@@ -83,15 +83,19 @@
             # bump it would relink against the old library paths. The same
             # -L dirs in CGO_LDFLAGS are part of its cache key.
             export CGO_LDFLAGS="$(pkg-config --libs-only-L gtk4 webkitgtk-6.0)"
-            if [ ! -e /run/opengl-driver ]; then
-              # Non-NixOS host (WSL, Ubuntu, …): the Nix-built libEGL finds no
-              # GL driver, so WebKit's web process aborts with EGL_BAD_PARAMETER
-              # and the window stays blank. Mesa's llvmpipe hook points EGL/GLX
-              # at Mesa's own software driver.
+            # WebKit's processes load the GL driver at /run/opengl-driver, which
+            # is missing on most hosts and on others (NixOS, system-manager)
+            # comes from another nixpkgs. A driver built against a newer glibc
+            # than this shell's fails to load. Without a driver WebKit's web
+            # process aborts with EGL_BAD_PARAMETER and the window stays blank.
+            # EGL, GBM and DRI use this shell's Mesa instead.
+            export __EGL_VENDOR_LIBRARY_FILENAMES=${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json
+            export GBM_BACKENDS_PATH=${pkgs.mesa}/lib/gbm
+            export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri
+            if grep -qi microsoft /proc/version 2>/dev/null; then
+              # WSL renders with Mesa's software driver.
               export WEBKIT_DISABLE_DMABUF_RENDERER=1
               source ${pkgs.mesa.llvmpipeHook}/nix-support/setup-hook
-            fi
-            if grep -qi microsoft /proc/version 2>/dev/null; then
               # WSLg: on its Wayland path the page loads but never paints with
               # the software driver; on X11 (XWayland) it renders.
               export GDK_BACKEND=x11
