@@ -20,7 +20,7 @@ priority = 1
 
 [formatter.eslint]
 command = "tools/treefmt/frontend"
-options = ["eslint", "--fix", "--cache", "--no-warn-ignored", "--max-warnings=0", "--"]
+options = ["eslint", "--fix", "--cache", "--cache-strategy", "content", "--no-warn-ignored", "--max-warnings=0", "--"]
 includes = ["frontend/**/*.vue", "frontend/**/*.ts", "frontend/**/*.mts"]
 priority = 2
 

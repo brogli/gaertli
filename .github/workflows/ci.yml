@@ -60,7 +60,8 @@ jobs:
           echo "pnpm=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
       # The module cache is the same for every job: one cache per go.sum. The
-      # build cache is per job and commit, the previous commit's as fallback.
+      # build cache is per job and commit, the previous commit's as fallback,
+      # then any Linux job's: a failed job saves none, and would start cold.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.paths.outputs.gomod }}
@@ -71,10 +72,11 @@ jobs:
         with:
           path: ${{ steps.paths.outputs.gobuild }}
           key:
-            gobuild-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+            gobuild-${{ runner.os }}-${{ matrix.task }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
-            gobuild-${{ matrix.task }}-${{ runner.os }}-${{ hashFiles('go.sum') }}-
-            gobuild-${{ matrix.task }}-${{ runner.os }}-
+            gobuild-${{ runner.os }}-${{ matrix.task }}-${{ hashFiles('go.sum') }}-
+            gobuild-${{ runner.os }}-${{ matrix.task }}-
+            gobuild-${{ runner.os }}-
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -91,6 +93,15 @@ jobs:
           restore-keys: |
             golangci-lint-${{ hashFiles('go.sum') }}-
             golangci-lint-
+
+      # ESLint's cache tracks each file, not the types it reads from others, so
+      # a cache from other sources can hide a finding. It is reused only when
+      # nothing ESLint reads changed; the bindings it reads come from the Go code.
+      - if: matrix.task == 'ci:lint'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: frontend/.eslintcache
+          key: eslint-${{ hashFiles('frontend/**', '**/*.go', 'go.mod', 'go.sum', 'treefmt.toml') }}
 
       - name: Setup (online)
         run: task setup
