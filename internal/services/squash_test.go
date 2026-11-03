@@ -400,12 +400,15 @@ func TestSquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *testing.T)
 	}
 }
 
-func TestAStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
+// The cases check what the stop left behind rather than git's words, which
+// change between git versions.
+func TestAStopThatIsNoConflictLeavesTheRebaseOpenAndAbortRestores(t *testing.T) {
 	t.Parallel()
+	const untracked = "untracked, not to be lost\n"
 	for _, tc := range []struct {
 		name    string
 		fixture func(t *testing.T, dir string) (shas []string)
-		reason  string
+		atStop  func(t *testing.T, dir string)
 	}{
 		{"an untracked file in the way of a later commit", func(t *testing.T, dir string) []string {
 			t.Helper()
@@ -416,9 +419,14 @@ func TestAStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
 			gittest.Run(t, dir, "rm", "-q", "z.txt")
 			gittest.CommitAll(t, dir, "D deletes z")
 			d := gittest.HeadSHA(t, dir)
-			writeFile(t, dir, "z.txt", "untracked, not to be lost\n")
+			writeFile(t, dir, "z.txt", untracked)
 			return []string{b, d}
-		}, "untracked working tree files would be overwritten"},
+		}, func(t *testing.T, dir string) {
+			t.Helper()
+			if got := readFile(t, dir, "z.txt"); got != untracked {
+				t.Errorf("z.txt at the stop = %q, want it untouched", got)
+			}
+		}},
 		{"a commit folded with its own revert", func(t *testing.T, dir string) []string {
 			t.Helper()
 			gittest.Commit(t, dir, "base.txt", "base\n", "base")
@@ -427,28 +435,39 @@ func TestAStopThatIsNoConflictSaysGitsReasonAndAbortRestores(t *testing.T) {
 			gittest.Run(t, dir, "rm", "-q", "g.txt")
 			gittest.CommitAll(t, dir, "D removes g")
 			return []string{b, gittest.HeadSHA(t, dir)}
-		}, "Could not apply"},
+		}, func(t *testing.T, dir string) {
+			t.Helper()
+			index, base := gittest.Out(t, dir, "write-tree"), gittest.Out(t, dir, "rev-parse", "HEAD~1^{tree}")
+			if index != base {
+				t.Errorf("index at the stop = %s, want the empty fold's tree %s", index, base)
+			}
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := gittest.New(t)
 			shas := tc.fixture(t, repo.Dir)
 			head := gittest.HeadSHA(t, repo.Dir)
+			status := gittest.Out(t, repo.Dir, "status", "--porcelain")
 			c, wt := openWorktree(t, repo.Dir)
 
 			_, err := c.Fixup(t.Context(), wt, shas)
 
 			ce := coretest.AsError(t, err, core.Stopped)
-			if !strings.Contains(ce.GitStderr+ce.Message, tc.reason) {
-				t.Errorf("error = %q (details %q), want git's reason %q", ce.Message, ce.GitStderr, tc.reason)
+			if ce.GitStderr == "" {
+				t.Error("the stop carries none of git's output")
 			}
 			if operation(filepath.Join(repo.Dir, ".git")) != "rebase" {
 				t.Fatal("no rebase in progress after the stop")
 			}
+			tc.atStop(t, repo.Dir)
 			if err := c.AbortOperation(t.Context(), wt); err != nil {
 				t.Fatal(err)
 			}
 			if got := gittest.HeadSHA(t, repo.Dir); got != head {
 				t.Errorf("HEAD after abort = %s, want %s", got, head)
+			}
+			if got := gittest.Out(t, repo.Dir, "status", "--porcelain"); got != status {
+				t.Errorf("status after abort = %q, want %q", got, status)
 			}
 		})
 	}
@@ -467,7 +486,10 @@ func TestAFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 
 	_, err := c.Squash(t.Context(), wt, []string{l.B, l.D}, "Folded")
 
-	coretest.AssertCode(t, err, core.Stopped)
+	ce := coretest.AsError(t, err, core.Stopped)
+	if !strings.Contains(ce.GitStderr, "refusing") {
+		t.Errorf("details = %q, want the reason the hook gave", ce.GitStderr)
+	}
 	if err := c.ContinueOperation(t.Context(), wt); err == nil {
 		t.Fatal("Continue with the amend still failing = nil, want the failure again")
 	}
