@@ -216,31 +216,30 @@ tasks:
       - go build -trimpath -o internal/remote/nebegit-core-linux ./cmd/nebegit-core
 
   ci:lint:
-    summary: CI's lint job (treefmt, type check, traceability, licence check)
+    summary: treefmt, type check, traceability, licence check
     cmds:
       - task: lint
       - task: trace
       - task: licence-check
 
   ci:go:
-    summary: CI's Go job (the Go tests embed the built frontend)
+    summary: The Go tests, which embed the built frontend
     deps:
       - task: common:build:frontend
     cmds:
       - task: test:go
 
-  ci:frontend:
-    summary:
-      CI's frontend job (component tests, the Linux build, the Windows cross-build and installer)
+  ci:build:
+    summary: The Linux build, the Windows cross-build and installer
     cmds:
-      - task: test:frontend
       - task: build
       - task: build:core
       - task: windows:package:dryrun
 
   ci:
-    summary: Everything CI runs offline after `task setup`, as its Linux jobs split it
+    summary: Every check of CI's Linux jobs but the e2e suites, offline after `task setup`
     cmds:
       - task: ci:lint
       - task: ci:go
-      - task: ci:frontend
+      - task: test:frontend
+      - task: ci:build

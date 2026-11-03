@@ -1032,8 +1032,8 @@ func TestForcePushRefusedWhenRemoteGainedAnUnfetchedCommit(t *testing.T) {
 	}
 }
 
-// requireHTTPTransport skips the test when git cannot talk to HTTP remotes:
-// CI's git 2.42 is built without libcurl.
+// requireHTTPTransport skips the test when git cannot talk to HTTP remotes: a
+// git built without libcurl.
 func requireHTTPTransport(t *testing.T) {
 	t.Helper()
 	execPath, err := exec.Command("git", "--exec-path").Output()
