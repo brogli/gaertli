@@ -456,9 +456,12 @@ const toolbar = computed<ToolbarButton[]>(() => {
         </div>
       </template>
       <template v-if="showsContent">
+        <!-- shrink-0: OpenVue lets a splitter nested in a panel shrink to fit,
+             and its panels clip. The diff view scrolls as a whole, so this one
+             stays as tall as its editors. -->
         <Splitter
           v-if="mode === DiffMode.SideBySideDiff"
-          class="cm-mergeView"
+          class="cm-mergeView shrink-0"
           layout="horizontal"
           state-key="nebegit.layout.diffSides"
           state-storage="local"

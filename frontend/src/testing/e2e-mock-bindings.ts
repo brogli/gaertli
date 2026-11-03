@@ -234,9 +234,12 @@ const DIFF_FILE_FIXTURE = diffFileFixture({
   oldPath: '',
   // Long enough to need more height than the diff window has, as a real
   // source file does.
-  oldContent: 'line one\nline two\nline three\n' + 'unchanged line\n'.repeat(200),
+  oldContent:
+    'line one\nline two\nline three\n' + 'unchanged line\n'.repeat(200) + 'last old line\n',
   newContent:
-    'line one\nline TWO, changed\nline three\nline four\n' + 'unchanged line\n'.repeat(200),
+    'line one\nline TWO, changed\nline three\nline four\n' +
+    'unchanged line\n'.repeat(200) +
+    'last new line\n',
   hunks: [hunk(2, 1, 2, 1), hunk(3, 0, 4, 1)],
 })
 
