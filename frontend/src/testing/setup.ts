@@ -7,6 +7,13 @@ import { i18n } from '@/i18n'
 import { openvueLocale } from '@/lib/openvueLocale'
 import { openvuePassThrough } from '@/lib/openvuePassThrough'
 
+// Vue ignores an event not newer than its handler's attach time, and Test
+// Utils stamps events from Date.now, so a system clock stepped back by time
+// sync would swallow clicks. In a worker, Date.now never runs backwards.
+const wallClock = Date.now
+let latest = 0
+Date.now = () => (latest = Math.max(latest, wallClock()))
+
 // Components with a window-level listener (onKeyStroke's shortcuts) would
 // otherwise keep firing into later tests in the same file: every mount
 // needs an unmount.
