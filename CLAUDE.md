@@ -5,8 +5,8 @@ hands-off by Claude sessions.
 
 Read `docs/requirements.md` (what), `docs/architecture.md` (how it is built) and
 `docs/conventions.md` (how its code is written) first, each an index of its folder, then only the
-topic files a task needs. `docs/testing.md` is the testing strategy, `docs/releasing.md` how builds
-and releases work.
+topic files a task needs. `docs/testing.md` is the testing strategy, `docs/ci.md` what the CI
+pipelines do, `docs/releasing.md` how builds and releases work.
 
 ## Process
 
@@ -20,8 +20,9 @@ and releases work.
 
 ## Docs
 
-- `docs/` holds requirements, architecture, conventions, the testing strategy and the release
-  process, kept current. Plans, research notes, task lists and logs stay out of the repo.
+- `docs/` holds requirements, architecture, conventions, the testing strategy, the CI pipelines and
+  the release process, kept current. Plans, research notes, task lists and logs stay out of the
+  repo.
 - `docs/requirements/` is the only source of truth for what the app does. Every behaviour an owner
   remark, a plan or a review settles becomes a row before it is built. Rows read as requirements
   written by people: what the user can do and gets, goal first, current state. UI rows may say how

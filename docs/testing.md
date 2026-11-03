@@ -21,11 +21,9 @@ Tests are the proof that a requirement holds (QA-MNT-01, QA-MNT-02).
 
 ## CI
 
-Every pull request runs the Linux checks in the Nix shell: lint, the Go and frontend tests, both e2e
-suites, the Linux build and the Windows cross-build, and the Go tests against the oldest supported
-git. The Windows Go tests and the macOS build cost more and run for pull requests into `main`, for
-pushes to `main`, for releases and by hand. A push to `main` runs everything so that later pull
-requests can restore its caches. Other pushes start no run, since `task ci` runs before each commit.
+Every pull request runs all of the automated levels above; `docs/ci.md` says which job runs which
+and how to reproduce one. Pushes other than to `main` start no run, since `task ci` runs before each
+commit.
 
 ## Manual checklist
 
