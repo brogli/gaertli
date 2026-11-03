@@ -23,7 +23,7 @@ task e2e             # Playwright against a mock backend
 task build           # -> bin/nebegit
 task windows:build   # -> bin/nebegit.exe
 task dev             # hot reload
-task ci              # what CI runs on Linux
+task ci              # CI's Linux checks, except e2e
 ```
 
 Binaries built in the shell use its libraries and run only inside it, e.g.
