@@ -14,6 +14,10 @@ const baseURL = `http://127.0.0.1:${port}`
 // page), so every test runs in parallel; Playwright's default on CI is one
 // worker.
 export default defineConfig({
+  // Each suite keeps its own folders, so the second suite of a CI job
+  // doesn't clear the first one's failure files.
+  outputDir: './test-results/mock',
+  reporter: [['list'], ['html', { open: 'never', outputFolder: './playwright-report/mock' }]],
   testDir: './e2e',
   fullyParallel: true,
   workers: process.env.CI ? 4 : '50%',

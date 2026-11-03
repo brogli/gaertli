@@ -19,7 +19,8 @@ Linux checks locally, offline after `task setup`, except the two e2e suites: `ta
 | `macos`         | The app builds on macOS; nothing runs                                                                                                                                     | On a Mac: `task build`                                                                                       |
 
 `linux (check)` and `linux (app)` run each check as its own step, so a failed lint still shows
-whether the component tests passed: read every red step.
+whether the component tests passed: read every red step. A failed e2e step attaches its report and
+failure files to the run.
 
 ## Timing
 
