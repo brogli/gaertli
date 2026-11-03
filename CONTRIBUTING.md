@@ -55,8 +55,9 @@ sudo apparmor_parser -r /etc/apparmor.d/nix-bwrap
   it proves in a header line: `// Requirements: FR-LOG-01, FR-LOG-02`.
 - `task ci` passes. Every check runs offline after `task setup`.
 - Commit messages: one imperative line, a body when the why isn't obvious.
-- The PR title becomes a line of the release notes, so write it for users: what they can do now, not
-  what you changed in the code.
+- The PR title is a [Conventional Commit](https://www.conventionalcommits.org) and becomes a line of
+  the release notes, so write it for users: what they can do now, not what you changed in the code,
+  such as `fix(log): filters survive a reload`.
 - Dependencies need a permissive licence (MIT, BSD, ISC, Apache-2.0, MPL-2.0). `task licence-check`
   verifies that and writes the third-party notices. pnpm is the only JS package manager, so commit
   `frontend/pnpm-lock.yaml`.

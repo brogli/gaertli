@@ -14,7 +14,8 @@ pipelines do, `docs/releasing.md` how builds and releases work.
   code), each finding with a link and a date.
 - Work on a branch off `main` and merge `main` into it for dependency updates. Never commit to
   `main`.
-- PR titles are written for users: they become the release notes.
+- PR titles are Conventional Commits, written for users: they become the release notes
+  (`docs/conventions/tooling.md`).
 - Project knowledge goes into this file or a project skill (`.claude/skills/`), not into Claude's
   private memory. Machine-specific facts and personal workflow go into `CLAUDE.local.md`.
 

@@ -1,6 +1,8 @@
 # GitHub's generated release notes: a flat list of the merged PRs' titles.
 changelog:
   exclude:
+    labels:
+      - no-release-notes
     authors:
       - renovate[bot]
       - dependabot[bot]

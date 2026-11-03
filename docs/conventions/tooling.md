@@ -10,3 +10,7 @@
   planted violation when added, not a permanent test.
 - **Checks run locally first.** `task ci` runs the checks a commit must pass; CI runs the same tasks
   plus the e2e suites and the oldest supported git, all offline after setup (QA-MNT-03).
+- **Pull request titles are [Conventional Commits](https://www.conventionalcommits.org)**, the form
+  Renovate's take, such as `fix(log): filters survive a reload`. They become the release notes, so
+  the description is written for users. A PR no user would notice carries the `no-release-notes`
+  label, which keeps it out of them.
