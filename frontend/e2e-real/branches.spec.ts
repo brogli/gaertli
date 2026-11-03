@@ -116,6 +116,8 @@ test.describe('a repo with no remote', () => {
     await app.locator('.filter-bar .p-multiselect').click()
     await app.getByRole('option', { name: 'main', exact: true }).click()
     await app.keyboard.press('Escape')
+    // Closing, the multiselect takes the focus back; typing before that loses the text.
+    await expect(app.getByRole('listbox')).toBeHidden()
     await app.getByPlaceholder('Path').fill('file.txt')
     await expect(app.locator('[data-test=clear-path]')).toBeVisible()
     await expect(logRow(app, 'commit C')).toBeVisible()
