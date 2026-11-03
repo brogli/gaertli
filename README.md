@@ -11,8 +11,7 @@ For developers whose editor lacks strong git tooling. Log viewer with graph, com
 worktree handling, safe sync actions, merge, rebase, cherry-pick and a three-pane merge editor. Go
 core, Wails v3 shell, Vue 3 frontend. Every git operation runs the system `git`.
 
-Status: pre-alpha. Windows and Linux are the targets, including repos inside WSL from a native
-Windows window.
+Windows and Linux are the targets, including repos inside WSL from a native Windows window.
 
 - What it does: [docs/requirements.md](docs/requirements.md)
 - How it is built: [docs/architecture.md](docs/architecture.md), its code conventions:

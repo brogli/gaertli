@@ -65,4 +65,4 @@ sudo apparmor_parser -r /etc/apparmor.d/nix-bwrap
 
 ## Licence
 
-BSD-3-Clause, no CLA, no sign-off. Opening a PR confirms that may submit it under this licence.
+BSD-3-Clause, no CLA, no sign-off. Opening a PR confirms that you may submit it under this licence.
