@@ -1,0 +1,245 @@
+version: '3'
+
+vars:
+  APP_NAME: 'nebegit'
+  BIN_DIR: 'bin'
+  PACKAGE_MANAGER: pnpm
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # Target OS for build/package/run. Cross-compile with the Task variable
+  # (`task build GOOS=windows`): an exported GOOS=windows makes Task's shell
+  # miss pnpm, go and wails3 on PATH.
+  GOOS: '{{.GOOS | default OS}}'
+  # Stamped into internal/buildinfo via -ldflags -X: the release version
+  # (build/release-version.sh) and the short commit, set by the release
+  # workflow; "dev" and no commit for every local build.
+  VERSION: '{{.VERSION | default "dev"}}'
+  COMMIT: '{{.COMMIT | default ""}}'
+  # The numeric version installers and packages need: 0.0.0 outside releases.
+  PRODUCT_VERSION:
+    sh: echo "{{.VERSION}}" | grep -xE '[0-9]+\.[0-9]+\.[0-9]+' || echo 0.0.0
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: '{{.GOOS}}:build'
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: '{{.GOOS}}:package'
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: '{{.GOOS}}:run'
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  setup:
+    summary: Downloads Go modules and frontend packages (the only step that needs the network)
+    cmds:
+      - go mod download
+      - task: common:install:frontend:deps
+
+  test:go:
+    summary: Runs the Go tests offline
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      # Tests mostly wait on git, so more of them run at once than there are cores.
+      - go test -parallel 16 ./...
+
+  test:go:core:
+    summary:
+      Runs the Go tests that need no frontend build (the windows CI job); FLAGS=-race adds the race
+      detector
+    deps:
+      - task: build:core:embed
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      # PARALLEL: tests mostly wait on git, so more run at once than there are cores; the Windows
+      # runner, where every git process is slow, takes fewer.
+      - go test -parallel {{.PARALLEL | default 16}} {{.FLAGS}} ./internal/...
+        ./cmd/nebegit-core/... ./build/windows/bin/...
+
+  test:go:oldgit:
+    summary:
+      Runs the Go tests whose behaviour depends on the git version (the git-2-42 CI job), i.e. the
+      core set without internal/app, the Wails shell, which alone needs cgo and the GTK/WebKit
+      headers
+    deps:
+      - task: build:core:embed
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      - go test -parallel 16 {{.FLAGS}} $(go list ./internal/... | grep -v '/internal/app$')
+        ./cmd/nebegit-core/... ./build/windows/bin/...
+
+  test:frontend:
+    summary: Runs the Vitest component tests offline
+    deps:
+      - task: common:install:frontend:deps
+      - task: common:generate:bindings
+    cmds:
+      - task: common:frontend:run
+        vars: { SCRIPT: test:unit }
+
+  test:
+    summary: Runs Go and frontend tests offline
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - task: test:go
+      - task: test:frontend
+
+  fmt:
+    summary: Lint with fixes, then format the whole repo (treefmt.toml)
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - treefmt
+
+  lint:
+    summary:
+      treefmt --ci (every linter, then every formatter; fails on a finding or a change), vue-tsc
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - cmd: treefmt --ci
+        platforms: [linux, darwin]
+      # Windows runners have no Nix shell; the Windows-only Go files are
+      # linted there. golangci-lint type-checks internal/remote, whose
+      # go:embed needs the cross-built core.
+      - task: build:core:embed
+        platforms: [windows]
+      - cmd: golangci-lint run
+        platforms: [windows]
+      - task: common:frontend:run
+        vars: { SCRIPT: type-check }
+
+  trace:
+    summary: Every MUST FR ID has a test name or a manual checklist entry
+    cmds:
+      - go run ./tools/trace
+
+  licence-check:
+    summary: Every shipped dependency has an allowed licence; writes the third-party notices
+    vars:
+      OUT: '{{.OUT | default "THIRD-PARTY-NOTICES.txt"}}'
+    cmds:
+      - go run ./tools/licensecheck -out {{.OUT}}
+
+  release:dry-run:
+    summary:
+      Builds this platform's release artifact and licence notices into dist/, mirroring release.yml
+      without publishing
+    vars:
+      VERSION:
+        sh: build/release-version.sh
+      COMMIT:
+        sh: git rev-parse --short=7 HEAD
+    cmds:
+      - rm -rf dist && mkdir -p dist
+      # Command-line vars, like the workflow's environment, reach every
+      # Taskfile's vars; vars passed to a called task do not.
+      - '{{.TASK_EXE}} build {{OS}}:package:dryrun VERSION={{.VERSION}} COMMIT={{.COMMIT}}'
+      - task: licence-check
+        vars: { OUT: dist/THIRD-PARTY-NOTICES.txt }
+      - cp LICENSE dist/
+      - sh -c 'cd dist && sha256sum * > SHA256SUMS'
+
+  bench:
+    summary: Builds/refreshes the reference repo and runs the perf checks (on demand)
+    env: { GOPROXY: off, GOFLAGS: -mod=readonly, GOTOOLCHAIN: local }
+    cmds:
+      - go run ./tools/mkrepo/cmd/mkrepo --out .bench/reference-repo
+      - go test -tags=bench -v ./tools/bench
+
+  e2e:
+    summary: Playwright against the Vite dev server with a mocked Go layer
+    deps:
+      - task: common:install:frontend:deps
+      - task: common:generate:bindings
+    cmds:
+      - task: common:frontend:run
+        vars: { SCRIPT: test:e2e }
+
+  build:server:
+    summary:
+      Builds the app in Wails server mode (UI served over HTTP) for the real-backend e2e suite;
+      Linux only
+    cmds:
+      - task: linux:build
+        vars: { EXTRA_TAGS: server, OUTPUT: '{{.BIN_DIR}}/nebegit-server' }
+
+  e2e:real:
+    summary: Playwright against the app in server mode, with the real core and git on scratch repos
+    platforms: [linux]
+    deps:
+      - task: build:server
+    cmds:
+      - task: common:frontend:run
+        vars: { SCRIPT: test:e2e:real }
+
+  build:core:
+    summary: Builds the headless core as pure Go
+    env:
+      CGO_ENABLED: '0'
+    cmds:
+      - go build -o {{.BIN_DIR}}/nebegit-core{{exeExt}} ./cmd/nebegit-core
+
+  build:core:embed:
+    summary:
+      Cross-compiles the headless core for linux/amd64 into internal/remote, for the Windows build
+      to embed
+    sources: [cmd/nebegit-core/**/*.go, internal/**/*.go]
+    generates: [internal/remote/nebegit-core-linux]
+    env: { GOOS: linux, GOARCH: amd64, CGO_ENABLED: '0' }
+    cmds:
+      - go build -trimpath -o internal/remote/nebegit-core-linux ./cmd/nebegit-core
+
+  ci:lint:
+    summary: treefmt, type check, traceability, licence check
+    cmds:
+      - task: lint
+      - task: trace
+      - task: licence-check
+
+  ci:go:
+    summary: The Go tests, which embed the built frontend
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - task: test:go
+
+  ci:build:
+    summary: The Linux build, the Windows cross-build and installer
+    cmds:
+      - task: build
+      - task: build:core
+      - task: windows:package:dryrun
+
+  ci:
+    summary: Every check of CI's Linux jobs but the e2e suites, offline after `task setup`
+    cmds:
+      - task: ci:lint
+      - task: ci:go
+      - task: test:frontend
+      - task: ci:build

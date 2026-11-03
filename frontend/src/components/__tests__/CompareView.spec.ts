@@ -1,0 +1,144 @@
+// Requirements: FR-CMP-01, FR-CMP-02, FR-CMP-03, FR-CMP-05, FR-ED-02, FR-LOG-16
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { Facade, AppService } = vi.hoisted(() => ({
+  Facade: { CompareCommits: vi.fn(), OpenFile: vi.fn() },
+  AppService: { OpenDiff: vi.fn() },
+}))
+
+vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+
+vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
+
+import CompareView from '../CompareView.vue'
+import { useLogStore } from '@/stores/log'
+import { pressKey } from '@/testing/pressKey'
+import { commitRow } from '@/testing/fixtures/log-rows'
+import type { ChangedFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+
+// mountComparing mounts CompareView comparing sha-a (selected first: from)
+// with sha-b (selected second: to), CompareCommits answering files.
+async function mountComparing(files: ChangedFile[] = []) {
+  Facade.CompareCommits.mockResolvedValue(files)
+  const log = useLogStore()
+  log.selection = [
+    commitRow({ sha: 'sha-a', shortSha: 'aaa1111' }),
+    commitRow({ sha: 'sha-b', shortSha: 'bbb2222' }),
+  ]
+  const wrapper = mount(CompareView, { props: { wt: '/repo' } })
+  await flushPromises()
+  return { wrapper, log }
+}
+
+describe('CompareView', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    Facade.CompareCommits.mockReset()
+    AppService.OpenDiff.mockReset()
+    Facade.OpenFile.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('shows both commits short SHAs in from->to order and the changed files', async () => {
+    const { wrapper } = await mountComparing([
+      { path: 'a.txt', status: 'M' },
+      { path: 'b.txt', status: 'A' },
+    ])
+
+    expect(Facade.CompareCommits).toHaveBeenCalledWith('/repo', 'sha-a', 'sha-b')
+    const text = wrapper.text()
+    expect(text.indexOf('aaa1111')).toBeLessThan(text.indexOf('bbb2222'))
+    expect(wrapper.findAll('.files li')).toHaveLength(2)
+  })
+
+  it("each side's box holds its short hash in its colour, not older or newer", async () => {
+    const { wrapper } = await mountComparing()
+
+    const fromTag = wrapper.get('[data-test="from-tag"]')
+    const toTag = wrapper.get('[data-test="to-tag"]')
+    expect(fromTag.text()).toBe('aaa1111')
+    expect(fromTag.attributes('title')).toBe('sha-a')
+    expect(fromTag.classes()).toContain('from')
+    expect(toTag.text()).toBe('bbb2222')
+    expect(toTag.attributes('title')).toBe('sha-b')
+    expect(toTag.classes()).toContain('to')
+    expect(wrapper.get('header').text()).not.toMatch(/older|newer/)
+  })
+
+  it('clicking swap reverses the comparison direction; the boxes keep their colours, the hashes in them swap', async () => {
+    const { wrapper } = await mountComparing()
+    Facade.CompareCommits.mockClear()
+
+    await wrapper.get('[data-test="swap"]').trigger('click')
+    await flushPromises()
+
+    expect(Facade.CompareCommits).toHaveBeenCalledWith('/repo', 'sha-b', 'sha-a')
+    const fromTag = wrapper.get('[data-test="from-tag"]')
+    const toTag = wrapper.get('[data-test="to-tag"]')
+    expect(fromTag.text()).toBe('bbb2222')
+    expect(fromTag.classes()).toContain('from')
+    expect(toTag.text()).toBe('aaa1111')
+    expect(toTag.classes()).toContain('to')
+  })
+
+  it('the close button names its shortcut in the tooltip, not in aria-label; pressing Escape exits the comparison', async () => {
+    const { wrapper, log } = await mountComparing()
+
+    const exit = wrapper.get('[data-test="exit"]')
+    expect(exit.attributes('title')).toBe('Stop comparing · Esc')
+    expect(exit.attributes('aria-label')).toBe('Stop comparing')
+
+    pressKey('Escape')
+
+    expect(log.selection).toEqual([])
+  })
+
+  it('a double-click on a file opens it in the diff window', async () => {
+    const { wrapper } = await mountComparing([
+      { path: 'a.txt', status: 'M' },
+      { path: 'b.txt', oldPath: 'a2.txt', status: 'R' },
+    ])
+
+    const file = wrapper.findAll('.files li')[1]!
+    await file.trigger('dblclick')
+
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: 'range',
+      from: 'sha-a',
+      to: 'sha-b',
+      path: 'b.txt',
+      oldPath: 'a2.txt',
+    })
+  })
+
+  it("a comparison's files switch to the folder tree, where a double-click opens a file", async () => {
+    const { wrapper } = await mountComparing([{ path: 'src/b.txt', status: 'M' }])
+
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+    await wrapper
+      .get('[role="treeitem"][aria-label="b.txt"] [data-pc-section="nodecontent"]')
+      .trigger('dblclick')
+
+    expect(AppService.OpenDiff).toHaveBeenCalledWith('/repo', {
+      kind: 'range',
+      from: 'sha-a',
+      to: 'sha-b',
+      path: 'src/b.txt',
+      oldPath: '',
+    })
+  })
+
+  it('an open-editor event from the file list calls Facade.OpenFile with wt, the path, and line 0', async () => {
+    const { wrapper } = await mountComparing([
+      { path: 'a.txt', status: 'M' },
+      { path: 'b.txt', status: 'A' },
+    ])
+
+    await wrapper.findAll('[data-test="open-editor"]')[1]!.trigger('click')
+
+    expect(Facade.OpenFile).toHaveBeenCalledTimes(1)
+    expect(Facade.OpenFile).toHaveBeenCalledWith('/repo', 'b.txt', 0)
+  })
+})

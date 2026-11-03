@@ -1,0 +1,29 @@
+// Project settings for VS Code.
+{
+  // Format every file through treefmt (treefmt.toml), so the editor formats
+  // exactly as `task lint` checks. The Custom Local Formatters extension
+  // (extensions.json) pipes the buffer through the command. `direnv exec .`
+  // provides the Nix shell's treefmt whatever environment the editor was
+  // started from.
+  "customLocalFormatters.formatters": [
+    {
+      "command": "direnv exec . treefmt --stdin \"${file}\"",
+      "languages": [
+        "go",
+        "typescript",
+        "javascript",
+        "vue",
+        "css",
+        "scss",
+        "html",
+        "json",
+        "jsonc",
+        "yaml",
+        "markdown",
+        "nix"
+      ]
+    }
+  ],
+  "editor.defaultFormatter": "jkillian.custom-local-formatters",
+  "editor.formatOnSave": true
+}

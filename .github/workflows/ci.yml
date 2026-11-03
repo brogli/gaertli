@@ -1,0 +1,356 @@
+name: ci
+
+# Pull requests, and pushes to main: a pull request can restore only its own
+# caches, its base branch's and the default branch's, so main's run saves them
+# for the next pull request. Other pushes are checked by `task ci` before their
+# commit.
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [main]
+  workflow_call:
+  # By hand (gh workflow run ci --ref dev): the full set, Windows and macOS included.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the run in progress. A
+# release's call (workflow_dispatch) is never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  linux:
+    # The Nix shell supplies GTK4, WebKitGTK, golangci-lint, treefmt, the
+    # task and wails3 shims and Playwright's browsers. Static checks with the
+    # component tests, the Go tests, and what needs a built app, each its own
+    # steps: a failing check doesn't hide the next one's result.
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [check, go, app]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: 'nix develop --command bash -eo pipefail {0}'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      # The dev shell's store paths, downloaded once per flake lock rather
+      # than by every job on every run.
+      - uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 2G
+
+      # Go is not part of the Nix shell.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cache paths
+        id: paths
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "pnpm=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback,
+      # then any Linux job's: a failed job saves none, and would start cold.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key:
+            gobuild-${{ runner.os }}-${{ matrix.job }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            gobuild-${{ runner.os }}-${{ matrix.job }}-${{ hashFiles('go.sum') }}-
+            gobuild-${{ runner.os }}-${{ matrix.job }}-
+            gobuild-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.pnpm }}
+          key: pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-
+
+      # golangci-lint's analysis cache, beside the Go build cache it compiles into.
+      - if: matrix.job == 'check'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            golangci-lint-${{ hashFiles('go.sum') }}-
+            golangci-lint-
+
+      # ESLint's cache tracks each file, not the types it reads from others, so
+      # a cache from other sources can hide a finding. It is reused only when
+      # nothing ESLint reads changed; the bindings it reads come from the Go code.
+      - if: matrix.job == 'check'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: frontend/.eslintcache
+          key: eslint-${{ hashFiles('frontend/**', '**/*.go', 'go.mod', 'go.sum', 'treefmt.toml') }}
+
+      - name: Setup (online)
+        run: task setup
+
+      - name: Offline from here
+        run: |
+          {
+            echo GOPROXY=off
+            echo GOTOOLCHAIN=local
+            echo GOFLAGS=-mod=readonly
+            echo npm_config_offline=true
+          } >> "$GITHUB_ENV"
+
+      - name: Lint, type check, trace, licences
+        if: matrix.job == 'check'
+        run: task ci:lint
+
+      - name: Component tests
+        if: matrix.job == 'check' && !cancelled()
+        run: task test:frontend
+
+      - name: Go tests
+        if: matrix.job == 'go'
+        run: task ci:go
+
+      - name: Linux build, Windows cross-build and installer
+        if: matrix.job == 'app'
+        run: task ci:build
+
+      - name: E2e, mock backend
+        if: matrix.job == 'app' && !cancelled()
+        run: task e2e
+
+      - name: E2e, real backend
+        if: matrix.job == 'app' && !cancelled()
+        run: task e2e:real
+
+      - name: Upload mock e2e report
+        if: failure() && matrix.job == 'app'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-mock
+          path: |
+            frontend/playwright-report/mock/
+            frontend/test-results/mock/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload real e2e report
+        if: failure() && matrix.job == 'app'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-real
+          path: |
+            frontend/playwright-report/real/
+            frontend/test-results/real/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  windows:
+    # Only Windows can run the Go tests' Windows paths (processes, paths,
+    # the WSL core). The Windows binary itself is cross-compiled on Linux,
+    # in the linux app job. Billed at twice the Linux rate
+    # and slow (git starts slowly there), so it runs for pull requests into
+    # main and for releases, not for those into dev.
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cache paths
+        id: paths
+        shell: bash
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key: gobuild-windows-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            gobuild-windows-${{ hashFiles('go.sum') }}-
+            gobuild-windows-
+
+      - name: Setup (online)
+        run: go mod download
+
+      # The tests start git thousands of times. cmd\git.exe is a launcher
+      # that starts the real git.exe as a second process; the scratch repos
+      # go to the faster D: disk and out of Defender's real-time scan.
+      - name: Direct git; scratch repos on the D drive, unscanned
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_PATH 'C:\Program Files\Git\mingw64\bin'
+          New-Item -ItemType Directory -Force D:\tmp | Out-Null
+          Add-Content $env:GITHUB_ENV "TEMP=D:\tmp`nTMP=D:\tmp`nGOTMPDIR=D:\tmp"
+          Add-MpPreference -ExclusionPath D:\tmp, $env:GITHUB_WORKSPACE
+
+      # -count=1: Go's test cache travels in the build cache, and a cached
+      # pass does not see a changed git on the runner image.
+      - name: Go tests (offline)
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly -count=1
+        run: |
+          where.exe git
+          git --version
+          go tool task test:go:core PARALLEL=4
+
+  macos:
+    # A build only (QA-PORT-04), billed at ten times the Linux rate: pull
+    # requests into main and releases.
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cache paths
+        id: paths
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key: gobuild-macos-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            gobuild-macos-${{ hashFiles('go.sum') }}-
+            gobuild-macos-
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: build (offline)
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+          npm_config_offline: 'true'
+        run: task build
+
+  git-2-42:
+    # The Go tests also run against the oldest supported git (git.MinVersion),
+    # from an old nixpkgs since ubuntu-24.04 ships a newer one. No frontend
+    # build and no Wails shell package (it needs cgo and GTK/WebKit headers
+    # and knows nothing of git), so only the packages whose behaviour depends
+    # on git; race detector on. Outside the Nix shell, which it does not need.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cache paths
+        id: paths
+        run: |
+          echo "gomod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gobuild=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      # The module cache is the same for every job: one cache per go.sum. The
+      # build cache is per job and commit, the previous commit's as fallback.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gomod }}
+          key: gomod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ runner.os }}-
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.paths.outputs.gobuild }}
+          key: gobuild-git-2-42-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            gobuild-git-2-42-${{ hashFiles('go.sum') }}-
+            gobuild-git-2-42-
+
+      - name: Put git 2.42 first on PATH (online)
+        run: |
+          git=$(nix build --no-link --print-out-paths github:NixOS/nixpkgs/205fd4226592cc83fd4c0885a3e4c9c400efabb5#git)
+          echo "$git/bin" >> "$GITHUB_PATH"
+
+      - name: Setup (online)
+        run: go mod download
+
+      - name: Go tests with the race detector on git 2.42 (offline)
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: |
+          git --version
+          go tool task test:go:oldgit FLAGS=-race

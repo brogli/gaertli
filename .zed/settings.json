@@ -1,0 +1,12 @@
+// Project settings for Zed.
+{
+  // Format every buffer through treefmt (treefmt.toml), so the editor formats
+  // exactly as `task lint` checks. `direnv exec .` provides the Nix shell's
+  // treefmt whatever environment the editor was started from.
+  "formatter": {
+    "external": {
+      "command": "direnv",
+      "arguments": ["exec", ".", "treefmt", "--stdin", "{buffer_path}"]
+    }
+  }
+}

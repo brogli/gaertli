@@ -1,0 +1,482 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { EditorState, Text } from '@codemirror/state'
+import { type Command, EditorView } from '@codemirror/view'
+import {
+  type Chunk,
+  getChunks,
+  getOriginalDoc,
+  goToNextChunk,
+  goToPreviousChunk,
+  MergeView,
+  unifiedMergeView,
+} from '@codemirror/merge'
+import Button from 'openvue/button'
+import Splitter from 'openvue/splitter'
+import SplitterPanel from 'openvue/splitterpanel'
+import ToggleButton from 'openvue/togglebutton'
+import { useI18n } from '@/i18n'
+import { useDiffStore } from '@/stores/diff'
+import { useSettingsStore } from '@/stores/settings'
+import { useChangesStore } from '@/stores/changes'
+import { useCoreCall } from '@/composables/useCoreCall'
+import { useConfirmAction } from '@/composables/useConfirmAction'
+import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import { diffColours } from '@/lib/diffColours'
+import { syncScroll } from '@/lib/tieScroll'
+import { hunkChanges, hunksIn } from '@/lib/gitHunks'
+import { codeEditorExtensions, PANE_LAYOUT } from '@/lib/codeEditor'
+import { iconClass, type IconName } from '@/lib/icons'
+import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
+import { useRepoChanged } from '@/lib/windowEvents'
+import { DiffKind, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
+import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { DiffMode } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+import ErrorBanner from './ErrorBanner.vue'
+import FileStepButtons from './FileStepButtons.vue'
+import {
+  ChangeScope,
+  type DiffHunk,
+  type LineSelection,
+} from '../../bindings/github.com/brogli/nebegit/internal/core'
+
+// DiffView shows target's file diff, read-only: a file of a commit, a file
+// between two commits, a commit against the working tree, or an
+// uncommitted change. status is a working-tree file's status: line actions
+// need it. git computes the diff; CodeMirror draws its hunks.
+const props = defineProps<{ wt: string; target: DiffTarget; status?: string }>()
+const emit = defineEmits<{ 'step-file': [step: 1 | -1] }>()
+
+const diff = useDiffStore()
+const settings = useSettingsStore()
+const changes = useChangesStore()
+const { error, run, runAndClose } = useCoreCall()
+// An outside change's refetch reports through its own call, so the user's
+// last action keeps a retryable error and its Try again.
+const refetchCall = useCoreCall()
+const shownError = computed(() => error.value ?? refetchCall.error.value)
+const { confirmAction } = useConfirmAction()
+const { openEditor: openInEditor } = useOpenInEditor(() => props.wt, run)
+const { t } = useI18n()
+
+const container = ref<HTMLElement | null>(null)
+// hostA/hostB hold side-by-side's two editors, one in each splitter panel;
+// MergeView is built without a parent so they can live there instead of its
+// own wrappers (@codemirror/merge has no API to move an existing view). Its
+// theme stops an editor scrolling inside an element of class cm-mergeView, so
+// with none around them each side scrolls on its own, as the merge editor's
+// panes do.
+const hostA = ref<HTMLElement | null>(null)
+const hostB = ref<HTMLElement | null>(null)
+let view: EditorView | MergeView | null = null
+let untieScroll: (() => void) | null = null
+
+// Reactive copies of CodeMirror state: the mounted view's chunks, and
+// whether the selection lies inside one.
+const chunks = ref<readonly Chunk[]>([])
+const selectedLinesEnabled = ref(false)
+
+const working = computed(() => props.target.kind === DiffKind.WorkingDiff)
+const staged = computed(() => !!props.target.staged)
+
+const mode = computed(() => settings.settings?.diffMode ?? DiffMode.UnifiedDiff)
+const ignoreWhitespace = computed(() => settings.settings?.ignoreWhitespace ?? false)
+
+function load(force = false): void {
+  refetchCall.error.value = null
+  const opts = { force, ignoreWhitespace: ignoreWhitespace.value }
+  void run(() => diff.load(props.wt, props.target, opts))
+}
+
+watch([() => props.target, ignoreWhitespace], () => load(), { immediate: true })
+
+// repo:changed{scope:"index"} fires on any change to this worktree's files
+// or index. An action's error without a retry is stale once the diff
+// reloads.
+useRepoChanged([ChangeScope.IndexChanged], () => {
+  if (!readsWorkingTree(props.target)) return
+  if (!error.value?.retry) error.value = null
+  void refetchCall.run(() => diff.refetch())
+})
+
+// openEditor opens the file shown at the cursor's line on the new side;
+// line 0 when no editor is mounted (a binary or too-large file).
+function openEditor(): void {
+  const cm = changeTarget()
+  const line = cm ? cm.state.doc.lineAt(cm.state.selection.main.head).number : 0
+  openInEditor({ path: props.target.path }, line)
+}
+
+// A binary or too-large file shows only its placeholder.
+const showsContent = computed(() => !!diff.file && !diff.file.binary && !diff.file.tooLarge)
+
+function toggleMode(): void {
+  const next = mode.value === DiffMode.UnifiedDiff ? DiffMode.SideBySideDiff : DiffMode.UnifiedDiff
+  if (settings.settings) void settings.save({ ...settings.settings, diffMode: next })
+}
+
+// toggleIgnoreWhitespace saves the setting; the load watch refetches with it.
+function toggleIgnoreWhitespace(): void {
+  if (settings.settings)
+    void settings.save({ ...settings.settings, ignoreWhitespace: !ignoreWhitespace.value })
+}
+
+// whitespaceLabel names the diff's current whitespace state: the toggle's
+// label, title and accessible name.
+const whitespaceLabel = computed(() =>
+  ignoreWhitespace.value ? t('diffWindow.ignoringWhitespace') : t('diffWindow.showingWhitespace'),
+)
+
+function destroyView(): void {
+  untieScroll?.()
+  untieScroll = null
+  view?.destroy()
+  view = null
+  chunks.value = []
+  selectedLinesEnabled.value = false
+}
+
+function updateSelectedLinesEnabled(): void {
+  selectedLinesEnabled.value = selectedLines() !== null
+}
+
+// loadSeq drops a language load that resolves after a newer file started.
+let loadSeq = 0
+
+async function mountView(): Promise<void> {
+  const seq = ++loadSeq
+  destroyView()
+  const file = diff.file
+  const sideBySide = mode.value === DiffMode.SideBySideDiff
+  const el = container.value
+  const a = hostA.value
+  const b = hostB.value
+  if (!file || file.binary || file.tooLarge) return
+  if (sideBySide ? !a || !b : !el) return
+
+  const shared = await codeEditorExtensions(props.target.path)
+  if (seq !== loadSeq) return
+
+  const docExtensions = [EditorState.readOnly.of(true), diffColours, ...shared]
+  // git's diff is line-based, so changed lines are marked whole.
+  const gitDiff = {
+    diffConfig: { override: hunkChanges(file.hunks ?? []) },
+    highlightChanges: false,
+  }
+  if (sideBySide) {
+    if (!a || !b) return
+    const merge = new MergeView({
+      a: { doc: file.oldContent ?? '', extensions: [...docExtensions, PANE_LAYOUT] },
+      b: { doc: file.newContent ?? '', extensions: [...docExtensions, PANE_LAYOUT] },
+      ...gitDiff,
+    })
+    a.append(merge.a.dom)
+    b.append(merge.b.dom)
+    untieScroll = syncScroll(merge.a.scrollDOM, merge.b.scrollDOM)
+    view = merge
+  } else {
+    if (!el) return
+    view = new EditorView({
+      parent: el,
+      state: EditorState.create({
+        doc: file.newContent ?? '',
+        extensions: [
+          ...docExtensions,
+          unifiedMergeView({
+            original: Text.of((file.oldContent ?? '').split('\n')),
+            mergeControls: false,
+            ...gitDiff,
+          }),
+          EditorView.updateListener.of((update) => {
+            if (update.selectionSet) updateSelectedLinesEnabled()
+          }),
+        ],
+      }),
+    })
+  }
+  chunks.value = view instanceof MergeView ? view.chunks : (getChunks(view.state)?.chunks ?? [])
+  updateSelectedLinesEnabled()
+}
+
+// flush: 'post', so the mount point(s) mountView reads exist. The
+// "Loading…" placeholder replaces them during a fetch, so a new element
+// mounts the view again even when the fetch returned the same diff.
+watch([() => diff.file, mode, container, hostA, hostB], mountView, { flush: 'post' })
+
+onBeforeUnmount(destroyView)
+
+// changeTarget is the new-side editor: the unified view, or side-by-side's b.
+function changeTarget(): EditorView | null {
+  return view instanceof MergeView ? view.b : view
+}
+
+// stepChange moves the new-side cursor to a neighbouring change.
+function stepChange(go: Command): void {
+  const cm = changeTarget()
+  if (cm) go(cm)
+}
+
+// stageLines stages sel, or unstages it on the staged side. The file and
+// side are read at the click: a retry after a lock stages what was clicked.
+function stageLines(sel: LineSelection | null): void {
+  if (!sel || !working.value) return
+  const { path } = props.target
+  const unstage = staged.value
+  void runAndClose(() => Facade.StageLines(props.wt, path, sel, unstage), reloadNow)
+}
+
+// discardLines is offered on the unstaged side only; it confirms first,
+// naming what is lost.
+function discardLines(sel: LineSelection | null): void {
+  if (!sel || !working.value) return
+  const { path } = props.target
+  confirmAction(
+    t('diffWindow.discardChangesTitle'),
+    t('diffWindow.discardLineConfirm', { path }),
+    () => {
+      void runAndClose(() => Facade.DiscardLines(props.wt, path, sel), reloadNow)
+    },
+  )
+}
+
+// reloadNow reloads the working tree's changes and this diff after a line
+// action, not after the watcher's debounce.
+function reloadNow(): void {
+  void changes.load(props.wt)
+  load(true)
+}
+
+// lines is count consecutive 1-based line numbers from start.
+function lines(start: number, count: number): number[] {
+  return Array.from({ length: count }, (_, i) => start + i)
+}
+
+// oldLinesOf and newLinesOf are the line numbers h changes on each side.
+const oldLinesOf = (h: DiffHunk) => lines(h.oldStart, h.oldLines)
+const newLinesOf = (h: DiffHunk) => lines(h.newStart, h.newLines)
+
+// chunkDocs is the mounted view's old and new documents.
+function chunkDocs(): { old: Text; new: Text } | null {
+  if (!view) return null
+  if (view instanceof MergeView) return { old: view.a.state.doc, new: view.b.state.doc }
+  return { old: getOriginalDoc(view.state), new: view.state.doc }
+}
+
+// offersLineActions: the file's hunks can be staged or discarded here, for
+// a plain modification only. Untracked files have no diff to re-diff; git
+// refuses a partial patch for an added or deleted file; a rename's file
+// header would need rewriting. Those are staged whole from the changes
+// view. The ignore-whitespace diff is for reading: its hunks are not git's
+// patch, so the template holds the actions back until whitespace is shown.
+const offersLineActions = computed(
+  () => showsContent.value && working.value && props.status === 'M',
+)
+
+// selection names lines of the shown diff. Its fingerprint lets Go refuse
+// the selection if the file changed since it was shown.
+function selection(old: number[], added: number[]): LineSelection {
+  return { old, new: added, fingerprint: diff.file?.fingerprint ?? '' }
+}
+
+// hunkSelection names the lines of git's hunks that chunk shows, not the
+// chunk's whole range: a joined chunk also covers unchanged lines.
+function hunkSelection(chunk: Chunk): LineSelection | null {
+  const docs = chunkDocs()
+  const file = diff.file
+  if (!docs || !file) return null
+  const hunks = hunksIn(chunk, file.hunks ?? [], docs.old, docs.new)
+  return selection(hunks.flatMap(oldLinesOf), hunks.flatMap(newLinesOf))
+}
+
+// selectedLines names the selected lines that git's hunks add, or null
+// unless the selection lies inside one chunk and holds one. Unified mode
+// only, so the selection holds new-side lines only: deleted lines are
+// decorations there. Per git hunk it touches: an insertion gives just the
+// selected lines; a one-for-one replacement each selected line with the
+// old line at its offset; any other replacement the whole hunk, so a
+// discard never removes an old line without restoring it.
+function selectedLines(): LineSelection | null {
+  if (!(view instanceof EditorView)) return null
+  const sel = view.state.selection.main
+  // toB, not endB: a selection through a chunk's whole last line extends
+  // past endB, up to the next line's start.
+  if (!chunks.value.some((c) => sel.from >= c.fromB && sel.to <= c.toB)) return null
+
+  const doc = view.state.doc
+  const selStartLine = doc.lineAt(sel.from).number
+  const selEndLine = doc.lineAt(Math.max(sel.to - 1, sel.from)).number
+  const old = new Set<number>()
+  const added = new Set<number>()
+  for (let n = selStartLine; n <= selEndLine; n++) {
+    const h = diff.file?.hunks?.find(
+      (hunk) => n >= hunk.newStart && n < hunk.newStart + hunk.newLines,
+    )
+    if (!h) continue
+    if (h.oldLines && h.oldLines !== h.newLines) {
+      oldLinesOf(h).forEach((o) => old.add(o))
+      newLinesOf(h).forEach((a) => added.add(a))
+      continue
+    }
+    added.add(n)
+    if (h.oldLines) old.add(h.oldStart + n - h.newStart)
+  }
+  return added.size ? selection([...old], [...added]) : null
+}
+
+// A toolbar toggle shows pressed by dropping ICON_BUTTON's text look.
+interface ToolbarButton {
+  test: string
+  label: string
+  icon?: IconName
+  pressed?: boolean
+  action: () => void
+}
+
+const toolbar = computed<ToolbarButton[]>(() => {
+  const buttons: ToolbarButton[] = []
+  if (showsContent.value) {
+    buttons.push(
+      {
+        test: 'mode-toggle',
+        label:
+          mode.value === DiffMode.UnifiedDiff
+            ? t('diffWindow.switchToSideBySide')
+            : t('diffWindow.switchToUnified'),
+        icon: mode.value === DiffMode.UnifiedDiff ? 'unifiedDiff' : 'sideBySideDiff',
+        pressed: mode.value === DiffMode.SideBySideDiff,
+        action: toggleMode,
+      },
+      {
+        test: 'prev-change',
+        label: t('diffWindow.previousChange'),
+        icon: 'prevChange',
+        action: () => stepChange(goToPreviousChunk),
+      },
+      {
+        test: 'next-change',
+        label: t('diffWindow.nextChange'),
+        icon: 'nextChange',
+        action: () => stepChange(goToNextChunk),
+      },
+    )
+  }
+  return buttons
+})
+</script>
+
+<template>
+  <section class="diff-view flex flex-col gap-2">
+    <ErrorBanner v-if="shownError" :error="shownError" />
+    <p v-else-if="diff.loading">{{ t('diffWindow.loading') }}</p>
+    <template v-else-if="diff.file">
+      <!-- Sticky: unified, the diff view scrolls as a whole (DiffWindowView.vue),
+           and next/previous change must stay clickable wherever a jump lands. -->
+      <div
+        class="diff-toolbar sticky top-0 z-10 flex items-center gap-1 bg-(--p-content-background)"
+      >
+        <ToggleButton
+          v-if="showsContent"
+          :model-value="ignoreWhitespace"
+          :on-label="t('diffWindow.ignoringWhitespace')"
+          :off-label="t('diffWindow.showingWhitespace')"
+          size="small"
+          data-test="ignore-whitespace-toggle"
+          :title="whitespaceLabel"
+          :aria-label="whitespaceLabel"
+          @update:model-value="toggleIgnoreWhitespace"
+        />
+        <Button
+          v-for="b in toolbar"
+          :key="b.test"
+          v-bind="ICON_BUTTON"
+          :text="!b.pressed"
+          :icon="b.icon && iconClass(b.icon)"
+          :label="b.icon ? undefined : b.label"
+          :data-test="b.test"
+          :title="b.label"
+          :aria-label="b.label"
+          :aria-pressed="b.pressed"
+          @click="b.action"
+        />
+        <FileStepButtons @step="emit('step-file', $event)" />
+        <Button
+          v-bind="ICON_BUTTON"
+          :icon="iconClass('openEditor')"
+          data-test="open-editor"
+          :title="t('common.openInEditor')"
+          :aria-label="t('common.openInEditor')"
+          @click="openEditor"
+        />
+      </div>
+      <p v-if="diff.file.binary">{{ t('diffWindow.binaryFile') }}</p>
+      <template v-else-if="diff.file.tooLarge">
+        <p>{{ t('diffWindow.tooLarge') }}</p>
+        <Button :label="t('diffWindow.loadAnyway')" size="small" @click="load(true)" />
+      </template>
+      <template v-if="offersLineActions">
+        <p v-if="ignoreWhitespace" data-test="whitespace-hint">
+          {{
+            staged
+              ? t('diffWindow.showWhitespaceToUnstageHint')
+              : t('diffWindow.showWhitespaceToStageHint')
+          }}
+        </p>
+        <div v-else class="flex flex-wrap items-center gap-2">
+          <Button
+            v-for="(chunk, i) in chunks"
+            :key="i"
+            v-bind="SECONDARY_BUTTON"
+            :label="staged ? t('diffWindow.unstageHunk') : t('diffWindow.stageHunk')"
+            data-test="stage-hunk"
+            @click="stageLines(hunkSelection(chunk))"
+          />
+          <Button
+            v-bind="SECONDARY_BUTTON"
+            :label="
+              staged ? t('diffWindow.unstageSelectedLines') : t('diffWindow.stageSelectedLines')
+            "
+            data-test="stage-selected-lines"
+            :disabled="!selectedLinesEnabled"
+            @click="stageLines(selectedLines())"
+          />
+          <template v-if="!staged">
+            <Button
+              v-for="(chunk, i) in chunks"
+              :key="'discard-' + i"
+              v-bind="SECONDARY_BUTTON"
+              :label="t('diffWindow.discardHunk')"
+              data-test="discard-hunk"
+              @click="discardLines(hunkSelection(chunk))"
+            />
+            <Button
+              v-bind="SECONDARY_BUTTON"
+              :label="t('diffWindow.discardSelectedLines')"
+              data-test="discard-selected-lines"
+              :disabled="!selectedLinesEnabled"
+              @click="discardLines(selectedLines())"
+            />
+          </template>
+        </div>
+      </template>
+      <template v-if="showsContent">
+        <!-- min-h-64: the splitter takes the height the buttons above leave, down
+             to a readable one; below that the diff view scrolls as a whole. -->
+        <Splitter
+          v-if="mode === DiffMode.SideBySideDiff"
+          class="min-h-64"
+          layout="horizontal"
+          state-key="nebegit.layout.diffSides"
+          state-storage="local"
+        >
+          <SplitterPanel :size="50" :min-size="15"
+            ><div ref="hostA" class="h-full"></div
+          ></SplitterPanel>
+          <SplitterPanel :size="50" :min-size="15"
+            ><div ref="hostB" class="h-full"></div
+          ></SplitterPanel>
+        </Splitter>
+        <div v-else ref="container" class="cm-container"></div>
+      </template>
+    </template>
+  </section>
+</template>

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "minimumReleaseAge": "7 days",
+  "constraints": { "pnpm": "11" },
+  "postUpdateOptions": ["gomodTidy"],
+  "nix": { "enabled": true },
+  "platformAutomerge": false,
+  "lockFileMaintenance": { "enabled": true, "automerge": true },
+  "packageRules": [
+    {
+      "description": "config:best-practices sets 3 days for npm; keep 7.",
+      "matchDatasources": ["npm"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "An app, not a library: pin production dependencies too.",
+      "matchDatasources": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "description": "These updates carry no release timestamp; pnpm's minimumReleaseAge gates them at resolution.",
+      "matchUpdateTypes": ["pin", "pinDigest", "lockFileMaintenance"],
+      "minimumReleaseAge": null
+    },
+    { "matchUpdateTypes": ["minor", "patch", "pin", "digest", "pinDigest"], "automerge": true },
+    {
+      "description": "0.x minors and patches may break.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "/^v?0\\./",
+      "automerge": false
+    },
+    {
+      "description": "One lock file maintenance PR per lock file.",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "additionalBranchPrefix": "{{manager}}-"
+    },
+    {
+      "matchManagers": ["nix"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "prBodyNotes": [
+        "The Nix shell supplies Playwright's browsers: if `playwright-driver` moved, set `@playwright/test` in `frontend/package.json` to its version in this PR (CI's e2e:real fails until then)."
+      ]
+    },
+    {
+      "description": "Moves only with the Nix input that supplies its browsers.",
+      "matchPackageNames": ["@playwright/test"],
+      "enabled": false
+    },
+    {
+      "description": "The runtime must equal the Go module's version.",
+      "groupName": "Wails",
+      "matchPackageNames": ["github.com/wailsapp/wails/v3", "@wailsio/runtime"],
+      "automerge": false
+    },
+    {
+      "description": "Node and pnpm's majors are pinned to the Nix shell's; bump them there instead.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["node", "pnpm"],
+      "enabled": false
+    },
+    {
+      "description": "flake.lock follows nixos-unstable on the next Renovate run instead of weekly, so nixpkgs security fixes land as soon as the channel has them.",
+      "matchManagers": ["nix"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "schedule": ["at any time"]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# pnpm resolves only versions published at least 7 days (10080 minutes) ago,
+# transitive ones included, reducing exposure to freshly compromised releases.
+minimumReleaseAge: 10080
+
+# pnpm add pins every new dependency to the exact version it resolves.
+saveExact: true
+
+# The runtime must match the Go module's version exactly, whatever its age.
+minimumReleaseAgeExclude:
+  - '@wailsio/runtime'
+
+# Dependency build scripts, reviewed: esbuild's postinstall only verifies the
+# binary that its platform package already ships, so it does not run.
+allowBuilds:
+  esbuild: false

@@ -1,0 +1,290 @@
+name: release candidate
+
+# Started by hand on main: runs CI, builds every artifact and leaves them in a
+# draft release. Publishing the draft by hand creates the tag on the built
+# commit, so what ships is what was checked.
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+    steps:
+      - name: Refuse any branch but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Release candidates are built from main only."
+          exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Publishing a draft creates its tag: an existing tag is a released version.
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(build/release-version.sh)
+          if gh api "repos/$GH_REPO/git/ref/tags/v$version" --silent 2>/dev/null; then
+            echo "::error::v$version is already released: raise the version in build/config.yml."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+  ci:
+    needs: version
+    # actionlint 1.7.12 rejects the $/ self-repository form.
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+
+  windows:
+    needs: [version, ci]
+    # Cross-compiled on Linux, as in development: the Windows app needs no
+    # cgo, so no Windows runner is needed.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup (online)
+        run: |
+          sudo apt-get update && sudo apt-get install -y nsis
+          go tool task setup
+          go install tool
+
+      - name: Build and package
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+          VERSION: ${{ needs.version.outputs.version }}
+          COMMIT: ${{ needs.version.outputs.commit }}
+        run: go tool task windows:package:dryrun
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nebegit-windows-amd64.zip
+          path: dist/nebegit-windows-amd64.zip
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nebegit-windows-amd64-setup.exe
+          path: dist/nebegit-windows-amd64-setup.exe
+
+  linux:
+    needs: [version, ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Linux native deps
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: Build and package
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+          VERSION: ${{ needs.version.outputs.version }}
+          COMMIT: ${{ needs.version.outputs.commit }}
+        run: go tool task linux:package:dryrun
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nebegit-linux-amd64.deb
+          path: dist/nebegit-linux-amd64.deb
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nebegit-linux-amd64.rpm
+          path: dist/nebegit-linux-amd64.rpm
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nebegit-linux-amd64.tar.gz
+          path: dist/nebegit-linux-amd64.tar.gz
+
+  darwin:
+    needs: [version, ci]
+    runs-on: macos-latest
+    continue-on-error: true # a failing macOS build never holds back the release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: Build and package
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+          VERSION: ${{ needs.version.outputs.version }}
+          COMMIT: ${{ needs.version.outputs.commit }}
+        run: go tool task darwin:package:dryrun
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: nebegit-darwin-arm64.zip
+          path: dist/nebegit-darwin-arm64.zip
+          if-no-files-found: ignore
+
+  notices:
+    needs: [version, ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Setup (online)
+        run: |
+          go tool task setup
+          go install tool
+
+      - name: Licence check
+        env:
+          GOPROXY: off
+          GOTOOLCHAIN: local
+          GOFLAGS: -mod=readonly
+        run: |
+          mkdir -p dist
+          go tool task licence-check OUT=dist/THIRD-PARTY-NOTICES.txt
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: THIRD-PARTY-NOTICES.txt
+          path: dist/THIRD-PARTY-NOTICES.txt
+
+  draft:
+    needs: [version, windows, linux, darwin, notices]
+    if:
+      always() && needs.windows.result == 'success' && needs.linux.result == 'success' &&
+      needs.notices.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+
+      - name: Flatten and checksum
+        run: |
+          cd dist
+          find . -mindepth 2 -type f -exec mv {} . \;
+          find . -mindepth 1 -type d -empty -delete
+          sha256sum -- * > SHA256SUMS
+
+      # Attestations need a public repo (or GitHub Enterprise Cloud).
+      - if: ${{ !github.event.repository.private }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+
+      # A draft has no tag yet: publishing it creates the tag on this commit.
+      - name: Replace older drafts with this one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+          COMMIT: ${{ needs.version.outputs.commit }}
+        # Older drafts go first: a failed candidate's draft may carry the same
+        # version.
+        run: |
+          for id in $(gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | select(.draft) | .id'); do
+            gh api --method DELETE "repos/$GH_REPO/releases/$id"
+          done
+          gh release create "v$VERSION" dist/* --draft --target "$GITHUB_SHA" \
+            --title "nebegit $VERSION ($COMMIT)" --generate-notes
