@@ -38,7 +38,8 @@ A separate OS window per main window (FR-DIFF-07) that selects nothing: it shows
 a range, a working-tree side, a conflicted file) and is retargeted by the shell when another file is
 opened. Its size is remembered, its position not, since a stored position can land off-screen.
 
-Side by side, the two diff panes scroll together through the scroll event and trail by a frame.
+Side by side, each diff pane scrolls on its own, as the merge editor's panes do, so its scrollbars
+and the divider stay in view. The two scroll together through the scroll event and trail by a frame.
 Taking over wheel input instead would block smooth scrolling for the whole diff and still miss
 scrollbar and keyboard scrolling.
 

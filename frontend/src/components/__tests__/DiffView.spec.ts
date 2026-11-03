@@ -847,6 +847,31 @@ describe('DiffView', () => {
     expect(b!.scrollLeft).toBe(120)
   })
 
+  it('side by side, scrolling side b up or down moves side a with it', async () => {
+    const wrapper = await mountSideBySide()
+    const [a, b] = wrapper.findAll<HTMLElement>('.cm-scroller').map((w) => w.element)
+
+    b!.scrollTop = 240
+    b!.dispatchEvent(new Event('scroll'))
+
+    expect(a!.scrollTop).toBe(240)
+  })
+
+  it('a side the other could not move, already at that position, still leads when scrolled back to it', async () => {
+    const wrapper = await mountSideBySide()
+    const [a, b] = wrapper.findAll<HTMLElement>('.cm-scroller').map((w) => w.element)
+    b!.scrollLeft = 50
+    a!.scrollLeft = 50
+    a!.dispatchEvent(new Event('scroll'))
+
+    b!.scrollLeft = 60
+    b!.dispatchEvent(new Event('scroll'))
+    b!.scrollLeft = 50
+    b!.dispatchEvent(new Event('scroll'))
+
+    expect(a!.scrollLeft).toBe(50)
+  })
+
   it('the echo scroll a synced write causes on the other side is ignored, so the two do not ping-pong', async () => {
     const wrapper = await mountSideBySide()
     const [a, b] = wrapper.findAll<HTMLElement>('.cm-scroller').map((w) => w.element)
@@ -880,9 +905,8 @@ describe('DiffView', () => {
   it('side by side shows the old text on side a and the new text on side b', async () => {
     const wrapper = await mountSideBySide()
 
-    const merge = wrapper.get('.cm-mergeView')
-    expect(merge.get('.cm-merge-a').text()).toContain('old')
-    expect(merge.get('.cm-merge-b').text()).toContain('new')
+    expect(wrapper.get('.cm-merge-a').text()).toContain('old')
+    expect(wrapper.get('.cm-merge-b').text()).toContain('new')
   })
 
   it('every toolbar button has a title and aria-label; the mode and ignore-whitespace toggles expose aria-pressed', async () => {

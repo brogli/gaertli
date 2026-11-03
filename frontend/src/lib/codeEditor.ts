@@ -5,6 +5,12 @@ import { languages } from '@codemirror/language-data'
 import { classHighlighter } from '@lezer/highlight'
 import { basename } from './path'
 
+// PANE_LAYOUT makes an editor fill its panel and scroll on its own.
+export const PANE_LAYOUT = EditorView.theme({
+  '&': { height: '100%' },
+  '.cm-scroller': { overflow: 'auto' },
+})
+
 // classHighlighter emits plain "tok-*" classes; they take the app's own
 // tokens rather than CodeMirror's default colours.
 const CODE_COLOURS = EditorView.theme({

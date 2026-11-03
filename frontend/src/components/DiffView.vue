@@ -23,9 +23,9 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { diffColours } from '@/lib/diffColours'
-import { syncScrollX } from '@/lib/syncScrollX'
+import { syncScroll } from '@/lib/tieScroll'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
-import { codeEditorExtensions } from '@/lib/codeEditor'
+import { codeEditorExtensions, PANE_LAYOUT } from '@/lib/codeEditor'
 import { iconClass, type IconName } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { useRepoChanged } from '@/lib/windowEvents'
@@ -62,11 +62,14 @@ const { t } = useI18n()
 const container = ref<HTMLElement | null>(null)
 // hostA/hostB hold side-by-side's two editors, one in each splitter panel;
 // MergeView is built without a parent so they can live there instead of its
-// own wrappers (@codemirror/merge has no API to move an existing view).
+// own wrappers (@codemirror/merge has no API to move an existing view). Its
+// theme stops an editor scrolling inside an element of class cm-mergeView, so
+// with none around them each side scrolls on its own, as the merge editor's
+// panes do.
 const hostA = ref<HTMLElement | null>(null)
 const hostB = ref<HTMLElement | null>(null)
 let view: EditorView | MergeView | null = null
-let untieScrollX: (() => void) | null = null
+let untieScroll: (() => void) | null = null
 
 // Reactive copies of CodeMirror state: the mounted view's chunks, and
 // whether the selection lies inside one.
@@ -125,8 +128,8 @@ const whitespaceLabel = computed(() =>
 )
 
 function destroyView(): void {
-  untieScrollX?.()
-  untieScrollX = null
+  untieScroll?.()
+  untieScroll = null
   view?.destroy()
   view = null
   chunks.value = []
@@ -163,13 +166,13 @@ async function mountView(): Promise<void> {
   if (sideBySide) {
     if (!a || !b) return
     const merge = new MergeView({
-      a: { doc: file.oldContent ?? '', extensions: docExtensions },
-      b: { doc: file.newContent ?? '', extensions: docExtensions },
+      a: { doc: file.oldContent ?? '', extensions: [...docExtensions, PANE_LAYOUT] },
+      b: { doc: file.newContent ?? '', extensions: [...docExtensions, PANE_LAYOUT] },
       ...gitDiff,
     })
     a.append(merge.a.dom)
     b.append(merge.b.dom)
-    untieScrollX = syncScrollX(merge.a.scrollDOM, merge.b.scrollDOM)
+    untieScroll = syncScroll(merge.a.scrollDOM, merge.b.scrollDOM)
     view = merge
   } else {
     if (!el) return
@@ -366,8 +369,8 @@ const toolbar = computed<ToolbarButton[]>(() => {
     <ErrorBanner v-if="shownError" :error="shownError" />
     <p v-else-if="diff.loading">{{ t('diffWindow.loading') }}</p>
     <template v-else-if="diff.file">
-      <!-- Sticky: the diff view scrolls as a whole (DiffWindowView.vue), and
-           next/previous change must stay clickable wherever a jump lands. -->
+      <!-- Sticky: unified, the diff view scrolls as a whole (DiffWindowView.vue),
+           and next/previous change must stay clickable wherever a jump lands. -->
       <div
         class="diff-toolbar sticky top-0 z-10 flex items-center gap-1 bg-(--p-content-background)"
       >
@@ -456,18 +459,21 @@ const toolbar = computed<ToolbarButton[]>(() => {
         </div>
       </template>
       <template v-if="showsContent">
-        <!-- shrink-0: OpenVue lets a splitter nested in a panel shrink to fit,
-             and its panels clip. The diff view scrolls as a whole, so this one
-             stays as tall as its editors. -->
+        <!-- min-h-64: the splitter takes the height the buttons above leave, down
+             to a readable one; below that the diff view scrolls as a whole. -->
         <Splitter
           v-if="mode === DiffMode.SideBySideDiff"
-          class="cm-mergeView shrink-0"
+          class="min-h-64"
           layout="horizontal"
           state-key="nebegit.layout.diffSides"
           state-storage="local"
         >
-          <SplitterPanel :size="50" :min-size="15"><div ref="hostA"></div></SplitterPanel>
-          <SplitterPanel :size="50" :min-size="15"><div ref="hostB"></div></SplitterPanel>
+          <SplitterPanel :size="50" :min-size="15"
+            ><div ref="hostA" class="h-full"></div
+          ></SplitterPanel>
+          <SplitterPanel :size="50" :min-size="15"
+            ><div ref="hostB" class="h-full"></div
+          ></SplitterPanel>
         </Splitter>
         <div v-else ref="container" class="cm-container"></div>
       </template>

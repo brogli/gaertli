@@ -2,6 +2,7 @@
 // lines, one per pane, that sit at the same height; between anchors lines map linearly.
 import type { EditorView } from '@codemirror/view'
 import { PANES, type Pane } from './conflictPanes'
+import { tieScroll } from './tieScroll'
 
 // Lines are 1-based and may be fractional.
 export type Anchor = Partial<Record<Pane, number>>
@@ -98,9 +99,7 @@ function scrollToLine(view: EditorView, line: number): void {
 
 // tieScrollY keeps the panes' vertical scrolling aligned: scrolling one
 // scrolls every other to the line at the same height, as the current anchors
-// map it. Setting scrollTop fires a scroll event of its own; one that reports
-// the value just written is that echo and is ignored, so the panes never
-// bounce off each other. Returns untie.
+// map it. Returns untie.
 export function tieScrollY(
   panes: Partial<Record<Pane, EditorView>>,
   anchors: () => Anchor[],
@@ -109,27 +108,12 @@ export function tieScrollY(
     const view = panes[name]
     return view ? [{ name, view }] : []
   })
-  // The scrollTop our own write last set into each pane.
-  const echoes = new Map<Pane, number>()
-
-  const listeners = entries.map(({ name, view }) => {
-    const onScroll = (): void => {
-      if (view.scrollDOM.scrollTop === echoes.get(name)) {
-        echoes.delete(name)
-        return
-      }
-      const line = topLine(view)
-      const current = anchors()
-      for (const other of entries) {
-        if (other.name === name) continue
-        const scroller = other.view.scrollDOM
-        const before = scroller.scrollTop
-        scrollToLine(other.view, mapLine(linePairs(current, name, other.name), line))
-        if (scroller.scrollTop !== before) echoes.set(other.name, scroller.scrollTop)
-      }
-    }
-    view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
-    return () => view.scrollDOM.removeEventListener('scroll', onScroll)
-  })
-  return () => listeners.forEach((untie) => untie())
+  return tieScroll(
+    entries,
+    ({ view }) => view.scrollDOM,
+    (from, to) => {
+      const pairs = linePairs(anchors(), from.name, to.name)
+      scrollToLine(to.view, mapLine(pairs, topLine(from.view)))
+    },
+  )
 }

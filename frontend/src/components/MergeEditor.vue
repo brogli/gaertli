@@ -8,7 +8,7 @@ import Message from 'openvue/message'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
-import { codeEditorExtensions } from '@/lib/codeEditor'
+import { codeEditorExtensions, PANE_LAYOUT } from '@/lib/codeEditor'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { conflictColours } from '@/lib/conflictColours'
@@ -196,12 +196,6 @@ function hostOf(pane: Pane): HTMLElement {
   if (!host) throw new Error(`no host for the ${pane} pane`)
   return host
 }
-
-// Each pane fills its panel and scrolls on its own.
-const PANE_LAYOUT = EditorView.theme({
-  '&': { height: '100%' },
-  '.cm-scroller': { overflow: 'auto' },
-})
 
 // Alt+Up and Alt+Down step between conflicts in every pane, ahead of the
 // result's move-line keys; Ctrl+S saves from any pane.
