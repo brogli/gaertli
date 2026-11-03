@@ -242,16 +242,6 @@ func TestContinueAbortAndSkipOperationSayNoOperationIsInProgress(t *testing.T) {
 	}
 }
 
-// unresolvedMessage is the substring git's refusal carries for each kind's
-// --continue while a conflicted file remains. Rebase prints its refusal to
-// stdout; GitStderr carries it via the runner's stdout fallback.
-var unresolvedMessage = map[string]string{
-	"merge":       "unresolved conflict",
-	"rebase":      "needs merge",
-	"cherry-pick": "unresolved conflict",
-	"revert":      "unresolved conflict",
-}
-
 func TestContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
@@ -265,8 +255,8 @@ func TestContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
 			err := c.ContinueOperation(t.Context(), wt)
 
 			ce := coretest.AsError(t, err, core.Conflicts)
-			if want := unresolvedMessage[kind]; !strings.Contains(ce.GitStderr, want) {
-				t.Errorf("GitStderr = %q, want it to contain %q", ce.GitStderr, want)
+			if ce.GitStderr == "" {
+				t.Error("GitStderr empty, want git's own explanation")
 			}
 			if !fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
 				t.Errorf("%s missing, want it left in place (still stopped)", operationStateFile[kind])

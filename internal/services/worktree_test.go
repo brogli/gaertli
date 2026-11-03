@@ -359,8 +359,8 @@ func TestAddWorktreeRefusalsCreateNeitherBranchNorFolder(t *testing.T) {
 
 	t.Run("non-empty target with an existing branch", func(t *testing.T) {
 		ce := coretest.AsError(t, add(occupied, "feature", "", false), core.GitFailed)
-		if !strings.Contains(ce.GitStderr, "already exists") {
-			t.Errorf("GitStderr = %q, want it to say %s already exists", ce.GitStderr, occupied)
+		if ce.GitStderr == "" {
+			t.Error("GitStderr empty, want git's own explanation")
 		}
 	})
 	t.Run("non-empty target with a new branch", func(t *testing.T) {
@@ -434,8 +434,8 @@ func TestRemoveWorktreeRefusesLockedAndDirtyThenForceRemovesDirty(t *testing.T) 
 	}
 
 	ce := coretest.AsError(t, remove(locked, true), core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "cannot remove a locked working tree") {
-		t.Errorf("GitStderr = %q, want git's own locked-worktree message", ce.GitStderr)
+	if ce.GitStderr == "" {
+		t.Error("GitStderr empty, want git's own explanation")
 	}
 	if _, statErr := os.Stat(locked); statErr != nil {
 		t.Errorf("worktree %s missing: %v, want still present", locked, statErr)

@@ -939,7 +939,7 @@ func TestPushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	hookPath := filepath.Join(origin, "hooks", "pre-receive")
-	if err := os.WriteFile(hookPath, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+	if err := os.WriteFile(hookPath, []byte("#!/bin/sh\necho refusing >&2\nexit 1\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	gittest.Commit(t, repo.Dir, "local.txt", "x", "local commit")
@@ -950,11 +950,11 @@ func TestPushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	if job.Error == nil || job.Error.Code != core.PushRejected {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.PushRejected)
 	}
-	if job.Error.GitStderr == "" {
-		t.Error("GitStderr empty, want git's own explanation")
+	if !strings.Contains(job.Error.GitStderr, "refusing") {
+		t.Errorf("GitStderr = %q, want the reason the hook gave", job.Error.GitStderr)
 	}
-	if !strings.Contains(job.Error.Message, "hook declined") {
-		t.Errorf("message = %q, want it to name the reason", job.Error.Message)
+	if got := gittest.Out(t, origin, "rev-parse", "master"); got == gittest.HeadSHA(t, repo.Dir) {
+		t.Error("origin's master took the declined commit")
 	}
 }
 

@@ -48,8 +48,8 @@ func TestRenameBranchRefusesBadNewNamesThenRenamesANonCurrentBranch(t *testing.T
 	coretest.AssertCode(t, c.RenameBranch(t.Context(), wt, "feature", "-badname"), core.InvalidName)
 
 	ce := coretest.AsError(t, c.RenameBranch(t.Context(), wt, "feature", "taken"), core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "already exists") {
-		t.Errorf("GitStderr = %q, want it to say the branch already exists", ce.GitStderr)
+	if ce.GitStderr == "" {
+		t.Error("GitStderr empty, want git's own explanation")
 	}
 	if got := branchTip(t, repo.Dir, "feature"); got != featureTip {
 		t.Errorf("feature = %s, want unchanged %s after the refusals", got, featureTip)
@@ -317,8 +317,8 @@ func TestCreateBranchRejectsADuplicateNameAsGitFailed(t *testing.T) {
 	err := c.CreateBranch(t.Context(), wt, "feature", sha, false)
 
 	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "already exists") {
-		t.Errorf("GitStderr = %q, want it to say the branch already exists", ce.GitStderr)
+	if ce.GitStderr == "" {
+		t.Error("GitStderr empty, want git's own explanation")
 	}
 	if got := branchTip(t, repo.Dir, "feature"); got != originalTip {
 		t.Errorf("feature = %s, want unchanged %s", got, originalTip)

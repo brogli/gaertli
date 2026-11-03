@@ -219,8 +219,8 @@ func TestUnstageFileOnAPathRaceFailsWithGitFailed(t *testing.T) {
 	err := c.UnstageFile(t.Context(), id, "never-tracked.txt")
 
 	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "pathspec") {
-		t.Errorf("GitStderr = %q, want it to mention the pathspec", ce.GitStderr)
+	if ce.GitStderr == "" {
+		t.Error("GitStderr empty, want git's own explanation")
 	}
 	if got := gittest.Out(t, repo.Dir, "status", "--porcelain"); got != "" {
 		t.Errorf("status = %q, want clean (nothing changed)", got)

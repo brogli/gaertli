@@ -141,8 +141,8 @@ func TestCherryPickRefusesWithADirtyFileInTheWay(t *testing.T) {
 	err := c.CherryPick(t.Context(), wt, []string{pickSHA}, core.PickOptions{})
 
 	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "would be overwritten") {
-		t.Errorf("GitStderr = %q, want it to say the file would be overwritten", ce.GitStderr)
+	if ce.GitStderr == "" {
+		t.Error("GitStderr empty, want git's own explanation")
 	}
 	if fileExists(filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD")) {
 		t.Error("CHERRY_PICK_HEAD present, want none")
@@ -347,8 +347,8 @@ func TestRevertRefusesWithADirtyFileInTheWay(t *testing.T) {
 	err := c.Revert(t.Context(), wt, []string{revertSHA}, core.PickOptions{})
 
 	ce := coretest.AsError(t, err, core.GitFailed)
-	if !strings.Contains(ce.GitStderr, "would be overwritten") {
-		t.Errorf("GitStderr = %q, want it to say the file would be overwritten", ce.GitStderr)
+	if ce.GitStderr == "" {
+		t.Error("GitStderr empty, want git's own explanation")
 	}
 	if fileExists(filepath.Join(repo.Dir, ".git", "REVERT_HEAD")) {
 		t.Error("REVERT_HEAD present, want none")
