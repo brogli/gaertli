@@ -4,8 +4,9 @@ Every pull request runs the `ci` workflow, and it has to be green to merge. `tas
 Linux checks locally, offline after `task setup`, except the two e2e suites: `task e2e` and
 `task e2e:real`. `task fmt` fixes lint findings and formatting.
 
-`ci` also runs on pushes to `main` and by hand. `release candidate`, started by hand on `main`, runs
-`ci`, builds every artifact and leaves a draft release; `docs/releasing.md` has the rest.
+`ci` also runs on pushes to `main` and by hand. `release candidate`, started by hand on `main` once
+`ci` has passed on that commit, builds every artifact and leaves a draft release;
+`docs/releasing.md` has the rest.
 
 ## Jobs
 

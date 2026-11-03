@@ -1,8 +1,8 @@
 name: release candidate
 
-# Started by hand on main: runs CI, builds every artifact and leaves them in a
-# draft release. Publishing the draft by hand creates the tag on the built
-# commit, so what ships is what was checked.
+# Started by hand on main, on a commit CI has passed: builds every artifact and
+# leaves them in a draft release. Publishing the draft by hand creates the tag
+# on the built commit, so what ships is what was checked.
 on: workflow_dispatch
 
 permissions:
@@ -16,6 +16,9 @@ jobs:
   version:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       commit: ${{ steps.version.outputs.commit }}
@@ -25,6 +28,18 @@ jobs:
         run: |
           echo "::error::Release candidates are built from main only."
           exit 1
+
+      - name: Refuse a commit CI has not passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          passed=$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --status success \
+            --json databaseId --jq length)
+          if [ "$passed" = 0 ]; then
+            echo "::error::ci has not passed on $GITHUB_SHA: wait for its run, or start one."
+            exit 1
+          fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,15 +59,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-  ci:
-    needs: version
-    # actionlint 1.7.12 rejects the $/ self-repository form.
-    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
-    permissions:
-      contents: read
-
   windows:
-    needs: [version, ci]
+    needs: version
     # Cross-compiled on Linux, as in development: the Windows app needs no
     # cgo, so no Windows runner is needed.
     runs-on: ubuntu-24.04
@@ -102,7 +110,7 @@ jobs:
           path: dist/nebegit-windows-amd64-setup.exe
 
   linux:
-    needs: [version, ci]
+    needs: version
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -157,7 +165,7 @@ jobs:
           path: dist/nebegit-linux-amd64.tar.gz
 
   darwin:
-    needs: [version, ci]
+    needs: version
     runs-on: macos-latest
     continue-on-error: true # a failing macOS build never holds back the release
     timeout-minutes: 30
@@ -202,7 +210,7 @@ jobs:
           if-no-files-found: ignore
 
   notices:
-    needs: [version, ci]
+    needs: version
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
