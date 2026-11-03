@@ -1,7 +1,7 @@
 // Requirements: DIST-03, OSS-04, QA-MNT-04, QA-MNT-05
 
 // Package repocheck holds the tests that scan the working tree for what no
-// linter checks: foreign lockfiles, owner-specific defaults, test-file
+// linter checks: foreign lockfiles, machine-specific defaults, test-file
 // placement, glossary use, the release version script.
 package repocheck_test
 
@@ -90,14 +90,14 @@ var (
 )
 
 // allowedPlumbingBranches are the branch names git itself defaults to;
-// anything else hard-coded as a "branch" field is a suspect owner default.
+// anything else hard-coded as a "branch" field is a suspect machine-specific default.
 var allowedPlumbingBranches = map[string]bool{"main": true, "master": true, "HEAD": true}
 
-// findOwnerSpecificDefaults walks root's files, skipping _test.go files and
+// findMachineSpecificDefaults walks root's files, skipping _test.go files and
 // any testing/fixtures/__tests__ directory, and returns the paths of files
 // containing a hard-coded home directory, remote URL, or non-plumbing
 // branch name.
-func findOwnerSpecificDefaults(t *testing.T, root string) []string {
+func findMachineSpecificDefaults(t *testing.T, root string) []string {
 	t.Helper()
 	var violations []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -139,7 +139,7 @@ func findOwnerSpecificDefaults(t *testing.T, root string) []string {
 	return violations
 }
 
-func TestNoOwnerSpecificDefaults(t *testing.T) {
+func TestNoMachineSpecificDefaults(t *testing.T) {
 	t.Run("fixture", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFixture := func(name, content string) {
@@ -150,9 +150,9 @@ func TestNoOwnerSpecificDefaults(t *testing.T) {
 		writeFixture("dirty.go", "package fixture\n\n// installed at /home/someone/repos/app\n")
 		writeFixture("clean.go", "package fixture\n")
 
-		got := findOwnerSpecificDefaults(t, dir)
+		got := findMachineSpecificDefaults(t, dir)
 		if len(got) != 1 || !strings.HasSuffix(got[0], "dirty.go") {
-			t.Errorf("findOwnerSpecificDefaults(fixture) = %v, want exactly one match, dirty.go", got)
+			t.Errorf("findMachineSpecificDefaults(fixture) = %v, want exactly one match, dirty.go", got)
 		}
 	})
 
@@ -160,10 +160,10 @@ func TestNoOwnerSpecificDefaults(t *testing.T) {
 		root := repoRoot(t)
 		var violations []string
 		for _, dir := range []string{"internal", "cmd", "frontend/src", "build"} {
-			violations = append(violations, findOwnerSpecificDefaults(t, filepath.Join(root, dir))...)
+			violations = append(violations, findMachineSpecificDefaults(t, filepath.Join(root, dir))...)
 		}
 		if len(violations) > 0 {
-			t.Errorf("owner-specific defaults found:\n%s", strings.Join(violations, "\n"))
+			t.Errorf("machine-specific defaults found:\n%s", strings.Join(violations, "\n"))
 		}
 	})
 }
