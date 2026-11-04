@@ -5,7 +5,7 @@
 - The Windows app needs no cgo, so it is cross-compiled on Linux everywhere, and it carries the
   Linux core for WSL repos (ADR-3).
 - Release binaries are built on stock CI runners, since binaries built in the Nix shell run only
-  inside it.
+  inside it. Only the frontend's Node and pnpm come from the flake, which alone sets their versions.
 - A release build stamps its version and commit, shown in Settings; local builds are `dev`.
 
 ## Packages
