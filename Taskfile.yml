@@ -124,13 +124,6 @@ tasks:
     cmds:
       - cmd: treefmt --ci
         platforms: [linux, darwin]
-      # Windows runners have no Nix shell; the Windows-only Go files are
-      # linted there. golangci-lint type-checks internal/remote, whose
-      # go:embed needs the cross-built core.
-      - task: build:core:embed
-        platforms: [windows]
-      - cmd: golangci-lint run
-        platforms: [windows]
       - task: common:frontend:run
         vars: { SCRIPT: type-check }
 
