@@ -175,6 +175,19 @@ jobs:
         with:
           persist-credentials: false
 
+      # The tests start git thousands of times. cmd\git.exe is a launcher
+      # that starts the real git.exe as a second process. Go's caches and the
+      # scratch repos go to the faster D: disk, and they and Go's install stay
+      # out of Defender's real-time scan, before anything is unpacked.
+      - name: Direct git; Go's caches and scratch repos on the D drive, unscanned
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_PATH 'C:\Program Files\Git\mingw64\bin'
+          New-Item -ItemType Directory -Force D:\tmp, D:\go | Out-Null
+          Add-Content $env:GITHUB_ENV "TEMP=D:\tmp`nTMP=D:\tmp`nGOTMPDIR=D:\tmp"
+          Add-Content $env:GITHUB_ENV "GOMODCACHE=D:\go\mod`nGOCACHE=D:\go\build"
+          Add-MpPreference -ExclusionPath D:\tmp, D:\go, $env:GITHUB_WORKSPACE, $env:RUNNER_TOOL_CACHE
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -206,17 +219,6 @@ jobs:
       - name: Setup (online)
         run: go mod download
 
-      # The tests start git thousands of times. cmd\git.exe is a launcher
-      # that starts the real git.exe as a second process; the scratch repos
-      # go to the faster D: disk and out of Defender's real-time scan.
-      - name: Direct git; scratch repos on the D drive, unscanned
-        shell: pwsh
-        run: |
-          Add-Content $env:GITHUB_PATH 'C:\Program Files\Git\mingw64\bin'
-          New-Item -ItemType Directory -Force D:\tmp | Out-Null
-          Add-Content $env:GITHUB_ENV "TEMP=D:\tmp`nTMP=D:\tmp`nGOTMPDIR=D:\tmp"
-          Add-MpPreference -ExclusionPath D:\tmp, $env:GITHUB_WORKSPACE
-
       # -count=1: Go's test cache travels in the build cache, and a cached
       # pass does not see a changed git on the runner image.
       - name: Go tests (offline)
@@ -227,7 +229,7 @@ jobs:
         run: |
           where.exe git
           git --version
-          go tool task test:go:core PARALLEL=4
+          go tool task test:go:core PARALLEL=8
 
   macos:
     # A build only (QA-PORT-04).
