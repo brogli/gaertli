@@ -32,9 +32,15 @@ config.global.plugins = [
   i18n,
 ]
 
-// @tanstack/vue-virtual measures its scroll container via offsetWidth/
-// offsetHeight, which happy-dom always reports as 0: it has no layout
-// engine, so every element gets a real size here; tests needing a
-// different size override it themselves.
-Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 800 })
-Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 })
+// @tanstack/vue-virtual measures its scroll container via clientWidth/
+// clientHeight and its rows via offsetWidth/offsetHeight, which happy-dom
+// always reports as 0: it has no layout engine, so every element gets a real
+// size here; tests needing a different size override it themselves.
+for (const [name, value] of Object.entries({
+  clientWidth: 800,
+  clientHeight: 600,
+  offsetWidth: 800,
+  offsetHeight: 600,
+})) {
+  Object.defineProperty(HTMLElement.prototype, name, { configurable: true, value })
+}
