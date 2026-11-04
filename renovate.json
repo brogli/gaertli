@@ -21,7 +21,7 @@
     }
   ],
   "minimumReleaseAge": "7 days",
-  "constraints": { "pnpm": "11" },
+  "constraints": { "pnpm": "12" },
   "postUpdateOptions": ["gomodTidy"],
   "nix": { "enabled": true },
   "platformAutomerge": false,
