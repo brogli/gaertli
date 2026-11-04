@@ -2,7 +2,7 @@ module github.com/brogli/nebegit
 
 go 1.26.0
 
-toolchain go1.27.1
+toolchain go1.27.3
 
 tool (
 	github.com/go-task/task/v3/cmd/task
