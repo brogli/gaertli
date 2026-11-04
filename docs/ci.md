@@ -25,6 +25,6 @@ failure files to the run.
 
 ## Timing
 
-A Linux job takes a few minutes, Windows about twice that when its caches are warm. A pull request's
-first run is slower when `main` has had no recent run to leave caches. A newer push to the same pull
-request cancels the run in progress.
+A Linux job takes a few minutes, Windows about twice that when its caches are warm. Only `main`'s
+runs save caches, and pull requests restore them, so a run is slower when `main` has had no recent
+run. A newer push to the same pull request cancels the run in progress.

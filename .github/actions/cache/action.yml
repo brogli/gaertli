@@ -1,0 +1,29 @@
+name: cache
+description: >
+  Restores a cache on every run but saves it only on main. A pull request can restore main's caches,
+  so its own would only evict them from the repo's limit.
+inputs:
+  path:
+    description: What to cache
+    required: true
+  key:
+    description: The cache's key
+    required: true
+  restore-keys:
+    description: Key prefixes to fall back on, one per line
+    required: false
+runs:
+  using: composite
+  steps:
+    - if: github.ref == 'refs/heads/main'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.path }}
+        key: ${{ inputs.key }}
+        restore-keys: ${{ inputs.restore-keys }}
+    - if: github.ref != 'refs/heads/main'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.path }}
+        key: ${{ inputs.key }}
+        restore-keys: ${{ inputs.restore-keys }}
