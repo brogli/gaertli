@@ -8,6 +8,8 @@ saveExact: true
 # The runtime must match the Go module's version exactly, whatever its age.
 minimumReleaseAgeExclude:
   - '@wailsio/runtime'
+  # Renovate security update: happy-dom@21.0.4
+  - happy-dom@21.0.4
 
 # Dependency build scripts, reviewed: esbuild's postinstall only verifies the
 # binary that its platform package already ships, so it does not run.
