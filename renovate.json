@@ -75,8 +75,8 @@
       "automerge": false
     },
     {
-      "description": "Node's major moves in the Nix shell and the workflows at once.",
-      "matchDepNames": ["node"],
+      "description": "Node's major moves in the Nix shell, the workflows and its types at once.",
+      "matchDepNames": ["node", "@types/node"],
       "groupName": "Node"
     },
     {
