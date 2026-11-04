@@ -6,6 +6,7 @@
   "postUpdateOptions": ["gomodTidy"],
   "nix": { "enabled": true },
   "platformAutomerge": false,
+  "rebaseWhen": "conflicted",
   "lockFileMaintenance": { "enabled": true, "automerge": true },
   "packageRules": [
     {
