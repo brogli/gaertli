@@ -30,7 +30,7 @@ func (p *fakePicker) Pick(dir string) (string, bool) {
 func TestPickAndOpenDoesNothingOnCancel(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("A", "/a", "")
-	s := &AppService{shell: shell{reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{}}
+	s := &AppService{reg: reg, store: newTestStore(t), notify: &fakeNotifier{}, picker: &fakePicker{}}
 
 	if err := s.PickAndOpen(callFrom(opener.windows[0].ID())); err != nil {
 		t.Fatal(err)
@@ -46,7 +46,7 @@ func TestPickAndOpenSwitchesTheCallingWindowToThePickedPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/a", "/a", "")
 	api := fakeAPI{openWorktree: openAsIs}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{path: "/picked", ok: true}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}, picker: &fakePicker{path: "/picked", ok: true}}
 	fw := &fakeCallingWindow{id: opener.windows[0].ID()}
 
 	if err := s.PickAndOpen(context.WithValue(t.Context(), application.WindowKey, fw)); err != nil {
@@ -68,7 +68,7 @@ func TestPickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *testing.T
 	reg.OpenOrFocus("/b", "/b", "")
 	window2 := opener.windows[1]
 	api := fakeAPI{openWorktree: openAsIs}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}, picker: &fakePicker{path: "/b", ok: true}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}, picker: &fakePicker{path: "/b", ok: true}}
 	fw := &fakeCallingWindow{id: opener.windows[0].ID()}
 
 	if err := s.PickAndOpen(context.WithValue(t.Context(), application.WindowKey, fw)); err != nil {
@@ -88,7 +88,7 @@ func TestPickAndOpenBringsForwardAWindowAlreadyShowingThePickedPath(t *testing.T
 func TestOpenPathOpensALocalPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	api := fakeAPI{openWorktree: openAsIs}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
 
 	s.OpenPath(t.Context(), "/repo-feature")
 	if len(opener.windows) != 1 {
@@ -101,7 +101,7 @@ func TestRecentReposListsStoredEntries(t *testing.T) {
 	if err := store.Update(func(s *settings.Settings) { s.AddRecent(settings.RecentRepo{Path: "/a"}, time.Now()) }); err != nil {
 		t.Fatal(err)
 	}
-	s := &AppService{shell: shell{store: store}}
+	s := &AppService{store: store}
 
 	got := s.RecentRepos()
 	if len(got) != 1 || got[0].Path != "/a" {
@@ -117,7 +117,7 @@ func TestRemoveRecentRepoDropsItLeavingOpenWorktreesUnchanged(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	s := &AppService{shell: shell{store: store}}
+	s := &AppService{store: store}
 
 	if err := s.RemoveRecentRepo(settings.RecentRepo{Path: "/b"}); err != nil {
 		t.Fatal(err)
@@ -142,7 +142,7 @@ func TestOpenFolderOpensAFolderInsideADistroOnItsCore(t *testing.T) {
 			reg.OpenOrFocus("", "", "")
 			store := newTestStore(t)
 			s := &AppService{
-				shell:  shell{api: NewForwarder(reg), reg: reg, store: store, notify: &fakeNotifier{}},
+				api: NewForwarder(reg), reg: reg, store: store, notify: &fakeNotifier{},
 				picker: &fakePicker{path: picked, ok: true},
 			}
 			fw := &fakeCallingWindow{id: opener.windows[0].ID()}
@@ -171,7 +171,7 @@ func TestOpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
 	reg.OpenOrFocus("", "", "")
 	store := newTestStore(t)
 	s := &AppService{
-		shell:  shell{api: NewForwarder(reg), reg: reg, store: store, notify: &fakeNotifier{}},
+		api: NewForwarder(reg), reg: reg, store: store, notify: &fakeNotifier{},
 		picker: &fakePicker{path: "/repos/r", ok: true},
 	}
 	fw := &fakeCallingWindow{id: opener.windows[0].ID()}
@@ -196,7 +196,7 @@ func TestOpenFolderOpensALocalFolderOnTheLocalCore(t *testing.T) {
 func TestNewWindowAlwaysOpensAnotherEmptyWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("", "", "")
-	s := &AppService{shell: shell{reg: reg}}
+	s := &AppService{reg: reg}
 
 	s.NewWindow()
 
@@ -216,7 +216,7 @@ func TestNewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
 	if err := store.Update(func(s *settings.Settings) { s.OpenWorktrees = []string{"/a"} }); err != nil {
 		t.Fatal(err)
 	}
-	s := &AppService{shell: shell{reg: reg, store: store}}
+	s := &AppService{reg: reg, store: store}
 
 	s.NewWindow()
 
@@ -228,7 +228,7 @@ func TestNewWindowLeavesOpenWorktreesUnchanged(t *testing.T) {
 func TestOpenPathOpensTheGivenPath(t *testing.T) {
 	reg, opener := newTestRegistry()
 	api := fakeAPI{openWorktree: openAsIs}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
 
 	s.OpenPath(t.Context(), `\\wsl.localhost\Ubuntu-22.04\home\user\project`)
 	if len(opener.windows) != 1 {
@@ -244,7 +244,7 @@ func callFrom(id uint) context.Context {
 func TestOpenDiffOpensADiffWindowOnTheTarget(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/x/project", "/x/project", "")
-	s := &AppService{shell: shell{reg: reg}}
+	s := &AppService{reg: reg}
 	target := DiffTarget{Kind: CommitDiff, Sha: "1111111111a", Path: "f.txt"}
 
 	s.OpenDiff(callFrom(opener.windows[0].ID()), "/x/project", target)
@@ -264,7 +264,7 @@ func TestOpenDiffOpensADiffWindowOnTheTarget(t *testing.T) {
 func TestOpenDiffFromTheSameMainWindowRetargetsItsDiffWindow(t *testing.T) {
 	reg, opener := newTestRegistry()
 	reg.OpenOrFocus("/x/project", "/x/project", "")
-	s := &AppService{shell: shell{reg: reg}}
+	s := &AppService{reg: reg}
 	ctx := callFrom(opener.windows[0].ID())
 	targets := []DiffTarget{
 		{Kind: CommitDiff, Sha: "s", Path: "a"},
@@ -300,7 +300,7 @@ func TestEachMainWindowHasItsOwnDiffWindow(t *testing.T) {
 	reg.OpenOrFocus("/a", "/a", "")
 	reg.OpenOrFocus("/b", "/b", "")
 	reg.SelectInWindow(opener.windows[1].ID(), "/a", "/a", "")
-	s := &AppService{shell: shell{reg: reg}}
+	s := &AppService{reg: reg}
 	target := DiffTarget{Kind: WorkingDiff, Path: "f"}
 
 	for _, mainWindow := range opener.windows[:2] {
@@ -320,7 +320,7 @@ func TestEachMainWindowHasItsOwnDiffWindow(t *testing.T) {
 // A call from outside any window, such as the second-instance hand-over, carries no window.
 func TestWithNoCallingWindowTheDiffWindowIsKeyedByItsWorktree(t *testing.T) {
 	reg, opener := newTestRegistry()
-	s := &AppService{shell: shell{reg: reg}}
+	s := &AppService{reg: reg}
 	target := DiffTarget{Kind: WorkingDiff, Path: "f"}
 
 	for _, wt := range []core.WorktreeID{"/a", "/a", "/b"} {
@@ -353,7 +353,7 @@ func TestUpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
 }
 
 func TestLogPathReportsTheAppLogsLocation(t *testing.T) {
-	s := &AppService{shell: shell{logPath: "/x/nebegit.log"}}
+	s := &AppService{logPath: "/x/nebegit.log"}
 
 	got := s.LogPath()
 	if got.Path != "/x/nebegit.log" || got.Error != "" {
@@ -362,7 +362,7 @@ func TestLogPathReportsTheAppLogsLocation(t *testing.T) {
 }
 
 func TestLogPathReportsWhyTheLogCouldNotOpen(t *testing.T) {
-	s := &AppService{shell: shell{logErr: "permission denied"}}
+	s := &AppService{logErr: "permission denied"}
 
 	got := s.LogPath()
 	if got.Path != "" || got.Error != "permission denied" {
@@ -377,7 +377,7 @@ func TestSelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
 		called = true
 		return core.WorktreeInfo{}, nil
 	}}
-	s := &AppService{shell: shell{api: api}}
+	s := &AppService{api: api}
 
 	err := s.SelectWorktree(t.Context(), "/x")
 
@@ -399,7 +399,7 @@ func TestSelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
 			return core.Worktree{}, nil
 		},
 	}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t)}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t)}
 
 	err := s.SelectRecentRepo(callFrom(opener.windows[0].ID()), settings.RecentRepo{Path: "/b"})
 	if err != nil {
@@ -428,7 +428,7 @@ func TestSelectRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing
 			return core.Worktree{Path: "/home/u/r", Main: true}, nil
 		},
 	}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t)}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t)}
 
 	err := s.SelectRecentRepo(callFrom(opener.windows[0].ID()), settings.RecentRepo{
 		Path: "/home/u/r-old", Distro: "Ubuntu", RepoKey: "/home/u/r/.git",
@@ -459,7 +459,7 @@ func TestSelectRecentRepoReturnsTheErrorWithNoRepoKey(t *testing.T) {
 			return core.Worktree{}, nil
 		},
 	}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t)}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t)}
 
 	err := s.SelectRecentRepo(callFrom(opener.windows[0].ID()), settings.RecentRepo{Path: "/b"})
 
@@ -481,7 +481,7 @@ func TestSelectRecentRepoReturnsMainWorktreesErrorOnASecondFailure(t *testing.T)
 			return core.Worktree{}, core.Errorf(core.NotARepo, "no worktree left")
 		},
 	}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t)}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t)}
 
 	err := s.SelectRecentRepo(callFrom(opener.windows[0].ID()), settings.RecentRepo{
 		Path: "/b", RepoKey: "/bare.git",
@@ -501,7 +501,7 @@ func TestOpenRecentRepoOpensASecondWindow(t *testing.T) {
 	reg.OpenOrFocus("/a", "/a", "")
 	api := fakeAPI{openWorktree: openAsIs}
 	store := newTestStore(t)
-	s := &AppService{shell: shell{api: api, reg: reg, store: store, notify: &fakeNotifier{}}}
+	s := &AppService{api: api, reg: reg, store: store, notify: &fakeNotifier{}}
 
 	if err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{Path: "/b"}); err != nil {
 		t.Fatal(err)
@@ -526,7 +526,7 @@ func TestOpenRecentRepoFocusesAWindowAlreadyShowingTheEntry(t *testing.T) {
 	reg.OpenOrFocus("/b", "/b", "")
 	windowB := opener.windows[1]
 	api := fakeAPI{openWorktree: openAsIs}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
 
 	if err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{Path: "/b"}); err != nil {
 		t.Fatal(err)
@@ -557,7 +557,7 @@ func TestOpenRecentRepoFallsBackToTheMainWorktreeWhenTheEntryIsGone(t *testing.T
 			return core.Worktree{Path: "/home/u/r", Main: true}, nil
 		},
 	}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t), notify: &fakeNotifier{}}
 
 	err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{
 		Path: "/home/u/r-old", Distro: "Ubuntu", RepoKey: "/home/u/r/.git",
@@ -581,7 +581,7 @@ func TestOpenRecentRepoReturnsTheErrorWithoutShowingItNatively(t *testing.T) {
 		return core.WorktreeInfo{}, core.Errorf(core.NotARepo, "gone")
 	}}
 	notify := &fakeNotifier{}
-	s := &AppService{shell: shell{api: api, reg: reg, store: newTestStore(t), notify: notify}}
+	s := &AppService{api: api, reg: reg, store: newTestStore(t), notify: notify}
 
 	err := s.OpenRecentRepo(t.Context(), settings.RecentRepo{Path: "/b"})
 

@@ -104,7 +104,7 @@ func (r RecentRepo) sameRepo(other RecentRepo) bool {
 // master protected, git's own pull default (--no-rebase), unified diffs,
 // and no auto-fetch.
 func Default() Settings {
-	return Settings{Preferences: Preferences{ProtectedBranches: []string{"main", "master"}, DefaultPullMode: core.PullMerge, DiffMode: UnifiedDiff}}
+	return Settings{ProtectedBranches: []string{"main", "master"}, DefaultPullMode: core.PullMerge, DiffMode: UnifiedDiff}
 }
 
 // Path is <os.UserConfigDir()>/nebegit/settings.json.

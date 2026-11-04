@@ -51,7 +51,7 @@ You also need:
 
 ## Build from source
 
-You need git, [Go](https://go.dev/dl) 1.26 or newer and [Nix](https://nixos.org/download) with
+You need git, [Go](https://go.dev/dl) 1.27 or newer and [Nix](https://nixos.org/download) with
 flakes enabled. On Windows, all three inside WSL. [direnv](https://direnv.net) is optional, but
 recommended. The Nix shell brings everything else.
 

@@ -104,6 +104,12 @@
       "matchManagers": ["nix"],
       "matchUpdateTypes": ["lockFileMaintenance"],
       "schedule": ["at any time"]
+    },
+    {
+      "description": "A toolchain bump is re-tested as main moves: it may wait for the Nix shell's golangci-lint to read the new compiler's export data.",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["toolchain"],
+      "rebaseWhen": "behind-base-branch"
     }
   ]
 }

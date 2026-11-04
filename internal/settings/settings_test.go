@@ -63,20 +63,18 @@ func load(t *testing.T, path string) settings.Settings {
 
 func TestSaveThenLoadRoundTripsEveryField(t *testing.T) {
 	want := settings.Settings{
-		RecentRepos:    []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
-		OpenWorktrees:  []string{"/a", "/b"},
-		DiffWindowSize: &settings.WindowSize{Width: 900, Height: 600},
-		Preferences: settings.Preferences{
-			EditorProfile:            core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}"},
-			ProtectedBranches:        []string{"main"},
-			DefaultPullMode:          core.PullRebase,
-			DiffMode:                 settings.SideBySideDiff,
-			AutoFetchIntervalMinutes: 5,
-			Theme:                    settings.DarkTheme,
-			IgnoreWhitespace:         true,
-			DebugMode:                true,
-			WorktreeFolders:          map[string]string{"": "/wt", "Ubuntu": "/home/u/wt"},
-		},
+		RecentRepos:              []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
+		OpenWorktrees:            []string{"/a", "/b"},
+		DiffWindowSize:           &settings.WindowSize{Width: 900, Height: 600},
+		EditorProfile:            core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}"},
+		ProtectedBranches:        []string{"main"},
+		DefaultPullMode:          core.PullRebase,
+		DiffMode:                 settings.SideBySideDiff,
+		AutoFetchIntervalMinutes: 5,
+		Theme:                    settings.DarkTheme,
+		IgnoreWhitespace:         true,
+		DebugMode:                true,
+		WorktreeFolders:          map[string]string{"": "/wt", "Ubuntu": "/home/u/wt"},
 	}
 
 	if got := saveAndLoad(t, want); !reflect.DeepEqual(got, want) {
@@ -147,7 +145,7 @@ func TestAnExistingFileKeepsTheProtectedBranchesItStores(t *testing.T) {
 }
 
 func TestThemeRoundTrips(t *testing.T) {
-	got := saveAndLoad(t, settings.Settings{Preferences: settings.Preferences{Theme: settings.DarkTheme}})
+	got := saveAndLoad(t, settings.Settings{Theme: settings.DarkTheme})
 
 	if got.Theme != settings.DarkTheme {
 		t.Errorf("Theme = %q, want %q", got.Theme, "dark")
@@ -326,9 +324,9 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 }
 
 func TestEditorProfileRoundTrips(t *testing.T) {
-	want := settings.Settings{Preferences: settings.Preferences{
+	want := settings.Settings{
 		EditorProfile: core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}", FileCmd: "alpha {path}", FileAtLineCmd: "alpha {path}:{line}"},
-	}}
+	}
 
 	if got := saveAndLoad(t, want); got.EditorProfile != want.EditorProfile {
 		t.Errorf("EditorProfile = %+v, want %+v", got.EditorProfile, want.EditorProfile)

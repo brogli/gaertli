@@ -23,6 +23,9 @@ Linux checks locally, offline after `task setup`, except the two e2e suites: `ta
 whether the component tests passed: read every red step. A failed e2e step attaches its report and
 failure files to the run.
 
+A lint failure "export data version N is greater than maximum supported version" means the Nix
+shell's golangci-lint predates the Go in `go.mod`. The next `flake.lock` update brings a newer one.
+
 ## Timing
 
 A Linux job takes a few minutes, Windows about twice that when its caches are warm. Only `main`'s
