@@ -1,11 +1,31 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The Nix shell's Node major, in its attribute name.",
+      "managerFilePatterns": ["/^flake\\.nix$/"],
+      "matchStrings": ["\\bnodejs_(?<currentValue>\\d+)\\b"],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "node-version",
+      "versioningTemplate": "node"
+    },
+    {
+      "customType": "regex",
+      "description": "The Nix shell's pnpm major, in its attribute name.",
+      "managerFilePatterns": ["/^flake\\.nix$/"],
+      "matchStrings": ["\\bpnpm_(?<currentValue>\\d+)\\b"],
+      "depNameTemplate": "pnpm",
+      "datasourceTemplate": "npm"
+    }
+  ],
   "minimumReleaseAge": "7 days",
   "constraints": { "pnpm": "11" },
   "postUpdateOptions": ["gomodTidy"],
   "nix": { "enabled": true },
   "platformAutomerge": false,
+  "rebaseWhen": "conflicted",
   "lockFileMaintenance": { "enabled": true, "automerge": true },
   "packageRules": [
     {
@@ -55,10 +75,29 @@
       "automerge": false
     },
     {
-      "description": "Node and pnpm's majors are pinned to the Nix shell's; bump them there instead.",
-      "matchManagers": ["github-actions"],
-      "matchDepNames": ["node", "pnpm"],
-      "enabled": false
+      "description": "Node's major moves in the Nix shell and the workflows at once.",
+      "matchDepNames": ["node"],
+      "groupName": "Node"
+    },
+    {
+      "description": "pnpm's major moves in the Nix shell, the workflows and Renovate's constraint at once.",
+      "matchDepNames": ["pnpm"],
+      "groupName": "pnpm"
+    },
+    {
+      "description": "Indirect modules compiled into release builds. The other indirect modules serve dev builds and the tools in go.mod, and move with them.",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "matchPackageNames": [
+        "github.com/adrg/xdg",
+        "github.com/creachadair/mds",
+        "github.com/go-ole/go-ole",
+        "github.com/godbus/dbus/v5",
+        "golang.org/x/mod",
+        "golang.org/x/sync"
+      ],
+      "enabled": true,
+      "groupName": "indirect Go modules"
     },
     {
       "description": "flake.lock follows nixos-unstable on the next Renovate run instead of weekly, so nixpkgs security fixes land as soon as the channel has them.",
