@@ -114,7 +114,7 @@ tasks:
       - task: create:tarball
 
   package:dryrun:
-    summary: Builds the deb, rpm and tar.gz into dist/, mirroring release.yml's linux job
+    summary: Builds the deb, rpm and tar.gz into dist/, mirroring release.yml's linux-windows job
     cmds:
       - task: create:deb
       - task: create:rpm

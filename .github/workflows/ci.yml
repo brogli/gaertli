@@ -6,18 +6,15 @@ name: ci
 # commit.
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [main]
   push:
     branches: [main]
-  workflow_call:
-  # By hand (gh workflow run ci --ref dev): the full set, Windows and macOS included.
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A newer push to the same pull request cancels the run in progress. A
-# release's call (workflow_dispatch) is never cancelled.
+# A newer push to the same pull request cancels the run in progress.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -170,10 +167,7 @@ jobs:
   windows:
     # Only Windows can run the Go tests' Windows paths (processes, paths,
     # the WSL core). The Windows binary itself is cross-compiled on Linux,
-    # in the linux app job. Billed at twice the Linux rate
-    # and slow (git starts slowly there), so it runs for pull requests into
-    # main and for releases, not for those into dev.
-    if: github.event_name != 'pull_request' || github.base_ref == 'main'
+    # in the linux app job.
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -236,9 +230,7 @@ jobs:
           go tool task test:go:core PARALLEL=4
 
   macos:
-    # A build only (QA-PORT-04), billed at ten times the Linux rate: pull
-    # requests into main and releases.
-    if: github.event_name != 'pull_request' || github.base_ref == 'main'
+    # A build only (QA-PORT-04).
     runs-on: macos-latest
     timeout-minutes: 20
     steps:

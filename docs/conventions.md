@@ -7,4 +7,5 @@ tool configuration and in the code, which enforce them where a tool can (QA-MNT-
 - [git.md](conventions/git.md): how the app runs git.
 - [dependencies.md](conventions/dependencies.md): reuse before build, licences, pinning.
 - [frontend.md](conventions/frontend.md): Vue, TypeScript, components, styling, texts.
-- [tooling.md](conventions/tooling.md): the development shell, formatting and linting.
+- [tooling.md](conventions/tooling.md): the development shell, formatting and linting, pull request
+  titles.

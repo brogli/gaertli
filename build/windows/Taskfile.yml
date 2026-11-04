@@ -114,7 +114,7 @@ tasks:
   package:dryrun:
     summary:
       Builds the zip (exe, LICENSE, bin/) and the NSIS installer into dist/, mirroring release.yml's
-      windows job
+      linux-windows job
     deps:
       - task: create:nsis:installer
     cmds:
