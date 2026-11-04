@@ -47,7 +47,7 @@
           packages =
             with pkgs;
             [
-              nodejs_24
+              nodejs_26
               pnpm_11
               golangci-lint
               treefmt
