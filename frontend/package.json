@@ -36,7 +36,7 @@
     "openvue": "1.0.0",
     "pinia": "4.0.3",
     "vue": "3.5.42",
-    "vue-i18n": "11.4.14"
+    "vue-i18n": "11.4.16"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
