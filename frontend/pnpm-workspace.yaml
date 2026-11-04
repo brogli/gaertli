@@ -12,6 +12,8 @@ minimumReleaseAgeExclude:
   - happy-dom@21.0.4
   # Renovate security update: vue-i18n@11.4.14
   - vue-i18n@11.4.14
+  # Renovate security update: vite@8.3.3
+  - vite@8.3.3
 
 # Dependency build scripts, reviewed: esbuild's postinstall only verifies the
 # binary that its platform package already ships, so it does not run.
