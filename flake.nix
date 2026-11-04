@@ -48,7 +48,7 @@
             with pkgs;
             [
               nodejs_26
-              pnpm_11
+              pnpm_12
               golangci-lint
               treefmt
               nixfmt
