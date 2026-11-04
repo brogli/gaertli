@@ -31,7 +31,7 @@
     "@openuxkit/themes": "1.1.0",
     "@openvue/openicons": "1.0.0",
     "@tanstack/vue-virtual": "3.13.39",
-    "@vueuse/core": "14.4.0",
+    "@vueuse/core": "15.0.0",
     "@wailsio/runtime": "3.0.0",
     "openvue": "1.0.0",
     "pinia": "4.1.0",
