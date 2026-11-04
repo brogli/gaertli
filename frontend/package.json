@@ -44,7 +44,7 @@
     "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "24.13.5",
-    "@vitejs/plugin-vue": "6.0.8",
+    "@vitejs/plugin-vue": "6.0.10",
     "@vitest/eslint-plugin": "1.6.27",
     "@vue/eslint-config-typescript": "14.9.0",
     "@vue/test-utils": "2.5.0",
