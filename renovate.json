@@ -75,12 +75,12 @@
       "automerge": false
     },
     {
-      "description": "Node's major moves in the Nix shell, the workflows and its types at once.",
+      "description": "Node's major moves in the Nix shell and its types at once.",
       "matchDepNames": ["node", "@types/node"],
       "groupName": "Node"
     },
     {
-      "description": "pnpm's major moves in the Nix shell, the workflows and Renovate's constraint at once.",
+      "description": "pnpm's major moves in the Nix shell and Renovate's constraint at once.",
       "matchDepNames": ["pnpm"],
       "groupName": "pnpm"
     },

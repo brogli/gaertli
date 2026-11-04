@@ -8,7 +8,20 @@
   outputs =
     { self, nixpkgs }:
     let
-      forSystem =
+      inherit (nixpkgs) lib;
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
+      # The one place their versions are set. Jobs outside the dev shell take
+      # them from the frontend-tools package.
+      frontendTools =
+        pkgs: with pkgs; [
+          nodejs_26
+          pnpm_12
+        ];
+      devShell =
         system:
         let
           pkgs = import nixpkgs { inherit system; };
@@ -46,9 +59,8 @@
         pkgs.mkShell {
           packages =
             with pkgs;
-            [
-              nodejs_26
-              pnpm_12
+            frontendTools pkgs
+            ++ [
               golangci-lint
               treefmt
               nixfmt
@@ -123,8 +135,20 @@
         };
     in
     {
-      devShells.x86_64-linux.default = forSystem "x86_64-linux";
-      devShells.aarch64-linux.default = forSystem "aarch64-linux";
-      devShells.aarch64-darwin.default = forSystem "aarch64-darwin";
+      devShells = lib.genAttrs systems (system: {
+        default = devShell system;
+      });
+      packages = lib.genAttrs systems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          frontend-tools = pkgs.buildEnv {
+            name = "frontend-tools";
+            paths = frontendTools pkgs;
+          };
+        }
+      );
     };
 }
