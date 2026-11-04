@@ -48,15 +48,10 @@ function row(sha: string, overrides: Partial<LogCommit> = {}): LogCommit {
 const sampleRow = commitRow()
 
 // mountWithRows renders LogList with rows already cached, ready to
-// click/shift-click; a sha stands for row(sha). clientHeight, not just
-// offsetHeight, is what @tanstack/vue-virtual needs to size enough rows for
-// a shift-click range to render under happy-dom.
+// click/shift-click; a sha stands for row(sha).
 async function mountWithRows(
   rows: (LogCommit | string)[],
 ): Promise<{ wrapper: VueWrapper; body: DOMWrapper<Element>; rowEls: DOMWrapper<Element>[] }> {
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 500 })
-  Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 500 })
-
   const { wrapper, body } = await mountInBody(LogList, { props: { wt: '/repo' } })
   const log = useLogStore()
   log.loaded = rows.length
