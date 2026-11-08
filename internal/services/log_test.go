@@ -323,20 +323,18 @@ func TestReloadLogRestartsTheActiveFilterWhenARefMoved(t *testing.T) {
 	}
 }
 
-// nextDone reads progress until a done event arrives.
+// nextDone reads progress until a done event arrives. It sets no time limit:
+// a load that never finishes fails at go test's timeout, with every
+// goroutine's stack.
 func nextDone(t *testing.T, progress <-chan core.LogProgress) core.LogProgress {
 	t.Helper()
-	timeout := time.After(5 * time.Second)
-	for {
-		select {
-		case p := <-progress:
-			if p.Done {
-				return p
-			}
-		case <-timeout:
-			t.Fatal("no done log:progress in time")
+	for p := range progress {
+		if p.Done {
+			return p
 		}
 	}
+	t.Fatal("log:progress closed without a done event")
+	return core.LogProgress{}
 }
 
 func TestLogIndexOfFindsRowBySHA(t *testing.T) {
@@ -615,14 +613,12 @@ func waitForLog(t *testing.T, c *Core, id core.WorktreeID) []core.LogCommit {
 	return res.Rows
 }
 
-// waitFor polls cond for up to 5 s.
+// waitFor polls cond until it holds. It sets no time limit, so a loaded
+// runner cannot fail it: a condition that never holds fails at go test's
+// timeout, with every goroutine's stack.
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
 	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatal("condition not met within 5 s")
-		}
 		time.Sleep(5 * time.Millisecond)
 	}
 }

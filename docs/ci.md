@@ -29,4 +29,4 @@ shell's golangci-lint predates the Go in `go.mod`. The next `flake.lock` update 
 
 A Linux job takes a few minutes, Windows about twice that when its caches are warm. Only `main`'s
 runs save caches, and pull requests restore them, so a run is slower when `main` has had no recent
-run. A newer push to the same pull request cancels the run in progress.
+run. A newer push to the same pull request, or a newer merge to `main`, cancels the run in progress.
