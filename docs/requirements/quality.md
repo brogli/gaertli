@@ -30,12 +30,12 @@
 
 ## Compatibility
 
-| ID         | Requirement                                                                                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| QA-COMP-01 | Results equal what the git command line would produce. The user's git config, hooks, ignore rules, attributes, and line-ending settings are respected. |
-| QA-COMP-02 | Works while other git tools (a terminal, an editor) use the same repo.                                                                                 |
-| QA-COMP-03 | The automated tests run against the oldest supported git version and against a current one.                                                            |
-| QA-COMP-04 | The app runs with git 2.42 or newer. With an older or missing git it says so at start and does nothing else.                                           |
+| ID         | Requirement                                                                                                                                                                                                                                                                                                             |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QA-COMP-01 | Results equal what the git command line would produce. The user's git config, hooks, ignore rules, attributes, and line-ending settings are respected.                                                                                                                                                                  |
+| QA-COMP-02 | Works while other git tools (a terminal, an editor) use the same repo.                                                                                                                                                                                                                                                  |
+| QA-COMP-03 | The automated tests run against the latest git release.                                                                                                                                                                                                                                                                 |
+| QA-COMP-04 | The app supports the latest git release. An older git, or one whose version cannot be read, gets a warning the user closes; the app then works as usual. Each git warns once per run: the host's at start, a WSL distro's on its first use, in the window that starts or uses it. A missing git stops the app at start. |
 
 ## Portability
 
@@ -62,6 +62,7 @@
 | QA-REL-01 | A failed git action never crashes the app.                                                                                                                                                         |
 | QA-REL-02 | Unexpected repo states (detached HEAD, empty repo, missing worktree folder, shallow clone) are shown, not hidden, and do not break the app.                                                        |
 | QA-REL-03 | When the app's backend for a repo stops (a crash, a WSL shutdown), nothing is lost: the next action starts it again, the window recovers without being reopened, and a typed commit message stays. |
+| QA-REL-04 | Several windows, background jobs and the repo watching acting at once never corrupt what the app shows or does.                                                                                    |
 
 ## Usability
 

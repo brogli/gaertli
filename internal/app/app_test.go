@@ -29,7 +29,10 @@ type fakeAPI struct {
 	closed         *[]core.WorktreeID
 	editorProfiles *[]core.EditorProfile // records every SetEditorProfile call, if set
 	calls          chan<- routedCall     // receives every Summary, CompareCommits and SetFocused call, if set
+	version        core.Version
 }
+
+func (f fakeAPI) Version(context.Context) (core.Version, error) { return f.version, nil }
 
 // routedCall is one worktree-routed call a fake core received.
 type routedCall struct {

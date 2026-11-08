@@ -426,6 +426,9 @@ export const AppService = {
   LogPath(): Promise<LogPathInfo> {
     return Promise.resolve({ path: '/mock/gaertli.log', error: '' })
   },
+  TakeGitWarnings(): Promise<[]> {
+    return Promise.resolve([])
+  },
   SetUnsavedWork(): Promise<void> {
     return Promise.resolve(undefined)
   },

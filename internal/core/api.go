@@ -426,15 +426,19 @@ type API interface {
 }
 
 // Version of a core. App and Commit are "dev" and "" until a release build
-// stamps them.
+// stamps them. Git is the version of the git the core runs, "" when it is
+// missing or did not report readably; GitOutdated says a git that runs is
+// from an older release cycle than the latest.
 type Version struct {
-	App      string `json:"app"`
-	Commit   string `json:"commit"`
-	Protocol int    `json:"protocol"`
+	App         string `json:"app"`
+	Commit      string `json:"commit"`
+	Protocol    int    `json:"protocol"`
+	Git         string `json:"git"`
+	GitOutdated bool   `json:"gitOutdated"`
 }
 
 // Protocol is bumped whenever the wire format of API changes.
-const Protocol = 5
+const Protocol = 6
 
 // WorktreeID names a worktree session. Issued by the core that owns the
 // repo; opaque to the UI. The shell and the UI name a WSL distro's

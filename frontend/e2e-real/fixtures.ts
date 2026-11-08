@@ -9,7 +9,7 @@ import {
 } from '../bindings/github.com/brogli/gaertli/internal/settings/models'
 import { switchToChanges } from './helpers'
 import { createRepos, gitWith, type Git, type Repos } from './repos'
-import { createSandbox, editorCalls, type Sandbox } from './sandbox'
+import { createSandbox, editorCalls, reportGitVersion, type Sandbox } from './sandbox'
 
 export { expect }
 
@@ -31,6 +31,8 @@ interface Options {
   open: (keyof Repos)[]
   // settings overrides the seeded settings file's fields.
   settings: Partial<Preferences>
+  // reportedGitVersion, if set, is what git --version reports.
+  reportedGitVersion: string | undefined
 }
 
 interface Fixtures {
@@ -53,10 +55,11 @@ interface Fixtures {
 export const test = base.extend<Options & Fixtures>({
   open: [['work'], { option: true }],
   settings: [{}, { option: true }],
+  reportedGitVersion: [undefined, { option: true }],
 
-  // oxlint-disable-next-line no-empty-pattern -- Playwright requires a destructuring pattern here
-  sandbox: async ({}, use, testInfo) => {
+  sandbox: async ({ reportedGitVersion }, use, testInfo) => {
     const sandbox = createSandbox()
+    if (reportedGitVersion) reportGitVersion(sandbox, reportedGitVersion)
     await use(sandbox)
     if (testInfo.status === testInfo.expectedStatus) {
       fs.rmSync(sandbox.dir, { recursive: true, force: true })

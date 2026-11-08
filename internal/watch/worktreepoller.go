@@ -33,6 +33,7 @@ type WorktreePoller struct {
 	baseInterval time.Duration
 
 	mu       sync.Mutex
+	closed   bool
 	focused  bool
 	interval time.Duration
 	baseline []byte
@@ -48,10 +49,10 @@ func NewWorktreePoller(runner git.Runner, dir string, onChange func(core.ChangeS
 
 // Focus runs one immediate CheckNow and starts the poll timer.
 // The first poll ever only sets the baseline: nothing to compare against
-// yet. Calling Focus while already focused is a no-op.
+// yet. Calling Focus while already focused, or after Close, is a no-op.
 func (p *WorktreePoller) Focus() {
 	p.mu.Lock()
-	if p.focused {
+	if p.focused || p.closed {
 		p.mu.Unlock()
 		return
 	}
@@ -119,8 +120,12 @@ func (p *WorktreePoller) CheckNow() {
 	}
 }
 
-// Close stops the poller.
+// Close stops the poller for good: a focus event can still arrive after
+// its session closed.
 func (p *WorktreePoller) Close() {
+	p.mu.Lock()
+	p.closed = true
+	p.mu.Unlock()
 	p.Blur()
 }
 

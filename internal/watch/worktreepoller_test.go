@@ -140,3 +140,21 @@ func TestBlurStopsPollingAfterTheTimer(t *testing.T) {
 		}
 	})
 }
+
+// A focus event can reach a worktree's poller after its session closed.
+func TestFocusAfterCloseDoesNotPoll(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var count atomic.Int32
+		runner := git.Runner{Git: nonexistentGit, Log: func(git.Entry) { count.Add(1) }}
+		p := NewWorktreePoller(runner, t.TempDir(), func(core.ChangeScope) {})
+
+		p.Close()
+		p.Focus()
+		time.Sleep(2*PollInterval + PollInterval/2)
+		p.Blur() // ends a wrongly started timer, so the bubble can end
+
+		if got := count.Load(); got != 0 {
+			t.Errorf("polls after Close = %d, want 0", got)
+		}
+	})
+}

@@ -14,7 +14,6 @@
     "branchCheckedOutSwitchFirst": "\"{branch}\" is checked out in {path}. Check out another branch there first.",
     "worktreeExists": "'{path}' already exists",
     "mergeCommitNotPickable": "{sha} is a merge commit; {verb} does not support a merge commit",
-    "gitTooOld": "git {version} is older than the minimum {minVersion}",
     "deployNeeded": "Repos in {distro} need Gärtli's helper. Open the folder again to install it.",
     "distroNotFound": "WSL distro {distro} is not installed",
     "wsl1Unsupported": "WSL distro {distro} runs on WSL 1; Gärtli needs WSL 2.",
@@ -76,7 +75,8 @@
       "typeChanged": "Type changed",
       "untracked": "Untracked",
       "conflicted": "Conflicted"
-    }
+    },
+    "ok": "OK"
   },
   "filterBar": {
     "searchMessage": "Search message",
@@ -228,6 +228,14 @@
       "header": "Check out commit",
       "message": "Checking out this commit detaches HEAD. Commits made in this state belong to no branch.",
       "checkOut": "Check out"
+    },
+    "gitWarning": {
+      "header": "git is out of date",
+      "message": "Gärtli supports git {latest} and newer. {git} is {version}; some features may not work.",
+      "installedGit": "The installed git",
+      "distroGit": "The git in WSL distro {distro}",
+      "unknownVersion": "of an unknown version",
+      "update": "Update git from"
     },
     "setUpstream": {
       "header": "Push and set upstream",

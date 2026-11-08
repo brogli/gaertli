@@ -29,6 +29,14 @@ func New(sink core.EventSink) *Core {
 }
 
 // Version implements core.API.
-func (c *Core) Version(context.Context) (core.Version, error) {
-	return core.Version{App: buildinfo.App, Commit: buildinfo.Commit, Protocol: core.Protocol}, nil
+func (c *Core) Version(ctx context.Context) (core.Version, error) {
+	v := core.Version{App: buildinfo.App, Commit: buildinfo.Commit, Protocol: core.Protocol}
+	// A missing git is not this call's failure: opening a repo reports it.
+	if gitVersion, err := c.discover.CheckVersion(ctx); err == nil {
+		if gitVersion != (git.Version{}) {
+			v.Git = gitVersion.String()
+		}
+		v.GitOutdated = gitVersion.Outdated()
+	}
+	return v, nil
 }

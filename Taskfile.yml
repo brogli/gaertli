@@ -63,6 +63,22 @@ tasks:
     cmds:
       # Tests mostly wait on git, so more of them run at once than there are cores.
       - go test -parallel 16 ./...
+      # The shell's server mode (the real-backend e2e suite's build) has tests of its own.
+      - go test -tags server ./internal/app/
+
+  test:go:race:
+    summary:
+      Runs the Go tests under the race detector, with the concurrency tests that exist only for it
+      (the *_race_test.go files)
+    deps:
+      - task: common:build:frontend
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      - go test -race -count=1 -parallel 16 ./...
+      - go test -race -count=1 -tags server ./internal/app/
 
   test:go:core:
     summary:
@@ -78,21 +94,6 @@ tasks:
       # PARALLEL: tests mostly wait on git, so more run at once than there are cores; the Windows
       # runner, where every git process is slow, takes fewer.
       - go test -parallel {{.PARALLEL | default 16}} {{.FLAGS}} ./internal/...
-        ./cmd/{{.APP_NAME}}-core/... ./build/windows/bin/...
-
-  test:go:oldgit:
-    summary:
-      Runs the Go tests whose behaviour depends on the git version (the git-2-42 CI job), i.e. the
-      core set without internal/app, the Wails shell, which alone needs cgo and the GTK/WebKit
-      headers
-    deps:
-      - task: build:core:embed
-    env:
-      GOPROXY: off
-      GOFLAGS: -mod=readonly
-      GOTOOLCHAIN: local
-    cmds:
-      - go test -parallel 16 {{.FLAGS}} $(go list ./internal/... | grep -v '/internal/app$')
         ./cmd/{{.APP_NAME}}-core/... ./build/windows/bin/...
 
   test:frontend:
@@ -224,6 +225,7 @@ tasks:
       - task: common:build:frontend
     cmds:
       - task: test:go
+      - task: test:go:race
 
   ci:build:
     summary: The Linux build, the Windows cross-build and installer

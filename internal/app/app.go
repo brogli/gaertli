@@ -31,8 +31,8 @@ func Run(assets fs.FS, args []string) error {
 		return runPathAction(action)
 	}
 
-	if ok, msg := checkGit(context.Background(), git.Runner{}); !ok {
-		showFatal(text(appName, nil), msg)
+	if !gitRuns(context.Background(), git.Runner{}) {
+		showFatal(text(appName, nil), text(missingGit, nil))
 		return errors.New("git prerequisite not met")
 	}
 
@@ -58,6 +58,7 @@ func Run(assets fs.FS, args []string) error {
 	reg := NewRegistry()
 	reg.SetStore(store)
 	reg.SetLocal(services.New(reg.Dispatch))
+	reg.noteGit(context.Background(), "", reg.Local())
 	reg.PushEditorProfile(context.Background())
 	reg.SetConsent(nativeConsent{ask: askYesNo})
 

@@ -18,6 +18,14 @@
       "matchStrings": ["\\bpnpm_(?<currentValue>\\d+)\\b"],
       "depNameTemplate": "pnpm",
       "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "The latest git release, which the app supports.",
+      "managerFilePatterns": ["/^internal/git/version\\.go$/"],
+      "matchStrings": [
+        "const Latest = \"(?<currentValue>[^\"]+)\" // renovate: datasource=(?<datasource>endoflife-date) depName=(?<depName>\\S+)"
+      ]
     }
   ],
   "minimumReleaseAge": "7 days",

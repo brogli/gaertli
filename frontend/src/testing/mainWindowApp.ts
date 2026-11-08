@@ -67,6 +67,7 @@ export const AppService = mocks(
   'OpenPath',
   'PickAndOpen',
   'SelectWorktree',
+  'TakeGitWarnings',
 )
 export const SettingsService = mocks('Get', 'Set')
 

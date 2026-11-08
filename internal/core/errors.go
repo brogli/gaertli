@@ -11,8 +11,8 @@ type Code string
 const (
 	// NotARepo: the path is not inside a git worktree.
 	NotARepo Code = "NOT_A_REPO"
-	// GitTooOld: the system git is older than the oldest supported version.
-	GitTooOld Code = "GIT_TOO_OLD"
+	// GitMissing: the system git cannot be run.
+	GitMissing Code = "GIT_MISSING"
 	// AuthFailed: sign-in to a remote failed.
 	AuthFailed Code = "AUTH_FAILED"
 	// PushRejected: the remote declined a push for a reason other than
