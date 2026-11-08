@@ -42,7 +42,7 @@ const pushedWarning = computed(() => {
     : warning
 })
 
-// leftForBanner handles a stop: the rebase waits in the conflict banner and
+// leftForBanner handles a stop: the rebase waits in the operation banner and
 // a stop on conflicts opens the diff window; a stop without conflicts names
 // git's reason in a notice.
 function leftForBanner(e: CoreError): boolean {
