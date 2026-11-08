@@ -20,7 +20,7 @@ import { branchFixture } from '@/testing/fixtures/branch'
 import { refsOfEveryKind } from '@/testing/fixtures/refs'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { worktreeFixture } from '@/testing/fixtures/worktree'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { useSettingsStore } from '@/stores/settings'
 import type { WorktreeStart } from '../startPoint'
 
@@ -29,7 +29,7 @@ const wslRepo = { repoPath: '/home/u/r', distro: 'Ubuntu' }
 // mountDialog mounts the dialog on a repo whose branches are main (current)
 // and feature, with the remote branch origin/x and the tag v1.
 function mountDialog(props: { repoPath: string; distro?: string; start?: WorktreeStart }) {
-  useRefsStore().refs = refsOfEveryKind([
+  useBranchesStore().refs = refsOfEveryKind([
     branchFixture(),
     branchFixture({ name: 'feature', current: false }),
   ])

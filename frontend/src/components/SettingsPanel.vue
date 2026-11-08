@@ -12,7 +12,7 @@ import SelectButton from 'openvue/selectbutton'
 import { useI18n } from '@/i18n'
 import { SECONDARY_BUTTON } from '@/lib/layout'
 import { branchSuggestions } from '@/lib/refOptions'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { useSettingsStore } from '@/stores/settings'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { darkThemes } from '@/theme/themes'
@@ -71,7 +71,7 @@ function applyPreset(profile: EditorProfile, preset: EditorProfile): void {
 
 const emit = defineEmits<{ close: [] }>()
 const store = useSettingsStore()
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const { error, run, runAndClose } = useCoreCall()
 const { t } = useI18n()
 

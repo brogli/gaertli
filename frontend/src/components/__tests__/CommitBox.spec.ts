@@ -15,7 +15,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import CommitBox from '../CommitBox.vue'
 import { useChangesStore } from '@/stores/changes'
 import { useRepoStore } from '@/stores/repo'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import { OperationKind } from '../../../bindings/github.com/brogli/gaertli/internal/core'
@@ -185,7 +185,7 @@ describe('CommitBox', () => {
     ['does not warn when the current branch has no upstream', { upstream: '' }, false],
   ])('%s', async (_name, branch, warns) => {
     useRepoStore().summary = summaryFixture({ sha: 'abc123' })
-    useRefsStore().refs = refsFixture(branch)
+    useBranchesStore().refs = refsFixture(branch)
 
     const wrapper = mount(CommitBox, { props })
     await amendCheckbox(wrapper).setValue(true)
@@ -255,7 +255,7 @@ describe('CommitBox', () => {
 
   it('with an upstream, checking "Push after commit" then clicking Commit calls Facade.Commit then Facade.Push', async () => {
     stageAFile()
-    useRefsStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
+    useBranchesStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
       autoSetUpstream: false,
@@ -278,7 +278,7 @@ describe('CommitBox', () => {
   })
 
   it('the "Push after commit" checkbox is enabled without an upstream when a remote exists, disabled without one', async () => {
-    const refs = useRefsStore()
+    const refs = useBranchesStore()
     refs.refs = refsFixture({ upstream: '' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })
@@ -293,7 +293,7 @@ describe('CommitBox', () => {
 
   it('without an upstream, checking "Push after commit" and committing pushes the way PushTarget says', async () => {
     stageAFile()
-    useRefsStore().refs = refsFixture({ upstream: '' }, ['origin'])
+    useBranchesStore().refs = refsFixture({ upstream: '' }, ['origin'])
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
       autoSetUpstream: true,
@@ -314,7 +314,7 @@ describe('CommitBox', () => {
 
   it('without an upstream, committing while PushTarget cannot decide opens the dialog; Cancel leaves the commit made, unpushed', async () => {
     stageAFile()
-    useRefsStore().refs = refsFixture({ upstream: '' }, ['origin'])
+    useBranchesStore().refs = refsFixture({ upstream: '' }, ['origin'])
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
       autoSetUpstream: false,
@@ -339,7 +339,7 @@ describe('CommitBox', () => {
 
   it('Push after commit is disabled once Amend is checked; checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
     useRepoStore().summary = summaryFixture({ sha: 'abc123' })
-    useRefsStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
+    useBranchesStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')

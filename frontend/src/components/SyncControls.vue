@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n'
 import Button from 'openvue/button'
 import SplitButton from 'openvue/splitbutton'
 import type { MenuItem } from 'openvue/menuitem'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { useSettingsStore } from '@/stores/settings'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
@@ -29,7 +29,7 @@ import SetUpstreamDialog from './SetUpstreamDialog.vue'
 // offers what can act. JobsMenu shows their progress; useJobNotices shows
 // their results.
 const props = defineProps<{ wt: string; compact?: boolean }>()
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const settings = useSettingsStore()
 const { confirmAction } = useConfirmAction()
 const { error, run } = useCoreCall()

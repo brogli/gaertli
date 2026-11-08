@@ -36,7 +36,7 @@ import { mountInBody } from '@/testing/mountInBody'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 import SyncControls from '../SyncControls.vue'
 import { useJobsStore } from '@/stores/jobs'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import {
   Code,
   JobKind,
@@ -55,7 +55,7 @@ function mountControls(props: { compact?: boolean } = {}) {
 
 // setRefs gives the repo one current branch and the named remotes.
 function setRefs(branch: Partial<Branch> = {}, remotes = ['origin']): void {
-  useRefsStore().refs = refsFixture(branch, remotes)
+  useBranchesStore().refs = refsFixture(branch, remotes)
 }
 
 // rejectPush ends a push job rejected as not fast-forward. Force push shows

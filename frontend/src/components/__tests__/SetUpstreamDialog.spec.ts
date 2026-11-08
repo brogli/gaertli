@@ -10,10 +10,10 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import SetUpstreamDialog from '../SetUpstreamDialog.vue'
 import { mountInBody } from '@/testing/mountInBody'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 
 function mountDialog(remotes: string[], remote: string, branch = 'feature') {
-  useRefsStore().refs = {
+  useBranchesStore().refs = {
     branches: [],
     remotes: remotes.map((name) => ({ name, branches: [] })),
     tags: [],

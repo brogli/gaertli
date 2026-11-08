@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n'
 import { useJobsStore } from '@/stores/jobs'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import {
   Code,
   JobKind,
@@ -42,7 +42,7 @@ interface JobNoticeActions {
 // confirm-gated recovery calls the rejection and blocked-pull notices offer.
 export function useJobNotices(actions: JobNoticeActions): void {
   const jobs = useJobsStore()
-  const refs = useRefsStore()
+  const refs = useBranchesStore()
   const { show, clear } = useNotices()
   const t = i18n.global.t
 

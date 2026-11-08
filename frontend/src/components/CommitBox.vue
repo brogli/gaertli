@@ -9,7 +9,7 @@ import Message from 'openvue/message'
 import Button from 'openvue/button'
 import { useChangesStore } from '@/stores/changes'
 import { useRepoStore } from '@/stores/repo'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { usePush } from '@/composables/usePush'
 import { useShortcut } from '@/composables/useShortcut'
@@ -24,7 +24,7 @@ import ShortcutHint from './ShortcutHint.vue'
 const props = defineProps<{ wt: string }>()
 const changes = useChangesStore()
 const repo = useRepoStore()
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const { error, run, runAndClose } = useCoreCall()
 const { push, upstreamQuestion } = usePush(() => props.wt, run)
 const { t } = useI18n()

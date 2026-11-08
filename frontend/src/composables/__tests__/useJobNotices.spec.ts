@@ -11,7 +11,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import { useJobNotices } from '../useJobNotices'
 import { useJobsStore } from '@/stores/jobs'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import {
   Code,
   JobKind,
@@ -26,7 +26,7 @@ import { refsFixture } from '@/testing/fixtures/refs'
 
 // setUpstream gives the repo one current branch with an upstream.
 function setUpstream(): void {
-  useRefsStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
+  useBranchesStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 }
 
 function rejectedPushJob(code: Code): JobInfo {
@@ -124,7 +124,7 @@ describe('useJobNotices', () => {
 
   it('a rejected push on a branch without upstream shows the error and no Pull or Force push', async () => {
     const notice = await mountWithNotices()
-    useRefsStore().refs = refsFixture()
+    useBranchesStore().refs = refsFixture()
 
     useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
     await nextTick()

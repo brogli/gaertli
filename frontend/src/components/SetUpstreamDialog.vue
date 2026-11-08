@@ -5,7 +5,7 @@ import Select from 'openvue/select'
 import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
 import { useCoreCall } from '@/composables/useCoreCall'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { DIALOG } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
@@ -18,7 +18,7 @@ import FormField from './FormField.vue'
 const props = defineProps<{ wt: string; branch: string; remote: string }>()
 const emit = defineEmits<{ close: [] }>()
 
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const remoteNames = computed(() => (refs.refs?.remotes ?? []).map((r) => r.name))
 const hasChoice = computed(() => remoteNames.value.length > 1)
 const chosen = ref(props.remote)

@@ -10,7 +10,7 @@ import TabPanels from 'openvue/tabpanels'
 import TabPanel from 'openvue/tabpanel'
 import Button from 'openvue/button'
 import { useRepoStore } from '@/stores/repo'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { useLogStore } from '@/stores/log'
 import { useCompareStore } from '@/stores/compare'
 import { useChangesStore } from '@/stores/changes'
@@ -51,7 +51,7 @@ const withShortcut = useWithShortcut()
 // UNC form for a WSL one. path stays what the window shows.
 const wt = repoPath(props.path, props.distro)
 const repo = useRepoStore()
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const log = useLogStore()
 const compare = useCompareStore()
 const changes = useChangesStore()

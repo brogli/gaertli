@@ -50,7 +50,7 @@ const mockRefsStore: { refs: { branches: unknown[]; remotes: unknown[]; tags: un
 }
 
 vi.mock('@/stores/log', () => ({ useLogStore: () => mockLogStore }))
-vi.mock('@/stores/refs', () => ({ useRefsStore: () => mockRefsStore }))
+vi.mock('@/stores/branches', () => ({ useBranchesStore: () => mockRefsStore }))
 
 import FilterBar from '../FilterBar.vue'
 

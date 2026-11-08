@@ -13,7 +13,7 @@ vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Fac
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { Events, emit } from '@/testing/runtime'
 
-import { useRefsStore } from '../refs'
+import { useBranchesStore } from '../branches'
 
 describe('refs store', () => {
   beforeEach(() => {
@@ -23,7 +23,7 @@ describe('refs store', () => {
   })
 
   it('reloads Refs on a refs repo:changed event, not on state', async () => {
-    const refs = useRefsStore()
+    const refs = useBranchesStore()
     await refs.load('/repo')
     expect(Facade.Refs).toHaveBeenCalledTimes(1)
 

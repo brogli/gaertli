@@ -4,9 +4,9 @@ import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { ChangeScope, type Refs } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { onRepoChanged } from '@/lib/windowEvents'
 
-// refs holds the repo's branches, remotes, and tags, reloaded only when a
+// branches holds the repo's branches, remotes, and tags, reloaded only when a
 // ref moved (the "refs" scope).
-export const useRefsStore = defineStore('refs', () => {
+export const useBranchesStore = defineStore('branches', () => {
   const refs = ref<Refs | null>(null)
   // current is this worktree's branch, undefined while detached.
   const current = computed(() => refs.value?.branches?.find((b) => b.current))
