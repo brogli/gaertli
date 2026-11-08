@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -65,52 +66,52 @@ func (h *eventHold) idle() bool {
 	return len(h.pending) == 0
 }
 
-func waitFor(t *testing.T, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatal("condition not met in time")
-		}
-		time.Sleep(time.Millisecond)
-	}
-}
-
 func TestServerPageHoldsEventsUntilItsWebsocketConnects(t *testing.T) {
-	f := &fakeBrowser{}
-	hold := newTestHold(f)
+	synctest.Test(t, func(t *testing.T) {
+		f := &fakeBrowser{}
+		hold := newTestHold(f)
 
-	hold.send("p", "a", nil)
-	hold.send("p", "b", nil)
-	if got := f.names(); len(got) != 0 {
-		t.Fatalf("sent before connect: %v", got)
-	}
+		hold.send("p", "a", nil)
+		hold.send("p", "b", nil)
+		if got := f.names(); len(got) != 0 {
+			t.Fatalf("sent before connect: %v", got)
+		}
 
-	f.connect()
-	hold.send("p", "c", nil)
-	waitFor(t, func() bool { return len(f.names()) == 3 })
+		f.connect()
+		hold.send("p", "c", nil)
+		time.Sleep(hold.poll)
+		synctest.Wait()
 
-	if got, want := f.names(), []string{"a", "b", "c"}; !slices.Equal(got, want) {
-		t.Fatalf("events = %v, want %v", got, want)
-	}
-	waitFor(t, hold.idle)
-	hold.send("p", "d", nil)
-	if got := f.names(); len(got) != 4 || got[3] != "d" {
-		t.Fatalf("direct send after drain: %v", got)
-	}
-	if got := f.senders()[0].sender; got != "window-1" {
-		t.Fatalf("sender = %q", got)
-	}
+		if got, want := f.names(), []string{"a", "b", "c"}; !slices.Equal(got, want) {
+			t.Fatalf("events = %v, want %v", got, want)
+		}
+		if !hold.idle() {
+			t.Fatal("hold still pending after the drain")
+		}
+		hold.send("p", "d", nil)
+		if got := f.names(); len(got) != 4 || got[3] != "d" {
+			t.Fatalf("direct send after drain: %v", got)
+		}
+		if got := f.senders()[0].sender; got != "window-1" {
+			t.Fatalf("sender = %q", got)
+		}
+	})
 }
 
 func TestServerPageDropsHeldEventsOfAGonePage(t *testing.T) {
-	f := &fakeBrowser{}
-	hold := newTestHold(f)
-	hold.giveUp = 20 * time.Millisecond
+	synctest.Test(t, func(t *testing.T) {
+		f := &fakeBrowser{}
+		hold := newTestHold(f)
+		hold.giveUp = 20 * time.Millisecond
 
-	hold.send("p", "a", nil)
-	waitFor(t, hold.idle)
-	if got := f.names(); len(got) != 0 {
-		t.Fatalf("sent for a gone page: %v", got)
-	}
+		hold.send("p", "a", nil)
+		time.Sleep(hold.giveUp + hold.poll)
+		synctest.Wait()
+		if !hold.idle() {
+			t.Fatal("hold still pending after giving up")
+		}
+		if got := f.names(); len(got) != 0 {
+			t.Fatalf("sent for a gone page: %v", got)
+		}
+	})
 }

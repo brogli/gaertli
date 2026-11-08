@@ -279,7 +279,7 @@ func TestManagerOpenWiresARealRepoWatcher(t *testing.T) {
 
 	// above FallbackPollInterval: still passes when fsnotify cannot start and
 	// only the fallback poll reports.
-	waitForEvent(t, events, watch.FallbackPollInterval+2*time.Second, "repo:changed(refs)", func(e core.Event) bool {
+	waitForEvent(events, func(e core.Event) bool {
 		// a real commit also touches the index; only the refs scope matters here.
 		return e.Name == "repo:changed" && e.Repo == wt.Repo.Key && string(e.Payload) == `{"scope":"refs"}`
 	})
@@ -302,7 +302,7 @@ func TestManagerOpenWiresARealWorktreePoller(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := waitForEvent(t, events, 2*time.Second, "repo:changed(index)", func(e core.Event) bool {
+	e := waitForEvent(events, func(e core.Event) bool {
 		return e.Name == "repo:changed" && e.Worktree == wt.ID && string(e.Payload) == `{"scope":"index"}`
 	})
 	if e.Repo != "" {
@@ -310,19 +310,12 @@ func TestManagerOpenWiresARealWorktreePoller(t *testing.T) {
 	}
 }
 
-// waitForEvent returns the first event on events matching cond within
-// timeout, or fails the test naming desc.
-func waitForEvent(t *testing.T, events chan core.Event, timeout time.Duration, desc string, cond func(core.Event) bool) core.Event {
-	t.Helper()
-	deadline := time.After(timeout)
+// waitForEvent returns the first event on events matching cond. desc names
+// the awaited event for the stack dump of a go test timeout.
+func waitForEvent(events chan core.Event, cond func(core.Event) bool) core.Event {
 	for {
-		select {
-		case e := <-events:
-			if cond(e) {
-				return e
-			}
-		case <-deadline:
-			t.Fatalf("no %s event within %s", desc, timeout)
+		if e := <-events; cond(e) {
+			return e
 		}
 	}
 }

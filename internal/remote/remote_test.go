@@ -9,7 +9,7 @@ import (
 	"io"
 	"reflect"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/remote"
@@ -97,18 +97,16 @@ func pipeClient(t *testing.T, f *fake, sink core.EventSink) *remote.Client {
 }
 
 func TestClosingAClientDoesNotWaitForTheCoresOutputToEnd(t *testing.T) {
-	r, w := io.Pipe()
-	t.Cleanup(func() { _ = w.Close() })
-	client := remote.NewClient(r, io.Discard, nil)
+	synctest.Test(t, func(t *testing.T) {
+		r, w := io.Pipe()
+		defer func() { _ = w.Close() }()
+		client := remote.NewClient(r, io.Discard, nil)
 
-	closed := make(chan struct{})
-	go func() { _ = client.Close(); close(closed) }()
+		closed := make(chan struct{})
+		go func() { _ = client.Close(); close(closed) }()
 
-	select {
-	case <-closed:
-	case <-time.After(time.Second):
-		t.Fatal("Close still waits 1s later for the core's output to end")
-	}
+		<-closed // a Close waiting for the output deadlocks the bubble
+	})
 }
 
 func TestVersionCallCrossesThePipe(t *testing.T) {
@@ -188,12 +186,8 @@ func TestEventsReachTheClientSink(t *testing.T) {
 	want := core.Event{Name: "repo:changed", Repo: "r", Worktree: "w1", Payload: json.RawMessage(`{"scope":"refs"}`)}
 	f.sink(want)
 
-	select {
-	case e := <-got:
-		if e.Name != want.Name || e.Repo != want.Repo || e.Worktree != want.Worktree || string(e.Payload) != string(want.Payload) {
-			t.Errorf("event = %+v, want %+v", e, want)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("no event within 1s")
+	e := <-got
+	if e.Name != want.Name || e.Repo != want.Repo || e.Worktree != want.Worktree || string(e.Payload) != string(want.Payload) {
+		t.Errorf("event = %+v, want %+v", e, want)
 	}
 }

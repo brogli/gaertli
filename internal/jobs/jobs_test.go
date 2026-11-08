@@ -64,34 +64,39 @@ func (u *updateLog) terminalFor(id ID) (Job, bool) {
 }
 
 func TestStartReturnsImmediatelyWithARunningJobRecorded(t *testing.T) {
-	release := make(chan struct{})
-	var log updateLog
-	m := NewManager(log.record)
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+		var log updateLog
+		m := NewManager(log.record)
 
-	start := time.Now()
-	id := m.Start(t.Context(), "test", func(ctx context.Context, progress Progress) (any, error) {
-		<-release
-		return nil, nil
+		start := time.Now()
+		id := m.Start(t.Context(), "test", func(ctx context.Context, progress Progress) (any, error) {
+			<-release
+			return nil, nil
+		})
+		elapsed := time.Since(start)
+
+		if elapsed != 0 {
+			t.Errorf("Start took %s of fake time, want it to return without waiting", elapsed)
+		}
+		if id == "" {
+			t.Fatal("Start returned an empty id")
+		}
+		if len(m.List()) != 1 {
+			t.Fatalf("List() = %d jobs, want 1", len(m.List()))
+		}
+
+		synctest.Wait()
+		if len(log.snapshot()) < 1 {
+			t.Fatal("no update recorded")
+		}
+		first := log.snapshot()[0]
+		if first.State != core.JobRunning || first.Percent != -1 {
+			t.Errorf("first update = %+v, want State Running, Percent -1", first)
+		}
+
+		close(release)
 	})
-	elapsed := time.Since(start)
-
-	if elapsed > 300*time.Millisecond {
-		t.Errorf("Start took %s, want well under 300ms", elapsed)
-	}
-	if id == "" {
-		t.Fatal("Start returned an empty id")
-	}
-	if len(m.List()) != 1 {
-		t.Fatalf("List() = %d jobs, want 1", len(m.List()))
-	}
-
-	waitFor(t, func() bool { return len(log.snapshot()) >= 1 }, time.Second)
-	first := log.snapshot()[0]
-	if first.State != core.JobRunning || first.Percent != -1 {
-		t.Errorf("first update = %+v, want State Running, Percent -1", first)
-	}
-
-	close(release)
 }
 
 func TestProgressEmitsImmediatelyThenThrottled(t *testing.T) {
@@ -144,36 +149,44 @@ func TestProgressEmitsImmediatelyThenThrottled(t *testing.T) {
 }
 
 func TestCancelledJobEndsInCancelledNotFailed(t *testing.T) {
-	var log updateLog
-	m := NewManager(log.record)
+	synctest.Test(t, func(t *testing.T) {
+		var log updateLog
+		m := NewManager(log.record)
 
-	id := m.Start(t.Context(), "test", func(ctx context.Context, progress Progress) (any, error) {
-		<-ctx.Done()
-		return nil, ctx.Err()
-	})
+		id := m.Start(t.Context(), "test", func(ctx context.Context, progress Progress) (any, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		})
 
-	waitFor(t, func() bool { return len(log.snapshot()) >= 1 }, time.Second)
-	if ok := m.Cancel(id); !ok {
-		t.Fatal("Cancel returned false for a running job")
-	}
-
-	waitFor(t, log.terminalSeen, 2*time.Second)
-
-	updates := log.snapshot()
-	terminals := 0
-	var last Job
-	for _, u := range updates {
-		if isTerminal(u.State) {
-			terminals++
-			last = u
+		synctest.Wait()
+		if len(log.snapshot()) < 1 {
+			t.Fatal("no update recorded")
 		}
-	}
-	if terminals != 1 {
-		t.Fatalf("got %d terminal updates, want exactly 1", terminals)
-	}
-	if last.State != core.JobCancelled {
-		t.Errorf("final State = %s, want %s", last.State, core.JobCancelled)
-	}
+		if ok := m.Cancel(id); !ok {
+			t.Fatal("Cancel returned false for a running job")
+		}
+
+		synctest.Wait()
+		if !log.terminalSeen() {
+			t.Fatal("no terminal update after Cancel")
+		}
+
+		updates := log.snapshot()
+		terminals := 0
+		var last Job
+		for _, u := range updates {
+			if isTerminal(u.State) {
+				terminals++
+				last = u
+			}
+		}
+		if terminals != 1 {
+			t.Fatalf("got %d terminal updates, want exactly 1", terminals)
+		}
+		if last.State != core.JobCancelled {
+			t.Errorf("final State = %s, want %s", last.State, core.JobCancelled)
+		}
+	})
 }
 
 func TestCancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
@@ -189,106 +202,110 @@ func TestCancelUnknownIDReturnsFalseNoPanicNoUpdate(t *testing.T) {
 }
 
 func TestFnErrorEndsFailedFnNilEndsDone(t *testing.T) {
-	var log updateLog
-	m := NewManager(log.record)
+	synctest.Test(t, func(t *testing.T) {
+		var log updateLog
+		m := NewManager(log.record)
 
-	failID := m.Start(t.Context(), "fail", func(ctx context.Context, progress Progress) (any, error) {
-		return nil, errors.New("boom")
+		failID := m.Start(t.Context(), "fail", func(ctx context.Context, progress Progress) (any, error) {
+			return nil, errors.New("boom")
+		})
+		okID := m.Start(t.Context(), "ok", func(ctx context.Context, progress Progress) (any, error) {
+			return nil, nil
+		})
+
+		synctest.Wait()
+		if o, _ := log.terminalFor(okID); o.State != core.JobDone {
+			t.Fatalf("ok job State = %s, want %s", o.State, core.JobDone)
+		}
+
+		f, _ := log.terminalFor(failID)
+		if f.Err == nil || f.Err.Error() != "boom" {
+			t.Errorf("failed job Err = %v, want \"boom\"", f.Err)
+		}
 	})
-	okID := m.Start(t.Context(), "ok", func(ctx context.Context, progress Progress) (any, error) {
-		return nil, nil
-	})
-
-	waitFor(t, func() bool {
-		f, fok := log.terminalFor(failID)
-		o, ook := log.terminalFor(okID)
-		return fok && f.State == core.JobFailed && ook && o.State == core.JobDone
-	}, 2*time.Second)
-
-	f, _ := log.terminalFor(failID)
-	if f.Err == nil || f.Err.Error() != "boom" {
-		t.Errorf("failed job Err = %v, want \"boom\"", f.Err)
-	}
 }
 
 func TestAJobOutlivesItsRequestContextAndKeepsItsValues(t *testing.T) {
-	type requestKey struct{}
-	var log updateLog
-	m := NewManager(log.record)
-	request, cancelRequest := context.WithCancel(context.WithValue(t.Context(), requestKey{}, "request value"))
-	release := make(chan struct{})
+	synctest.Test(t, func(t *testing.T) {
+		type requestKey struct{}
+		var log updateLog
+		m := NewManager(log.record)
+		request, cancelRequest := context.WithCancel(context.WithValue(t.Context(), requestKey{}, "request value"))
+		release := make(chan struct{})
 
-	id := m.Start(request, "test", func(ctx context.Context, progress Progress) (any, error) {
-		<-release
-		return ctx.Value(requestKey{}), ctx.Err()
+		id := m.Start(request, "test", func(ctx context.Context, progress Progress) (any, error) {
+			<-release
+			return ctx.Value(requestKey{}), ctx.Err()
+		})
+		cancelRequest()
+		close(release)
+
+		synctest.Wait()
+		if job, _ := log.terminalFor(id); job.State != core.JobDone || job.Result != "request value" {
+			t.Errorf("job = %+v, want State Done with Result \"request value\"", job)
+		}
 	})
-	cancelRequest()
-	close(release)
-
-	waitFor(t, func() bool { _, ok := log.terminalFor(id); return ok }, 2*time.Second)
-	if job, _ := log.terminalFor(id); job.State != core.JobDone || job.Result != "request value" {
-		t.Errorf("job = %+v, want State Done with Result \"request value\"", job)
-	}
 }
 
 func TestNoManagerImposedConcurrencyCap(t *testing.T) {
-	m := NewManager(func(Job) {})
-	block := make(chan struct{})
+	synctest.Test(t, func(t *testing.T) {
+		m := NewManager(func(Job) {})
+		block := make(chan struct{})
 
-	m.Start(t.Context(), "first", func(ctx context.Context, progress Progress) (any, error) {
-		<-block
-		return nil, nil
+		m.Start(t.Context(), "first", func(ctx context.Context, progress Progress) (any, error) {
+			<-block
+			return nil, nil
+		})
+		secondDone := make(chan struct{})
+		m.Start(t.Context(), "second", func(ctx context.Context, progress Progress) (any, error) {
+			close(secondDone)
+			return nil, nil
+		})
+
+		<-secondDone
+		synctest.Wait()
+		if got := findKind(m.List(), "second").State; got != core.JobDone {
+			t.Errorf("second job State = %s, want %s", got, core.JobDone)
+		}
+		if got := findKind(m.List(), "first").State; got != core.JobRunning {
+			t.Errorf("first job State = %s, want %s", got, core.JobRunning)
+		}
+
+		close(block)
 	})
-	secondDone := make(chan struct{})
-	m.Start(t.Context(), "second", func(ctx context.Context, progress Progress) (any, error) {
-		close(secondDone)
-		return nil, nil
-	})
-
-	select {
-	case <-secondDone:
-	case <-time.After(time.Second):
-		t.Fatal("second job never ran while the first was still blocked (a concurrency cap?)")
-	}
-	waitFor(t, func() bool { return findKind(m.List(), "second").State == core.JobDone }, time.Second)
-	waitFor(t, func() bool { return findKind(m.List(), "first").State == core.JobRunning }, time.Second)
-
-	close(block)
 }
 
 func TestStartDedupesAKindAlreadyRunning(t *testing.T) {
-	var calls atomic.Int32
-	done := make(chan Job, 1)
-	m := NewManager(func(j Job) {
-		if j.State == core.JobDone {
-			done <- j
+	synctest.Test(t, func(t *testing.T) {
+		var calls atomic.Int32
+		done := make(chan Job, 1)
+		m := NewManager(func(j Job) {
+			if j.State == core.JobDone {
+				done <- j
+			}
+		})
+
+		release := make(chan struct{})
+		fn := func(ctx context.Context, progress Progress) (any, error) {
+			calls.Add(1)
+			<-release
+			return nil, nil
+		}
+
+		first := m.Start(t.Context(), "fetch", fn)
+		second := m.Start(t.Context(), "fetch", fn)
+
+		if second != first {
+			t.Errorf("Start returned a new id %q for a kind already running (%q), want the running job's own id", second, first)
+		}
+
+		close(release)
+		<-done
+
+		if got := calls.Load(); got != 1 {
+			t.Errorf("fn ran %d times, want 1 (no second process for a kind already running on this repo)", got)
 		}
 	})
-
-	release := make(chan struct{})
-	fn := func(ctx context.Context, progress Progress) (any, error) {
-		calls.Add(1)
-		<-release
-		return nil, nil
-	}
-
-	first := m.Start(t.Context(), "fetch", fn)
-	second := m.Start(t.Context(), "fetch", fn)
-
-	if second != first {
-		t.Errorf("Start returned a new id %q for a kind already running (%q), want the running job's own id", second, first)
-	}
-
-	close(release)
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("job never finished")
-	}
-
-	if got := calls.Load(); got != 1 {
-		t.Errorf("fn ran %d times, want 1 (no second process for a kind already running on this repo)", got)
-	}
 }
 
 func TestStartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
@@ -318,45 +335,53 @@ func TestStartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
 }
 
 func TestListBoundsFinishedHistoryButNeverDropsAnActiveJob(t *testing.T) {
-	m := NewManager(func(Job) {})
+	synctest.Test(t, func(t *testing.T) {
+		m := NewManager(func(Job) {})
 
-	for range historyCap + 3 {
-		done := make(chan struct{})
-		id := m.Start(t.Context(), "fast", func(ctx context.Context, progress Progress) (any, error) {
-			close(done)
+		for range historyCap + 3 {
+			done := make(chan struct{})
+			id := m.Start(t.Context(), "fast", func(ctx context.Context, progress Progress) (any, error) {
+				close(done)
+				return nil, nil
+			})
+			<-done
+			synctest.Wait()
+			if got := findID(m.List(), id).State; got != core.JobDone {
+				t.Fatalf("fast job State = %s, want %s", got, core.JobDone)
+			}
+		}
+
+		block := make(chan struct{})
+		blockedID := m.Start(t.Context(), "blocked", func(ctx context.Context, progress Progress) (any, error) {
+			<-block
 			return nil, nil
 		})
-		<-done
-		waitFor(t, func() bool { return findID(m.List(), id).State == core.JobDone }, time.Second)
-	}
+		synctest.Wait()
+		if got := findID(m.List(), blockedID).State; got != core.JobRunning {
+			t.Fatalf("blocked job State = %s, want %s", got, core.JobRunning)
+		}
 
-	block := make(chan struct{})
-	blockedID := m.Start(t.Context(), "blocked", func(ctx context.Context, progress Progress) (any, error) {
-		<-block
-		return nil, nil
+		list := m.List()
+		finished := 0
+		sawBlocked := false
+		for _, j := range list {
+			if j.ID == blockedID {
+				sawBlocked = true
+				continue
+			}
+			if isTerminal(j.State) {
+				finished++
+			}
+		}
+		if !sawBlocked {
+			t.Error("the still-running job is missing from List(), want it always present")
+		}
+		if finished > historyCap {
+			t.Errorf("List() returned %d finished jobs, want at most %d", finished, historyCap)
+		}
+
+		close(block)
 	})
-	waitFor(t, func() bool { return findID(m.List(), blockedID).State == core.JobRunning }, time.Second)
-
-	list := m.List()
-	finished := 0
-	sawBlocked := false
-	for _, j := range list {
-		if j.ID == blockedID {
-			sawBlocked = true
-			continue
-		}
-		if isTerminal(j.State) {
-			finished++
-		}
-	}
-	if !sawBlocked {
-		t.Error("the still-running job is missing from List(), want it always present")
-	}
-	if finished > historyCap {
-		t.Errorf("List() returned %d finished jobs, want at most %d", finished, historyCap)
-	}
-
-	close(block)
 }
 
 func findID(list []Job, id ID) Job {
@@ -375,18 +400,4 @@ func findKind(list []Job, kind core.JobKind) Job {
 		}
 	}
 	return Job{}
-}
-
-func waitFor(t *testing.T, cond func() bool, timeout time.Duration) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if !cond() {
-		t.Fatal("condition never became true")
-	}
 }

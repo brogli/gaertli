@@ -14,6 +14,7 @@ import (
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 func TestACancelledFetchLeavesNoLockAndTheNextFetchWorks(t *testing.T) {
@@ -111,7 +112,7 @@ func (h stalledHook) release() { _ = os.Remove(h.hold) }
 // waits for it to end cancelled.
 func (h stalledHook) cancel(t *testing.T, c *Core, wt core.WorktreeID, job string) {
 	t.Helper()
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		_, err := os.Stat(h.stalled)
 		return err == nil
 	})

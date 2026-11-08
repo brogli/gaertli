@@ -6,13 +6,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git"
 	"github.com/brogli/gaertli/internal/git/gittest"
 	"github.com/brogli/gaertli/internal/jobs"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
@@ -25,18 +26,17 @@ func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
 	}
 
 	file := filepath.Join(t.TempDir(), "stderr-records")
-	data := "remote: Counting objects:   1% (1/90)   \r" +
-		"remote: Counting objects:  50% (45/90)   \r" +
-		"remote: Counting objects: 100% (90/90), done.\n"
+	// Far more records than the test lives to see: only a kill ends fakegit.
+	data := strings.Repeat("remote: Counting objects:  50% (45/90)   \r", 3000)
 	if err := os.WriteFile(file, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	heartbeat := filepath.Join(t.TempDir(), "heartbeat")
 	t.Setenv("FAKEGIT_STDERR_FILE", file)
 	t.Setenv("FAKEGIT_STDERR_DELAY_MS", "200")
-	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
 
+	returned := make(chan struct{})
 	sess.Repo.Jobs().Start(t.Context(), "fetch", func(ctx context.Context, progress jobs.Progress) (any, error) {
+		defer close(returned)
 		_, err := (git.Runner{Git: fakegit}).StreamErr(ctx, git.Call{Args: []string{"fetch"}}, func(line []byte) error {
 			if percent, message, ok := git.ParseProgressLine(line); ok {
 				progress(percent, message)
@@ -53,11 +53,7 @@ func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
 	}
 	waitForJob(t, c, wt, func(j core.JobInfo) bool { return j.State == core.JobCancelled })
 
-	stopped := mtime(t, heartbeat)
-	time.Sleep(100 * time.Millisecond)
-	if got := mtime(t, heartbeat); !got.Equal(stopped) {
-		t.Errorf("heartbeat mtime advanced after CancelJob: %v -> %v (process not killed)", stopped, got)
-	}
+	<-returned // StreamErr returns only once the process is gone
 }
 
 // waitForJob polls Jobs until it returns a job matching want, and fails the
@@ -65,7 +61,7 @@ func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
 func waitForJob(t *testing.T, c *Core, id core.WorktreeID, want func(core.JobInfo) bool) core.JobInfo {
 	t.Helper()
 	var match core.JobInfo
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		list, err := c.Jobs(t.Context(), id)
 		if err != nil {
 			t.Fatal(err)
@@ -110,13 +106,4 @@ func jobID(t *testing.T) func(string, error) string {
 		}
 		return id
 	}
-}
-
-func mtime(t *testing.T, path string) time.Time {
-	t.Helper()
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return info.ModTime()
 }

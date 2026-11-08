@@ -14,6 +14,12 @@ Tests are the proof that a requirement holds (QA-MNT-01, QA-MNT-02).
 - **Races by dedicated tests.** Shared state that goroutines touch at once (jobs, log loading,
   watching, windows, the WSL connection) has a test that drives those calls in parallel. These tests
   exist only under the race detector, which also runs the rest of the Go suite (QA-REL-04).
+- **No guessed time limits** (QA-MNT-06). A test waits for the signal that the awaited thing
+  happened, never for a duration a slow runner can exceed. Pure Go concurrency and timers run on a
+  fake clock (`testing/synctest`), which also proves that something did not happen. A test with a
+  real git process, file or watcher blocks on the code's own signal, or polls without a deadline
+  where nothing signals; a hang fails at the test binary's timeout with every goroutine's stack.
+  Time bounds remain only where speed is the requirement.
 - **End to end only where nothing cheaper reaches.** A mock-backend suite for what a component test
   cannot see (virtual scrolling, cross-view keyboard flow). A real-backend suite, the app in Wails'
   server mode on scratch repos, for an outside change reaching the UI and one flow per family of

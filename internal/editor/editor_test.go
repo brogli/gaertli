@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/core/coretest"
 	"github.com/brogli/gaertli/internal/testbin"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 // argvWriterBin writes its argv to the file its first argument names,
@@ -168,17 +168,14 @@ func argvWriterCmd(t *testing.T) (template, outFile string) {
 	return argvWriterBin + " " + outFile + " {path}", outFile
 }
 
-// awaitFile waits up to 2s for the helper to write path and returns its
-// content.
+// awaitFile waits for the helper to write path and returns its content.
 func awaitFile(t *testing.T, path string) string {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if content, err := os.ReadFile(path); err == nil {
-			return string(content)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("helper never wrote %s", path)
-	return ""
+	var content []byte
+	testwait.Until(func() bool {
+		var err error
+		content, err = os.ReadFile(path)
+		return err == nil
+	})
+	return string(content)
 }

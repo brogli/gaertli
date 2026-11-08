@@ -216,15 +216,9 @@ func TestRepoWatcherToleratesConcurrentReadsWhileWriting(t *testing.T) {
 
 func waitForScope(t *testing.T, got chan core.ChangeScope, want core.ChangeScope) {
 	t.Helper()
-	deadline := time.After(2 * time.Second)
-	for {
-		select {
-		case scope := <-got:
-			if scope == want {
-				return
-			}
-		case <-deadline:
-			t.Fatalf("onChange(%s) did not fire within 2s", want)
+	for scope := range got {
+		if scope == want {
+			return
 		}
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/core/coretest"
 	"github.com/brogli/gaertli/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 // onlyEditorRecord finds the one "editor" event among events and decodes
@@ -50,7 +51,7 @@ func pushArgvWriter(t *testing.T, c *Core) string {
 func waitForFile(t *testing.T, outFile string) string {
 	t.Helper()
 	var content []byte
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		var err error
 		content, err = os.ReadFile(outFile)
 		return err == nil
