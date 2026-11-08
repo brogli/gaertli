@@ -32,7 +32,7 @@
     "@openvue/openicons": "1.0.0",
     "@tanstack/vue-virtual": "3.13.51",
     "@vueuse/core": "15.0.0",
-    "@wailsio/runtime": "3.0.0",
+    "@wailsio/runtime": "3.1.0",
     "openvue": "1.0.0",
     "pinia": "4.1.0",
     "vue": "3.5.44",
