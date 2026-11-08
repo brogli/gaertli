@@ -63,6 +63,8 @@ tasks:
     cmds:
       # Tests mostly wait on git, so more of them run at once than there are cores.
       - go test -parallel 16 ./...
+      # The shell's server mode (the real-backend e2e suite's build) has tests of its own.
+      - go test -tags server ./internal/app/
 
   test:go:race:
     summary:
@@ -76,6 +78,7 @@ tasks:
       GOTOOLCHAIN: local
     cmds:
       - go test -race -count=1 -parallel 16 ./...
+      - go test -race -count=1 -tags server ./internal/app/
 
   test:go:core:
     summary:
