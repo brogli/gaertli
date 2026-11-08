@@ -11,6 +11,9 @@ How Gärtli is built. What it does is in `requirements.md`, how its code is writ
   for WSL repos, behind one interface (ADR-3).
 - **One process, many windows.** Windows on one repo share its log, caches and locks (ADR-8).
 - **Heavy lifting in Go.** Go builds the log and graph; the UI fetches only what it shows (ADR-5).
+- **One language, eight areas.** The core is one package of bounded-context interfaces: log,
+  changes, branches, sync, operations, conflicts, worktrees, editor; every name in code is the
+  glossary's (ADR-9).
 
 ## System context
 
@@ -68,7 +71,7 @@ C4Component
   Container_Boundary(app, "Desktop app") {
     Component(shell, "Shell", "internal/app", "Windows, single instance, settings, app log, event routing; a generated facade picks each call's core")
     Component(remote, "WSL connector", "internal/remote", "Finds distros, deploys and starts a WSL core, the generated RPC client")
-    Component(core, "Core", "internal/core, internal/services", "The API and its implementation, one feature area at a time")
+    Component(core, "Core", "internal/core, internal/services", "The API, one interface per bounded context, and its implementation, one file group per context")
     Component(session, "Sessions", "internal/session", "Repo and worktree sessions: caches, write queues, watchers, drafts")
     Component(git, "Git runner", "internal/git", "Runs git, parses its machine-readable output")
     Component(graph, "Graph layout", "internal/graph", "Lanes over the commit stream")
@@ -101,6 +104,7 @@ shell.
   - [ADR-6: Write queues by what they lock](architecture/adr-6-write-queues-by-what-they-lock.md)
   - [ADR-7: Git computes the diff, CodeMirror draws it](architecture/adr-7-diff-ui-with-codemirror-6-merge.md)
   - [ADR-8: One process, one selection per window](architecture/adr-8-one-process-selection-per-window.md)
+  - [ADR-9: One package of bounded contexts](architecture/adr-9-one-package-of-bounded-contexts.md)
 - [backend.md](architecture/backend.md): shell and core responsibilities, calls, events, errors.
 - [frontend.md](architecture/frontend.md): window state, layout, diff view, merge editor.
 - [git-mapping.md](architecture/git-mapping.md): which git commands back which feature.
