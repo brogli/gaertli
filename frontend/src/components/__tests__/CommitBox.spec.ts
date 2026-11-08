@@ -18,7 +18,7 @@ import { useRepoStore } from '@/stores/repo'
 import { useRefsStore } from '@/stores/refs'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { summaryFixture } from '@/testing/fixtures/summary'
-import { Operation } from '../../../bindings/github.com/brogli/gaertli/internal/core'
+import { OperationKind } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { refsFixture } from '@/testing/fixtures/refs'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
@@ -136,7 +136,7 @@ describe('CommitBox', () => {
     ['on an unborn HEAD', summaryFixture({ sha: '' })],
     [
       'while an operation (merge, rebase, …) is in progress',
-      summaryFixture({ sha: 'abc123', operation: Operation.MergeOperation }),
+      summaryFixture({ sha: 'abc123', operation: OperationKind.MergeOperation }),
     ],
   ])('the Amend checkbox is disabled %s', (_name, summary) => {
     useRepoStore().summary = summary

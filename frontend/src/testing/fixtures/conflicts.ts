@@ -1,6 +1,6 @@
 import {
   ConflictKind,
-  Operation,
+  OperationKind,
   MergeChangeKind,
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/gaertli/internal/core'
@@ -29,7 +29,7 @@ export function conflictFileFixture(overrides: Partial<ConflictFile> = {}): Conf
   return {
     path: 'a.txt',
     kind: ConflictKind.ConflictText,
-    operation: Operation.MergeOperation,
+    operation: OperationKind.MergeOperation,
     base: { present: true, content: 'a\no1\nb\no2\nz' },
     current: {
       present: true,

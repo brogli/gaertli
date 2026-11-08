@@ -14,7 +14,7 @@ import {
   ChangeScope,
   ConflictChoice,
   ConflictKind,
-  Operation,
+  OperationKind,
   type ConflictFile,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
@@ -118,7 +118,7 @@ const versions = computed(() => {
       choice: ConflictChoice.ChooseIncoming,
       present: file.incoming.present,
       label:
-        file.operation === Operation.RevertOperation
+        file.operation === OperationKind.RevertOperation
           ? t('conflictView.takeVersionBefore', { commit: plainNames.value.incoming })
           : t('conflictView.takeVersion', { side: plainNames.value.incoming }),
     },

@@ -310,7 +310,7 @@ func conflictAttrs(ctx context.Context, r git.Runner, dir, path string) (mergeAt
 // HEAD, except in a rebase, where it is the commit rebased onto.
 func labelSides(ctx context.Context, wt *session.Worktree, out *core.ConflictFile) error {
 	op := operation(wt.GitDir)
-	out.Operation = core.Operation(op)
+	out.Operation = core.OperationKind(op)
 
 	var err error
 	if op != "rebase" {

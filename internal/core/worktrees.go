@@ -78,12 +78,12 @@ type WorktreeInfo struct {
 
 // Summary is the worktree's branch and state.
 type Summary struct {
-	Branch       string    `json:"branch"` // "" when Detached
-	Detached     bool      `json:"detached"`
-	Operation    Operation `json:"operation"`     // "" if none
-	SHA          SHA       `json:"sha,omitempty"` // HEAD's commit, "" for an unborn HEAD
-	EditorName   string    `json:"editorName"`    // the effective editor profile's Name
-	MessageDraft string    `json:"messageDraft"`  // "" if none
+	Branch       string        `json:"branch"` // "" when Detached
+	Detached     bool          `json:"detached"`
+	Operation    OperationKind `json:"operation"`     // "" if none
+	SHA          SHA           `json:"sha,omitempty"` // HEAD's commit, "" for an unborn HEAD
+	EditorName   string        `json:"editorName"`    // the effective editor profile's Name
+	MessageDraft string        `json:"messageDraft"`  // "" if none
 
 	// WaitingStash is the commit of the newest stash entry a pull, merge or rebase with stash made
 	// that is still in the stash list, "" if none.

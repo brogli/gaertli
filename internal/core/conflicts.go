@@ -50,7 +50,7 @@ type Conflicts interface {
 type ConflictFile struct {
 	Path       string        `json:"path"`
 	Kind       ConflictKind  `json:"kind"`
-	Operation  Operation     `json:"operation"` // "" for a conflict no operation records (a stash pop)
+	Operation  OperationKind `json:"operation"` // "" for a conflict no operation records (a stash pop)
 	Base       ConflictSide  `json:"base"`
 	Current    ConflictSide  `json:"current"`          // stage 2, the side checked out
 	Incoming   ConflictSide  `json:"incoming"`         // stage 3, the side brought in

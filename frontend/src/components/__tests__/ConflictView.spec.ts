@@ -34,7 +34,7 @@ import {
   ChangeScope,
   ConflictChoice,
   ConflictKind,
-  Operation,
+  OperationKind,
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
@@ -104,7 +104,7 @@ describe('ConflictView', () => {
     ],
     [
       'FR-CONF-05 FR-CONF-07 a revert, naming its incoming side as the state before the commit,',
-      { kind: ConflictKind.ConflictBinary, operation: Operation.RevertOperation },
+      { kind: ConflictKind.ConflictBinary, operation: OperationKind.RevertOperation },
       'Both sides changed this binary file.',
       ['Keep the version of main', 'Take the version before abcdef0 on side'],
     ],
@@ -112,7 +112,7 @@ describe('ConflictView', () => {
       'FR-CONF-05 FR-CONF-07 a conflict between sides without a commit, naming them the current and incoming side,',
       {
         kind: ConflictKind.ConflictBinary,
-        operation: Operation.$zero,
+        operation: OperationKind.$zero,
         current: { ...current, sha: '', ref: '' },
         incoming: { ...incoming, sha: '', ref: '' },
       },

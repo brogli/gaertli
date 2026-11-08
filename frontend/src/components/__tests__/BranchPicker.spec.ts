@@ -36,7 +36,7 @@ import { useLogStore } from '@/stores/log'
 import {
   BranchInUse,
   Code,
-  Operation,
+  OperationKind,
   type Refs,
   type Summary,
 } from '../../../bindings/github.com/brogli/gaertli/internal/core'
@@ -146,7 +146,7 @@ describe('BranchPicker', () => {
   it('the button shows ahead/behind while the branch tracks an upstream, and the operation in progress', async () => {
     const { wrapper } = await mountPicker(
       refsOfEveryKind([branchFixture({ upstream: 'origin/main', ahead: 2, behind: 1 })]),
-      summaryFixture({ operation: Operation.MergeOperation }),
+      summaryFixture({ operation: OperationKind.MergeOperation }),
     )
 
     const button = wrapper.get('[data-test="branch-picker"]')

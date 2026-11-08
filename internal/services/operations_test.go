@@ -82,7 +82,7 @@ var operationKinds = []string{"merge", "rebase", "cherry-pick", "revert"}
 
 // assertOperation asserts that Summary names want as the operation in
 // progress, "" for none.
-func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.Operation) {
+func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.OperationKind) {
 	t.Helper()
 	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
@@ -261,7 +261,7 @@ func TestContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
 			if !fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
 				t.Errorf("%s missing, want it left in place (still stopped)", operationStateFile[kind])
 			}
-			assertOperation(t, c, wt, core.Operation(kind))
+			assertOperation(t, c, wt, core.OperationKind(kind))
 		})
 	}
 }
@@ -292,7 +292,7 @@ func TestSummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			_, c, wt, _ := stoppedRepo(t, kind)
 
-			assertOperation(t, c, wt, core.Operation(kind))
+			assertOperation(t, c, wt, core.OperationKind(kind))
 
 			status := statusOf(t, c, wt)
 			want := core.ChangedFile{Status: "UU", Path: conflictPath(kind)}

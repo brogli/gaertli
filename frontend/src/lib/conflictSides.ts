@@ -1,7 +1,7 @@
 import type { Translate } from '@/i18n'
 import { shortSha } from '@/lib/format'
 import {
-  Operation,
+  OperationKind,
   type ConflictSide,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
@@ -10,11 +10,14 @@ interface Roles {
   incoming: string
 }
 
-const ROLES: Partial<Record<Operation, Roles>> = {
-  [Operation.MergeOperation]: { current: 'currentBranch', incoming: 'mergedBranch' },
-  [Operation.RebaseOperation]: { current: 'rebasedOnto', incoming: 'commitBeingReplayed' },
-  [Operation.CherryPickOperation]: { current: 'currentBranch', incoming: 'pickedCommit' },
-  [Operation.RevertOperation]: { current: 'currentBranch', incoming: 'stateBeforeRevertedCommit' },
+const ROLES: Partial<Record<OperationKind, Roles>> = {
+  [OperationKind.MergeOperation]: { current: 'currentBranch', incoming: 'mergedBranch' },
+  [OperationKind.RebaseOperation]: { current: 'rebasedOnto', incoming: 'commitBeingReplayed' },
+  [OperationKind.CherryPickOperation]: { current: 'currentBranch', incoming: 'pickedCommit' },
+  [OperationKind.RevertOperation]: {
+    current: 'currentBranch',
+    incoming: 'stateBeforeRevertedCommit',
+  },
 }
 const NO_OPERATION: Roles = { current: 'currentSide', incoming: 'incomingSide' }
 
@@ -27,8 +30,8 @@ function sideName(side: ConflictSide, useRef = true): string | undefined {
 }
 
 // incomingName is the incoming side's name; a revert's is only its commit.
-function incomingName(operation: Operation, incoming: ConflictSide): string | undefined {
-  return sideName(incoming, operation !== Operation.RevertOperation)
+function incomingName(operation: OperationKind, incoming: ConflictSide): string | undefined {
+  return sideName(incoming, operation !== OperationKind.RevertOperation)
 }
 
 // paneTitle is the side's name and role, or the role alone for a side
@@ -42,7 +45,7 @@ function paneTitle(name: string | undefined, role: string, t: Translate): string
 // conflictSideNames names a conflict's two sides without their roles:
 // "main".
 export function conflictSideNames(
-  operation: Operation,
+  operation: OperationKind,
   current: ConflictSide,
   incoming: ConflictSide,
   t: Translate,
@@ -56,7 +59,7 @@ export function conflictSideNames(
 // conflictSideTitles names a conflict's two sides and their roles for the
 // operation, as a pane or panel title: "main · current branch".
 export function conflictSideTitles(
-  operation: Operation,
+  operation: OperationKind,
   current: ConflictSide,
   incoming: ConflictSide,
   t: Translate,
