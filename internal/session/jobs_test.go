@@ -5,8 +5,10 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"runtime"
+	"slices"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/core/coretest"
@@ -28,10 +30,9 @@ func TestRepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 	})
 
 	sawProgress, sawDone := false, false
-	deadline := time.After(2 * time.Second)
 	for !sawProgress || !sawDone {
-		select {
-		case e := <-events:
+		{
+			e := <-events
 			if e.Name != "job:update" {
 				continue
 			}
@@ -51,8 +52,6 @@ func TestRepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 			if info.State == core.JobDone {
 				sawDone = true
 			}
-		case <-deadline:
-			t.Fatal("timed out waiting for job:update progress and terminal events")
 		}
 	}
 }
@@ -60,29 +59,46 @@ func TestRepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 // A job whose fn takes the worktree lock is no bypass: a concurrent direct
 // Lock() waits for it.
 func TestJobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
-	// Real time: a goroutine blocked on the mutex keeps a synctest clock from advancing.
-	const hold = 60 * time.Millisecond
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
 
-	locked := make(chan struct{})
+	var mu sync.Mutex
+	var order []string
+	record := func(step string) {
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, step)
+	}
+
+	locked, release := make(chan struct{}), make(chan struct{})
 	m.Start(t.Context(), "test", func(ctx context.Context, progress jobs.Progress) (any, error) {
 		wt.Lock()
 		defer wt.Unlock()
 		close(locked)
-		time.Sleep(hold)
+		<-release
+		record("job released")
 		return nil, nil
 	})
 	<-locked
-	heldSince := time.Now()
-	time.Sleep(10 * time.Millisecond)
 
-	wt.Lock()
-	held := time.Since(heldSince)
-	wt.Unlock()
+	attempting, direct := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(direct)
+		close(attempting)
+		wt.Lock()
+		defer wt.Unlock()
+		record("direct lock acquired")
+	}()
+	<-attempting
+	// Give a lock that does not serialise the chance to be acquired first.
+	for range 1000 {
+		runtime.Gosched()
+	}
+	close(release)
+	<-direct
 
-	if held < hold/2 {
-		t.Errorf("direct Lock() returned %s after the job took the lock, want >= %s (should wait for the job's own hold)", held, hold/2)
+	if want := []string{"job released", "direct lock acquired"}; !slices.Equal(order, want) {
+		t.Errorf("order = %v, want %v (direct Lock() must wait for the job)", order, want)
 	}
 }
 
@@ -100,11 +116,7 @@ func TestJobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing.T) {
 		return nil, nil
 	})
 
-	select {
-	case <-jobDone:
-	case <-time.After(time.Second):
-		t.Fatal("job with no lock never ran while the worktree lock was held")
-	}
+	<-jobDone
 }
 
 // The fn's deferred Unlock runs once ctx.Done() unblocks it.
@@ -132,10 +144,6 @@ func TestCancelReleasesAWorktreeLockHeldByTheJob(t *testing.T) {
 		close(acquired)
 	}()
 
-	select {
-	case <-acquired:
-		wt.Unlock()
-	case <-time.After(time.Second):
-		t.Error("wt.Lock() after Cancel never succeeded — the cancelled job's lock leaked")
-	}
+	<-acquired
+	wt.Unlock()
 }

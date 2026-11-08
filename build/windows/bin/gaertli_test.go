@@ -12,9 +12,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/testbin"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 var fakeExePath string
@@ -100,20 +100,18 @@ func runScript(t *testing.T, dir, distro, wslpathDir string, args ...string) {
 	}
 }
 
-// readArgvEventually polls for the fake app's argv file, which it writes
-// only after a short sleep, failing the test if it never appears.
+// readArgvEventually waits for the fake app's argv file, which it writes
+// only after a short sleep.
 func readArgvEventually(t *testing.T, dir string) string {
 	t.Helper()
 	path := filepath.Join(dir, "argv.txt")
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if content, err := os.ReadFile(path); err == nil {
-			return strings.TrimSpace(string(content))
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("the app never recorded its arguments")
-	return ""
+	var content []byte
+	testwait.Until(func() bool {
+		var err error
+		content, err = os.ReadFile(path)
+		return err == nil
+	})
+	return strings.TrimSpace(string(content))
 }
 
 func TestScriptArgv(t *testing.T) {

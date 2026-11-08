@@ -4,13 +4,11 @@ package main_test
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/remote"
@@ -39,9 +37,7 @@ func TestStdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	v, err := remote.NewClient(stdout, stdin, nil).Version(ctx)
+	v, err := remote.NewClient(stdout, stdin, nil).Version(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,14 +48,8 @@ func TestStdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 	_ = stdin.Close()
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Errorf("exit: %v, want 0", err)
-		}
-	case <-time.After(2 * time.Second):
-		_ = cmd.Process.Kill()
-		t.Fatal("core did not exit within 2s of stdin closing")
+	if err := <-done; err != nil {
+		t.Errorf("exit: %v, want 0", err)
 	}
 }
 

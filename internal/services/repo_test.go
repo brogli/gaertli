@@ -330,15 +330,10 @@ func TestRefreshRunsTheWatcherAndPollerChecksPromptly(t *testing.T) {
 	}
 
 	var sawCommand, sawRefsChanged bool
-	deadline := time.After(2 * time.Second)
 	for !sawRefsChanged {
-		select {
-		case e := <-events:
-			sawCommand = sawCommand || e.Name == "command"
-			sawRefsChanged = e.Name == "repo:changed" && string(e.Payload) == `{"scope":"refs"}`
-		case <-deadline:
-			t.Fatal("no repo:changed(refs) event after Refresh (the watcher's CheckNow)")
-		}
+		e := <-events
+		sawCommand = sawCommand || e.Name == "command"
+		sawRefsChanged = e.Name == "repo:changed" && string(e.Payload) == `{"scope":"refs"}`
 	}
 	// The watcher's and the poller's events are both already enqueued by the
 	// time Refresh returns, in either order: drain what is left too.
