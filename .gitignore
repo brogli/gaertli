@@ -12,7 +12,6 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/.eslintcache
 frontend/.stylelintcache
-build/linux/gaertli.desktop
 .claude/worktrees/
 /THIRD-PARTY-NOTICES.txt
 /dist/

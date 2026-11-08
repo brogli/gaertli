@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Gärtli
+Comment=Desktop git GUI that sits beside your editor
+Exec=gaertli
+Icon=io.github.brogli.gaertli
+StartupWMClass=io.github.brogli.gaertli
+Categories=Development;RevisionControl;
+Keywords=git;
+Terminal=false

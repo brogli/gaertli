@@ -23,7 +23,11 @@ import (
 	wailslog "github.com/wailsapp/wails/v3/pkg/services/log"
 )
 
-const singleInstanceID = "gaertli" // stable per machine; no reverse-domain owner to use
+const singleInstanceID = "gaertli" // stable per machine
+
+// linuxAppID names the installed .desktop file and icon; the desktop shows a
+// window's icon only when its GTK application id equals that name.
+const linuxAppID = "io.github.brogli.gaertli"
 
 // Run starts the shell. args is os.Args (argv[0] included, see launchPath).
 func Run(assets fs.FS, args []string) error {
@@ -121,6 +125,7 @@ func options(assets fs.FS, reg *Registry, onSecondInstance func(path string), lo
 			Handler:    application.AssetFileServerFS(assets),
 			Middleware: pageMiddleware,
 		},
+		Linux: application.LinuxOptions{ApplicationID: linuxAppID},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},

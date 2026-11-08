@@ -16,9 +16,10 @@ The app needs only git and the platform's web view, and no package bundles eithe
   `gaertli` command for Windows and WSL terminals that starts the app and returns at once
   (FR-REPO-06); the installer puts it on the user PATH. The app's own exe edits the PATH, since the
   installer's script language cannot hold a long one.
-- **Linux**: `.deb` and `.rpm` that depend on GTK, WebKitGTK and git, and a `.tar.gz`. The `.deb`
-  brings an AppArmor profile, since Ubuntu otherwise denies WebKitGTK's sandbox the user namespaces
-  it needs (DIST-06).
+- **Linux**: `.deb` and `.rpm` that depend on GTK, WebKitGTK and git, and a `.tar.gz`. The packages
+  name the desktop file and icon after the app's reverse-DNS id, which is also its GTK application
+  id, so the desktop finds the icon for its windows. The `.deb` brings an AppArmor profile, since
+  Ubuntu otherwise denies WebKitGTK's sandbox the user namespaces it needs (DIST-06).
 - **macOS**: an unsigned, untested app (QA-PORT-04).
 - No auto-update and no code signing (DIST-03).
 
