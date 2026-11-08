@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-02, FR-CHG-04, FR-CHG-08, FR-CHG-10, FR-CHG-13, FR-CONF-02, FR-CONF-03, FR-CONF-08, FR-ED-02, FR-ED-06
+// Requirements: FR-CHG-02, FR-CHG-04, FR-CHG-08, FR-CHG-10, FR-CHG-13, FR-CONF-02, FR-CONF-03, FR-CONF-08, FR-ED-02, FR-ED-06, FR-LOG-21
 import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -309,6 +309,17 @@ describe('ChangesView', () => {
     expect(treeLabels(trees[1]!)).toEqual(['b.txt'])
     expect(treeLabels(trees[2]!)).toEqual(['n.txt'])
     expect(treeLabels(trees[3]!)).toEqual(['c.txt'])
+  })
+
+  it("the fold button folds every group's tree at once", async () => {
+    const wrapper = await mountIn('tree', {
+      staged: [{ path: 'sub/a.ts', status: 'M' }],
+      unstaged: [{ path: 'lib/b.txt', status: 'M' }],
+    })
+
+    await wrapper.get('[data-test="fold-toggle"]').trigger('click')
+
+    expect(wrapper.findAll('[role="tree"]').flatMap(treeLabels)).toEqual(['sub', 'lib'])
   })
 
   it('the changes view shares its choice with ChangedFiles, and a fresh mount starts from the remembered choice', async () => {

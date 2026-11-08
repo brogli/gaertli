@@ -10,7 +10,8 @@ import ChangedFileButton from './ChangedFileButton.vue'
 import FileStatusIcon from './FileStatusIcon.vue'
 
 // ChangedFileTree shows changed files by folder in OpenVue's Tree, every
-// folder unfolded whenever the files change. A click selects a file, a
+// folder unfolded, or folded while folded is set, whenever the files or
+// folded change. A click selects a file, a
 // double-click or Enter opens it; a click or Enter on a folder folds or
 // unfolds it. action, when set, adds a per-file button before the status
 // icon (the changes view's stage/unstage); secondAction adds one after Open
@@ -19,6 +20,7 @@ import FileStatusIcon from './FileStatusIcon.vue'
 const props = defineProps<{
   files: ChangedFile[]
   selected?: ChangedFile | null
+  folded?: boolean
   action?: ChangedFileAction
   // | undefined, not just optional: ChangesView binds a per-group value that
   // may be undefined, which exactOptionalPropertyTypes tells from absent.
@@ -38,7 +40,11 @@ const secondActions = computed(
   () => new Map(props.files.map((file) => [file.path, props.secondAction?.(file)])),
 )
 const expandedKeys = ref<TreeExpandedKeys>({})
-watch(nodes, (n) => (expandedKeys.value = folderKeys(n)), { immediate: true })
+watch(
+  [nodes, () => props.folded],
+  ([n, folded]) => (expandedKeys.value = folded ? {} : folderKeys(n)),
+  { immediate: true },
+)
 
 // The tree shows only the selected file as selected, so every click or
 // Enter on a folder reaches onNodeSelect.

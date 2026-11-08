@@ -76,6 +76,8 @@ const ICON = {
   folder: 'folder',
   fileList: 'list',
   fileTree: 'sitemap',
+  foldAll: 'folder',
+  unfoldAll: 'folder-open',
   branch: 'code-branch',
   dropdown: 'chevron-down',
   fetch: 'cloud-download',

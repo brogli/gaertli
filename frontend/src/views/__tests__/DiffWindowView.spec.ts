@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-ED-02, QA-REL-03
+// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-ED-02, FR-LOG-21, QA-REL-03
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -424,6 +424,27 @@ describe('DiffWindowView', () => {
     await flushPromises()
 
     expect(Facade.DiffWorking).toHaveBeenLastCalledWith('/repo', 'lib/b.txt', '', false, opts)
+  })
+
+  it("the fold button folds every group's tree at once", async () => {
+    Facade.Status.mockResolvedValue(
+      changedFilesFixture({
+        staged: [{ path: 'src/a.txt', status: 'M' }],
+        unstaged: [{ path: 'lib/b.txt', status: 'M' }],
+      }),
+    )
+    const wrapper = await mountRealWindow({
+      kind: DiffKind.WorkingDiff,
+      staged: true,
+      path: 'src/a.txt',
+      oldPath: '',
+    })
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+
+    await wrapper.get('[data-test="fold-toggle"]').trigger('click')
+
+    const labels = wrapper.findAll('[role="treeitem"]').map((n) => n.attributes('aria-label'))
+    expect(labels).toEqual(['src', 'lib'])
   })
 
   it('a choice already stored (by the commit detail view) shows the files as trees, the toggle pressed', async () => {

@@ -15,7 +15,7 @@ import ChangedFileList from './ChangedFileList.vue'
 import ChangedFileTree from './ChangedFileTree.vue'
 import CommitBox from './CommitBox.vue'
 import ErrorBanner from './ErrorBanner.vue'
-import FileTreeToggle from './FileTreeToggle.vue'
+import FileTreeControls from './FileTreeControls.vue'
 import type { ChangedFileAction } from './changedFileAction'
 
 // ChangesView is the changes view: the change list, which scrolls on its
@@ -33,6 +33,7 @@ const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(() => props.wt, run)
 const { confirmAction } = useConfirmAction()
 const asTree = useFileTreeChoice()
+const folded = ref(false)
 const { t } = useI18n()
 
 // The selected row, with its group's side: one path can be both staged
@@ -170,7 +171,7 @@ const resolvedUnchanged = computed<ChangedFile[]>(() => {
             :label="t('changesView.unstageAll')"
             @click="unstageAll"
           />
-          <FileTreeToggle v-model:as-tree="asTree" />
+          <FileTreeControls v-model:as-tree="asTree" v-model:folded="folded" />
         </div>
       </header>
       <ErrorBanner v-if="error" :error="error" />
@@ -180,6 +181,7 @@ const resolvedUnchanged = computed<ChangedFile[]>(() => {
         <p v-if="!g.files.length">{{ g.empty }}</p>
         <component
           :is="asTree ? ChangedFileTree : ChangedFileList"
+          :folded="asTree ? folded : undefined"
           :files="g.files"
           :selected="selected?.staged === g.staged ? selected.file : null"
           :action="g.action"
@@ -199,6 +201,7 @@ const resolvedUnchanged = computed<ChangedFile[]>(() => {
         </p>
         <component
           :is="asTree ? ChangedFileTree : ChangedFileList"
+          :folded="asTree ? folded : undefined"
           :files="conflicted"
           action="markResolved"
           @open="openConflict"
@@ -208,6 +211,7 @@ const resolvedUnchanged = computed<ChangedFile[]>(() => {
         <component
           :is="asTree ? ChangedFileTree : ChangedFileList"
           v-if="resolvedUnchanged.length"
+          :folded="asTree ? folded : undefined"
           :files="resolvedUnchanged"
           :second-action="() => 'reopenConflict'"
           @open-editor="openEditor"
