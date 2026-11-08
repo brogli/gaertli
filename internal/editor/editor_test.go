@@ -109,19 +109,27 @@ func TestOpenFolderNamesTheFailedCommandInArgs(t *testing.T) {
 	}
 }
 
-func TestOpenFolderStartsTheConfiguredCommandDetached(t *testing.T) {
+func TestOpenFolderReturnsWhileTheEditorIsStillRunning(t *testing.T) {
 	t.Parallel()
 	cmd, outFile := argvWriterCmd(t)
+	hold := outFile + ".hold"
+	if err := os.WriteFile(hold, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	profile := core.EditorProfile{FolderCmd: cmd}
 
-	start := time.Now()
 	if _, err := OpenFolder(profile, "/tmp/x"); err != nil {
 		t.Fatal(err)
 	}
-	if elapsed := time.Since(start); elapsed > 250*time.Millisecond {
-		t.Errorf("OpenFolder took %v, want promptly (detached, not waiting on the editor)", elapsed)
+	if _, err := os.Stat(outFile + ".exited"); err == nil {
+		t.Error("OpenFolder returned only after the editor exited, want it detached")
 	}
-	if got := awaitArgv(t, outFile); got != "/tmp/x" {
+
+	if err := os.Remove(hold); err != nil {
+		t.Fatal(err)
+	}
+	awaitFile(t, outFile+".exited")
+	if got := awaitFile(t, outFile); got != "/tmp/x" {
 		t.Errorf("helper argv = %q, want %q", got, "/tmp/x")
 	}
 }
@@ -138,7 +146,7 @@ func TestOpenFileReturnsTheResolvedArgv(t *testing.T) {
 	if want := []string{argvWriterBin, outFile, "/tmp/x"}; !slices.Equal(argv, want) {
 		t.Errorf("argv = %v, want %v", argv, want)
 	}
-	awaitArgv(t, outFile)
+	awaitFile(t, outFile)
 }
 
 func TestALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
@@ -149,7 +157,7 @@ func TestALauncherThatExitsNonZeroStillCountsAsStarted(t *testing.T) {
 	if _, err := OpenFile(profile, "/tmp/x", 0); err != nil {
 		t.Fatalf("OpenFile = %v, want nil: argvwriter exits 1 like explorer.exe after a successful open", err)
 	}
-	awaitArgv(t, outFile)
+	awaitFile(t, outFile)
 }
 
 // argvWriterCmd returns a command template that runs argvWriterBin on
@@ -160,16 +168,17 @@ func argvWriterCmd(t *testing.T) (template, outFile string) {
 	return argvWriterBin + " " + outFile + " {path}", outFile
 }
 
-// awaitArgv waits up to 2s for outFile and returns its content.
-func awaitArgv(t *testing.T, outFile string) string {
+// awaitFile waits up to 2s for the helper to write path and returns its
+// content.
+func awaitFile(t *testing.T, path string) string {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if content, err := os.ReadFile(outFile); err == nil {
+		if content, err := os.ReadFile(path); err == nil {
 			return string(content)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatal("helper never wrote its argv file")
+	t.Fatalf("helper never wrote %s", path)
 	return ""
 }
