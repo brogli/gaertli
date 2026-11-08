@@ -48,7 +48,7 @@ func TestEventHoldDeliversEverySendOnceAndInOrderPerSenderWhileTheDrainRuns(t *t
 		}
 		wg.Wait()
 
-		time.Sleep(time.Second)
+		time.Sleep(hold.poll)
 		synctest.Wait()
 		hold.mu.Lock()
 		drained := len(hold.pending) == 0
