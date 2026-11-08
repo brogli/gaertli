@@ -5,8 +5,8 @@
 [![licence](https://img.shields.io/github/license/brogli/gaertli)](LICENSE)
 [![go](https://img.shields.io/github/go-mod/go-version/brogli/gaertli)](go.mod)
 
-_Gärtli_ is Swiss German for "little garden", where you tend your branches: a desktop Git GUI that
-sits beside your editor.
+_Gärtli_ (say "GAIRT-lee") is Swiss German for "little garden", where you tend your branches: a
+desktop Git GUI that sits beside your editor.
 
 For developers whose editor lacks strong git tooling. Log viewer with graph, commit compare,
 worktree handling, safe sync actions, merge, rebase, cherry-pick and a three-pane merge editor. Go
