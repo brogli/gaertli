@@ -15,13 +15,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/core/coretest"
 	"github.com/brogli/gaertli/internal/git/gittest"
 	"github.com/brogli/gaertli/internal/remote"
 	"github.com/brogli/gaertli/internal/testbin"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 // coreBin is the real gaertli-core; badBin reports a wrong protocol version;
@@ -387,19 +387,18 @@ func TestRejectsAPathForAnotherDistroOrLocal(t *testing.T) {
 // process's exit is observed by DistroCore's own goroutine asynchronously.
 func waitForRespawn(t *testing.T, dc *remote.DistroCore) *remote.Client {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	var fresh *remote.Client
+	testwait.Until(func() bool {
 		client, respawned, err := dc.Ensure(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
 		if respawned {
-			return client
+			fresh = client
 		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("Ensure did not respawn within 5s of the process being killed")
-	return nil
+		return respawned
+	})
+	return fresh
 }
 
 func TestEnsureLogsAFailedCoreStartAtWarn(t *testing.T) {
@@ -439,7 +438,7 @@ func TestTheCoresStderrReachesTheLogAtWarnMasked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	waitFor(func() bool { return strings.Contains(text(), "https://***@host/repo") })
+	testwait.Until(func() bool { return strings.Contains(text(), "https://***@host/repo") })
 	got := text()
 	if !strings.Contains(got, "level=WARN") || !strings.Contains(got, "https://***@host/repo") {
 		t.Errorf("log = %q, want the masked stderr line at Warn", got)
@@ -500,23 +499,17 @@ func TestACoreThatExitsAfterAnOverlongStderrLineIsRespawned(t *testing.T) {
 	waitForRespawn(t, dc)
 }
 
-// waitFor polls done for up to 3s and reports its last answer.
-func waitFor(done func() bool) bool {
-	deadline := time.Now().Add(3 * time.Second)
-	for !done() && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
-	return done()
-}
-
 func TestEveryEventACoreSendsBeforeItExitsArrives(t *testing.T) {
 	var events atomic.Int64
+	allArrived := make(chan struct{})
 
-	exitingCore(t, func(core.Event) { events.Add(1) }, slog.Default())
+	exitingCore(t, func(core.Event) {
+		if events.Add(1) == exitBurst {
+			close(allArrived)
+		}
+	}, slog.Default())
 
-	if !waitFor(func() bool { return events.Load() == exitBurst }) {
-		t.Errorf("%d events arrived, want %d", events.Load(), exitBurst)
-	}
+	<-allArrived
 }
 
 func TestEveryStderrLineACoreWritesBeforeItExitsReachesTheLog(t *testing.T) {
@@ -525,7 +518,5 @@ func TestEveryStderrLineACoreWritesBeforeItExitsReachesTheLog(t *testing.T) {
 	exitingCore(t, nil, logger)
 
 	last := fmt.Sprintf("line %d", exitBurst-1)
-	if !waitFor(func() bool { return strings.Contains(text(), last) }) {
-		t.Errorf("log lacks %q, the core's last stderr line", last)
-	}
+	testwait.Until(func() bool { return strings.Contains(text(), last) })
 }

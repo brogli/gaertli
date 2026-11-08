@@ -10,9 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 // ensureConcurrently runs n Ensure calls at once and returns how many
@@ -53,13 +53,7 @@ func TestConcurrentEnsureSharesOneSpawnAndOneOnConnectAlsoAfterAKill(t *testing.
 
 	// the kill is observed asynchronously: Ensure rounds return the old
 	// client until then
-	deadline := time.Now().Add(2 * time.Second)
-	for ensureConcurrently(t, dc, callers) == 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("no Ensure respawned within 2s of the kill")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	testwait.Until(func() bool { return ensureConcurrently(t, dc, callers) != 0 })
 	if len(wsl.spawns) != 2 || connects.Load() != 2 {
 		t.Fatalf("after the kill: spawns = %d, onConnect = %d, want 2 and 2", len(wsl.spawns), connects.Load())
 	}
