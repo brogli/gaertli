@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -19,48 +20,45 @@ type heldDelivery struct {
 }
 
 func TestEventHoldDeliversEverySendOnceAndInOrderPerSenderWhileTheDrainRuns(t *testing.T) {
-	const senders, perSender = 8, 50
+	synctest.Test(t, func(t *testing.T) {
+		const senders, perSender = 8, 50
 
-	var found atomic.Bool
-	var delivered []heldDelivery // guarded by the hold's mutex: emit runs under it
-	hold := &eventHold{
-		lookup: func(string) (string, bool) { return "page", found.Load() },
-		emit: func(_, name string, data []any) {
-			delivered = append(delivered, heldDelivery{name, data[0].(int)})
-		},
-		poll:    time.Millisecond,
-		giveUp:  time.Minute,
-		pending: map[string][]heldEvent{},
-	}
+		var found atomic.Bool
+		var delivered []heldDelivery // guarded by the hold's mutex: emit runs under it
+		hold := &eventHold{
+			lookup: func(string) (string, bool) { return "page", found.Load() },
+			emit: func(_, name string, data []any) {
+				delivered = append(delivered, heldDelivery{name, data[0].(int)})
+			},
+			poll:    time.Millisecond,
+			giveUp:  time.Minute,
+			pending: map[string][]heldEvent{},
+		}
 
-	var wg sync.WaitGroup
-	for s := range senders {
-		wg.Go(func() {
-			for seq := range perSender {
-				hold.send("client", fmt.Sprint(s), []any{seq})
-				if seq == perSender/2 && s == 0 {
-					found.Store(true)
+		var wg sync.WaitGroup
+		for s := range senders {
+			wg.Go(func() {
+				for seq := range perSender {
+					hold.send("client", fmt.Sprint(s), []any{seq})
+					if seq == perSender/2 && s == 0 {
+						found.Store(true)
+					}
 				}
-			}
-		})
-	}
-	wg.Wait()
+			})
+		}
+		wg.Wait()
 
-	deadline := time.Now().Add(time.Second)
-	for {
+		time.Sleep(time.Second)
+		synctest.Wait()
 		hold.mu.Lock()
 		drained := len(hold.pending) == 0
 		got := slices.Clone(delivered)
 		hold.mu.Unlock()
-		if drained {
-			assertDeliveredOncePerSenderInOrder(t, got, senders, perSender)
-			return
+		if !drained {
+			t.Fatal("held events were not drained")
 		}
-		if time.Now().After(deadline) {
-			t.Fatal("held events were not drained within 1s")
-		}
-		time.Sleep(time.Millisecond)
-	}
+		assertDeliveredOncePerSenderInOrder(t, got, senders, perSender)
+	})
 }
 
 func assertDeliveredOncePerSenderInOrder(t *testing.T, got []heldDelivery, senders, perSender int) {

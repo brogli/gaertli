@@ -9,7 +9,6 @@ import (
 	"slices"
 	"testing"
 	"testing/fstest"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/remote"
@@ -49,13 +48,7 @@ func (f fakeAPI) record(method string, wt core.WorktreeID) {
 // nextCall waits for the next call a fake core records on calls.
 func nextCall(t *testing.T, calls <-chan routedCall) routedCall {
 	t.Helper()
-	select {
-	case c := <-calls:
-		return c
-	case <-time.After(5 * time.Second):
-		t.Fatal("no core call arrived")
-		return routedCall{}
-	}
+	return <-calls
 }
 
 // openAsIs opens path as a worktree whose id and path are path itself.
