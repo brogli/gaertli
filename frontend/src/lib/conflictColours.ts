@@ -15,7 +15,7 @@ const TINTS: Record<string, [tone: string, mix: number, selectedMix: number]> = 
 
 // conflictColours tints the merge editor's lines from the theme's tone
 // tokens: blue for lines a side changed, green for lines it added, red for an
-// unresolved conflict region, a neutral tint of the text colour for a resolved
+// unresolved conflict, a neutral tint of the text colour for a resolved
 // one. The selected region's lines take a stronger tint and an outline in the
 // theme's accent colour around the region, and a marker in the pane's gutter.
 export const conflictColours = EditorView.theme({

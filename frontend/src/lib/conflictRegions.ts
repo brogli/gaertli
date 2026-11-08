@@ -333,7 +333,7 @@ export function selectedRegion(state: EditorState): number {
 
 function regionOf(state: EditorState, i: number): TrackedRegion {
   const region = state.field(resultField).regions[i]
-  if (!region) throw new RangeError(`no conflict region ${i}`)
+  if (!region) throw new RangeError(`no change ${i}`)
   return region
 }
 

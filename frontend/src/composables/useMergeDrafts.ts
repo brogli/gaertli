@@ -3,7 +3,7 @@ import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import type { ResultRegion } from '@/lib/conflictRegions'
 import { toCoreError, type CoreError } from './useCoreCall'
 
-// MergeDraft is a merge result with unsaved edits: its text, the conflict
+// MergeDraft holds a conflicted file's unsaved edits: its text, the conflict
 // regions in it with their states, the fingerprint of the working file it
 // was read from and the conflictId of the conflict it was made for.
 export interface MergeDraft {
@@ -123,7 +123,7 @@ interface MergeDrafts {
   keepOnly: (wt: string, paths: string[]) => void
 }
 
-// useMergeDrafts keeps the merge results with unsaved edits, so showing
+// useMergeDrafts keeps the merge drafts, so showing
 // another file or reopening the diff window loses nothing.
 export function useMergeDrafts(): MergeDrafts {
   return {

@@ -232,7 +232,7 @@ function syncSidePanes(state: EditorState): void {
   }
 }
 
-// anchors align the panes by conflict region; the result's regions follow its
+// anchors align the panes by change; the result's regions follow its
 // edits.
 let anchors: Anchor[] = []
 
@@ -401,7 +401,7 @@ function markSelectedDone(): void {
 
 let untieScroll: (() => void) | undefined
 
-// tieScroll keeps the shown panes aligned by conflict region.
+// tieScroll keeps the shown panes aligned by change.
 function tieScroll(): void {
   untieScroll?.()
   untieScroll = tieScrollY(views, () => anchors)

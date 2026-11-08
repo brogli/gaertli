@@ -376,7 +376,7 @@ describe('DiffWindowView', () => {
     expect(Window.Close).toHaveBeenCalledTimes(1)
   })
 
-  it('Escape with an unsaved merge result closes the window without asking', async () => {
+  it('Escape with a merge draft closes the window without asking', async () => {
     confirmRequire.mockReset()
     await mountWindow(commitA)
     useMergeDrafts().set('/repo', 'a.txt', '', () => ({

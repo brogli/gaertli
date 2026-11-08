@@ -8,7 +8,7 @@ import { onRepoChanged } from '@/lib/windowEvents'
 // ref moved (the "refs" scope).
 export const useRefsStore = defineStore('refs', () => {
   const refs = ref<Refs | null>(null)
-  // current is this worktree's checked-out branch, undefined while detached.
+  // current is this worktree's branch, undefined while detached.
   const current = computed(() => refs.value?.branches?.find((b) => b.current))
   let wt = ''
   let unlisten: (() => void)[] = []

@@ -192,7 +192,7 @@ function showRefusal(refusal: CoreError): boolean {
 // A local branch checked out in another worktree asks before switching this
 // window there instead of checking it out. A remote branch checks out as
 // the local branch of its short name if there is one, else by its full ref
-// as a new tracking branch. A tag detaches HEAD, after the warning.
+// as a new branch with it as upstream. A tag detaches HEAD, after the warning.
 function checkout(row: RefRow, runCall: Runner = inList): void {
   if (row.kind === 'remote') {
     const local = localRows.value.find((r) => r.name === row.shortName)

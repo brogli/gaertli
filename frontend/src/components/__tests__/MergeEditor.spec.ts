@@ -189,7 +189,7 @@ describe('MergeEditor layout', () => {
   })
 })
 
-// threeRegionFile has one conflict region on each of the lines 2, 4 and 6 of
+// threeRegionFile has one conflict on each of the lines 2, 4 and 6 of
 // both sides.
 function threeRegionFile(): ConflictFile {
   const block = (n: number) => ['<<<<<<< HEAD', `c${n}`, '=======', `i${n}`, '>>>>>>> side']
@@ -465,7 +465,7 @@ describe('MergeEditor saving while typing', () => {
   })
 })
 
-describe('MergeEditor unsaved results', () => {
+describe('MergeEditor merge drafts', () => {
   beforeEach(() => {
     Facade.SaveConflict.mockReset().mockResolvedValue('fp2')
   })

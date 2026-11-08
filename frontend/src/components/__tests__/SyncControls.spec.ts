@@ -246,7 +246,7 @@ describe('SyncControls', () => {
     },
   )
 
-  it('branch without upstream, remote with no tracking branches: Push is enabled; PushTarget cannot push straight away, so clicking it opens the dialog naming the branch; confirming pushes to it', async () => {
+  it('branch without upstream, remote with no remote branches: Push is enabled; PushTarget cannot push straight away, so clicking it opens the dialog naming the branch; confirming pushes to it', async () => {
     setRefs({ upstream: '' })
     Facade.PushTarget.mockResolvedValue({
       remote: 'origin',
