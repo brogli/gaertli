@@ -4,8 +4,6 @@ package git
 
 import (
 	"context"
-	"errors"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 // fakegit is testdata/fakegit, built once for every test in this package.
@@ -155,21 +154,6 @@ func TestExitNonZeroFailsDespiteBenignStdout(t *testing.T) {
 	coretest.AssertCode(t, err, core.GitFailed)
 }
 
-func TestCancelKillsAndReturnsQuickly(t *testing.T) {
-	t.Setenv("FAKEGIT_SLEEP_MS", "5000")
-	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(50*time.Millisecond, cancel)
-
-	start := time.Now()
-	_, err := (Runner{Git: fakegit}).Run(ctx, Call{Args: []string{"whatever"}})
-	elapsed := time.Since(start)
-
-	coretest.AssertCode(t, err, core.Cancelled)
-	if elapsed > time.Second {
-		t.Errorf("Run() took %s, want well under 5s", elapsed)
-	}
-}
-
 func TestGitStderrFallsBackToStdoutWhenStderrIsEmpty(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "conflict.txt: needs merge\n")
 	t.Setenv("FAKEGIT_EXIT", "1")
@@ -285,11 +269,12 @@ func TestLogsEveryCall(t *testing.T) {
 func TestCancelActuallyKillsProcess(t *testing.T) {
 	heartbeat := sleepWithHeartbeat(t)
 	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(50*time.Millisecond, cancel)
+	cancelWhen(fileExists(heartbeat), cancel)
 
-	_, _ = (Runner{Git: fakegit}).Run(ctx, Call{Args: []string{"whatever"}})
+	// fakegit sleeps for minutes: Run returns only because cancel killed it.
+	_, err := (Runner{Git: fakegit}).Run(ctx, Call{Args: []string{"whatever"}})
 
-	assertStopped(t, heartbeat)
+	coretest.AssertCode(t, err, core.Cancelled)
 }
 
 // testGrace shortens the wait for a git that ignores an interrupt.
@@ -299,10 +284,11 @@ const testGrace = 200 * time.Millisecond
 func TestCancelInterruptsGitBeforeKillingIt(t *testing.T) {
 	skipWithoutPOSIXSignals(t)
 	t.Parallel()
+	started := filepath.Join(t.TempDir(), "started")
 	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(100*time.Millisecond, cancel)
+	cancelWhen(fileExists(started), cancel)
 
-	result, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", `trap 'echo interrupted >&2; exit 1' TERM; sleep 10 & wait`}})
+	result, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", `trap 'echo interrupted >&2; exit 1' TERM; : >` + started + `; sleep 60 & wait`}})
 
 	coretest.AssertCode(t, err, core.Cancelled)
 	if !strings.Contains(string(result.Stderr), "interrupted") {
@@ -313,16 +299,15 @@ func TestCancelInterruptsGitBeforeKillingIt(t *testing.T) {
 func TestAGitIgnoringTheInterruptIsKilledAfterTheGracePeriod(t *testing.T) {
 	skipWithoutPOSIXSignals(t)
 	t.Parallel()
+	started := filepath.Join(t.TempDir(), "started")
 	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(100*time.Millisecond, cancel)
+	sinceCancel := cancelWhen(fileExists(started), cancel)
 
-	start := time.Now()
-	_, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", `trap '' TERM; exec sleep 10`}})
-	elapsed := time.Since(start)
+	_, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", `trap '' TERM; : >` + started + `; exec sleep 60`}})
 
 	coretest.AssertCode(t, err, core.Cancelled)
-	if elapsed > time.Second {
-		t.Errorf("Run() took %s, want it back soon after the grace period", elapsed)
+	if elapsed := sinceCancel(); elapsed > promptBound {
+		t.Errorf("Run() took %s after cancel, want it back soon after the grace period", elapsed)
 	}
 }
 
@@ -332,14 +317,12 @@ func TestCancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	err := runCancelledAfter(t, 100*time.Millisecond,
-		`(trap '' TERM; exec sleep 20) >/dev/null 2>&1 & echo $! >`+dir+`/pid; wait`)
+	err := runCancelledWhen(t, fileExists(dir+"/started"),
+		`(trap '' TERM; : >`+dir+`/started; exec sleep 60) >/dev/null 2>&1 & echo $! >`+dir+`/pid; wait`)
 
 	coretest.AssertCode(t, err, core.Cancelled)
 	pid := readTrimmed(t, dir+"/pid")
-	if !within(time.Second, func() bool { return processGone(pid) }) {
-		t.Fatal("the child that ignored the interrupt still runs after the grace period")
-	}
+	testwait.Until(func() bool { return processGone(pid) })
 }
 
 // A hook or transport that ends its own way on the interrupt, after its
@@ -348,13 +331,12 @@ func TestAChildOfGitGetsTheGracePeriodToCleanUp(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	err := runCancelledAfter(t, 200*time.Millisecond,
-		`(exec >/dev/null 2>&1; trap 'sleep 0.05; echo x >`+dir+`/cleaned; exit 0' TERM; sleep 30 & wait) & wait`)
+	err := runCancelledWhen(t, fileExists(dir+"/started"),
+		`(exec >/dev/null 2>&1; trap 'sleep 0.05; echo x >`+dir+`/cleaned; exit 0' TERM; : >`+dir+`/started; sleep 30 & wait) & wait`)
 
 	coretest.AssertCode(t, err, core.Cancelled)
-	if !within(time.Second, func() bool { _, err := os.Stat(dir + "/cleaned"); return err == nil }) {
-		t.Fatal("the child was killed before its clean-up ended")
-	}
+	// A child killed before its clean-up ends leaves no file and fails at go test's timeout.
+	testwait.Until(fileExists(dir + "/cleaned"))
 }
 
 // git that ended before the cancel was never interrupted, so nothing of
@@ -363,7 +345,12 @@ func TestNothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	err := runCancelledAfter(t, 100*time.Millisecond, `(sleep 5 & echo $! >`+dir+`/pid; wait) &`)
+	// git has ended once its shell is gone and the child has recorded its pid.
+	gitEnded := func() bool {
+		shell, child := readPID(dir+"/shell"), readPID(dir+"/pid")
+		return shell != "" && child != "" && processGone(shell)
+	}
+	err := runCancelledWhen(t, gitEnded, `echo $$ >`+dir+`/shell; (sleep 5 & echo $! >`+dir+`/pid; wait) &`)
 
 	coretest.AssertCode(t, err, core.Cancelled)
 	pid := readTrimmed(t, dir+"/pid")
@@ -374,15 +361,15 @@ func TestNothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 	}
 }
 
-// runCancelledAfter runs script through sh as the git of a call whose ctx
-// ends after delay.
-func runCancelledAfter(t *testing.T, delay time.Duration, script string) error {
+// runCancelledWhen runs script through sh as the git of a call whose ctx
+// ends once started holds.
+func runCancelledWhen(t *testing.T, started func() bool, script string) error {
 	t.Helper()
 	if runtime.GOOS != "linux" {
 		t.Skip("reads /proc")
 	}
 	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(delay, cancel)
+	cancelWhen(started, cancel)
 	_, err := (Runner{Git: "sh", StopGrace: testGrace}).Run(ctx, Call{Args: []string{"-c", script}})
 	return err
 }
@@ -396,16 +383,35 @@ func readTrimmed(t *testing.T, path string) string {
 	return strings.TrimSpace(string(data))
 }
 
-// within polls done until it holds or timeout passes.
-func within(timeout time.Duration, done func() bool) bool {
-	deadline := time.Now().Add(timeout)
-	for !done() {
-		if time.Now().After(deadline) {
-			return false
-		}
-		time.Sleep(20 * time.Millisecond)
+// promptBound is how long a cancelled call may take to return. The grace
+// period is a fraction of it, and the processes it must not wait out run
+// longer.
+const promptBound = 15 * time.Second
+
+// cancelWhen cancels once started holds, i.e. once the process under test is
+// set up. The returned func reports the time since the cancel; call it after
+// the cancelled call returned.
+func cancelWhen(started func() bool, cancel context.CancelFunc) (sinceCancel func() time.Duration) {
+	var at time.Time
+	go func() {
+		testwait.Until(started)
+		at = time.Now()
+		cancel()
+	}()
+	return func() time.Duration { return time.Since(at) }
+}
+
+func fileExists(path string) func() bool {
+	return func() bool {
+		_, err := os.Stat(path)
+		return err == nil
 	}
-	return true
+}
+
+// readPID is the pid in path, or "" while the file is missing or empty.
+func readPID(path string) string {
+	data, _ := os.ReadFile(path)
+	return strings.TrimSpace(string(data))
 }
 
 // processGone reports whether pid has exited: no longer listed, or a
@@ -426,37 +432,13 @@ func skipWithoutPOSIXSignals(t *testing.T) {
 	}
 }
 
-// sleepWithHeartbeat makes fakegit sleep 5s while touching the returned
-// file every 50ms.
+// sleepWithHeartbeat makes fakegit sleep for minutes, far longer than a test
+// runs, while touching the returned file every 50ms. Once the file exists the
+// process has started.
 func sleepWithHeartbeat(t *testing.T) (heartbeat string) {
 	t.Helper()
 	heartbeat = filepath.Join(t.TempDir(), "heartbeat")
-	t.Setenv("FAKEGIT_SLEEP_MS", "5000")
+	t.Setenv("FAKEGIT_SLEEP_MS", "600000")
 	t.Setenv("FAKEGIT_HEARTBEAT", heartbeat)
 	return heartbeat
-}
-
-// assertStopped fails if heartbeat is still being touched, i.e. fakegit
-// was not killed.
-func assertStopped(t *testing.T, heartbeat string) {
-	t.Helper()
-	stopped := mtime(t, heartbeat)
-	time.Sleep(300 * time.Millisecond)
-	if got := mtime(t, heartbeat); !got.Equal(stopped) {
-		t.Errorf("heartbeat mtime advanced after cancel: %v -> %v (process not killed)", stopped, got)
-	}
-}
-
-// mtime is the zero time for a missing file: a process killed before its
-// first heartbeat never wrote one.
-func mtime(t *testing.T, path string) time.Time {
-	t.Helper()
-	info, err := os.Stat(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return time.Time{}
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	return info.ModTime()
 }

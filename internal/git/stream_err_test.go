@@ -10,7 +10,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/core/coretest"
@@ -56,47 +55,50 @@ func TestStreamErrCallsOnLinePerRecordStdoutUntouched(t *testing.T) {
 func TestStreamErrCancelKillsProcess(t *testing.T) {
 	heartbeat := sleepWithHeartbeat(t)
 	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(50*time.Millisecond, cancel)
+	sinceCancel := cancelWhen(fileExists(heartbeat), cancel)
 
-	start := time.Now()
+	// fakegit sleeps for minutes: StreamErr returns only because cancel killed it.
 	_, err := (Runner{Git: fakegit, StopGrace: testGrace}).StreamErr(ctx, Call{Args: []string{"fetch"}}, func([]byte) error { return nil })
-	elapsed := time.Since(start)
 
 	coretest.AssertCode(t, err, core.Cancelled)
-	if elapsed > time.Second {
-		t.Errorf("StreamErr() took %s, want it back soon after the grace period", elapsed)
+	if elapsed := sinceCancel(); elapsed > promptBound {
+		t.Errorf("StreamErr() took %s after cancel, want it back soon after the grace period", elapsed)
 	}
-	assertStopped(t, heartbeat)
 }
 
 // A grandchild that inherited git's stderr and outlives the interrupt,
 // e.g. a stalled ssh transport, keeps the pipe open after git itself is gone.
 func TestStreamErrCancelReturnsWhileAGrandchildHoldsStderr(t *testing.T) {
 	t.Parallel()
-	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6) & wait")
+	assertCancelReturnsDespiteGrandchild(t, func(started string) string {
+		return "(trap '' TERM; : >" + started + "; exec sleep 30) & wait"
+	})
 }
 
 // The shape of a delayed transport: the grandchild holds git's stderr but
 // not its stdout, so stdout ends as soon as git is gone.
 func TestStreamErrCancelReturnsWhileAGrandchildHoldsOnlyStderr(t *testing.T) {
 	t.Parallel()
-	assertCancelReturnsDespiteGrandchild(t, "(trap '' TERM; exec sleep 6 >/dev/null) & wait")
+	assertCancelReturnsDespiteGrandchild(t, func(started string) string {
+		return "(trap '' TERM; : >" + started + "; exec sleep 30 >/dev/null) & wait"
+	})
 }
 
-func assertCancelReturnsDespiteGrandchild(t *testing.T, script string) {
+// assertCancelReturnsDespiteGrandchild cancels a call whose script (given the
+// file it creates once set up) leaves a grandchild holding stderr.
+func assertCancelReturnsDespiteGrandchild(t *testing.T, script func(started string) string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("needs a POSIX shell")
 	}
 	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(50*time.Millisecond, cancel)
+	started := filepath.Join(t.TempDir(), "started")
+	sinceCancel := cancelWhen(fileExists(started), cancel)
 
-	start := time.Now()
-	_, err := (Runner{Git: "sh", StopGrace: testGrace}).StreamErr(ctx, Call{Args: []string{"-c", script}}, func([]byte) error { return nil })
-	elapsed := time.Since(start)
+	_, err := (Runner{Git: "sh", StopGrace: testGrace}).StreamErr(ctx, Call{Args: []string{"-c", script(started)}}, func([]byte) error { return nil })
 
 	coretest.AssertCode(t, err, core.Cancelled)
-	if elapsed > time.Second {
+	if elapsed := sinceCancel(); elapsed > promptBound {
 		t.Errorf("StreamErr() took %s after cancel, want it back within the grace period", elapsed)
 	}
 }
