@@ -86,7 +86,10 @@
       "description": "The runtime must equal the Go module's version.",
       "groupName": "Wails",
       "matchPackageNames": ["github.com/wailsapp/wails/v3", "@wailsio/runtime"],
-      "automerge": false
+      "automerge": false,
+      "prBodyNotes": [
+        "Wails' CGO-free backend (`-tags purego`) would build the Linux and macOS apps without cgo, so release builds would need no GTK headers and no macOS runner. Switch once Wails' docs no longer call it experimental and a build with it no longer panics when WebKitGTK is missing (in 3.1.0 Wails calls GTK before its own library check)."
+      ]
     },
     {
       "description": "Node's major moves in the Nix shell and its types at once.",
