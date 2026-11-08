@@ -47,6 +47,19 @@ func TestLaneTakesANewColourAtALocalBranchTip(t *testing.T) {
 	}
 }
 
+// M merges feature's F, which feature still points at, into main's B.
+func TestMergedBranchKeepsItsLinesColourAtItsTip(t *testing.T) {
+	l := NewLayout()
+
+	m := l.Next(Commit{SHA: "M", Parents: []string{"B", "F"}, BranchTip: true})
+	l.Next(Commit{SHA: "B", Parents: []string{"A"}})
+	f := l.Next(Commit{SHA: "F", Parents: []string{"A"}, BranchTip: true})
+
+	if into := m.Edges[1]; into.Lane != f.Lane || f.Colour != into.Colour {
+		t.Errorf("F colour %d, want %d of the line from M into its lane %+v", f.Colour, into.Colour, into)
+	}
+}
+
 // B and C, both off A, merge into M. Topo order (newest first) feeds M, B, C, A.
 func TestMergeDrawsALineToEachParentsLane(t *testing.T) {
 	l := NewLayout()

@@ -40,11 +40,13 @@ type Row struct {
 // laneCap is how many lanes a Layout draws before overflow.
 const laneCap = 32
 
-// openLane is one lane's state: the SHA it is waiting for next, and its
-// colour, stable for as long as the lane stays open.
+// openLane is one lane's state: the SHA it is waiting for next, its colour,
+// and whether a commit sits on it already (not so for a lane a merge opened
+// for its further parent).
 type openLane struct {
-	sha    string
-	colour int
+	sha     string
+	colour  int
+	hasDots bool
 }
 
 // Layout assigns lanes to a streamed commit sequence, ported from
@@ -72,9 +74,9 @@ func NewLayout() *Layout {
 // parent (a merge) opens a fresh lane waiting for that parent, subject to
 // the same cap; each is a line out of c (Kind Out). Every other open lane
 // passes the row (Kind Through). A colour is assigned when its lane opens,
-// and anew where the lane reaches a local branch tip, so a branch's own
-// commits stand apart from the branch it was started on; a colour is never
-// reused. Lane indices are not compacted once assigned.
+// and anew where a lane that holds commits reaches a local branch tip, so a
+// branch's own commits stand apart from the branch it was started on; a
+// colour is never reused. Lane indices are not compacted once assigned.
 func (l *Layout) Next(c Commit) Row {
 	if l.overflow == nil {
 		l.overflow = map[string]int{}
@@ -87,8 +89,9 @@ func (l *Layout) Next(c Commit) Row {
 		row.Edges = append(row.Edges, Edge{Lane: i, Kind: In, Colour: l.lanes[i].colour})
 	}
 
+	recolour := c.BranchTip && len(closing) > 0 && l.lanes[closing[0]].hasDots
 	own, colour, ownReal := l.ownLane(closing)
-	if c.BranchTip && len(closing) > 0 {
+	if recolour {
 		colour = l.newColour()
 	}
 	row.Lane, row.Colour = own, colour
@@ -150,7 +153,7 @@ func (l *Layout) armParents(own, colour int, ownReal bool, parents []string) []i
 
 	var armed []int
 	if ownReal {
-		l.lanes[own] = &openLane{sha: parents[0], colour: colour}
+		l.lanes[own] = &openLane{sha: parents[0], colour: colour, hasDots: true}
 		armed = append(armed, own)
 	} else {
 		l.overflow[parents[0]]++
