@@ -8,7 +8,7 @@ import Checkbox from 'openvue/checkbox'
 import Message from 'openvue/message'
 import Button from 'openvue/button'
 import { useChangesStore } from '@/stores/changes'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useBranchesStore } from '@/stores/branches'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { usePush } from '@/composables/usePush'
@@ -23,7 +23,7 @@ import ShortcutHint from './ShortcutHint.vue'
 // gated by the staged count — amend alone needs nothing staged.
 const props = defineProps<{ wt: string }>()
 const changes = useChangesStore()
-const repo = useRepoStore()
+const repo = useWorktreesStore()
 const refs = useBranchesStore()
 const { error, run, runAndClose } = useCoreCall()
 const { push, upstreamQuestion } = usePush(() => props.wt, run)

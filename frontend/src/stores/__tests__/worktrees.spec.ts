@@ -14,7 +14,7 @@ vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Fac
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { Events, emit } from '@/testing/runtime'
 
-import { useRepoStore } from '../repo'
+import { useWorktreesStore } from '../worktrees'
 import { summaryFixture } from '@/testing/fixtures/summary'
 
 describe('repo store', () => {
@@ -26,17 +26,17 @@ describe('repo store', () => {
   })
 
   it("calls UpdateWindowTitle with the worktree's path and branch after loading Summary", async () => {
-    const repo = useRepoStore()
+    const repo = useWorktreesStore()
 
-    await repo.loadSummary('/home/user/project')
+    await repo.load('/home/user/project')
 
     expect(AppService.UpdateWindowTitle).toHaveBeenCalledTimes(1)
     expect(AppService.UpdateWindowTitle).toHaveBeenCalledWith('/home/user/project', 'main')
   })
 
   it('reloads Summary on a state or refs repo:changed event, not on index', async () => {
-    const repo = useRepoStore()
-    await repo.loadSummary('/repo')
+    const repo = useWorktreesStore()
+    await repo.load('/repo')
     Facade.Summary.mockClear()
 
     emit('repo:changed', { data: { scope: ChangeScope.StateChanged } })

@@ -14,7 +14,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import CommitBox from '../CommitBox.vue'
 import { useChangesStore } from '@/stores/changes'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useBranchesStore } from '@/stores/branches'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { summaryFixture } from '@/testing/fixtures/summary'
@@ -67,7 +67,7 @@ describe('CommitBox', () => {
     useChangesStore().files = changedFilesFixture(
       staged ? { staged: [{ path: 'a.txt', status: 'M' }] } : {},
     )
-    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useWorktreesStore().summary = summaryFixture({ sha: 'abc123' })
 
     const wrapper = mount(CommitBox, { props })
     if (amend) await amendCheckbox(wrapper).setValue(true)
@@ -78,7 +78,7 @@ describe('CommitBox', () => {
 
   it("a rejected commit shows the hook's output and keeps the message", async () => {
     stageAFile()
-    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useWorktreesStore().summary = summaryFixture({ sha: 'abc123' })
     Facade.Commit.mockRejectedValue(wailsError('hook says no', 'STOPPED'))
 
     const wrapper = mount(CommitBox, { props })
@@ -103,7 +103,7 @@ describe('CommitBox', () => {
 
   it('a successful commit clears the message and resets amend', async () => {
     stageAFile()
-    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useWorktreesStore().summary = summaryFixture({ sha: 'abc123' })
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('a message')
@@ -139,7 +139,7 @@ describe('CommitBox', () => {
       summaryFixture({ sha: 'abc123', operation: OperationKind.MergeOperation }),
     ],
   ])('the Amend checkbox is disabled %s', (_name, summary) => {
-    useRepoStore().summary = summary
+    useWorktreesStore().summary = summary
 
     const wrapper = mount(CommitBox, { props })
 
@@ -147,7 +147,7 @@ describe('CommitBox', () => {
   })
 
   it('checking Amend with an empty message pre-fills it from CommitDetails', async () => {
-    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useWorktreesStore().summary = summaryFixture({ sha: 'abc123' })
     Facade.CommitDetails.mockResolvedValue({ body: 'last msg' })
 
     const wrapper = mount(CommitBox, { props })
@@ -160,7 +160,7 @@ describe('CommitBox', () => {
   })
 
   it('checking Amend never clobbers a message already typed', async () => {
-    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useWorktreesStore().summary = summaryFixture({ sha: 'abc123' })
 
     const wrapper = mount(CommitBox, { props })
     await wrapper.get('textarea').setValue('typed draft')
@@ -184,7 +184,7 @@ describe('CommitBox', () => {
     ],
     ['does not warn when the current branch has no upstream', { upstream: '' }, false],
   ])('%s', async (_name, branch, warns) => {
-    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useWorktreesStore().summary = summaryFixture({ sha: 'abc123' })
     useBranchesStore().refs = refsFixture(branch)
 
     const wrapper = mount(CommitBox, { props })
@@ -194,7 +194,7 @@ describe('CommitBox', () => {
   })
 
   it('initializes the message field from the restored draft', () => {
-    useRepoStore().summary = summaryFixture({ messageDraft: 'restored' })
+    useWorktreesStore().summary = summaryFixture({ messageDraft: 'restored' })
 
     const wrapper = mount(CommitBox, { props })
 
@@ -214,7 +214,7 @@ describe('CommitBox', () => {
     const wrapper = mount(CommitBox, { props })
     // Summary (and its draft) arrives asynchronously, after CommitBox has
     // already mounted and is watching `message` for edits to save.
-    useRepoStore().summary = summaryFixture({ messageDraft: 'restored' })
+    useWorktreesStore().summary = summaryFixture({ messageDraft: 'restored' })
     await wrapper.vm.$nextTick()
     await vi.advanceTimersByTimeAsync(300)
 
@@ -338,7 +338,7 @@ describe('CommitBox', () => {
   })
 
   it('Push after commit is disabled once Amend is checked; checking Push after commit, then Amend, then committing never pushes (amend needs a force push)', async () => {
-    useRepoStore().summary = summaryFixture({ sha: 'abc123' })
+    useWorktreesStore().summary = summaryFixture({ sha: 'abc123' })
     useBranchesStore().refs = refsFixture({ upstream: 'origin/main' }, ['origin'])
 
     const wrapper = mount(CommitBox, { props })

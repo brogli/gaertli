@@ -31,7 +31,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import BranchPicker from '../BranchPicker.vue'
 import RenameBranchDialog from '../RenameBranchDialog.vue'
 import { useBranchesStore } from '@/stores/branches'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useLogStore } from '@/stores/log'
 import {
   BranchInUse,
@@ -60,7 +60,7 @@ const feat = branchFixture({
 // mountPicker mounts the picker on refs and summary, its list closed.
 function mountPicker(refs: Refs, summary: Summary = summaryFixture({ sha: 'sha-main' })) {
   useBranchesStore().refs = refs
-  useRepoStore().summary = summary
+  useWorktreesStore().summary = summary
   return mountInBody(BranchPicker, {
     props: { wt: '/repo' },
     global: { stubs: { transition: false } },

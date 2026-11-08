@@ -21,7 +21,7 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import ConflictBanner from '../ConflictBanner.vue'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
@@ -31,7 +31,7 @@ import { OperationKind } from '../../../bindings/github.com/brogli/gaertli/inter
 
 // mountDuring mounts ConflictBanner while operation is in progress.
 function mountDuring(operation: OperationKind) {
-  useRepoStore().summary = summaryFixture({ operation })
+  useWorktreesStore().summary = summaryFixture({ operation })
   return mount(ConflictBanner, { props: { wt: '/repo' } })
 }
 

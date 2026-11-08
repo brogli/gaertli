@@ -13,7 +13,7 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import StashBanner from '../StashBanner.vue'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
@@ -23,7 +23,7 @@ import type { ChangedFile } from '../../../bindings/github.com/brogli/gaertli/in
 // mountWithStash mounts StashBanner with waitingStash set and conflicted
 // files remaining.
 function mountWithStash(waitingStash: string, conflicted: ChangedFile[] = []) {
-  useRepoStore().summary = summaryFixture({ waitingStash })
+  useWorktreesStore().summary = summaryFixture({ waitingStash })
   useChangesStore().files = changedFilesFixture({ conflicted })
   return mount(StashBanner, { props: { wt: '/repo' } })
 }

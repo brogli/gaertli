@@ -8,9 +8,9 @@ import { onRepoChanged } from '@/lib/windowEvents'
 // scopes that mean the summary might now be stale
 const SUMMARY_SCOPES = [ChangeScope.StateChanged, ChangeScope.RefsChanged]
 
-// repo holds the open worktree's summary (branch, detached, operation),
+// worktrees holds the open worktree's summary (branch, detached, operation),
 // refreshed on the worktree's outside-change events.
-export const useRepoStore = defineStore('repo', () => {
+export const useWorktreesStore = defineStore('worktrees', () => {
   const summary = ref<Summary | null>(null)
   let wt = ''
   let unlisten: (() => void)[] = []
@@ -21,7 +21,7 @@ export const useRepoStore = defineStore('repo', () => {
     void AppService.UpdateWindowTitle(wt, summary.value.branch)
   }
 
-  async function loadSummary(id: string): Promise<void> {
+  async function load(id: string): Promise<void> {
     wt = id
 
     unlisten.forEach((off) => off())
@@ -34,5 +34,5 @@ export const useRepoStore = defineStore('repo', () => {
     await refresh()
   }
 
-  return { summary, loadSummary }
+  return { summary, load }
 })

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Button from 'openvue/button'
 import Message from 'openvue/message'
 import { useI18n } from '@/i18n'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useChangesStore } from '@/stores/changes'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
@@ -13,7 +13,7 @@ import ErrorBanner from './ErrorBanner.vue'
 // StashBanner offers to restore or drop the stash a pull, merge or rebase with stash made
 // (Summary.WaitingStash) once no conflicted file remains.
 const props = defineProps<{ wt: string }>()
-const repo = useRepoStore()
+const repo = useWorktreesStore()
 const changes = useChangesStore()
 const { error, run } = useCoreCall()
 const { confirmAction } = useConfirmAction()

@@ -22,7 +22,7 @@ import { mountNotices } from '@/testing/mountNotices'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { wailsError } from '@/testing/errors'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { summaryFixture } from '@/testing/fixtures/summary'
@@ -42,7 +42,7 @@ async function submit(body: DOMWrapper<Element>): Promise<void> {
 }
 
 function onBranch(branch: string, protectedBranches: string[] = []): void {
-  useRepoStore().summary = summaryFixture({ branch })
+  useWorktreesStore().summary = summaryFixture({ branch })
   useSettingsStore().settings = defaultSettingsFixture({ protectedBranches })
 }
 

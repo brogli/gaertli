@@ -12,7 +12,7 @@ import {
   type IntegrateResult,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { useBranchesStore } from '@/stores/branches'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useLogStore } from '@/stores/log'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
@@ -42,7 +42,7 @@ const emit = defineEmits<{
   'show-log': []
 }>()
 const refs = useBranchesStore()
-const repo = useRepoStore()
+const repo = useWorktreesStore()
 const log = useLogStore()
 const { error, run, runAndClose } = useCoreCall()
 const { confirmAction } = useConfirmAction()
