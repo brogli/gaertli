@@ -6,8 +6,9 @@ import "slices"
 
 // Commit is the minimal input one layout step needs.
 type Commit struct {
-	SHA     string
-	Parents []string // full SHAs, first parent first
+	SHA       string
+	Parents   []string // full SHAs, first parent first
+	BranchTip bool     // a local branch points at it
 }
 
 // EdgeKind is the shape of one line inside a row. Lanes keep their index,
@@ -70,8 +71,10 @@ func NewLayout() *Layout {
 // first parent re-arms c's own lane to wait for it next; each further
 // parent (a merge) opens a fresh lane waiting for that parent, subject to
 // the same cap; each is a line out of c (Kind Out). Every other open lane
-// passes the row (Kind Through). A colour is assigned when its lane opens
-// and never reused. Lane indices are not compacted once assigned.
+// passes the row (Kind Through). A colour is assigned when its lane opens,
+// and anew where the lane reaches a local branch tip, so a branch's own
+// commits stand apart from the branch it was started on; a colour is never
+// reused. Lane indices are not compacted once assigned.
 func (l *Layout) Next(c Commit) Row {
 	if l.overflow == nil {
 		l.overflow = map[string]int{}
@@ -85,6 +88,9 @@ func (l *Layout) Next(c Commit) Row {
 	}
 
 	own, colour, ownReal := l.ownLane(closing)
+	if c.BranchTip && len(closing) > 0 {
+		colour = l.newColour()
+	}
 	row.Lane, row.Colour = own, colour
 
 	outs := l.armParents(own, colour, ownReal, c.Parents)

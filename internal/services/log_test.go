@@ -149,6 +149,27 @@ func TestLogRowsJoinAMergeAndItsForkPointToBothLanes(t *testing.T) {
 	}
 }
 
+func TestLogRowsColourABranchApartFromTheBranchItStartedOn(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "on master")
+	gittest.Run(t, repo.Dir, "switch", "-c", "feature")
+	gittest.Commit(t, repo.Dir, "a.txt", "b", "on feature")
+	gittest.Run(t, repo.Dir, "tag", "v1")
+	gittest.Commit(t, repo.Dir, "a.txt", "c", "on feature too")
+
+	c, wt := openWorktree(t, repo.Dir)
+	rows := loadLog(t, c, wt)
+
+	if len(rows) != 3 {
+		t.Fatalf("rows = %+v, want 3", rows)
+	}
+	feature, tagged, master := rows[0].Graph.Colour, rows[1].Graph.Colour, rows[2].Graph.Colour
+	if feature != tagged || feature == master {
+		t.Errorf("colours feature %d, tagged %d, master %d; want the feature's two alike, master apart", feature, tagged, master)
+	}
+}
+
 func TestLoadLogMarksCheckedOutWorktrees(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

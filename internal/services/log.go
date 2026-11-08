@@ -173,7 +173,9 @@ func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFil
 		}
 		commit.CheckedOutIn = checkedOut[commit.SHA]
 		if !flat {
-			commit.Graph = toGraphRow(layout.Next(graph.Commit{SHA: commit.SHA, Parents: parents}))
+			commit.Graph = toGraphRow(layout.Next(graph.Commit{
+				SHA: commit.SHA, Parents: parents, BranchTip: isBranchTip(commit),
+			}))
 		}
 		appendRow(commit)
 		loaded++
@@ -187,6 +189,10 @@ func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFil
 		return loaded, core.ErrorOf(runErr)
 	}
 	return loaded, nil
+}
+
+func isBranchTip(commit core.LogCommit) bool {
+	return slices.ContainsFunc(commit.Refs, func(r core.RefLabel) bool { return r.Kind == core.BranchRef })
 }
 
 // writeCommitGraphIfLarge writes git's commit-graph file when a load reaches

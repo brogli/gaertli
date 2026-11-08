@@ -29,6 +29,24 @@ func TestLinearHistoryDrawsOneLaneIntoAndOutOfEachDot(t *testing.T) {
 	}
 }
 
+// feature's D and C sit on main's B, the tip of a local branch.
+func TestLaneTakesANewColourAtALocalBranchTip(t *testing.T) {
+	l := NewLayout()
+
+	d := l.Next(Commit{SHA: "D", Parents: []string{"C"}, BranchTip: true})
+	c := l.Next(Commit{SHA: "C", Parents: []string{"B"}})
+	b := l.Next(Commit{SHA: "B", Parents: []string{"A"}, BranchTip: true})
+	a := l.Next(Commit{SHA: "A"})
+
+	if d.Colour != 0 || c.Colour != 0 || b.Colour != 1 || a.Colour != 1 {
+		t.Errorf("colours D %d C %d B %d A %d, want 0 0 1 1", d.Colour, c.Colour, b.Colour, a.Colour)
+	}
+	want := []Edge{{Lane: 0, Kind: In, Colour: 0}, {Lane: 0, Kind: Out, Colour: 1}}
+	if !slices.Equal(b.Edges, want) {
+		t.Errorf("B edges = %+v, want %+v", b.Edges, want)
+	}
+}
+
 // B and C, both off A, merge into M. Topo order (newest first) feeds M, B, C, A.
 func TestMergeDrawsALineToEachParentsLane(t *testing.T) {
 	l := NewLayout()
