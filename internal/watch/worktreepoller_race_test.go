@@ -5,25 +5,32 @@
 package watch
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
-func TestWorktreePollerStopsCleanlyAfterConcurrentFocusBlurAndCheckNow(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		const workers = 12
-		// synctest cannot run git, so every poll fails: the test covers the
-		// poller's own state, and synctest fails on a goroutine left running.
-		runner := git.Runner{Git: nonexistentGit}
-		p := NewWorktreePoller(runner, t.TempDir(), func(core.ChangeScope) {})
+func TestWorktreePollerReportsEditsUnderConcurrentFocusBlurCheckNowAndClose(t *testing.T) {
+	setInterval(t, &PollInterval, 5*time.Millisecond)
+	const workers, iterations = 12, 40
 
-		hammer := func(worker int) {
-			for i := range 40 {
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "seed.txt", "x", "seed")
+	var changes atomic.Int32
+	p := NewWorktreePoller(git.Runner{}, repo.Dir, func(core.ChangeScope) { changes.Add(1) })
+
+	var wg sync.WaitGroup
+	for worker := range workers {
+		wg.Go(func() {
+			for i := range iterations {
 				switch (worker + i) % 3 {
 				case 0:
 					p.Focus()
@@ -32,25 +39,32 @@ func TestWorktreePollerStopsCleanlyAfterConcurrentFocusBlurAndCheckNow(t *testin
 				default:
 					p.CheckNow()
 				}
-				time.Sleep(PollInterval / 7)
+				time.Sleep(time.Millisecond)
 			}
+		})
+	}
+	wg.Go(func() {
+		for i := range iterations {
+			if err := os.WriteFile(filepath.Join(repo.Dir, "seed.txt"), []byte(fmt.Sprint(i)), 0o644); err != nil {
+				t.Error(err)
+			}
+			time.Sleep(2 * time.Millisecond)
 		}
-
-		var wg sync.WaitGroup
-		for worker := range workers {
-			wg.Go(func() { hammer(worker) })
-		}
-		wg.Wait()
-		p.Close()
-
-		var after sync.WaitGroup
-		for range workers {
-			after.Go(func() {
-				p.Blur()
-				p.CheckNow()
-				p.Close()
-			})
-		}
-		after.Wait()
 	})
+	wg.Wait()
+
+	p.CheckNow()
+	if changes.Load() == 0 {
+		t.Error("no edit reported")
+	}
+
+	var after sync.WaitGroup
+	for range workers {
+		after.Go(func() {
+			p.Close()
+			p.Focus()
+			p.CheckNow()
+		})
+	}
+	after.Wait()
 }
