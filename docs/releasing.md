@@ -24,8 +24,8 @@ The app needs only git and the platform's web view, and no package bundles eithe
 
 ## Versions and releases
 
-- Versions are plain `X.Y.Z`, set by hand before each release, one string in every artifact; tags
-  are `vX.Y.Z`.
+- Versions are plain `X.Y.Z`, set by hand before each release, one string in every artifact and in
+  every artifact's file name; tags are `vX.Y.Z`.
 - A release is started by hand on `main` (DIST-02). It refuses a commit CI has not passed, builds
   every artifact with checksums and third-party notices, and creates a draft release on the built
   commit, replacing older drafts. A failed macOS build does not hold it back.

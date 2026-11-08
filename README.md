@@ -29,20 +29,21 @@ opinionated directions were given, expect some heavy AI slop.
 Download from the project's GitHub Releases page. `SHA256SUMS` there verifies the download. There is
 no auto-update. Installing a newer version over the old one keeps your settings.
 
-- **Windows, installer** (recommended): run `gaertli-windows-amd64-setup.exe`. No administrator
-  rights needed. It installs under your user profile, adds a Start menu entry, and puts the
-  `gaertli` command on `PATH` for Windows and WSL terminals opened afterwards. Uninstalling from
-  Windows' "Installed apps" removes the app and that command.
-- **Windows, zip**: unzip `gaertli-windows-amd64.zip` and run `gaertli.exe`. Nothing is installed.
-  For the `gaertli` command, add the unzipped `bin` folder to your user `PATH` by hand (Windows'
-  "Edit environment variables for your account").
+- **Windows, installer** (recommended): run `gaertli-<version>-windows-amd64-setup.exe`. No
+  administrator rights needed. It installs under your user profile, adds a Start menu entry, and
+  puts the `gaertli` command on `PATH` for Windows and WSL terminals opened afterwards. Uninstalling
+  from Windows' "Installed apps" removes the app and that command.
+- **Windows, zip**: unzip `gaertli-<version>-windows-amd64.zip` and run `gaertli.exe`. Nothing is
+  installed. For the `gaertli` command, add the unzipped `bin` folder to your user `PATH` by hand
+  (Windows' "Edit environment variables for your account").
 - **WSL**: install the Windows app (any of the above). Nothing is installed inside the distro by
   hand. The Linux packages below are for native Linux desktops, not for WSL. See Known limits.
 - **Linux, deb/rpm**: install with your package manager, e.g.
-  `sudo apt install ./gaertli-linux-amd64.deb` or `sudo dnf install ./gaertli-linux-amd64.rpm`.
-- **Linux, other distributions**: unpack `gaertli-linux-amd64.tar.gz` and run the `gaertli` binary
-  inside it. Start from a terminal says how to put it on `PATH`.
-- **macOS** (best-effort, unsigned, untested): `gaertli-darwin-arm64.zip`.
+  `sudo apt install ./gaertli-<version>-linux-amd64.deb` or
+  `sudo dnf install ./gaertli-<version>-linux-amd64.rpm`.
+- **Linux, other distributions**: unpack `gaertli-<version>-linux-amd64.tar.gz` and run the
+  `gaertli` binary inside it. Start from a terminal says how to put it on `PATH`.
+- **macOS** (best-effort, unsigned, untested): `gaertli-<version>-darwin-arm64.zip`.
 
 You also need:
 
