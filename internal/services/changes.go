@@ -88,7 +88,7 @@ func (c *Core) SetMessageDraft(ctx context.Context, id core.WorktreeID, message 
 // "MM" file lands in both groups.
 func parseStatus(data []byte) core.ChangedFiles {
 	var out core.ChangedFiles
-	records := splitRecords(data)
+	records := nulRecords(data)
 	for i := 0; i < len(records); i++ {
 		rec := records[i]
 		switch {
@@ -109,16 +109,6 @@ func parseStatus(data []byte) core.ChangedFiles {
 		}
 	}
 	return out
-}
-
-// splitRecords splits porcelain v2 -z output on NUL, dropping the trailing
-// empty element after the last record's terminator.
-func splitRecords(data []byte) []string {
-	s := strings.TrimSuffix(string(data), "\x00")
-	if s == "" {
-		return nil
-	}
-	return strings.Split(s, "\x00")
 }
 
 // appendChange places a "1" (ordinary) or "2" (rename/copy) record by its

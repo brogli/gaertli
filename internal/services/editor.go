@@ -3,8 +3,6 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"path/filepath"
-	"strings"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/editor"
@@ -76,20 +74,4 @@ func (c *Core) logEditorStart(id core.WorktreeID, argv []string, err error) {
 	}
 	payload, _ := json.Marshal(record)
 	c.sink(core.Event{Name: "editor", Worktree: id, Payload: payload})
-}
-
-// worktreeFile joins path onto dir. A path that resolves outside dir is
-// Code Internal: path is caller-supplied and, unlike a revision or
-// pathspec, never validated by git. A file deleted or moved away since the
-// diff being viewed is Code FileNotFound.
-func worktreeFile(dir, path string) (string, error) {
-	full := filepath.Join(dir, path)
-	rel, err := filepath.Rel(dir, full)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", core.Errorf(core.Internal, "path escapes the worktree: %s", path)
-	}
-	if !fileExists(full) {
-		return "", core.ErrorfArgs(core.FileNotFound, "fileNotFound", map[string]string{"path": path}, "%s no longer exists in this worktree", path)
-	}
-	return full, nil
 }

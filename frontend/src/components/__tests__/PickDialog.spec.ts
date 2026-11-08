@@ -12,6 +12,7 @@ vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Fac
 import PickDialog from '../PickDialog.vue'
 import { DiffKind } from '@/lib/diffTarget'
 import { wailsError } from '@/testing/errors'
+import { Code } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 
@@ -77,7 +78,7 @@ describe('PickDialog', () => {
   })
 
   it('a stop on conflicts opens the diff window and closes the dialog', async () => {
-    Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
+    Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', Code.Conflicted))
     const { wrapper, body } = await mountDialog('cherry-pick', ['a1'])
 
     await body.get('[data-test="pick-submit"]').trigger('click')

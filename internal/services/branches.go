@@ -251,19 +251,6 @@ func parseRefRecords(out []byte) []parsedRef {
 	return refs
 }
 
-// nulRecords splits a %00-terminated git stream into records, stripping the
-// '\n' git appends after each one and dropping empties.
-func nulRecords(out []byte) []string {
-	var records []string
-	for record := range bytes.SplitSeq(out, []byte{0}) {
-		record = bytes.TrimPrefix(record, []byte("\n"))
-		if len(record) > 0 {
-			records = append(records, string(record))
-		}
-	}
-	return records
-}
-
 func parseRefRecord(record string) parsedRef {
 	f := strings.Split(record, "\x1f")
 	sha := f[1]

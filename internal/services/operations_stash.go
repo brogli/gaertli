@@ -24,6 +24,43 @@ func popStash(ctx context.Context, wt *session.Worktree, sha string) error {
 	return err
 }
 
+// withStash runs integrate with local changes stashed around it, the entry's subject naming verb.
+// git stash push exits 0 without an entry when there is nothing to save, so refs/stash is compared
+// before and after the push. The new entry is popped by its commit, never by a bare "stash pop"
+// that could take someone else's. A failed integrate that left the worktree untouched gives the
+// entry back; any other failure keeps it. Caller holds wt's write lock.
+func withStash(ctx context.Context, wt *session.Worktree, verb string, integrate func() error) error {
+	before, err := verifyRev(ctx, wt.Runner, wt.Path, "refs/stash")
+	if err != nil {
+		return err
+	}
+	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"stash", "push", "-m", stashSubjectPrefix + verb}}); err != nil {
+		return err
+	}
+	after, err := verifyRev(ctx, wt.Runner, wt.Path, "refs/stash")
+	if err != nil {
+		return err
+	}
+
+	stashed := after != before
+	var head string
+	if stashed {
+		if head, err = revParse(ctx, wt.Runner, wt.Path, "HEAD"); err != nil {
+			return err
+		}
+	}
+	if err := integrate(); err != nil {
+		if stashed && untouched(ctx, wt, head) {
+			_ = popStash(ctx, wt, after) // on failure the entry stays for the user
+		}
+		return err
+	}
+	if !stashed {
+		return nil
+	}
+	return popStash(ctx, wt, after)
+}
+
 // PopStash implements core.API.
 func (c *Core) PopStash(ctx context.Context, id core.WorktreeID, sha string) error {
 	return c.stashVerb(ctx, id, "pop", sha)

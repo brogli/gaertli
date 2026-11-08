@@ -1,9 +1,9 @@
 // Package services implements core.API in-process: it validates input, runs
 // git, and returns DTOs.
 //
-// One file group per bounded context: <context>.go holds the context's core
-// methods, <context>_<topic>.go its own helpers; a file without a context
-// stem holds helpers several contexts share.
+// One file group per bounded context: its methods and helpers live in
+// <context>.go and <context>_<topic>.go; helpers several contexts share live
+// in files without a context stem.
 package services
 
 import (
