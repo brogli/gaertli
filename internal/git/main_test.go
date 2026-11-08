@@ -5,9 +5,9 @@ package git_test
 import (
 	"testing"
 
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/git/gittest"
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
 func TestMain(m *testing.M) {

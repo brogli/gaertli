@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/services"
-	"github.com/brogli/nebegit/tools/mkrepo"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/services"
+	"github.com/brogli/gaertli/tools/mkrepo"
 )
 
 // refDir is the reference repo `task bench` builds, relative to this

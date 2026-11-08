@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick } from 'vue'
 
 const { Facade } = vi.hoisted(() => ({ Facade: { Jobs: vi.fn() } }))
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
@@ -18,7 +18,7 @@ import {
   JobState,
   UpdateOutcome,
   type JobInfo,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { mountNotices } from '@/testing/mountNotices'
 import { findButton } from '@/testing/findButton'
 import { jobFixture } from '@/testing/fixtures/job'

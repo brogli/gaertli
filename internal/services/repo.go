@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // OpenWorktree implements core.API.

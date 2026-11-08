@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // errorKeyLiteral matches an ErrorfArgs or Retag call's key literal: a

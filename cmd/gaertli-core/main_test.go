@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
-// bin is nebegit-core.
+// bin is gaertli-core.
 var bin string
 
 func TestMain(m *testing.M) {
@@ -74,9 +74,9 @@ func TestVersionFlagPrintsAppVersion(t *testing.T) {
 }
 
 func TestLdflagsStampAppVersion(t *testing.T) {
-	stamped := filepath.Join(t.TempDir(), testbin.Exe("nebegit-core-stamped"))
+	stamped := filepath.Join(t.TempDir(), testbin.Exe("gaertli-core-stamped"))
 	build := exec.CommandContext(t.Context(), "go", "build",
-		"-ldflags", "-X github.com/brogli/nebegit/internal/buildinfo.App=v9.9.9",
+		"-ldflags", "-X github.com/brogli/gaertli/internal/buildinfo.App=v9.9.9",
 		"-o", stamped, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, output)
@@ -103,7 +103,7 @@ func TestABarePathExits2WithTheUsageLine(t *testing.T) {
 	if exit, ok := errors.AsType[*exec.ExitError](err); !ok || exit.ExitCode() != 2 {
 		t.Errorf("err = %v, want exit 2", err)
 	}
-	if !bytes.Contains(out, []byte("usage: nebegit-core")) {
+	if !bytes.Contains(out, []byte("usage: gaertli-core")) {
 		t.Errorf("output = %q, want the usage line", out)
 	}
 }

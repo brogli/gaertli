@@ -9,10 +9,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/jobs"
-	"github.com/brogli/nebegit/internal/watch"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/jobs"
+	"github.com/brogli/gaertli/internal/watch"
 )
 
 // repoWatcher is the part of *watch.RepoWatcher session uses; tests fake it.

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 func TestClassifyMapsPathsToTheirScope(t *testing.T) {

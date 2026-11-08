@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 const detailsFormat = "%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%ct%x1f%B%x00"

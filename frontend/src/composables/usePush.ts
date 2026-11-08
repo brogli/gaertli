@@ -1,5 +1,5 @@
 import { ref, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import type { useCoreCall } from './useCoreCall'
 
 // UpstreamQuestion is the branch and remote a first push asks about;

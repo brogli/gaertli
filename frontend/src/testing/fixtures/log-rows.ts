@@ -3,7 +3,7 @@ import {
   RefKind,
   type GraphRow,
   type LogCommit,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const ROW_COUNT = 300
 const NOW = Math.floor(Date.now() / 1000)

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import Dialog from 'openvue/dialog'
 import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
-import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import SettingsPanel from '@/components/SettingsPanel.vue'
 import RepoPicker from '@/components/RepoPicker.vue'
 import DebugArea from '@/components/DebugArea.vue'
@@ -44,7 +44,7 @@ useShortcut(
     />
     <main v-else class="start-page flex min-h-0 flex-1 flex-col overflow-auto">
       <header class="flex items-center justify-between border-b border-surface py-1.5 px-2.5">
-        <h1>nebegit</h1>
+        <h1>Gärtli</h1>
         <Button
           v-bind="ICON_BUTTON"
           :icon="iconClass('settings')"

@@ -5,7 +5,7 @@ import path from 'node:path'
 // A Sandbox is one test's private world: HOME, the app's config dir, git's
 // global config, stand-in programs and the scratch repos. It lives under
 // the OS temp dir, not the checkout: a repo nested in the checkout would
-// see nebegit's own .git.
+// see gaertli's own .git.
 export interface Sandbox {
   dir: string
   // env is what the server and every helper git call run with.
@@ -15,9 +15,9 @@ export interface Sandbox {
 }
 
 export function createSandbox(): Sandbox {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nebegit-e2e-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gaertli-e2e-'))
   const bin = path.join(dir, 'bin')
-  for (const sub of [bin, path.join(dir, 'home'), path.join(dir, 'config', 'nebegit')]) {
+  for (const sub of [bin, path.join(dir, 'home'), path.join(dir, 'config', 'gaertli')]) {
     fs.mkdirSync(sub, { recursive: true })
   }
   const editorLog = path.join(dir, 'editor.log')
@@ -27,7 +27,7 @@ export function createSandbox(): Sandbox {
     dir,
     env: sandboxEnv(dir, bin),
     editorLog,
-    settingsPath: path.join(dir, 'config', 'nebegit', 'settings.json'),
+    settingsPath: path.join(dir, 'config', 'gaertli', 'settings.json'),
   }
 }
 

@@ -1,7 +1,7 @@
 // Requirements: FR-UX-16
 import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
-import { Code } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { Code } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { useCoreCall } from '../useCoreCall'
 
 describe('useCoreCall', () => {

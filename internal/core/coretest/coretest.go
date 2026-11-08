@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // AssertCode fails the test unless err is a *core.Error with Code want.

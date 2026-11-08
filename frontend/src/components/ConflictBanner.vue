@@ -8,8 +8,8 @@ import { useChangesStore } from '@/stores/changes'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { openConflicts } from '@/lib/openConflicts'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { Operation } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { Operation } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
 // ConflictBanner shows while a merge, rebase, cherry-pick, or revert is

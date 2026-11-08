@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { Text } from '@codemirror/state'
 import { Chunk } from '@codemirror/merge'
-import type { DiffHunk } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { DiffHunk } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { hunkChanges } from '../gitHunks'
 import { hunk } from '@/testing/fixtures/diff'
 

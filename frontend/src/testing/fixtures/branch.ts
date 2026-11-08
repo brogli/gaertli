@@ -1,4 +1,4 @@
-import { BranchInUse, type Branch } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { BranchInUse, type Branch } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // branchFixture is the current "main" branch with no upstream.
 export function branchFixture(overrides: Partial<Branch> = {}): Branch {

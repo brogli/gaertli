@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))

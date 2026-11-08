@@ -4,7 +4,7 @@ import "strings"
 
 // windowTitle formats a window's title: the worktree's display name (its
 // last path segment) and, once known, the branch. path is "" for the
-// empty-selection window, titled plain "nebegit".
+// empty-selection window, titled plain "Gärtli".
 func windowTitle(path, branch string) string {
 	if path == "" {
 		return text(appName, nil)

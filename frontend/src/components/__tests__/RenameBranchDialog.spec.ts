@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({ Facade: { RenameBranch: vi.fn() } }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 import RenameBranchDialog from '../RenameBranchDialog.vue'
 import { wailsError } from '@/testing/errors'

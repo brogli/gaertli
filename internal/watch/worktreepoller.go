@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // StatusArgs is the one status call shape: the poll here and the changes

@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { usePreferredDark } from '@vueuse/core'
 import { Events } from '@wailsio/runtime'
-import { AppService, SettingsService } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { Theme, type Preferences } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+import { AppService, SettingsService } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { Theme, type Preferences } from '../../bindings/github.com/brogli/gaertli/internal/settings'
 import { applyTheme } from '@/theme/themes'
 
 export const useSettingsStore = defineStore('settings', () => {

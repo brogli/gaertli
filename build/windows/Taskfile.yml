@@ -29,10 +29,10 @@ tasks:
         vars:
           ARCH: '{{.ARCH}}'
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}}
-        {{.BUILD_FLAGS}} -o "{{.BIN_DIR}}/{{.APP_NAME}}.exe" ./cmd/nebegit'
-      - cmd: powershell Remove-item cmd/nebegit/*.syso
+        {{.BUILD_FLAGS}} -o "{{.BIN_DIR}}/{{.APP_NAME}}.exe" ./cmd/{{.APP_NAME}}'
+      - cmd: powershell Remove-item cmd/{{.APP_NAME}}/*.syso
         platforms: [windows]
-      - cmd: rm -f cmd/nebegit/*.syso
+      - cmd: rm -f cmd/{{.APP_NAME}}/*.syso
         platforms: [linux, darwin]
     vars:
       BUILD_FLAGS:
@@ -41,8 +41,8 @@ tasks:
         {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED
         "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath
         -buildvcs=false -ldflags="-w -s -H windowsgui -X
-        github.com/brogli/nebegit/internal/buildinfo.App={{.VERSION}} -X
-        github.com/brogli/nebegit/internal/buildinfo.Commit={{.COMMIT}}"{{end}}'
+        {{.MODULE}}/internal/buildinfo.App={{.VERSION}} -X
+        {{.MODULE}}/internal/buildinfo.Commit={{.COMMIT}}"{{end}}'
     env:
       GOOS: windows
       CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
@@ -68,11 +68,12 @@ tasks:
       - task: create:nsis:installer
     cmds:
       - mkdir -p dist
-      - rm -f dist/{{.APP_NAME}}-windows-amd64.zip
-      - zip -j dist/{{.APP_NAME}}-windows-amd64.zip {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE
-      - cd build/windows && zip ../../dist/{{.APP_NAME}}-windows-amd64.zip bin/nebegit
-        bin/nebegit.cmd
-      - cp {{.BIN_DIR}}/{{.APP_NAME}}-amd64-installer.exe dist/{{.APP_NAME}}-windows-amd64-setup.exe
+      - rm -f dist/{{.ASSET_NAME}}-windows-amd64.zip
+      - zip -j dist/{{.ASSET_NAME}}-windows-amd64.zip {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE
+      - cd build/windows && zip ../../dist/{{.ASSET_NAME}}-windows-amd64.zip bin/{{.APP_NAME}}
+        bin/{{.APP_NAME}}.cmd
+      - cp {{.BIN_DIR}}/{{.APP_NAME}}-amd64-installer.exe
+        dist/{{.ASSET_NAME}}-windows-amd64-setup.exe
 
   generate:syso:
     summary: Generates Windows `.syso` file
@@ -84,7 +85,7 @@ tasks:
         windows/info.json > ../{{.BIN_DIR}}/info.json
       - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest
         windows/wails.exe.manifest -info ../{{.BIN_DIR}}/info.json -out
-        ../cmd/nebegit/wails_windows_{{.ARCH}}.syso
+        ../cmd/{{.APP_NAME}}/wails_windows_{{.ARCH}}.syso
     vars:
       ARCH: '{{.ARCH | default ARCH}}'
 
@@ -99,9 +100,9 @@ tasks:
     cmds:
       - |
         {{if eq OS "windows"}}
-        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DINFO_PRODUCTVERSION="{{.PRODUCT_VERSION}}" -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" project.nsi
+        makensis -INPUTCHARSET UTF8 {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DINFO_PRODUCTVERSION="{{.PRODUCT_VERSION}}" -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}\{{.BIN_DIR}}\{{.APP_NAME}}.exe" project.nsi
         {{else}}
-        makensis {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DINFO_PRODUCTVERSION="{{.PRODUCT_VERSION}}" -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" project.nsi
+        makensis -INPUTCHARSET UTF8 {{if eq .INSTALL_SCOPE "user"}}-DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user {{end}}-DINFO_PRODUCTVERSION="{{.PRODUCT_VERSION}}" -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" project.nsi
         {{end}}
     vars:
       ARCH: '{{.ARCH | default ARCH}}'

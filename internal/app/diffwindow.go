@@ -3,7 +3,7 @@ package app
 import (
 	"net/url"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // DiffKind is what a diff window lists and diffs.

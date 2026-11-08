@@ -1,6 +1,6 @@
 import type { TreeExpandedKeys } from 'openvue/tree'
 import type { TreeNode } from 'openvue/treenode'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { basename } from './path'
 
 interface Folder {

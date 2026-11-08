@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/remote/remotetest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/remote/remotetest"
 )
 
 // fake is a core whose Version behaviour the test picks per call. Of the

@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git/gittest"
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
 // fakegit is internal/git/testdata/fakegit, for the tests that inject a

@@ -1,7 +1,7 @@
 // Requirements: FR-REPO-06
 
-// Package bin_test runs the nebegit and nebegit.cmd wrapper scripts under a
-// fake nebegit.exe and a fake wslpath, without a real Windows or WSL setup.
+// Package bin_test runs the gaertli and gaertli.cmd wrapper scripts under a
+// fake gaertli.exe and a fake wslpath, without a real Windows or WSL setup.
 package bin_test
 
 import (
@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
 var fakeExePath string
@@ -46,7 +46,7 @@ func newApp(t *testing.T, script string, perm os.FileMode) (dir, scriptPath stri
 	}
 	scriptPath = filepath.Join(dir, "bin", script)
 	copyFile(t, script, scriptPath, perm)
-	copyFile(t, fakeExePath, filepath.Join(dir, "nebegit.exe"), 0o755)
+	copyFile(t, fakeExePath, filepath.Join(dir, "gaertli.exe"), 0o755)
 	return dir, scriptPath
 }
 
@@ -72,12 +72,12 @@ func fakeWslpath(t *testing.T, script string) string {
 	return dir
 }
 
-// scriptCmd builds the command for running dir's bin/nebegit script, with a
+// scriptCmd builds the command for running dir's bin/gaertli script, with a
 // clean environment: wslDistro sets WSL_DISTRO_NAME ("" leaves it unset),
 // wslpathDir is prepended to PATH so a fake wslpath shadows any real one (""
 // adds none).
 func scriptCmd(dir, wslDistro, wslpathDir string, args ...string) *exec.Cmd {
-	shArgs := append([]string{filepath.Join(dir, "bin", "nebegit")}, args...)
+	shArgs := append([]string{filepath.Join(dir, "bin", "gaertli")}, args...)
 	cmd := exec.Command("sh", shArgs...)
 	cmd.Dir = dir
 	path := os.Getenv("PATH")
@@ -91,7 +91,7 @@ func scriptCmd(dir, wslDistro, wslpathDir string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-// runScript runs dir's bin/nebegit script and fails the test if it exits
+// runScript runs dir's bin/gaertli script and fails the test if it exits
 // with an error.
 func runScript(t *testing.T, dir, distro, wslpathDir string, args ...string) {
 	t.Helper()
@@ -139,7 +139,7 @@ func TestScriptArgv(t *testing.T) {
 			t.Parallel()
 			skipOnWindows(t)
 
-			dir, _ := newApp(t, "nebegit", 0o755)
+			dir, _ := newApp(t, "gaertli", 0o755)
 			runDir := dir
 			if tc.symlink {
 				// The app is found beside the real script, not the symlink:
@@ -149,7 +149,7 @@ func TestScriptArgv(t *testing.T) {
 				if err := os.Mkdir(filepath.Join(runDir, "bin"), 0o755); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Symlink(filepath.Join(dir, "bin", "nebegit"), filepath.Join(runDir, "bin", "nebegit")); err != nil {
+				if err := os.Symlink(filepath.Join(dir, "bin", "gaertli"), filepath.Join(runDir, "bin", "gaertli")); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -171,7 +171,7 @@ func TestScriptArgv(t *testing.T) {
 func TestScriptExitsWithoutWaitingForTheApp(t *testing.T) {
 	t.Parallel()
 	skipOnWindows(t)
-	dir, _ := newApp(t, "nebegit", 0o755)
+	dir, _ := newApp(t, "gaertli", 0o755)
 	wslpathDir := fakeWslpath(t, wslpathSuccessScript)
 
 	runScript(t, dir, "Ubuntu-22.04", wslpathDir, "repo")
@@ -185,7 +185,7 @@ func TestScriptExitsWithoutWaitingForTheApp(t *testing.T) {
 func TestScriptFailsWhenWslpathFails(t *testing.T) {
 	t.Parallel()
 	skipOnWindows(t)
-	dir, _ := newApp(t, "nebegit", 0o755)
+	dir, _ := newApp(t, "gaertli", 0o755)
 	wslpathDir := fakeWslpath(t, wslpathFailScript)
 
 	out, err := scriptCmd(dir, "Ubuntu-22.04", wslpathDir, "repo").CombinedOutput()

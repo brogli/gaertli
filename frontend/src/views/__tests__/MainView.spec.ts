@@ -6,7 +6,7 @@ import { pressKey } from '@/testing/pressKey'
 import { mountInBody } from '@/testing/mountInBody'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { AppService, SettingsService, resetMainWindowApp } from '@/testing/mainWindowApp'

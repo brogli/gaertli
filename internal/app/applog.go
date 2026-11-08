@@ -3,8 +3,8 @@ package app
 import (
 	"log/slog"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // maxStderrLog bounds how much of a failed command's stderr reaches the app

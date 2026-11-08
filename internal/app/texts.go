@@ -25,14 +25,14 @@ const (
 
 // texts holds the shell's own text, in English.
 var texts = map[textID]string{
-	appName:            "nebegit",
-	usage:              "usage: nebegit [path]",
-	missingGit:         "nebegit needs git. Install git and make sure it is on your PATH, then start nebegit again.",
-	gitOutdated:        "nebegit needs git {minVersion} or newer; the installed version is {version}. Update git, then start nebegit again.",
+	appName:            "Gärtli",
+	usage:              "usage: gaertli [path]",
+	missingGit:         "Gärtli needs git. Install git and make sure it is on your PATH, then start Gärtli again.",
+	gitOutdated:        "Gärtli needs git {minVersion} or newer; the installed version is {version}. Update git, then start Gärtli again.",
 	settingsPathErr:    "could not determine the settings location: {error}",
 	settingsLoadErr:    "could not load settings: {error}",
-	startupFailed:      "nebegit could not start its web view. On Windows, install the WebView2 runtime; on Linux, install the webkitgtk package. ({error})",
-	deployConsent:      "nebegit needs a small helper inside the WSL distro {distro} to work with repos there. Install it now?",
+	startupFailed:      "Gärtli could not start its web view. On Windows, install the WebView2 runtime; on Linux, install the webkitgtk package. ({error})",
+	deployConsent:      "Gärtli needs a small helper inside the WSL distro {distro} to work with repos there. Install it now?",
 	worktreeTitle:      "{name} [{branch}]",
 	diffCommitTitle:    "{name}: {sha}",
 	diffRangeTitle:     "{name}: compare {from}..{to}",

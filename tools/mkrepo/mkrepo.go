@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // Config is the reference repo's shape.
@@ -137,7 +137,7 @@ func isolatedGit(ctx context.Context, dir, home string) gitFunc {
 
 const (
 	authorName  = "mkrepo"
-	authorEmail = "mkrepo@nebegit.invalid"
+	authorEmail = "mkrepo@gaertli.invalid"
 	baseTime    = 1_700_000_000 // fixed epoch, deterministic across runs
 
 	branchAdvanceEvery = 137 // a side branch advances every 137th main-line step

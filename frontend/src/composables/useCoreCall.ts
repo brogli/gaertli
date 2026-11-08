@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { Code, type Error as GoError } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Code, type Error as GoError } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // CoreError is core.Error as a rejected bound-method call carries it in
 // .cause, plus retry once run() attaches it. Only message is sure: a

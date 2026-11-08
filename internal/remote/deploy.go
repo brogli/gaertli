@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // wslRunner runs a command inside a distro: WslRun, or a fake in tests.
 type wslRunner func(ctx context.Context, distro string, args ...string) (*exec.Cmd, error)
 
-// Consent asks before the shell places its helper program and the nebegit
+// Consent asks before the shell places its helper program and the gaertli
 // command inside distro. Implemented by internal/app, since this package
 // may not depend on Wails.
 type Consent interface {
@@ -26,7 +26,7 @@ type Consent interface {
 // $HOME is expanded by the distro's own sh, not here; shown to the user as
 // "~/...".
 func deployTarget(version string) string {
-	return "$HOME/.cache/nebegit/" + version + "/nebegit-core"
+	return "$HOME/.cache/gaertli/" + version + "/gaertli-core"
 }
 
 // ensureDeployed makes sure d's distro has a working, current core binary
@@ -48,7 +48,7 @@ func (d *DistroCore) ensureDeployed(ctx context.Context) error {
 // binary whose size happened to match.
 func (d *DistroCore) deployCore(ctx context.Context) error {
 	if !d.consent.Ask(d.distro) {
-		return core.ErrorfArgs(core.DeployRefused, "deployNeeded", map[string]string{"distro": d.distro}, "repos in %s need nebegit's helper; open the folder again to install it", d.distro)
+		return core.ErrorfArgs(core.DeployRefused, "deployNeeded", map[string]string{"distro": d.distro}, "repos in %s need Gärtli's helper; open the folder again to install it", d.distro)
 	}
 	return d.copyCore(ctx)
 }

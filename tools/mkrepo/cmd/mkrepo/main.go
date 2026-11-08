@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/brogli/nebegit/tools/mkrepo"
+	"github.com/brogli/gaertli/tools/mkrepo"
 )
 
 func main() {

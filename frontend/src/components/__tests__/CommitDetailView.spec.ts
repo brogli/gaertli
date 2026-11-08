@@ -16,7 +16,7 @@ const { Facade, AppService } = vi.hoisted(() => ({
   AppService: { OpenDiff: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade, AppService }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 

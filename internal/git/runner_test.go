@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
 )
 
 // fakegit is testdata/fakegit, built once for every test in this package.
@@ -27,13 +27,13 @@ var fakegit string
 var FakegitPath = &fakegit
 
 func TestDefaultEnvHasNoLocksOrEditorOverride(t *testing.T) {
-	t.Setenv("NEBEGIT_TEST_MARKER", "present")
+	t.Setenv("GAERTLI_TEST_MARKER", "present")
 	unsetenvForTest(t, "GIT_EDITOR")
 	env := runEnvDump(t, Call{})
 	assertEnv(t, env, "GIT_TERMINAL_PROMPT", "0")
 	assertEnv(t, env, "LC_MESSAGES", "C")
 	assertEnv(t, env, "LANGUAGE", "C")
-	assertEnv(t, env, "NEBEGIT_TEST_MARKER", "present")
+	assertEnv(t, env, "GAERTLI_TEST_MARKER", "present")
 	assertEnvAbsent(t, env, "GIT_OPTIONAL_LOCKS")
 	assertEnvAbsent(t, env, "GIT_EDITOR")
 	assertEnvAbsent(t, env, "LC_ALL")
@@ -67,9 +67,9 @@ func TestNoEditorAddsGitEditor(t *testing.T) {
 }
 
 func TestEnvAddsTheCallsOwnVariables(t *testing.T) {
-	env := runEnvDump(t, Call{Env: []string{"GIT_SEQUENCE_EDITOR=:", "NEBEGIT_TODO=pick 1"}})
+	env := runEnvDump(t, Call{Env: []string{"GIT_SEQUENCE_EDITOR=:", "GAERTLI_TODO=pick 1"}})
 	assertEnv(t, env, "GIT_SEQUENCE_EDITOR", ":")
-	assertEnv(t, env, "NEBEGIT_TODO", "pick 1")
+	assertEnv(t, env, "GAERTLI_TODO", "pick 1")
 }
 
 // unsetenvForTest unsets key for the test, so an env test sees only what

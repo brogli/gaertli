@@ -17,21 +17,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/git/gittest"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
-// coreBin is the real nebegit-core; badBin reports a wrong protocol version;
+// coreBin is the real gaertli-core; badBin reports a wrong protocol version;
 // stderrBin also writes to stderr, including a line with a credential;
 // exitBin writes a burst of events and stderr lines, then exits.
 var coreBin, badBin, stderrBin, exitBin string
 
 func TestMain(m *testing.M) {
 	gittest.Main(m,
-		testbin.Bin{Path: &coreBin, Pkg: "../../cmd/nebegit-core"},
+		testbin.Bin{Path: &coreBin, Pkg: "../../cmd/gaertli-core"},
 		testbin.Bin{Path: &badBin, Pkg: "./testdata/badcore"},
 		testbin.Bin{Path: &stderrBin, Pkg: "./testdata/stderrcore"},
 		testbin.Bin{Path: &exitBin, Pkg: "./testdata/exitcore"},

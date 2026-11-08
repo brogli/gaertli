@@ -15,7 +15,7 @@ const { Facade } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { Events, emit } from '@/testing/runtime'
@@ -26,7 +26,7 @@ import {
   ChangeScope,
   type LogCommit,
   type LogSearchResult,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 function rowFixture(sha: string) {
   return commitRow({ sha, shortSha: sha, subject: 'x' })

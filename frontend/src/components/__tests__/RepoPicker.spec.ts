@@ -22,7 +22,7 @@ const { AppService, Facade } = vi.hoisted(() => ({
   Facade: { ListWorktrees: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ AppService, Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ AppService, Facade }))
 
 import RepoPicker from '../RepoPicker.vue'
 import ErrorBanner from '../ErrorBanner.vue'

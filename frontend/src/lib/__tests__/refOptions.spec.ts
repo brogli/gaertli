@@ -1,6 +1,6 @@
 // Requirements: FR-SYNC-06
 import { describe, expect, it } from 'vitest'
-import type { Refs } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { Refs } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { branchFixture } from '@/testing/fixtures/branch'
 import { branchSuggestions } from '../refOptions'
 

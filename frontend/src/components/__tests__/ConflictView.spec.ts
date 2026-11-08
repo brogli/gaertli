@@ -18,7 +18,7 @@ const { Facade } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
@@ -36,7 +36,7 @@ import {
   ConflictKind,
   Operation,
   type ConflictFile,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 async function mountView(file: Partial<ConflictFile> = {}) {
   Facade.Conflict.mockResolvedValue(conflictFileFixture(file))

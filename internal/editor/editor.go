@@ -1,5 +1,5 @@
 // Package editor builds and starts the external editor command. Pure Go:
-// used identically in-process (local) and inside nebegit-core --stdio (a
+// used identically in-process (local) and inside gaertli-core --stdio (a
 // WSL distro).
 package editor
 
@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // OpenFolder starts profile's folder command for path, detached. argv is

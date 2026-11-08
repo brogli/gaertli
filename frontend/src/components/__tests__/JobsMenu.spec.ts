@@ -4,13 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ProgressBar from 'openvue/progressbar'
 import Badge from 'openvue/badge'
-import { JobKind, JobState } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { JobKind, JobState } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const { Facade } = vi.hoisted(() => ({
   Facade: { Jobs: vi.fn(), CancelJob: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { wailsError } from '@/testing/errors'

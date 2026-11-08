@@ -20,7 +20,7 @@ Unicode true
 ####
 ## The following information is taken from the wails_tools.nsh file, but they can be overwritten here.
 ####
-## !define INFO_PROJECTNAME    "my-project" # Default "nebegit"
+## !define INFO_PROJECTNAME    "my-project" # Default "gaertli"
 ## !define INFO_COMPANYNAME    "My Company" # Default "My Company"
 ## !define INFO_PRODUCTNAME    "My Product Name" # Default "My Product"
 ## !define INFO_PRODUCTVERSION "1.0.0"     # Default "0.1.0"
@@ -32,7 +32,7 @@ Unicode true
 ## !define REQUEST_EXECUTION_LEVEL "admin"            # Default "admin"  see also https://nsis.sourceforge.io/Docs/Chapter4.html
 ## !define WAILS_INSTALL_SCOPE     "user"             # Default "machine" - set to "user" for per-user install ($LOCALAPPDATA) without UAC prompt
 ####
-!define UNINST_KEY_NAME  "nebegit" # wails_tools.nsh's default combines INFO_COMPANYNAME and INFO_PRODUCTNAME
+!define UNINST_KEY_NAME  "gaertli" # wails_tools.nsh's default combines INFO_COMPANYNAME and INFO_PRODUCTNAME
 ####
 ## Include the wails tools
 ####
@@ -57,7 +57,7 @@ Unicode true
                 FileClose $0
                 ${Break}
             ${EndIf}
-            ${If} ${Cmd} `MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "nebegit is running. Close it, then click Retry." /SD IDCANCEL IDCANCEL`
+            ${If} ${Cmd} `MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Gärtli is running. Close it, then click Retry." /SD IDCANCEL IDCANCEL`
                 SetErrorLevel 32
                 Abort
             ${EndIf}
@@ -123,7 +123,7 @@ Section
     !insertmacro wails.files
 
     SetOutPath $INSTDIR\bin
-    File "..\bin\nebegit" "..\bin\nebegit.cmd"
+    File "..\bin\gaertli" "..\bin\gaertli.cmd"
     SetOutPath $INSTDIR
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
@@ -131,7 +131,7 @@ Section
     # The exe edits the user PATH: NSIS strings stop at 1024 characters.
     ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --add-to-path' $0
     ${If} $0 <> 0
-        !insertmacro warnPath "The user PATH was left as it was. To use the nebegit command, add this folder to it: $INSTDIR\bin"
+        !insertmacro warnPath "The user PATH was left as it was. To use the gaertli command, add this folder to it: $INSTDIR\bin"
     ${EndIf}
 
     !insertmacro wails.associateFiles

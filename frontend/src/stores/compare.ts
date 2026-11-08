@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { ChangedFile, LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import type { ChangedFile, LogCommit } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { useLogStore } from './log'
 
 // compare reads the log store's one selection: exactly two commits is a

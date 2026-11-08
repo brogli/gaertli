@@ -1,4 +1,4 @@
-import type { Branch, Refs } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { Branch, Refs } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { branchFixture } from './branch'
 
 // refsFixture holds branchFixture's main with overrides and the named

@@ -1,6 +1,6 @@
 import { toValue, type MaybeRefOrGetter } from 'vue'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { Code, type ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { Code, type ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { errorNotice, useNotices } from '@/lib/notice'
 import type { CoreError, useCoreCall } from './useCoreCall'
 

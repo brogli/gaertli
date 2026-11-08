@@ -7,7 +7,7 @@ import {
   JobState,
   UpdateOutcome,
   type JobInfo,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import type { CoreError } from './useCoreCall'
 import { errorNotice, useNotices, type AppNotice } from '@/lib/notice'
 import { shortSha } from '@/lib/format'

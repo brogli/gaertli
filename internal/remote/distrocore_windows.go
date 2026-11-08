@@ -6,7 +6,7 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/brogli/nebegit/internal/proc"
+	"github.com/brogli/gaertli/internal/proc"
 )
 
 // WslRun is the production wslRunner: wsl.exe -d <distro> -- args..., with

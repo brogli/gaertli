@@ -12,10 +12,10 @@ import (
 
 func TestParseGoLicensesReadsTheReportAndSkipsOwnModule(t *testing.T) {
 	report := []byte("github.com/adrg/xdg\tv0.5.3\tMIT\t/mod/xdg/LICENSE\n" +
-		"github.com/brogli/nebegit\t\tBSD-3-Clause\t/repo/LICENSE\n" +
+		"github.com/brogli/gaertli\t\tBSD-3-Clause\t/repo/LICENSE\n" +
 		"golang.org/x/sys/unix\tv0.48.0\tBSD-3-Clause\t/mod/sys/LICENSE\n")
 
-	got, err := parseGoLicenses(report, "github.com/brogli/nebegit")
+	got, err := parseGoLicenses(report, "github.com/brogli/gaertli")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({ Facade: { DiffWorking: vi.fn() } }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 import { useDiffStore } from '../diff'
 import { diffFileFixture } from '@/testing/fixtures/diff'
 import { DiffKind, type DiffTarget } from '@/lib/diffTarget'
-import type { DiffFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { DiffFile } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const opts = { force: false, ignoreWhitespace: false }
 

@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { pressKey } from '@/testing/pressKey'
@@ -18,7 +18,7 @@ import { useRepoStore } from '@/stores/repo'
 import { useRefsStore } from '@/stores/refs'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { summaryFixture } from '@/testing/fixtures/summary'
-import { Operation } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { Operation } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { refsFixture } from '@/testing/fixtures/refs'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'

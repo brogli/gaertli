@@ -9,7 +9,7 @@ const { Facade, SettingsService, AppService } = vi.hoisted(() => ({
   SettingsService: { Get: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({
   Facade,
   SettingsService,
   AppService,
@@ -26,7 +26,7 @@ import { useRepoStore } from '@/stores/repo'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { summaryFixture } from '@/testing/fixtures/summary'
-import { Code, type SquashCheck } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { Code, type SquashCheck } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const shas = ['sha-a', 'sha-b', 'sha-c']
 

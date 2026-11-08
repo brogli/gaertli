@@ -1,4 +1,4 @@
-// Command fakeexe stands in for nebegit.exe in the script tests: it sleeps
+// Command fakeexe stands in for gaertli.exe in the script tests: it sleeps
 // a second, so a test can check the script does not wait for it, then writes
 // its arguments to argv.txt in its working directory. The rename makes the file
 // appear whole: a test polling for it never reads it half written.

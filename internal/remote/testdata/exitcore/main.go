@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/services"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/services"
 )
 
 const burst = 2000

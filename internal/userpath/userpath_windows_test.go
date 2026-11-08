@@ -12,7 +12,7 @@ import (
 
 func TestAddAndRemoveEditPathUnderAGivenKeyAndKeepItsType(t *testing.T) {
 	key := scratchKey(t)
-	dir := `C:\Apps\nebegit\bin`
+	dir := `C:\Apps\gaertli\bin`
 	add := func(path string) string { return withEntry(path, dir) }
 	remove := func(path string) string { return withoutEntry(path, dir) }
 
@@ -23,12 +23,12 @@ func TestAddAndRemoveEditPathUnderAGivenKeyAndKeepItsType(t *testing.T) {
 	if err := updateKey(key, add); err != nil {
 		t.Fatalf("first add: %v", err)
 	}
-	assertPath(t, key, `%USERPROFILE%\x;C:\Apps\nebegit\bin`)
+	assertPath(t, key, `%USERPROFILE%\x;C:\Apps\gaertli\bin`)
 
 	if err := updateKey(key, add); err != nil {
 		t.Fatalf("second add: %v", err)
 	}
-	assertPath(t, key, `%USERPROFILE%\x;C:\Apps\nebegit\bin`)
+	assertPath(t, key, `%USERPROFILE%\x;C:\Apps\gaertli\bin`)
 
 	if err := updateKey(key, remove); err != nil {
 		t.Fatalf("remove: %v", err)
@@ -48,7 +48,7 @@ func TestAddAndRemoveEditPathUnderAGivenKeyAndKeepItsType(t *testing.T) {
 // deleted when the test ends: never the real HKCU\Environment.
 func scratchKey(t *testing.T) registry.Key {
 	t.Helper()
-	const name = `Software\nebegit-userpath-test`
+	const name = `Software\gaertli-userpath-test`
 	key, _, err := registry.CreateKey(registry.CURRENT_USER, name, registry.ALL_ACCESS)
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

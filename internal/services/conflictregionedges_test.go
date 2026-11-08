@@ -5,7 +5,7 @@ package services
 import (
 	"testing"
 
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 func TestConflictRegionBaseKeepsLinesTheCurrentSideDeleted(t *testing.T) {

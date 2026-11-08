@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // checkGit reports whether runner's git runs and is at least

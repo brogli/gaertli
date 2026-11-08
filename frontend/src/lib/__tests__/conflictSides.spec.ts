@@ -5,7 +5,7 @@ import { conflictSideTitles } from '../conflictSides'
 import {
   Operation,
   type ConflictSide,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const t = i18n.global.t
 

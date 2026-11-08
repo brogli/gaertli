@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/proc"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/proc"
 )
 
 // Call is one git invocation.

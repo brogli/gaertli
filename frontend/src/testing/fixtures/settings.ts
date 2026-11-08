@@ -1,9 +1,9 @@
-import { PullMode } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { PullMode } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import {
   DiffMode,
   Theme,
   type Preferences,
-} from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+} from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 
 // defaultSettingsFixture is a fully-populated Preferences value, shared by
 // every test that mocks SettingsService.Get.

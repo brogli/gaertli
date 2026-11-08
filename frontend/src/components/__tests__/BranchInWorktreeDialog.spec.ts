@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { AppService } = vi.hoisted(() => ({ AppService: { SelectWorktree: vi.fn() } }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ AppService }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ AppService }))
 
 import BranchInWorktreeDialog from '../BranchInWorktreeDialog.vue'
-import { BranchInUse } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { BranchInUse } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { footerButtons } from '@/testing/dialog'

@@ -1,5 +1,5 @@
 import { reactive, shallowReactive } from 'vue'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import type { ResultRegion } from '@/lib/conflictRegions'
 import { toCoreError, type CoreError } from './useCoreCall'
 

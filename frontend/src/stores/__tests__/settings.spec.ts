@@ -9,7 +9,7 @@ const { AppService, SettingsService } = vi.hoisted(() => ({
   SettingsService: { Get: vi.fn(), Set: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({
   AppService,
   SettingsService,
 }))
@@ -19,7 +19,7 @@ import { Events, emit } from '@/testing/runtime'
 
 import { useSettingsStore } from '../settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
-import { Theme } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+import { Theme } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 
 describe('settings store', () => {
   beforeEach(() => {
@@ -33,13 +33,13 @@ describe('settings store', () => {
     SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: Theme.LightTheme }))
     const store = useSettingsStore()
     await store.load()
-    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(false)
+    expect(document.documentElement.classList.contains('gaertli-dark')).toBe(false)
 
     SettingsService.Get.mockResolvedValue(defaultSettingsFixture({ theme: Theme.DarkTheme }))
     emit('settings:changed')
     await flushPromises()
 
-    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
+    expect(document.documentElement.classList.contains('gaertli-dark')).toBe(true)
   })
 
   it('with System, the theme follows the OS setting as it changes', async () => {
@@ -64,11 +64,11 @@ describe('settings store', () => {
 
     handler!({ matches: true })
     await nextTick()
-    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
+    expect(document.documentElement.classList.contains('gaertli-dark')).toBe(true)
 
     handler!({ matches: false })
     await nextTick()
-    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(false)
+    expect(document.documentElement.classList.contains('gaertli-dark')).toBe(false)
 
     matchMediaSpy.mockRestore()
   })

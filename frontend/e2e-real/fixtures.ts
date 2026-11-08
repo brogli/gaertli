@@ -2,18 +2,18 @@ import { test as base, expect, type Page } from '@playwright/test'
 import { spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { PullMode } from '../bindings/github.com/brogli/nebegit/internal/core/models'
+import { PullMode } from '../bindings/github.com/brogli/gaertli/internal/core/models'
 import {
   DiffMode,
   type Preferences,
-} from '../bindings/github.com/brogli/nebegit/internal/settings/models'
+} from '../bindings/github.com/brogli/gaertli/internal/settings/models'
 import { switchToChanges } from './helpers'
 import { createRepos, gitWith, type Git, type Repos } from './repos'
 import { createSandbox, editorCalls, type Sandbox } from './sandbox'
 
 export { expect }
 
-const serverBin = path.resolve(process.env.NEBEGIT_SERVER_BIN ?? '../bin/nebegit-server')
+const serverBin = path.resolve(process.env.GAERTLI_SERVER_BIN ?? '../bin/gaertli-server')
 
 const firstPort = 20000
 const portsPerWorker = 100

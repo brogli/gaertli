@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 // bareRemote inits a bare repo at a fresh temp dir and adds it to repo as
@@ -163,7 +163,7 @@ func TestRemapAuthFailedClassifiesVerifiedPrefixes(t *testing.T) {
 			if strings.Contains(ce.Message, url) || strings.Contains(ce.Message, "s3cret") {
 				t.Errorf("message leaks the URL or credential text: %q", ce.Message)
 			}
-			for _, hint := range []string{"from a terminal", "never asks for, stores or sees credentials"} {
+			for _, hint := range []string{"from a terminal", "Gärtli never asks for, stores or sees credentials"} {
 				if !strings.Contains(ce.Message, hint) {
 					t.Errorf("message lacks %q: %q", hint, ce.Message)
 				}
@@ -344,7 +344,7 @@ func TestPopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *testing.T) 
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "stashed change\n")
-	stashSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
+	stashSHA := stashPush(t, repo.Dir, "Gärtli: local changes before pull")
 	gittest.Commit(t, repo.Dir, "f.txt", "conflicting head change\n", "head change")
 
 	c, wt := openWorktree(t, repo.Dir)
@@ -367,7 +367,7 @@ func TestDropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "marker change\n")
-	markerSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
+	markerSHA := stashPush(t, repo.Dir, "Gärtli: local changes before pull")
 
 	writeFile(t, repo.Dir, "f.txt", "user change\n")
 	userSHA := stashPush(t, repo.Dir, "user's own work")
@@ -392,7 +392,7 @@ func TestPopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	gittest.Commit(t, repo.Dir, "g.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "marker change\n")
-	markerSHA := stashPush(t, repo.Dir, "nebegit: local changes before pull")
+	markerSHA := stashPush(t, repo.Dir, "Gärtli: local changes before pull")
 
 	writeFile(t, repo.Dir, "g.txt", "user change\n")
 	userSHA := stashPush(t, repo.Dir, "user's own work")

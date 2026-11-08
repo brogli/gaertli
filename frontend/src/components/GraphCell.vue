@@ -4,7 +4,7 @@ import {
   EdgeKind,
   type GraphEdge,
   type GraphRow,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { laneColourClass } from '@/lib/laneColours'
 import { highestLane } from '@/lib/graphLanes'
 

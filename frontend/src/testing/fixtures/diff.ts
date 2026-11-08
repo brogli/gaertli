@@ -1,4 +1,4 @@
-import type { DiffFile, DiffHunk } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { DiffFile, DiffHunk } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // diffFileFixture is a DiffFile answer for a text file within the size cap.
 export function diffFileFixture(overrides: Partial<DiffFile> = {}): DiffFile {

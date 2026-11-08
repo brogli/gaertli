@@ -3,7 +3,7 @@ import Dialog from 'openvue/dialog'
 import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
 import { useCoreCall } from '@/composables/useCoreCall'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { DIALOG } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'
 

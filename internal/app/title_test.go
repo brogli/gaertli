@@ -6,7 +6,7 @@ import "testing"
 
 func TestWindowTitle(t *testing.T) {
 	cases := []struct{ path, branch, want string }{
-		{"", "", "nebegit"},
+		{"", "", "Gärtli"},
 		{"/x/project", "", "project"},
 		{"/x/project", "main", "project [main]"},
 	}

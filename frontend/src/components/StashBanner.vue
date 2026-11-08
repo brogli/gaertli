@@ -7,7 +7,7 @@ import { useRepoStore } from '@/stores/repo'
 import { useChangesStore } from '@/stores/changes'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
 // StashBanner offers to restore or drop the stash a pull, merge or rebase with stash made

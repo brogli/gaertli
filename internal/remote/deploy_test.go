@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
 )
 
 // localRunner is a fake wslRunner: it ignores distro and runs args as a

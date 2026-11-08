@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
 // argvWriterBin writes its argv to the file its first argument names,

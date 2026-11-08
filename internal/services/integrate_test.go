@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 // edit is a file's content in one commit.
@@ -377,8 +377,8 @@ func TestMergeWithStashKeepsTheEntryOnConflicts(t *testing.T) {
 
 	coretest.AssertCode(t, err, core.Conflicts)
 	list := gittest.Out(t, repo.Dir, "stash", "list")
-	if !strings.HasSuffix(list, ": nebegit: local changes before merge") || strings.Contains(list, "\n") {
-		t.Errorf("stash list = %q, want one entry with subject %q", list, "nebegit: local changes before merge")
+	if !strings.HasSuffix(list, ": Gärtli: local changes before merge") || strings.Contains(list, "\n") {
+		t.Errorf("stash list = %q, want one entry with subject %q", list, "Gärtli: local changes before merge")
 	}
 	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
@@ -394,7 +394,7 @@ func TestWaitingStashFindsAnEntryWithTheOlderPullSubject(t *testing.T) {
 	repo := gittest.New(t)
 	gittest.Commit(t, repo.Dir, "f.txt", "base\n", "base")
 	writeFile(t, repo.Dir, "f.txt", "changed\n")
-	sha := stashPush(t, repo.Dir, "nebegit: local changes before pull")
+	sha := stashPush(t, repo.Dir, "Gärtli: local changes before pull")
 
 	c, wt := openWorktree(t, repo.Dir)
 	summary, err := c.Summary(t.Context(), wt)

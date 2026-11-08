@@ -1,6 +1,6 @@
 # ADR-4: Git is the only source of truth
 
-**Context.** nebegit runs beside a terminal and an editor that change the repo at any time. Repo
+**Context.** Gärtli runs beside a terminal and an editor that change the repo at any time. Repo
 state the app keeps can go stale, and a stale view in a git tool leads to wrong actions (G4).
 
 **Decision.** No database or on-disk cache of repo data. What the app reads lives in memory and can

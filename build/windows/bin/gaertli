@@ -2,7 +2,7 @@
 # Starts the Windows app beside this script. In WSL, converts every
 # non-flag argument to a Windows path first.
 
-app="$(dirname "$(dirname "$(realpath "$0")")")/nebegit.exe"
+app="$(dirname "$(dirname "$(realpath "$0")")")/gaertli.exe"
 
 if [ -n "$WSL_DISTRO_NAME" ]; then
 	for arg; do

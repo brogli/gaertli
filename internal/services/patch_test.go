@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 func TestHunksOfReadsGitsU0HunkHeaders(t *testing.T) {

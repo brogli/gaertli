@@ -28,7 +28,7 @@ import {
 import {
   RegionKind,
   type ConflictRegion,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DEFAULT_MARKER_SIZE, isMarkerLine } from './conflictMarkers'
 import type { Pane } from './conflictPanes'
 

@@ -8,10 +8,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/brogli/nebegit/internal/buildinfo"
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/settings"
+	"github.com/brogli/gaertli/internal/buildinfo"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )

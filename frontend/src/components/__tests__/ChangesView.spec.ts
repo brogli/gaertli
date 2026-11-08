@@ -6,7 +6,7 @@ import { mountNotices } from '@/testing/mountNotices'
 import { editorNotFound } from '@/testing/errors'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { AppService, Facade, resetMainWindowApp } from '@/testing/mainWindowApp'
@@ -21,7 +21,7 @@ import ChangedFiles from '../ChangedFiles.vue'
 import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
-import type { ChangedFiles as ChangedFilesData } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFiles as ChangedFilesData } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const props = { wt: '/repo' }
 
@@ -320,7 +320,7 @@ describe('ChangesView', () => {
     await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
 
     expect(other.find('[role="tree"]').exists()).toBe(true)
-    expect(localStorage.getItem('nebegit.changedFiles.tree')).toBe('true')
+    expect(localStorage.getItem('gaertli.changedFiles.tree')).toBe('true')
 
     const fresh = mountWith({ staged: [{ path: 'a.txt', status: 'M' }] })
     expect(fresh.find('[role="tree"]').exists()).toBe(true)

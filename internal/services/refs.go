@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // refsFormat: %1f/%00 is for-each-ref's own hex-escape syntax, not git

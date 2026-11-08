@@ -9,14 +9,14 @@ import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   ChangeScope,
   ConflictChoice,
   ConflictKind,
   Operation,
   type ConflictFile,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 import MergeEditor from './MergeEditor.vue'

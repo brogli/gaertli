@@ -37,8 +37,8 @@ type route struct {
 // routes maps the type of a method's second parameter to its route. Any
 // other type means the local core.
 var routes = map[string]route{
-	"github.com/brogli/nebegit/internal/core.WorktreeID": {method: "CoreOf", translates: true},
-	"github.com/brogli/nebegit/internal/core.RepoPath":   {method: "CoreFor"},
+	"github.com/brogli/gaertli/internal/core.WorktreeID": {method: "CoreOf", translates: true},
+	"github.com/brogli/gaertli/internal/core.RepoPath":   {method: "CoreFor"},
 }
 
 // coreArg names the translated argument in a generated Forwarder method.

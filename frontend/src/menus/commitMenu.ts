@@ -1,5 +1,5 @@
 import type { Translate } from '@/i18n'
-import type { LogCommit } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { LogCommit } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 export type CommitMenuItem =
   | { label: string; command: () => void; shortcut?: string }

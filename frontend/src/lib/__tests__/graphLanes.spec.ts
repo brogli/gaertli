@@ -1,7 +1,7 @@
 // Requirements: FR-LOG-01
 import { describe, expect, it } from 'vitest'
 import { laneSpan } from '../graphLanes'
-import { EdgeKind } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { EdgeKind } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 describe('laneSpan', () => {
   it('reaches the highest lane a row draws in, its dot or a line', () => {

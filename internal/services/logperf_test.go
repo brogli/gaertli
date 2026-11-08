@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 func TestFirstRowObservableWhileLoadingWellUnderFullStreamDuration(t *testing.T) {

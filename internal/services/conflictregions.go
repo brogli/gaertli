@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // markerBlock is one complete conflict block of a text: the line indexes of
@@ -275,7 +275,7 @@ func diffHunks(ctx context.Context, r git.Runner, dir, oldText, newText string) 
 	if oldText == newText {
 		return nil, nil
 	}
-	tmp, err := os.MkdirTemp("", "nebegit-conflict-")
+	tmp, err := os.MkdirTemp("", "gaertli-conflict-")
 	if err != nil {
 		return nil, core.Errorf(core.Internal, "temp dir: %v", err)
 	}

@@ -1,4 +1,4 @@
-# nebegit
+# Gärtli
 
 Desktop git GUI: Go core + Wails v3 shell + Vue 3 (OpenVue). Developed spec-driven, test-driven,
 hands-off by Claude sessions.

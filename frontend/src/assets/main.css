@@ -5,7 +5,7 @@
 @plugin 'tailwindcss-primeui';
 
 /* dark: follows the class the settings store toggles on <html>. */
-@custom-variant dark (&:where(.nebegit-dark, .nebegit-dark *));
+@custom-variant dark (&:where(.gaertli-dark, .gaertli-dark *));
 
 /* The bundled fonts make the UI and fixed-width text (hashes, paths,
    diffs) look the same on every system; OpenVue's components inherit the
@@ -93,7 +93,7 @@
     --nb-diff-removed-marker: var(--p-red-600);
   }
 
-  :root.nebegit-dark {
+  :root.gaertli-dark {
     --nb-tone-green: var(--p-green-400);
     --nb-tone-blue: var(--p-blue-400);
     --nb-tone-red: var(--p-red-400);

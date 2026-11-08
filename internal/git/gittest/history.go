@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // Step is one commit of History.
@@ -20,7 +20,7 @@ type Step struct {
 	From    string // branch a new Branch forks from; empty for a root commit
 	Merge   string // branch whose tip becomes the second parent
 	Message string
-	Author  string            // author name; the test identity if empty. The email is the lowercased name at nebegit.invalid.
+	Author  string            // author name; the test identity if empty. The email is the lowercased name at gaertli.invalid.
 	Files   map[string]string // path to content, set in this commit
 	Delete  []string          // paths removed in this commit
 }
@@ -51,7 +51,7 @@ func fastImportStream(steps []Step, start int64) []byte {
 		when := start + int64(i)
 		author := identity
 		if c.Author != "" {
-			author = fmt.Sprintf("%s <%s@nebegit.invalid>", c.Author, strings.ToLower(c.Author))
+			author = fmt.Sprintf("%s <%s@gaertli.invalid>", c.Author, strings.ToLower(c.Author))
 		}
 		msg := strings.TrimRight(c.Message, "\n") + "\n"
 		fmt.Fprintf(&s, "commit refs/heads/%s\nmark :%d\nauthor %s %d +0000\ncommitter %s %d +0000\ndata %d\n%s",

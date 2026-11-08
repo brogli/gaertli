@@ -2,13 +2,13 @@
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { ChangeScope } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const { Facade } = vi.hoisted(() => ({
   Facade: { Refs: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { Events, emit } from '@/testing/runtime'

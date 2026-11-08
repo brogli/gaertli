@@ -1,4 +1,4 @@
-import type { Refs } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { Refs } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import type { Translate } from '@/i18n'
 
 // RefOption is one ref in a Select or MultiSelect: its short name shown,

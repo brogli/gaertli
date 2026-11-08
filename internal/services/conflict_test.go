@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 // tryGit returns git's stdout for args in dir, untrimmed; nil if git fails, as a merge that stops

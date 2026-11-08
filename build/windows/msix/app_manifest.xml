@@ -8,7 +8,7 @@
   IgnorableNamespaces="uap3">
   
   <Identity 
-    Name="com.example.nebegit"
+    Name="com.example.gaertli"
     Publisher="CN=My Company"
     Version="0.1.0.0" 
     ProcessorArchitecture="x64" />
@@ -16,7 +16,7 @@
   <Properties>
     <DisplayName>My Product</DisplayName>
     <PublisherDisplayName>My Company</PublisherDisplayName>
-    <Description>A nebegit application</Description>
+    <Description>A Gärtli application</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   
@@ -29,10 +29,10 @@
   </Resources>
   
   <Applications>
-    <Application Id="com.example.nebegit" Executable="nebegit" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="com.example.gaertli" Executable="gaertli" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="My Product"
-        Description="A nebegit application"
+        Description="A Gärtli application"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
@@ -41,7 +41,7 @@
       </uap:VisualElements>
       
       <Extensions>
-        <desktop:Extension Category="windows.fullTrustProcess" Executable="nebegit" />
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="gaertli" />
         
         
       </Extensions>

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 // mutateLines inserts, deletes and replaces a few lines.

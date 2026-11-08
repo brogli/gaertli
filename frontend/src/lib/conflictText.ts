@@ -1,4 +1,4 @@
-import type { ConflictFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ConflictFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import type { LineRange } from './conflictRegions'
 
 export type Take = 'current' | 'incoming' | 'currentFirst' | 'incomingFirst'

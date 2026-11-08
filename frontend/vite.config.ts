@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => ({
       ...(mode === 'e2e'
         ? [
             {
-              find: /(\.\.\/)+bindings\/github\.com\/brogli\/nebegit\/internal\/app$/,
+              find: /(\.\.\/)+bindings\/github\.com\/brogli\/gaertli\/internal\/app$/,
               replacement: fileURLToPath(
                 new URL('./src/testing/e2e-mock-bindings.ts', import.meta.url),
               ),

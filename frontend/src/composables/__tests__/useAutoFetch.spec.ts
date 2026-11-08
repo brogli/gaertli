@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({ Facade: { Fetch: vi.fn() } }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import { useAutoFetch } from '../useAutoFetch'

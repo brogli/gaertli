@@ -7,9 +7,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/services"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/services"
 )
 
 func main() {

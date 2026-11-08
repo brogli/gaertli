@@ -1,6 +1,6 @@
 import { onScopeDispose } from 'vue'
 import { Events, Window } from '@wailsio/runtime'
-import type { ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangeScope } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // Wails hands every window's event to every window, naming the window it
 // is for as the sender. The name is asked on the first event: a server-mode

@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // Router picks the core for a call: the local one, the one owning a

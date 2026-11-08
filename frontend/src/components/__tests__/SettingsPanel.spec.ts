@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { wailsError } from '@/testing/errors'
@@ -15,7 +15,7 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import SettingsPanel from '../SettingsPanel.vue'
 import ErrorBanner from '../ErrorBanner.vue'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
-import { Theme } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+import { Theme } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 import { field } from '@/testing/dialog'
 import { mountInBody } from '@/testing/mountInBody'
 import { chooseOption } from '@/testing/select'
@@ -50,14 +50,14 @@ describe('SettingsPanel', () => {
     SettingsService.Get.mockResolvedValue(filled)
     System.IsWindows.mockReset().mockReturnValue(false)
     AppService.LogPath.mockResolvedValue({
-      path: '/home/user/.local/state/nebegit/nebegit.log',
+      path: '/home/user/.local/state/gaertli/gaertli.log',
       error: '',
     })
     Facade.Version.mockResolvedValue({ app: 'v0.1.0', commit: '', protocol: 1 })
   })
 
   afterEach(() => {
-    document.documentElement.classList.remove('nebegit-dark')
+    document.documentElement.classList.remove('gaertli-dark')
   })
 
   it('loads the stored settings and submits every edited field, keeping the system theme', async () => {
@@ -105,8 +105,8 @@ describe('SettingsPanel', () => {
   it.each([
     [
       'the app log path',
-      { path: '/home/user/.local/state/nebegit/nebegit.log', error: '' },
-      'App log: /home/user/.local/state/nebegit/nebegit.log',
+      { path: '/home/user/.local/state/gaertli/gaertli.log', error: '' },
+      'App log: /home/user/.local/state/gaertli/gaertli.log',
     ],
     [
       'why the app log could not be opened',
@@ -288,7 +288,7 @@ describe('SettingsPanel', () => {
 
     expect(SettingsService.Set).toHaveBeenCalledTimes(1)
     expect(SettingsService.Set.mock.calls[0]?.[0]).toMatchObject({ theme: Theme.DarkTheme })
-    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
+    expect(document.documentElement.classList.contains('gaertli-dark')).toBe(true)
   })
 
   it('a preset fills all three commands, and the next preset fully overwrites rather than merges', async () => {
@@ -339,8 +339,8 @@ describe('SettingsPanel', () => {
   })
 
   it.each([
-    [{ app: '0.1.57', commit: 'abc1234', protocol: 1 }, 'nebegit 0.1.57 (abc1234)'],
-    [{ app: 'dev', commit: '', protocol: 1 }, 'nebegit dev'],
+    [{ app: '0.1.57', commit: 'abc1234', protocol: 1 }, 'Gärtli 0.1.57 (abc1234)'],
+    [{ app: 'dev', commit: '', protocol: 1 }, 'Gärtli dev'],
   ])(
     'shows the app version fetched on mount, with the commit when there is one',
     async (version, text) => {

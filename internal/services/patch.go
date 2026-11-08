@@ -4,7 +4,7 @@ import (
 	"bytes"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // patchArgs starts every git diff or show whose patch the app parses. It

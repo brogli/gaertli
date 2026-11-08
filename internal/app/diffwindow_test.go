@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 func TestDiffWindowTitleNamesTheWorktreeAndWhatItShows(t *testing.T) {

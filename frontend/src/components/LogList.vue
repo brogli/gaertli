@@ -6,7 +6,7 @@ import ContextMenu from 'openvue/contextmenu'
 import { useLogStore } from '@/stores/log'
 import { useCompareStore } from '@/stores/compare'
 import { useCoreCall } from '@/composables/useCoreCall'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import GraphCell from './GraphCell.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import PickDialog from './PickDialog.vue'
@@ -26,7 +26,7 @@ import type {
   LogCommit,
   PickOptions,
   SquashCheck,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // LogList is a virtual-scrolled commit list: only the rows in view are
 // rendered, and only their window is fetched.

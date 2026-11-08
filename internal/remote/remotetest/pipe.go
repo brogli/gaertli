@@ -7,8 +7,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
 )
 
 // NewPipeClient serves the API newAPI builds (given the server-side event

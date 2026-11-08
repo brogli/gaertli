@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
 // fakegit is internal/git/testdata/fakegit, built once for every test in
@@ -15,7 +15,7 @@ import (
 var fakegit string
 
 func TestMain(m *testing.M) {
-	testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "github.com/brogli/nebegit/internal/git/testdata/fakegit"})
+	testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "github.com/brogli/gaertli/internal/git/testdata/fakegit"})
 }
 
 func TestChecksGitPresence(t *testing.T) {

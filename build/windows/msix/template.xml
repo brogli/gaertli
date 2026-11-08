@@ -8,7 +8,7 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="nebegit"
+        Path="gaertli"
         Arguments=""
         InstallLocation="C:\Program Files\My Company\My Product">
     </Installer>
@@ -18,17 +18,17 @@
         PublisherName="CN=My Company"
         PublisherDisplayName="My Company"
         Version="0.1.0.0"
-        PackageDescription="A nebegit application">
+        PackageDescription="A Gärtli application">
         <Capabilities>
             <Capability Name="runFullTrust" />
             
         </Capabilities>
         <Applications>
             <Application
-                Id="com.example.nebegit"
-                Description="A nebegit application"
+                Id="com.example.gaertli"
+                Description="A Gärtli application"
                 DisplayName="My Product"
-                ExecutableName="nebegit"
+                ExecutableName="gaertli"
                 EntryPoint="Windows.FullTrustApplication">
                 
             </Application>
@@ -43,11 +43,11 @@
             <Framework>false</Framework>
             <DisplayName>My Product</DisplayName>
             <PublisherDisplayName>My Company</PublisherDisplayName>
-            <Description>A nebegit application</Description>
+            <Description>A Gärtli application</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="nebegit.msix" />
+    <SaveLocation PackagePath="gaertli.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

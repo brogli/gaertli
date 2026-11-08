@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/editor"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/editor"
 )
 
 // SetEditorProfile implements core.API.

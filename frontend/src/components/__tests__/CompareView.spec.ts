@@ -8,7 +8,7 @@ const { Facade, AppService } = vi.hoisted(() => ({
   AppService: { OpenDiff: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade, AppService }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
@@ -16,7 +16,7 @@ import CompareView from '../CompareView.vue'
 import { useLogStore } from '@/stores/log'
 import { pressKey } from '@/testing/pressKey'
 import { commitRow } from '@/testing/fixtures/log-rows'
-import type { ChangedFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // mountComparing mounts CompareView comparing sha-a (selected first: from)
 // with sha-b (selected second: to), CompareCommits answering files.

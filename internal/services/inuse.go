@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // branchInUse names where and how a worktree holds a branch: rebasing or

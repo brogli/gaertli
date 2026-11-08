@@ -1,7 +1,9 @@
 version: '3'
 
 vars:
-  APP_NAME: 'nebegit'
+  APP_NAME: 'gaertli'
+  PRODUCT_NAME: 'Gärtli'
+  MODULE: 'github.com/brogli/gaertli'
   BIN_DIR: 'bin'
   PACKAGE_MANAGER: pnpm
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
@@ -13,6 +15,7 @@ vars:
   # (build/release-version.sh) and the short commit, set by the release
   # workflow; "dev" and no commit for every local build.
   VERSION: '{{.VERSION | default "dev"}}'
+  ASSET_NAME: '{{.APP_NAME}}-{{.VERSION}}'
   COMMIT: '{{.COMMIT | default ""}}'
   # The numeric version installers and packages need: 0.0.0 outside releases.
   PRODUCT_VERSION:
@@ -75,7 +78,7 @@ tasks:
       # PARALLEL: tests mostly wait on git, so more run at once than there are cores; the Windows
       # runner, where every git process is slow, takes fewer.
       - go test -parallel {{.PARALLEL | default 16}} {{.FLAGS}} ./internal/...
-        ./cmd/nebegit-core/... ./build/windows/bin/...
+        ./cmd/{{.APP_NAME}}-core/... ./build/windows/bin/...
 
   test:go:oldgit:
     summary:
@@ -90,7 +93,7 @@ tasks:
       GOTOOLCHAIN: local
     cmds:
       - go test -parallel 16 {{.FLAGS}} $(go list ./internal/... | grep -v '/internal/app$')
-        ./cmd/nebegit-core/... ./build/windows/bin/...
+        ./cmd/{{.APP_NAME}}-core/... ./build/windows/bin/...
 
   test:frontend:
     summary: Runs the Vitest component tests offline
@@ -180,7 +183,7 @@ tasks:
       Linux only
     cmds:
       - task: linux:build
-        vars: { EXTRA_TAGS: server, OUTPUT: '{{.BIN_DIR}}/nebegit-server' }
+        vars: { EXTRA_TAGS: server, OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}-server' }
 
   e2e:real:
     summary: Playwright against the app in server mode, with the real core and git on scratch repos
@@ -196,17 +199,17 @@ tasks:
     env:
       CGO_ENABLED: '0'
     cmds:
-      - go build -o {{.BIN_DIR}}/nebegit-core{{exeExt}} ./cmd/nebegit-core
+      - go build -o {{.BIN_DIR}}/{{.APP_NAME}}-core{{exeExt}} ./cmd/{{.APP_NAME}}-core
 
   build:core:embed:
     summary:
       Cross-compiles the headless core for linux/amd64 into internal/remote, for the Windows build
       to embed
-    sources: [cmd/nebegit-core/**/*.go, internal/**/*.go]
-    generates: [internal/remote/nebegit-core-linux]
+    sources: ['cmd/{{.APP_NAME}}-core/**/*.go', 'internal/**/*.go']
+    generates: ['internal/remote/{{.APP_NAME}}-core-linux']
     env: { GOOS: linux, GOARCH: amd64, CGO_ENABLED: '0' }
     cmds:
-      - go build -trimpath -o internal/remote/nebegit-core-linux ./cmd/nebegit-core
+      - go build -trimpath -o internal/remote/{{.APP_NAME}}-core-linux ./cmd/{{.APP_NAME}}-core
 
   ci:lint:
     summary: treefmt, type check, traceability, licence check

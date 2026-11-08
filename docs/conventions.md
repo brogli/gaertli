@@ -1,6 +1,6 @@
-# Conventions — nebegit
+# Conventions — Gärtli
 
-How nebegit's code is written. Each convention states its intent; the details live in the lint and
+How Gärtli's code is written. Each convention states its intent; the details live in the lint and
 tool configuration and in the code, which enforce them where a tool can (QA-MNT-05).
 
 - [code.md](conventions/code.md): how code is shaped: simplicity, coupling, naming, errors.

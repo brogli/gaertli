@@ -7,8 +7,8 @@ import (
 	"slices"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // diffArgsFor is path's staged or unstaged diff at full context, as the

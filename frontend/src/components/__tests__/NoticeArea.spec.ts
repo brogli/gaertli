@@ -5,7 +5,7 @@ import { defineComponent, nextTick } from 'vue'
 import { mountNotices } from '@/testing/mountNotices'
 import { findButton } from '@/testing/findButton'
 import { errorNotice, useNotices, type AppNotice } from '@/lib/notice'
-import { Code } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { Code } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // mountShow mounts a throwaway component whose setup shows message under
 // kind 'test'.

@@ -1,4 +1,4 @@
-# Requirements — nebegit
+# Requirements — Gärtli
 
 What the app must do. How it is built is in `architecture.md`.
 
@@ -7,7 +7,8 @@ task plans and tests refer to these IDs.
 
 ## Purpose
 
-**nebegit** = Swiss German _näbe_ ("beside") + git: the git tool that sits beside your editor.
+**Gärtli** is Swiss German for "little garden", where you tend your branches: the git tool that sits
+beside your editor.
 
 A desktop GUI for daily git work, used next to a code editor that lacks strong git tooling. It
 offers a strong log view, commit comparison, worktree handling, and safe sync actions.

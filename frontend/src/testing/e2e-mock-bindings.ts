@@ -21,14 +21,14 @@ import {
   type Summary,
   type Worktree,
   type WorktreeID,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import {
   DiffMode,
   Theme,
   type RecentRepo,
   type Preferences,
-} from '../../bindings/github.com/brogli/nebegit/internal/settings'
-import type { LogPathInfo } from '../../bindings/github.com/brogli/nebegit/internal/app/models'
+} from '../../bindings/github.com/brogli/gaertli/internal/settings'
+import type { LogPathInfo } from '../../bindings/github.com/brogli/gaertli/internal/app/models'
 import { branchFixture } from '@/testing/fixtures/branch'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
@@ -424,7 +424,7 @@ export const AppService = {
     return Promise.resolve(undefined)
   },
   LogPath(): Promise<LogPathInfo> {
-    return Promise.resolve({ path: '/mock/nebegit.log', error: '' })
+    return Promise.resolve({ path: '/mock/gaertli.log', error: '' })
   },
   SetUnsavedWork(): Promise<void> {
     return Promise.resolve(undefined)

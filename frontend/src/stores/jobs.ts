@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { JobState, type JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { JobState, type JobInfo } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // jobs holds the worktree's repo-level jobs: load fetches the current list,
 // upsert applies one "job:update" event.

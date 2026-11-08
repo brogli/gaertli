@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-const ownModule = "github.com/brogli/nebegit"
+const ownModule = "github.com/brogli/gaertli"
 
 func main() {
 	out := flag.String("out", "THIRD-PARTY-NOTICES.txt", "where to write the notices")
@@ -46,7 +46,7 @@ func collect() ([]Dependency, error) {
 		return nil, err
 	}
 
-	goReport, err := output("go", "tool", "go-licenses", "report", "--template", tmpl, "./cmd/nebegit", "./cmd/nebegit-core")
+	goReport, err := output("go", "tool", "go-licenses", "report", "--template", tmpl, "./cmd/gaertli", "./cmd/gaertli-core")
 	if err != nil {
 		return nil, err
 	}

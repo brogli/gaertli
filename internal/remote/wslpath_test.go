@@ -5,7 +5,7 @@ package remote_test
 import (
 	"testing"
 
-	"github.com/brogli/nebegit/internal/remote"
+	"github.com/brogli/gaertli/internal/remote"
 )
 
 func TestBuildWSLPathRoundTripsThroughClassifyWSLPath(t *testing.T) {

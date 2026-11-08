@@ -3,7 +3,7 @@ package session
 import (
 	"testing"
 
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 func TestMain(m *testing.M) {

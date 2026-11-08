@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
-	"github.com/brogli/nebegit/internal/settings"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -353,11 +353,11 @@ func TestUpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
 }
 
 func TestLogPathReportsTheAppLogsLocation(t *testing.T) {
-	s := &AppService{logPath: "/x/nebegit.log"}
+	s := &AppService{logPath: "/x/gaertli.log"}
 
 	got := s.LogPath()
-	if got.Path != "/x/nebegit.log" || got.Error != "" {
-		t.Errorf("LogPath() = %+v, want Path /x/nebegit.log, no Error", got)
+	if got.Path != "/x/gaertli.log" || got.Error != "" {
+		t.Errorf("LogPath() = %+v, want Path /x/gaertli.log, no Error", got)
 	}
 }
 

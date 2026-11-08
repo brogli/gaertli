@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/git/gittest"
-	"github.com/brogli/nebegit/internal/jobs"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/jobs"
 )
 
 func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {

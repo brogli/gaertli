@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="#1F3B2C"/>
+  <!-- plant: stem and branch are the commit graph -->
+  <g transform="translate(96 41) scale(.85)">
+    <g stroke="#F4EBD0" stroke-width="44" stroke-linecap="round" fill="none">
+      <line x1="440" y1="840" x2="440" y2="300"/>
+      <path d="M440 700 C440 620 616 640 616 560 L616 480"/>
+    </g>
+    <g fill="#7BC96F">
+      <path d="M440 304 C420 220 470 150 580 128 C600 230 540 300 440 304 Z"/>
+      <path d="M616 484 C640 390 720 350 808 372 C780 470 700 510 616 484 Z"/>
+      <path d="M440 460 C400 410 340 400 272 424 C312 486 380 500 440 460 Z"/>
+    </g>
+    <g fill="#F4EBD0">
+      <circle cx="440" cy="560" r="44"/>
+      <circle cx="616" cy="580" r="44"/>
+    </g>
+  </g>
+  <!-- pot -->
+  <path d="M384 744 H640 L612 872 Q608 888 592 888 H432 Q416 888 412 872 Z" fill="#C2653A"/>
+  <rect x="352" y="696" width="320" height="64" rx="20" fill="#D97F4E"/>
+</svg>

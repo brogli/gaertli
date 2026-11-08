@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/brogli/nebegit/internal/applog"
-	"github.com/brogli/nebegit/internal/settings"
+	"github.com/brogli/gaertli/internal/applog"
+	"github.com/brogli/gaertli/internal/settings"
 )
 
 // emitter sends an event to every window; satisfied by

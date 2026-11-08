@@ -1,6 +1,6 @@
 package jobs
 
-import "github.com/brogli/nebegit/internal/core"
+import "github.com/brogli/gaertli/internal/core"
 
 // Info converts j to its JSON DTO. An UpdateBranchJob's
 // core.UpdateBranchResult is the one result a job returns.

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/core/coretest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
 )
 
 func TestStreamErrCallsOnLinePerRecordStdoutUntouched(t *testing.T) {

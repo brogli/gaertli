@@ -6,7 +6,7 @@ const { Facade } = vi.hoisted(() => ({
   Facade: { CompareCommits: vi.fn(), CompareWithWorking: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
