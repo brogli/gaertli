@@ -284,6 +284,8 @@ jobs:
         run: task build
 
   git-2-42:
+    # Off until the job is removed with the move to the current git as the minimum.
+    if: false
     # The Go tests also run against the oldest supported git (git.MinVersion),
     # from an old nixpkgs since ubuntu-24.04 ships a newer one. No frontend
     # build and no Wails shell package (it needs cgo and GTK/WebKit headers

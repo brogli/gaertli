@@ -100,7 +100,7 @@
       "groupName": "indirect Go modules"
     },
     {
-      "description": "flake.lock follows nixos-unstable on the next Renovate run instead of weekly, so nixpkgs security fixes land as soon as the channel has them.",
+      "description": "flake.lock follows nixpkgs-unstable on the next Renovate run instead of weekly, so nixpkgs security fixes land as soon as the channel has them.",
       "matchManagers": ["nix"],
       "matchUpdateTypes": ["lockFileMaintenance"],
       "schedule": ["at any time"]
