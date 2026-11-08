@@ -52,6 +52,12 @@
       "automerge": false
     },
     {
+      "description": "A formatter: a release that reformats code fails CI's lint and stays unmerged.",
+      "matchPackageNames": ["oxfmt"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
       "description": "One lock file maintenance PR per lock file.",
       "matchUpdateTypes": ["lockFileMaintenance"],
       "additionalBranchPrefix": "{{manager}}-"

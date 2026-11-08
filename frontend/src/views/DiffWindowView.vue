@@ -21,7 +21,7 @@ import { useFileTreeChoice } from '@/composables/useFileTreeChoice'
 import ErrorBanner from '@/components/ErrorBanner.vue'
 import ChangedFileList from '@/components/ChangedFileList.vue'
 import ChangedFileTree from '@/components/ChangedFileTree.vue'
-import FileTreeToggle from '@/components/FileTreeToggle.vue'
+import FileTreeControls from '@/components/FileTreeControls.vue'
 import DiffView from '@/components/DiffView.vue'
 import ConflictView from '@/components/ConflictView.vue'
 
@@ -39,6 +39,7 @@ const diff = useDiffStore()
 const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(wt, run)
 const asTree = useFileTreeChoice()
+const folded = ref(false)
 const { t } = useI18n()
 const { keepOnly } = useMergeDrafts()
 
@@ -206,14 +207,13 @@ useEventListener(
     <SplitterPanel :size="25" :min-size="10" class="flex min-h-0 flex-col">
       <ErrorBanner v-if="error" :error="error" class="mx-2.5 mt-2.5" />
       <aside class="file-list min-h-0 flex-1 overflow-auto pl-2.5">
-        <div class="flex justify-end">
-          <FileTreeToggle v-model:as-tree="asTree" />
-        </div>
+        <FileTreeControls v-model:as-tree="asTree" v-model:folded="folded" />
         <template v-for="g in groups" :key="g.title">
           <template v-if="g.files.length">
             <h3 v-if="g.title" class="mt-2 mb-1 text-sm">{{ g.title }}</h3>
             <component
               :is="asTree ? ChangedFileTree : ChangedFileList"
+              :folded="asTree ? folded : undefined"
               :files="g.files"
               :selected="
                 current?.staged === g.staged && current.conflicted === g.conflicted

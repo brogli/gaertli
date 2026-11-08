@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-16
+// Requirements: FR-LOG-16, FR-LOG-21
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import ChangedFiles from '../ChangedFiles.vue'
@@ -33,6 +33,33 @@ describe('ChangedFiles', () => {
 
     await toggle().trigger('click')
     expect(wrapper.findAll('.files li')).toHaveLength(2)
+  })
+
+  it('the toggle shows what a click does: the tree icon over the list, the list icon over the tree', async () => {
+    const wrapper = mount(ChangedFiles, { props: { files, selected: null } })
+    const icon = () =>
+      wrapper.get('[data-test="file-tree-toggle"] [data-pc-section="icon"]').classes()
+    expect(icon()).toContain('oi-sitemap')
+
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+
+    expect(icon()).toContain('oi-list')
+  })
+
+  it('in tree mode a fold button folds every folder, the next click unfolds them all', async () => {
+    const wrapper = mount(ChangedFiles, { props: { files, selected: null } })
+    const fold = () => wrapper.get('[data-test="fold-toggle"]')
+    const labels = () => wrapper.findAll('[role="treeitem"]').map((n) => n.attributes('aria-label'))
+    expect(wrapper.find('[data-test="fold-toggle"]').exists()).toBe(false)
+    await wrapper.get('[data-test="file-tree-toggle"]').trigger('click')
+    expect(fold().attributes('aria-label')).toBe('Fold all folders')
+
+    await fold().trigger('click')
+    expect(labels()).toEqual(['src'])
+    expect(fold().attributes('aria-label')).toBe('Unfold all folders')
+
+    await fold().trigger('click')
+    expect(labels()).toEqual(['src', 'a.ts', 'b.ts'])
   })
 
   it('the choice is remembered: the next mount starts as a tree', async () => {

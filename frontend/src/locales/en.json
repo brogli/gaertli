@@ -290,7 +290,9 @@
     "selectedCount": "{n} commit selected | {n} commits selected",
     "changedFiles": "{n} changed file | {n} changed files",
     "showAsTree": "Show as folder tree",
-    "showAsList": "Show as flat list"
+    "showAsList": "Show as flat list",
+    "foldAll": "Fold all folders",
+    "unfoldAll": "Unfold all folders"
   },
   "compareView": {
     "swap": "Swap",

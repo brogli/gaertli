@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-13, FR-ED-02, FR-LOG-16, FR-UX-13
+// Requirements: FR-CHG-13, FR-ED-02, FR-LOG-16, FR-LOG-21, FR-UX-13
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import ChangedFileTree from '../ChangedFileTree.vue'
@@ -26,6 +26,26 @@ describe('ChangedFileTree', () => {
     await row(wrapper, 'src').trigger('click')
     expect(labels(wrapper)).toEqual(['src', 'a.ts', 'b.ts'])
     expect(wrapper.emitted('select')).toBeUndefined()
+  })
+
+  it('folded folds every folder; unfolded again unfolds them all', async () => {
+    const wrapper = mount(ChangedFileTree, {
+      props: { files: [a, { path: 'lib/c.ts', status: 'A' }] },
+    })
+
+    await wrapper.setProps({ folded: true })
+    expect(labels(wrapper)).toEqual(['lib', 'src'])
+
+    await wrapper.setProps({ folded: false })
+    expect(labels(wrapper)).toEqual(['lib', 'c.ts', 'src', 'a.ts'])
+  })
+
+  it('a folded tree stays folded when its files refresh', async () => {
+    const wrapper = mount(ChangedFileTree, { props: { files, folded: true } })
+
+    await wrapper.setProps({ files: [...files] })
+
+    expect(labels(wrapper)).toEqual(['src'])
   })
 
   it('Enter on a folder folds it', async () => {
