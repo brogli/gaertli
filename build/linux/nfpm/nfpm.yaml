@@ -14,10 +14,12 @@ release: '1'
 contents:
   - src: './bin/gaertli'
     dst: '/usr/bin/gaertli'
-  - src: './build/appicon.png'
-    dst: '/usr/share/icons/hicolor/1024x1024/apps/gaertli.png'
-  - src: './build/linux/gaertli.desktop'
-    dst: '/usr/share/applications/gaertli.desktop'
+  # The desktop file, its icon and the app's GTK application id share one
+  # name, which is how the desktop matches a window to its icon.
+  - src: './build/appicon.svg'
+    dst: '/usr/share/icons/hicolor/scalable/apps/io.github.brogli.gaertli.svg'
+  - src: './build/linux/io.github.brogli.gaertli.desktop'
+    dst: '/usr/share/applications/io.github.brogli.gaertli.desktop'
   # Ubuntu's AppArmor denies user namespaces to programs without a profile;
   # WebKitGTK's sandbox needs them. Inert where AppArmor does not run.
   - src: './build/linux/apparmor/gaertli'
