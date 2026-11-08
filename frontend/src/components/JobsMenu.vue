@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import ProgressBar from 'openvue/progressbar'
-import { useJobsStore } from '@/stores/jobs'
+import { useSyncStore } from '@/stores/sync'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useWindowEvent } from '@/lib/windowEvents'
 import { iconClass, spinClass } from '@/lib/icons'
@@ -17,7 +17,7 @@ import ErrorBanner from './ErrorBanner.vue'
 // each. Starting or ending a job never resizes the button, so the rest of
 // the toolbar and the log below it never move.
 const props = defineProps<{ wt: string }>()
-const jobs = useJobsStore()
+const jobs = useSyncStore()
 const { error, run } = useCoreCall()
 const { t } = useI18n()
 const toolbarButton = useToolbarButton()
@@ -38,7 +38,7 @@ function jobLabel(job: JobInfo): string {
   return kindLabels[job.kind] ?? job.kind
 }
 
-const count = computed(() => jobs.active.length)
+const count = computed(() => jobs.running.length)
 const tooltip = computed(() =>
   count.value === 0
     ? t('jobsMenu.noJobs')
@@ -69,7 +69,7 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover')
       <ErrorBanner v-if="error" :error="error" />
       <p v-if="!count" class="text-muted-color">{{ t('jobsMenu.noJobs') }}</p>
       <div
-        v-for="job in jobs.active"
+        v-for="job in jobs.running"
         :key="job.id"
         class="flex items-center gap-2"
         data-test="job-row"

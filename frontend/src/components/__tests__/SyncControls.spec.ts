@@ -35,7 +35,7 @@ import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { mountInBody } from '@/testing/mountInBody'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'
 import SyncControls from '../SyncControls.vue'
-import { useJobsStore } from '@/stores/jobs'
+import { useSyncStore } from '@/stores/sync'
 import { useBranchesStore } from '@/stores/branches'
 import {
   Code,
@@ -61,7 +61,7 @@ function setRefs(branch: Partial<Branch> = {}, remotes = ['origin']): void {
 // rejectPush ends a push job rejected as not fast-forward. Force push shows
 // only as the rejection notice's action; useJobNotices renders it.
 async function rejectPush(): Promise<void> {
-  useJobsStore().upsert(
+  useSyncStore().upsert(
     jobFixture({
       kind: JobKind.PushJob,
       state: JobState.JobFailed,
@@ -132,11 +132,11 @@ describe('SyncControls', () => {
     await body.get('.p-splitbutton-button').trigger('click')
     await flushPromises()
 
-    useJobsStore().upsert(conflictedPull('other-window'))
+    useSyncStore().upsert(conflictedPull('other-window'))
     await flushPromises()
     expect(AppService.OpenDiff).not.toHaveBeenCalled()
 
-    useJobsStore().upsert(conflictedPull('job-1'))
+    useSyncStore().upsert(conflictedPull('job-1'))
     await flushPromises()
     expect(AppService.OpenDiff).toHaveBeenCalledTimes(1)
   })
@@ -149,7 +149,7 @@ describe('SyncControls', () => {
     await flushPromises()
     await body.get('.p-splitbutton-button').trigger('click')
 
-    useJobsStore().upsert(conflictedPull('job-1'))
+    useSyncStore().upsert(conflictedPull('job-1'))
     await flushPromises()
     answerPull('job-1')
     await flushPromises()
@@ -164,11 +164,11 @@ describe('SyncControls', () => {
     await body.get('.p-splitbutton-button').trigger('click')
     await flushPromises()
 
-    useJobsStore().upsert(
+    useSyncStore().upsert(
       jobFixture({ id: 'job-1', kind: JobKind.PullJob, state: JobState.JobDone }),
     )
     await flushPromises()
-    useJobsStore().upsert(conflictedPull('job-1'))
+    useSyncStore().upsert(conflictedPull('job-1'))
     await flushPromises()
 
     expect(AppService.OpenDiff).not.toHaveBeenCalled()

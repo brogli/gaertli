@@ -10,7 +10,7 @@ vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Fac
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import { useJobNotices } from '../useJobNotices'
-import { useJobsStore } from '@/stores/jobs'
+import { useSyncStore } from '@/stores/sync'
 import { useBranchesStore } from '@/stores/branches'
 import {
   Code,
@@ -103,7 +103,7 @@ describe('useJobNotices', () => {
     const notice = await mountWithNotices()
     setUpstream()
 
-    useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
+    useSyncStore().upsert(rejectedPushJob(Code.NotFastForward))
     await nextTick()
 
     expect(notice.text()).toContain('Updates were rejected')
@@ -115,7 +115,7 @@ describe('useJobNotices', () => {
     const notice = await mountWithNotices()
     setUpstream()
 
-    useJobsStore().upsert(rejectedPushJob(Code.PushRejected))
+    useSyncStore().upsert(rejectedPushJob(Code.PushRejected))
     await nextTick()
 
     await findButton(notice, 'Pull')!.trigger('click')
@@ -126,7 +126,7 @@ describe('useJobNotices', () => {
     const notice = await mountWithNotices()
     useBranchesStore().refs = refsFixture()
 
-    useJobsStore().upsert(rejectedPushJob(Code.NotFastForward))
+    useSyncStore().upsert(rejectedPushJob(Code.NotFastForward))
     await nextTick()
 
     expect(notice.text()).toContain('Updates were rejected')
@@ -136,7 +136,7 @@ describe('useJobNotices', () => {
 
   it('a later pull clears the rejection notice', async () => {
     const notice = await mountWithNotices()
-    const jobs = useJobsStore()
+    const jobs = useSyncStore()
 
     jobs.upsert(rejectedPushJob(Code.NotFastForward))
     await nextTick()
@@ -153,7 +153,7 @@ describe('useJobNotices', () => {
   it('a pull job failed DIRTY_WORKTREE shows "Stash and pull", running PullWithStash', async () => {
     const notice = await mountWithNotices()
 
-    useJobsStore().upsert(blockedPullJob)
+    useSyncStore().upsert(blockedPullJob)
     await nextTick()
 
     expect(notice.text()).toContain('local changes in the way')
@@ -171,8 +171,8 @@ describe('useJobNotices', () => {
     })
     const done = jobFixture({ id: 'done', kind: JobKind.PullJob, state: JobState.JobDone })
 
-    useJobsStore().upsert(conflicted)
-    useJobsStore().upsert(done)
+    useSyncStore().upsert(conflicted)
+    useSyncStore().upsert(done)
     await nextTick()
 
     expect(onPullEnded.mock.calls.map(([job]) => job.id)).toEqual(['conflicted', 'done'])
@@ -182,7 +182,7 @@ describe('useJobNotices', () => {
   it('a sync failure not explained elsewhere shows a plain notice', async () => {
     const notice = await mountWithNotices()
 
-    useJobsStore().upsert(failedFetchJob)
+    useSyncStore().upsert(failedFetchJob)
     await nextTick()
 
     expect(notice.text()).toContain('Could not sign in to the remote.')
@@ -191,7 +191,7 @@ describe('useJobNotices', () => {
   it("a sync failure's notice shows git's command and stderr behind a details toggle", async () => {
     const notice = await mountWithNotices()
 
-    useJobsStore().upsert(
+    useSyncStore().upsert(
       jobFixture({
         state: JobState.JobFailed,
         error: {
@@ -215,7 +215,7 @@ describe('useJobNotices', () => {
 
   it('a failure another notice explains shows no extra notice', async () => {
     const notice = await mountWithNotices()
-    const jobs = useJobsStore()
+    const jobs = useSyncStore()
 
     jobs.upsert(
       jobFixture({
@@ -239,7 +239,7 @@ describe('useJobNotices', () => {
       },
     })
 
-    useJobsStore().upsert(job)
+    useSyncStore().upsert(job)
     await nextTick()
 
     await findButton(notice, 'Try again')!.trigger('click')
@@ -250,7 +250,7 @@ describe('useJobNotices', () => {
   it('an update-branch job ends updated: notice names the branch, commit count, from and to', async () => {
     const notice = await mountWithNotices()
 
-    useJobsStore().upsert(
+    useSyncStore().upsert(
       branchUpdateJob({
         result: {
           outcome: UpdateOutcome.BranchUpdated,
@@ -268,7 +268,7 @@ describe('useJobNotices', () => {
   it('an update-branch job ends up to date: notice says so', async () => {
     const notice = await mountWithNotices()
 
-    useJobsStore().upsert(branchUpdateJob())
+    useSyncStore().upsert(branchUpdateJob())
     await nextTick()
 
     expect(notice.text()).toContain('feature is up to date')
@@ -277,7 +277,7 @@ describe('useJobNotices', () => {
   it('an update-branch job fails: notice shows the failure', async () => {
     const notice = await mountWithNotices()
 
-    useJobsStore().upsert(
+    useSyncStore().upsert(
       branchUpdateJob({
         state: JobState.JobFailed,
         progress: 0,
@@ -300,7 +300,7 @@ describe('useJobNotices', () => {
     '%s: its closed notice does not come back on a later job update or a reload of the jobs',
     async (_, job) => {
       const notice = await mountWithNotices()
-      const jobs = useJobsStore()
+      const jobs = useSyncStore()
       jobs.upsert(job)
       await flushPromises()
       await notice.get('.p-toast-close-button').trigger('click')
@@ -321,7 +321,7 @@ describe('useJobNotices', () => {
     const notice = await mountWithNotices()
     Facade.Jobs.mockResolvedValue(endedJobs.map(([, job], i) => ({ ...job, id: `j${i}` })))
 
-    await useJobsStore().load('/repo')
+    await useSyncStore().load('/repo')
     await flushPromises()
 
     expect(notice.find('.p-toast-message').exists()).toBe(false)
@@ -329,7 +329,7 @@ describe('useJobNotices', () => {
 
   it("one branch's update result leaves another branch's open", async () => {
     const notice = await mountWithNotices()
-    const jobs = useJobsStore()
+    const jobs = useSyncStore()
 
     jobs.upsert(branchUpdateJob())
     jobs.upsert(branchUpdateJob({ id: 'j2', branch: 'topic' }))

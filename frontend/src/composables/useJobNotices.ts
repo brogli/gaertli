@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n'
-import { useJobsStore } from '@/stores/jobs'
+import { useSyncStore } from '@/stores/sync'
 import { useBranchesStore } from '@/stores/branches'
 import {
   Code,
@@ -41,7 +41,7 @@ interface JobNoticeActions {
 // window listed it shows none. Actions supplies the pull-mode-aware,
 // confirm-gated recovery calls the rejection and blocked-pull notices offer.
 export function useJobNotices(actions: JobNoticeActions): void {
-  const jobs = useJobsStore()
+  const jobs = useSyncStore()
   const refs = useBranchesStore()
   const { show, clear } = useNotices()
   const t = i18n.global.t
