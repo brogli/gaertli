@@ -147,7 +147,7 @@ func pickArgs(verb string, opts core.PickOptions) []string {
 // runSequence is CherryPick's and Revert's shared body: resolve
 // shas, refuse the whole call up front if any is a merge commit, then run
 // verb under wt's write lock. A failure that leaves headFile behind stopped
-// mid-way: Code Conflicts.
+// mid-way: Code Conflicted.
 func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb, headFile string, oldestFirst bool, opts core.PickOptions) error {
 	if len(shas) == 0 {
 		return core.Errorf(core.Internal, "no commits given")

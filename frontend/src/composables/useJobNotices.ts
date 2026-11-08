@@ -19,7 +19,7 @@ const EXPLAINED_ELSEWHERE: Code[] = [
   Code.PushRejected,
   Code.NotFastForward,
   Code.DirtyWorktree,
-  Code.Conflicts,
+  Code.Conflicted,
   Code.Cancelled,
 ]
 

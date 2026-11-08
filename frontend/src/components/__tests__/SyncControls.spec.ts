@@ -77,7 +77,7 @@ function conflictedPull(id: string) {
     id,
     kind: JobKind.PullJob,
     state: JobState.JobFailed,
-    error: { code: Code.Conflicts, message: 'conflicts' },
+    error: { code: Code.Conflicted, message: 'conflicts' },
   })
 }
 

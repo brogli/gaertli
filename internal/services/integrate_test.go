@@ -55,7 +55,7 @@ func TestMergeAndRebaseRefuseBeforeGitRunsWithAnOperationOrDetachedHead(t *testi
 		},
 	}
 	sideTip := gittest.Out(t, repo.Dir, "rev-parse", "side")
-	coretest.AssertCode(t, c.CherryPick(t.Context(), wt, []string{sideTip}, core.PickOptions{}), core.Conflicts)
+	coretest.AssertCode(t, c.CherryPick(t.Context(), wt, []string{sideTip}, core.PickOptions{}), core.Conflicted)
 
 	for name, call := range calls {
 		ce := coretest.AsError(t, call(), core.GitFailed)
@@ -222,12 +222,12 @@ func TestMergeBlockedByLocalChangesIsDirtyWorktree(t *testing.T) {
 	}
 }
 
-func TestMergeStopsAsConflictsOrStopped(t *testing.T) {
+func TestMergeStopsAsConflictedOrStopped(t *testing.T) {
 	t.Parallel()
 	repo := divergedConflictRepo(t)
 	c, wt := openWorktree(t, repo.Dir)
 	_, err := c.Merge(t.Context(), wt, "refs/heads/side", false)
-	coretest.AssertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicted)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Error("MERGE_HEAD missing, want the merge left for the conflict flow")
 	}
@@ -324,7 +324,7 @@ func TestRebaseStopsOnConflictsLeavingTheRebase(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 	_, err := c.Rebase(t.Context(), wt, "refs/heads/master", false)
-	coretest.AssertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicted)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "rebase-merge")) {
 		t.Error("rebase-merge missing, want the rebase left for the conflict flow")
 	}
@@ -375,7 +375,7 @@ func TestMergeWithStashKeepsTheEntryOnConflicts(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	_, err := c.Merge(t.Context(), wt, "refs/heads/side", true)
 
-	coretest.AssertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicted)
 	list := gittest.Out(t, repo.Dir, "stash", "list")
 	if !strings.HasSuffix(list, ": Gärtli: local changes before merge") || strings.Contains(list, "\n") {
 		t.Errorf("stash list = %q, want one entry with subject %q", list, "Gärtli: local changes before merge")

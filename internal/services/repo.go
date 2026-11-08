@@ -119,12 +119,12 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// remapIfPending reclassifies git's failure as Code Conflicts if pending: an
+// remapIfPending reclassifies git's failure as Code Conflicted if pending: an
 // operation-state file was left behind, so git stopped mid-way rather than
 // refusing outright.
 func remapIfPending(err error, pending bool) error {
 	if ce := gitFailure(err); ce != nil && pending {
-		ce.Code = core.Conflicts
+		ce.Code = core.Conflicted
 	}
 	return err
 }

@@ -61,13 +61,13 @@ func stopOf(ctx context.Context, wt *session.Worktree, err error) error {
 }
 
 // asStop reclassifies err, from a step that left an operation in progress,
-// as a stop: Code Conflicts with conflicted files, else Code Stopped,
+// as a stop: Code Conflicted with conflicted files, else Code Stopped,
 // whatever err's code was (a timeout included).
 func asStop(err error, conflicted bool) error {
 	ce := core.ErrorOf(err)
 	ce.Code = core.Stopped
 	if conflicted {
-		ce.Code = core.Conflicts
+		ce.Code = core.Conflicted
 	}
 	return ce
 }
@@ -78,7 +78,7 @@ func asStop(err error, conflicted bool) error {
 // operation half done.
 const operationTimeout = 10 * time.Minute
 
-// remapOperationConflict reclassifies git's failure as Code Conflicts while
+// remapOperationConflict reclassifies git's failure as Code Conflicted while
 // an operation is still in progress under gitDir.
 func remapOperationConflict(err error, gitDir string) error {
 	return remapIfPending(err, operation(gitDir) != "")

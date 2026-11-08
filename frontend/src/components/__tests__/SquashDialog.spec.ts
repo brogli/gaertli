@@ -116,7 +116,7 @@ describe('SquashDialog', () => {
     },
     {
       outcome: 'a conflict stop closes the dialog and opens the conflicted file',
-      error: { code: Code.Conflicts, message: 'could not apply' },
+      error: { code: Code.Conflicted, message: 'could not apply' },
       closes: true,
       shows: '',
     },
@@ -135,6 +135,6 @@ describe('SquashDialog', () => {
 
     expect(wrapper.emitted('done')?.length).toBe(closes ? 1 : undefined)
     expect(notice.text() + body.text()).toContain(shows)
-    expect(AppService.OpenDiff).toHaveBeenCalledTimes(error.code === Code.Conflicts ? 1 : 0)
+    expect(AppService.OpenDiff).toHaveBeenCalledTimes(error.code === Code.Conflicted ? 1 : 0)
   })
 })

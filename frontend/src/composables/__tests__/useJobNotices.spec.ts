@@ -167,7 +167,7 @@ describe('useJobNotices', () => {
       id: 'conflicted',
       kind: JobKind.PullJob,
       state: JobState.JobFailed,
-      error: { code: Code.Conflicts, message: 'conflicts' },
+      error: { code: Code.Conflicted, message: 'conflicts' },
     })
     const done = jobFixture({ id: 'done', kind: JobKind.PullJob, state: JobState.JobDone })
 
@@ -221,7 +221,7 @@ describe('useJobNotices', () => {
       jobFixture({
         kind: JobKind.PullJob,
         state: JobState.JobFailed,
-        error: { code: Code.Conflicts, message: Code.Conflicts },
+        error: { code: Code.Conflicted, message: Code.Conflicted },
       }),
     )
     await nextTick()

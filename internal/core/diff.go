@@ -1,5 +1,16 @@
 package core
 
+// ChangedFile is one file touched by a commit, or one entry in a worktree's
+// current changes.
+type ChangedFile struct {
+	Path    string `json:"path"`
+	OldPath string `json:"oldPath,omitempty"` // rename/copy source
+	// Status is "A" | "M" | "D" | "R" | "C" | "T" | "U" for a commit's own
+	// file; "?" for an untracked entry, or a two-letter unmerged code (e.g.
+	// "UU", "AU", "DD") for a conflicted entry.
+	Status string `json:"status"`
+}
+
 // DiffFile is one file's diff as git computed it: both sides' content and
 // git's hunks between them. The frontend only draws it.
 type DiffFile struct {

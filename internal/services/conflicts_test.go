@@ -254,7 +254,7 @@ func TestContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
 
 			err := c.ContinueOperation(t.Context(), wt)
 
-			ce := coretest.AsError(t, err, core.Conflicts)
+			ce := coretest.AsError(t, err, core.Conflicted)
 			if ce.GitStderr == "" {
 				t.Error("GitStderr empty, want git's own explanation")
 			}
