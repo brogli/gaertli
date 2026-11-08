@@ -13,7 +13,9 @@ pipelines do, `docs/releasing.md` how builds and releases work.
 - Design decisions rest on research from primary sources (official docs, release notes, source
   code), each finding with a link and a date.
 - Work on a branch off `main` and rebase it onto `main` for updates; never merge `main` into it.
-  Never commit to `main`.
+  Never commit to `main`. Pushing branches and opening PRs is allowed; releases only when the user
+  says so.
+- Owner decisions (a new or changed ADR, a new MUST requirement, a release) go to the user.
 - PR titles are Conventional Commits, written for users: they become the release notes
   (`docs/conventions/tooling.md`).
 - Project knowledge goes into this file or a project skill (`.claude/skills/`), not into Claude's
@@ -76,7 +78,8 @@ pipelines do, `docs/releasing.md` how builds and releases work.
   repo root it fails).
 - Windows build: `nix develop --command task windows:build`. An exported `GOOS=windows` breaks
   Task's PATH lookup.
-- Before a push, `git grep` finds no home paths or personal names.
+- Before a push, `git grep` finds no home paths or personal names, and
+  `git log origin/main..HEAD --format='%ae %ce' | sort -u` shows only the GitHub noreply address.
 
 ## Claude's shell
 
