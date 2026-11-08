@@ -23,32 +23,24 @@ var (
 	rebaseVerb = integrateVerb{"rebase", []string{"--merge", "--no-rebase-merges", "--no-update-refs", "--no-autostash"}}
 )
 
-// shortRefName drops the namespace of a branch, remote branch or tag ref; ok is false for any
-// other name.
-func shortRefName(full string) (short string, ok bool) {
-	for _, prefix := range []string{"refs/heads/", "refs/remotes/", "refs/tags/"} {
-		if short, ok := strings.CutPrefix(full, prefix); ok {
-			return short, true
-		}
-	}
-	return "", false
-}
-
 // Merge implements core.API.
-func (c *Core) Merge(ctx context.Context, id core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+func (c *Core) Merge(ctx context.Context, id core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
 	return c.integrate(ctx, id, ref, mergeVerb, stash)
 }
 
 // Rebase implements core.API.
-func (c *Core) Rebase(ctx context.Context, id core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+func (c *Core) Rebase(ctx context.Context, id core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
 	return c.integrate(ctx, id, ref, rebaseVerb, stash)
 }
 
 // integrate runs verb of ref into wt's current branch under wt's write lock,
 // with local changes stashed around it if stash.
-func (c *Core) integrate(ctx context.Context, id core.WorktreeID, ref string, verb integrateVerb, stash bool) (core.IntegrateResult, error) {
+func (c *Core) integrate(ctx context.Context, id core.WorktreeID, ref core.RefName, verb integrateVerb, stash bool) (core.IntegrateResult, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
+		return core.IntegrateResult{}, err
+	}
+	if err := ref.Validate(); err != nil {
 		return core.IntegrateResult{}, err
 	}
 	wt.Lock()
@@ -116,10 +108,10 @@ func refuseIntegrate(ctx context.Context, wt *session.Worktree) error {
 // integrateArg is ref as git is given it: its short name when that names
 // ref alone, so a merge message reads as on the command line, else the full
 // ref.
-func integrateArg(ctx context.Context, wt *session.Worktree, ref string) (string, error) {
-	short, ok := shortRefName(ref)
-	if !ok || strings.HasPrefix(short, "-") {
-		return ref, nil
+func integrateArg(ctx context.Context, wt *session.Worktree, ref core.RefName) (string, error) {
+	short := ref.Short()
+	if strings.HasPrefix(short, "-") {
+		return string(ref), nil
 	}
 	result, err := wt.Runner.Run(ctx, git.Call{
 		Dir: wt.Path, ReadOnly: true,
@@ -128,15 +120,15 @@ func integrateArg(ctx context.Context, wt *session.Worktree, ref string) (string
 	if err != nil && !quietFailure(err, result) {
 		return "", err
 	}
-	if strings.TrimSpace(string(result.Stdout)) == ref {
+	if core.RefName(strings.TrimSpace(string(result.Stdout))) == ref {
 		return short, nil
 	}
-	return ref, nil
+	return string(ref), nil
 }
 
 // integrateOutcome tells what a successful verb did, from HEAD before and
 // after. A merge that moved HEAD to arg's commit fast-forwarded.
-func integrateOutcome(ctx context.Context, wt *session.Worktree, rebased bool, before, after, arg string) (core.IntegrateOutcome, error) {
+func integrateOutcome(ctx context.Context, wt *session.Worktree, rebased bool, before, after core.SHA, arg string) (core.IntegrateOutcome, error) {
 	switch {
 	case before == after:
 		return core.IntegrateUpToDate, nil
@@ -268,7 +260,7 @@ func integrateWithStash(ctx context.Context, wt *session.Worktree, integrateArgs
 
 // untouched reports whether wt has no operation in progress, HEAD at head, and the index and
 // tracked files as HEAD has them.
-func untouched(ctx context.Context, wt *session.Worktree, head string) bool {
+func untouched(ctx context.Context, wt *session.Worktree, head core.SHA) bool {
 	if operation(wt.GitDir) != "" {
 		return false
 	}

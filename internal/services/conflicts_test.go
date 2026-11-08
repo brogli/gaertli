@@ -301,7 +301,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 	cases := []struct {
 		name  string
 		start func(t *testing.T) (dir string)
-		want  func(sha func(rev string) string) (op core.Operation, current, incoming core.ConflictSide)
+		want  func(sha func(rev string) core.SHA) (op core.Operation, current, incoming core.ConflictSide)
 	}{
 		{
 			"merge",
@@ -311,7 +311,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 				tryGit(t, dir, "merge", "side")
 				return dir
 			},
-			func(sha func(string) string) (core.Operation, core.ConflictSide, core.ConflictSide) {
+			func(sha func(string) core.SHA) (core.Operation, core.ConflictSide, core.ConflictSide) {
 				return core.MergeOperation,
 					core.ConflictSide{Present: true, SHA: sha("master"), Ref: "master"},
 					core.ConflictSide{Present: true, SHA: sha("side"), Ref: "side"}
@@ -326,7 +326,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 				tryGit(t, dir, "rebase", "master")
 				return dir
 			},
-			func(sha func(string) string) (core.Operation, core.ConflictSide, core.ConflictSide) {
+			func(sha func(string) core.SHA) (core.Operation, core.ConflictSide, core.ConflictSide) {
 				return core.RebaseOperation,
 					core.ConflictSide{Present: true, SHA: sha("master"), Ref: "master"},
 					core.ConflictSide{Present: true, SHA: sha("side"), Subject: "incoming change"}
@@ -341,7 +341,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 				tryGit(t, dir, "-c", "rebase.backend=apply", "rebase", "master")
 				return dir
 			},
-			func(sha func(string) string) (core.Operation, core.ConflictSide, core.ConflictSide) {
+			func(sha func(string) core.SHA) (core.Operation, core.ConflictSide, core.ConflictSide) {
 				return core.RebaseOperation,
 					core.ConflictSide{Present: true, SHA: sha("master"), Ref: "master"},
 					core.ConflictSide{Present: true, SHA: sha("side"), Subject: "incoming change"}
@@ -355,7 +355,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 				tryGit(t, dir, "cherry-pick", "side")
 				return dir
 			},
-			func(sha func(string) string) (core.Operation, core.ConflictSide, core.ConflictSide) {
+			func(sha func(string) core.SHA) (core.Operation, core.ConflictSide, core.ConflictSide) {
 				return core.CherryPickOperation,
 					core.ConflictSide{Present: true, SHA: sha("master"), Ref: "master"},
 					core.ConflictSide{Present: true, SHA: sha("side"), Subject: "incoming change"}
@@ -373,7 +373,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 				tryGit(t, dir, "revert", "HEAD~1")
 				return dir
 			},
-			func(sha func(string) string) (core.Operation, core.ConflictSide, core.ConflictSide) {
+			func(sha func(string) core.SHA) (core.Operation, core.ConflictSide, core.ConflictSide) {
 				return core.RevertOperation,
 					core.ConflictSide{Present: true, SHA: sha("master"), Ref: "master"},
 					core.ConflictSide{Present: true, SHA: sha("reverted"), Subject: "reverted change"}
@@ -391,7 +391,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 				tryGit(t, dir, "stash", "pop")
 				return dir
 			},
-			func(sha func(string) string) (core.Operation, core.ConflictSide, core.ConflictSide) {
+			func(sha func(string) core.SHA) (core.Operation, core.ConflictSide, core.ConflictSide) {
 				return "", core.ConflictSide{Present: true, SHA: sha("master"), Ref: "master"}, core.ConflictSide{Present: true}
 			},
 		},
@@ -400,7 +400,7 @@ func TestConflictLabelsTheSidesByOperation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := tc.start(t)
 			c, wt := openWorktree(t, dir)
-			sha := func(rev string) string { return gittest.Out(t, dir, "rev-parse", rev) }
+			sha := func(rev string) core.SHA { return core.SHA(gittest.Out(t, dir, "rev-parse", rev)) }
 
 			got := readConflict(t, c, wt, "a.txt")
 

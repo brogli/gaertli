@@ -85,7 +85,7 @@ func TestParseCommitDetailsFieldsEmailsAndDates(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := core.CommitDetails{
-		SHA: "aaaa", Parents: []string{"bbbb", "cccc"},
+		SHA: "aaaa", Parents: []core.SHA{"bbbb", "cccc"},
 		Author: "Alice", AuthorEmail: "alice@example.com", AuthorAt: 1700000000,
 		Committer: "Bob", CommitterEmail: "bob@example.com", CommitterAt: 1700000100,
 		Body:  "Subject line",

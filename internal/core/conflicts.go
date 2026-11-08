@@ -70,7 +70,7 @@ type ConflictFile struct {
 type ConflictSide struct {
 	Present bool   `json:"present"`           // the side has a version of the file
 	Content string `json:"content,omitempty"` // Kind text only
-	SHA     string `json:"sha,omitempty"`     // the commit the side comes from; "" for base or unknown
+	SHA     SHA    `json:"sha,omitempty"`     // the commit the side comes from; "" for base or unknown
 	Ref     string `json:"ref,omitempty"`     // short name of a ref at SHA, "" if none
 	Subject string `json:"subject,omitempty"` // SHA's subject, for a side that is one commit
 }

@@ -179,7 +179,7 @@ func TestLoadLogMarksCheckedOutWorktrees(t *testing.T) {
 	gittest.Run(t, repo.Dir, "branch", "feature")
 	linked := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linked, "feature")
-	gittest.Run(t, repo.Dir, "switch", "--detach", older)
+	gittest.Run(t, repo.Dir, "switch", "--detach", string(older))
 
 	c, wt := openWorktree(t, repo.Dir)
 	rows := loadLog(t, c, wt)

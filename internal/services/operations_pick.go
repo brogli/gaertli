@@ -148,7 +148,7 @@ func pickArgs(verb string, opts core.PickOptions) []string {
 // shas, refuse the whole call up front if any is a merge commit, then run
 // verb under wt's write lock. A failure that leaves headFile behind stopped
 // mid-way: Code Conflicted.
-func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb, headFile string, oldestFirst bool, opts core.PickOptions) error {
+func runSequence(ctx context.Context, wt *session.Worktree, shas []core.SHA, verb, headFile string, oldestFirst bool, opts core.PickOptions) error {
 	if len(shas) == 0 {
 		return core.Errorf(core.Internal, "no commits given")
 	}
@@ -156,7 +156,7 @@ func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb,
 	wt.Lock()
 	defer wt.Unlock()
 
-	candidates, err := resolveCandidates(ctx, wt.Runner, wt.Path, shas)
+	candidates, err := resolveCandidates(ctx, wt.Runner, wt.Path, shaArgs(shas))
 	if err != nil {
 		return err
 	}
@@ -165,16 +165,16 @@ func runSequence(ctx context.Context, wt *session.Worktree, shas []string, verb,
 		return core.ErrorfArgs(core.GitFailed, "mergeCommitNotPickable", args, "%s is a merge commit; %s does not support a merge commit", merge.ShortSHA, verb)
 	}
 
-	shas, err = orderedSHAs(ctx, wt.Runner, wt.Path, candidates, oldestFirst)
+	ordered, err := orderedSHAs(ctx, wt.Runner, wt.Path, candidates, oldestFirst)
 	if err != nil {
 		return err
 	}
-	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: append(pickArgs(verb, opts), shas...)})
+	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: append(pickArgs(verb, opts), ordered...)})
 	return remapIfPending(err, fileExists(filepath.Join(wt.GitDir, headFile)))
 }
 
 // CherryPick implements core.API.
-func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return err
@@ -183,7 +183,7 @@ func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []string
 }
 
 // Revert implements core.API.
-func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return err

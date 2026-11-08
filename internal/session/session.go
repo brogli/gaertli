@@ -239,7 +239,7 @@ func (r *Repo) LogSnapshot(from, to int) LogView {
 // LogIndexOf returns sha's row index in the currently loaded log. A racing
 // reload can make it momentarily stale; the frontend's next LogRows call
 // corrects it.
-func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
+func (r *Repo) LogIndexOf(sha core.SHA) (index int, found bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i, c := range r.log.rows {
@@ -253,7 +253,7 @@ func (r *Repo) LogIndexOf(sha string) (index int, found bool) {
 // LogIndicesOf returns, in row order, the indices of every row whose SHA is
 // in shas, and the log's current generation. Reads r.log.rows in place
 // under the lock: no copy, unlike LogSnapshot.
-func (r *Repo) LogIndicesOf(shas map[string]bool) (indices []int, generation int) {
+func (r *Repo) LogIndicesOf(shas map[core.SHA]bool) (indices []int, generation int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.log.indicesOf(shas)
@@ -341,7 +341,7 @@ func (w *Worktree) ActiveFilter() (filter core.LogFilter, ok bool) {
 // this worktree's current view (its filtered view while one is active,
 // else the repo's shared log), without copying that view's rows. filtered
 // says which view answered.
-func (w *Worktree) LogIndicesOf(shas map[string]bool) (indices []int, generation int, filtered bool) {
+func (w *Worktree) LogIndicesOf(shas map[core.SHA]bool) (indices []int, generation int, filtered bool) {
 	if indices, generation, ok := w.filteredIndicesOf(shas); ok {
 		return indices, generation, true
 	}
@@ -350,7 +350,7 @@ func (w *Worktree) LogIndicesOf(shas map[string]bool) (indices []int, generation
 }
 
 // filteredIndicesOf mirrors FilterSnapshot, scoped to LogIndicesOf.
-func (w *Worktree) filteredIndicesOf(shas map[string]bool) (indices []int, generation int, ok bool) {
+func (w *Worktree) filteredIndicesOf(shas map[core.SHA]bool) (indices []int, generation int, ok bool) {
 	w.filterMu.Lock()
 	defer w.filterMu.Unlock()
 	if !w.filterActive {
@@ -421,7 +421,7 @@ func (s *logState) view(from, to int) LogView {
 // indicesOf returns, in row order, the indices of every row whose SHA is in
 // shas, and the stream's current generation; no row is copied. An empty
 // shas skips the scan.
-func (s *logState) indicesOf(shas map[string]bool) (indices []int, generation int) {
+func (s *logState) indicesOf(shas map[core.SHA]bool) (indices []int, generation int) {
 	if len(shas) > 0 {
 		for i, c := range s.rows {
 			if shas[c.SHA] {

@@ -26,12 +26,12 @@ type Branches interface {
 	Checkout(ctx context.Context, wt WorktreeID, branch string) error
 
 	// CheckoutCommit detaches wt's HEAD at sha. Same errors as Checkout.
-	CheckoutCommit(ctx context.Context, wt WorktreeID, sha string) error
+	CheckoutCommit(ctx context.Context, wt WorktreeID, sha SHA) error
 
-	// Reset moves wt's current branch, or its detached HEAD, to sha, a
-	// resolved hash. Refusals are GitFailed, e.g. --soft during a merge.
+	// Reset moves wt's current branch, or its detached HEAD, to sha.
+	// Refusals are GitFailed, e.g. --soft during a merge.
 	// --mixed and --hard never refuse a dirty tree or a conflict.
-	Reset(ctx context.Context, wt WorktreeID, sha string, mode ResetMode) (ResetResult, error)
+	Reset(ctx context.Context, wt WorktreeID, sha SHA, mode ResetMode) (ResetResult, error)
 
 	// RenameBranch renames name to newName, validated first (Code
 	// InvalidName).
@@ -54,7 +54,7 @@ type Refs struct {
 // Branch is one local branch.
 type Branch struct {
 	Name         string `json:"name"`
-	SHA          string `json:"sha"`
+	SHA          SHA    `json:"sha"`
 	Upstream     string `json:"upstream,omitempty"` // short form; "" if none configured
 	Ahead        int    `json:"ahead"`
 	Behind       int    `json:"behind"`
@@ -88,20 +88,20 @@ type Remote struct {
 // prefix (e.g. "main" under Remote{Name: "origin"}, from "origin/main").
 type RemoteBranch struct {
 	Name string `json:"name"`
-	SHA  string `json:"sha"`
+	SHA  SHA    `json:"sha"`
 }
 
 // Tag is one tag. SHA is always the commit it points to, also for an
 // annotated tag.
 type Tag struct {
 	Name string `json:"name"`
-	SHA  string `json:"sha"`
+	SHA  SHA    `json:"sha"`
 }
 
 // ResetResult is Reset's result: the HEAD commit before the reset, so the
 // user can go back. "" only if HEAD was unborn.
 type ResetResult struct {
-	PreviousHead string `json:"previousHead"`
+	PreviousHead SHA `json:"previousHead"`
 }
 
 // ResetMode is git reset's mode.

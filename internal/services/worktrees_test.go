@@ -56,12 +56,12 @@ func TestListWorktreesReportsEveryWorktreeShape(t *testing.T) {
 	linkedDir := filepath.Join(t.TempDir(), "linked")
 	gittest.Run(t, repo.Dir, "worktree", "add", linkedDir, "feature")
 	detachedDir := filepath.Join(t.TempDir(), "detached")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", detachedDir, sha)
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", detachedDir, string(sha))
 	dirtyDir := filepath.Join(t.TempDir(), "dirty")
 	gittest.Run(t, repo.Dir, "worktree", "add", dirtyDir, "dirty")
 	writeFile(t, dirtyDir, "seed.txt", "changed")
 	missingDir := filepath.Join(t.TempDir(), "missing")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", missingDir, sha)
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", missingDir, string(sha))
 	paths := map[string]string{
 		"main": gitPath(t, repo.Dir), "linked": gitPath(t, linkedDir), "detached": gitPath(t, detachedDir),
 		"dirty": gitPath(t, dirtyDir), "missing": gitPath(t, missingDir),
@@ -260,7 +260,7 @@ func TestAddWorktreeCreatesANewBranchFromAGivenStart(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "wt")
 
 	c, _ := openWorktree(t, repo.Dir)
-	got, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "newb", firstSHA, true)
+	got, err := c.AddWorktree(t.Context(), core.RepoPath(repo.Dir), target, "newb", string(firstSHA), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestAddWorktreeWithANewBranchFromARemoteBranchSetsNoUpstream(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	if got.Branch != "topic" || got.SHA != originTip {
+	if got.Branch != "topic" || got.SHA != core.SHA(originTip) {
 		t.Errorf("AddWorktree = %+v, want Branch \"topic\" at %s", got, originTip)
 	}
 	if branch := currentBranch(t, target); branch != "topic" {
@@ -307,7 +307,10 @@ func TestAddWorktreeStartsANewBranchAtTheFullRefNamedWhenATagAndABranchShareItsN
 	branchSHA, tagSHA := branchAndTagNamedV1(t, repo.Dir)
 
 	c, _ := openWorktree(t, repo.Dir)
-	for _, tc := range []struct{ name, start, want string }{
+	for _, tc := range []struct {
+		name, start string
+		want        core.SHA
+	}{
 		{"from-branch", "refs/heads/v1", branchSHA},
 		{"from-tag", "refs/tags/v1", tagSHA},
 	} {
@@ -373,7 +376,7 @@ func TestAddWorktreeRefusalsCreateNeitherBranchNorFolder(t *testing.T) {
 		coretest.AssertCode(t, add(free, "-weird", "", true), core.InvalidName)
 	})
 	t.Run("duplicate new branch name", func(t *testing.T) {
-		coretest.AssertCode(t, add(free, "dup", sha, true), core.GitFailed)
+		coretest.AssertCode(t, add(free, "dup", string(sha), true), core.GitFailed)
 	})
 
 	entries, err := os.ReadDir(occupied)
@@ -469,11 +472,11 @@ func TestRemoveWorktreeRemovesCleanAndMissingOnesAndPruneKeepsTheRest(t *testing
 	clean := filepath.Join(t.TempDir(), "clean")
 	gittest.Run(t, repo.Dir, "worktree", "add", clean, "feature")
 	keep := filepath.Join(t.TempDir(), "keep")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", keep, sha)
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", keep, string(sha))
 	missingRemoved := filepath.Join(t.TempDir(), "missing-removed")
 	missingPruned := filepath.Join(t.TempDir(), "missing-pruned")
 	for _, dir := range []string{missingRemoved, missingPruned} {
-		gittest.Run(t, repo.Dir, "worktree", "add", "--detach", dir, sha)
+		gittest.Run(t, repo.Dir, "worktree", "add", "--detach", dir, string(sha))
 	}
 	cleanPath, keepPath := gitPath(t, clean), gitPath(t, keep)
 	removedPath, prunedPath := gitPath(t, missingRemoved), gitPath(t, missingPruned)

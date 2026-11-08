@@ -271,7 +271,7 @@ func TestCreateBranchWithoutCheckoutLeavesCurrentBranchAlone(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CreateBranch(t.Context(), wt, "feature", firstSHA, false); err != nil {
+	if err := c.CreateBranch(t.Context(), wt, "feature", string(firstSHA), false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -292,7 +292,7 @@ func TestCreateBranchWithCheckoutSwitchesToIt(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.CreateBranch(t.Context(), wt, "feature", firstSHA, true); err != nil {
+	if err := c.CreateBranch(t.Context(), wt, "feature", string(firstSHA), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -314,7 +314,7 @@ func TestCreateBranchRejectsADuplicateNameAsGitFailed(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.CreateBranch(t.Context(), wt, "feature", sha, false)
+	err := c.CreateBranch(t.Context(), wt, "feature", string(sha), false)
 
 	ce := coretest.AsError(t, err, core.GitFailed)
 	if ce.GitStderr == "" {
@@ -333,7 +333,7 @@ func TestCreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.CreateBranch(t.Context(), wt, "-bad", sha, false)
+	err := c.CreateBranch(t.Context(), wt, "-bad", string(sha), false)
 
 	ce := coretest.AsError(t, err, core.InvalidName)
 	if ce.Key != "invalidBranchName" || ce.Args["name"] != "-bad" {
@@ -348,7 +348,7 @@ func TestCheckoutRefusesADirtyConflictAsDirtyWorktree(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	olderSHA := conflictingCheckoutFixture(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "branch", "feature", olderSHA) // a plain ref create, unaffected by the dirty working tree
+	gittest.Run(t, repo.Dir, "branch", "feature", string(olderSHA)) // a plain ref create, unaffected by the dirty working tree
 	beforeBranch := currentBranch(t, repo.Dir)
 	beforeHEAD := gittest.HeadSHA(t, repo.Dir)
 
@@ -357,7 +357,7 @@ func TestCheckoutRefusesADirtyConflictAsDirtyWorktree(t *testing.T) {
 	for name, err := range map[string]error{
 		"Checkout":                   c.Checkout(t.Context(), wt, "feature"),
 		"CheckoutCommit":             c.CheckoutCommit(t.Context(), wt, olderSHA),
-		"CreateBranch with checkout": c.CreateBranch(t.Context(), wt, "old", olderSHA, true),
+		"CreateBranch with checkout": c.CreateBranch(t.Context(), wt, "old", string(olderSHA), true),
 	} {
 		t.Run(name, func(t *testing.T) { coretest.AssertCode(t, err, core.DirtyWorktree) })
 	}
@@ -384,8 +384,9 @@ func TestCreateBranchStartsAtTheFullRefNamedWhenATagAndABranchShareItsName(t *te
 	c, wt := openWorktree(t, repo.Dir)
 
 	for _, tc := range []struct {
-		name, start, want string
-		checkout          bool
+		name, start string
+		want        core.SHA
+		checkout    bool
 	}{
 		{"from-branch", "refs/heads/v1", branchSHA, false},
 		{"from-tag", "refs/tags/v1", tagSHA, false},
@@ -420,7 +421,7 @@ func TestCreateBranchFromARemoteBranchSetsNoUpstream(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if got := branchTip(t, repo.Dir, tc.newName); got != originTip {
+			if got := branchTip(t, repo.Dir, tc.newName); got != core.SHA(originTip) {
 				t.Errorf("%s = %s, want the remote branch's commit %s", tc.newName, got, originTip)
 			}
 			if got := upstreamOf(t, repo.Dir, tc.newName); got != "" {
@@ -456,7 +457,7 @@ func TestABranchCreatedFromARemoteBranchGetsItsOwnUpstreamOnFirstPush(t *testing
 
 	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "topic")), core.JobDone)
 
-	if got := gittest.Out(t, origin, "rev-parse", "topic"); got != localTip {
+	if got := gittest.Out(t, origin, "rev-parse", "topic"); core.SHA(got) != localTip {
 		t.Errorf("origin's topic = %q, want %q", got, localTip)
 	}
 	if got := upstreamOf(t, repo.Dir, "topic"); got != "origin/topic" {
@@ -575,7 +576,7 @@ func TestCheckoutCommitSucceedsEvenWhenAlreadyDetachedInAnotherWorktree(t *testi
 	gittest.Commit(t, repo.Dir, "seed.txt", "a", "first")
 	sha := gittest.HeadSHA(t, repo.Dir)
 	linked := filepath.Join(t.TempDir(), "linked")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", linked, sha)
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", linked, string(sha))
 
 	c, wt := openWorktree(t, repo.Dir)
 
@@ -596,6 +597,21 @@ func TestBranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
 		"CheckoutCommit": c.CheckoutCommit(t.Context(), wt, "HEAD"),
 	} {
 		t.Run(name, func(t *testing.T) { coretest.AssertCode(t, err, core.GitFailed) })
+	}
+}
+
+func TestResetRefusesARevisionThatIsNoCommitHash(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	resetFixture(t, repo.Dir)
+	before := gittest.HeadSHA(t, repo.Dir)
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, err := c.Reset(t.Context(), wt, "master~2", core.ResetHard)
+
+	coretest.AssertCode(t, err, core.Internal)
+	if got := gittest.HeadSHA(t, repo.Dir); got != before {
+		t.Errorf("HEAD = %s, want unchanged %s", got, before)
 	}
 }
 
@@ -874,7 +890,7 @@ func TestResetRefusesANonexistentSHAAsGitFailed(t *testing.T) {
 
 // mergeConflictFixture builds a merge conflict in dir left unresolved
 // (MERGE_HEAD set), returning the two branches' common ancestor.
-func mergeConflictFixture(t *testing.T, dir string) (baseSHA string) {
+func mergeConflictFixture(t *testing.T, dir string) (baseSHA core.SHA) {
 	t.Helper()
 	shas := gittest.History(t, dir,
 		gittest.Step{Message: "base", Files: map[string]string{"conflict.txt": "base"}},
@@ -892,7 +908,7 @@ func mergeInProgress(dir string) bool {
 // resetFixture builds three commits and a dirty working tree: firstSHA's
 // tree has only seed.txt; the second commit adds extra.txt; the third edits
 // seed.txt, which then gets a staged change and an unstaged one on top.
-func resetFixture(t *testing.T, dir string) (firstSHA string) {
+func resetFixture(t *testing.T, dir string) (firstSHA core.SHA) {
 	t.Helper()
 	shas := gittest.History(t, dir,
 		gittest.Step{Message: "first", Files: map[string]string{"seed.txt": "a"}},
@@ -927,7 +943,7 @@ func trackedInIndex(t *testing.T, dir, name string) bool {
 // conflict.txt differs from an uncommitted change made on top of a newer
 // commit, so any switch to the older commit is refused as "would be
 // overwritten" (exit 1).
-func conflictingCheckoutFixture(t *testing.T, dir string) (olderSHA string) {
+func conflictingCheckoutFixture(t *testing.T, dir string) (olderSHA core.SHA) {
 	t.Helper()
 	shas := gittest.History(t, dir,
 		gittest.Step{Message: "older", Files: map[string]string{"conflict.txt": "old"}},
@@ -954,9 +970,9 @@ func branchExists(t *testing.T, dir, name string) bool {
 }
 
 // branchTip returns local branch name's commit sha in dir.
-func branchTip(t *testing.T, dir, name string) string {
+func branchTip(t *testing.T, dir, name string) core.SHA {
 	t.Helper()
-	return gittest.Out(t, dir, "rev-parse", "refs/heads/"+name)
+	return core.SHA(gittest.Out(t, dir, "rev-parse", "refs/heads/"+name))
 }
 
 // currentBranch returns dir's current branch name, "" if detached.
@@ -974,15 +990,15 @@ func currentBranch(t *testing.T, dir string) string {
 // branchAndTagNamedV1 makes a branch v1 at the first commit and an
 // annotated tag v1 at the second, then commits past both: the bare name v1
 // is ambiguous.
-func branchAndTagNamedV1(t *testing.T, dir string) (branchSHA, tagSHA string) {
+func branchAndTagNamedV1(t *testing.T, dir string) (branchSHA, tagSHA core.SHA) {
 	t.Helper()
 	shas := gittest.History(t, dir,
 		gittest.Step{Message: "first", Files: map[string]string{"seed.txt": "a"}},
 		gittest.Step{Message: "second", Files: map[string]string{"seed.txt": "b"}},
 		gittest.Step{Message: "third", Files: map[string]string{"seed.txt": "c"}},
 	)
-	gittest.Run(t, dir, "branch", "v1", shas[0])
-	gittest.Run(t, dir, "tag", "-a", "-m", "release", "v1", shas[1])
+	gittest.Run(t, dir, "branch", "v1", string(shas[0]))
+	gittest.Run(t, dir, "tag", "-a", "-m", "release", "v1", string(shas[1]))
 	return shas[0], shas[1]
 }
 

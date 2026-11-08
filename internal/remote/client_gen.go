@@ -52,20 +52,20 @@ func (c *Client) Checkout(ctx context.Context, wt core.WorktreeID, branch string
 
 type checkoutCommitParams struct {
 	Wt  core.WorktreeID `json:"wt"`
-	Sha string          `json:"sha"`
+	Sha core.SHA        `json:"sha"`
 }
 
-func (c *Client) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha string) error {
+func (c *Client) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
 	return c.call(ctx, "CheckoutCommit", checkoutCommitParams{Wt: wt, Sha: sha}, nil)
 }
 
 type cherryPickParams struct {
 	Wt   core.WorktreeID  `json:"wt"`
-	Shas []string         `json:"shas"`
+	Shas []core.SHA       `json:"shas"`
 	Opts core.PickOptions `json:"opts"`
 }
 
-func (c *Client) CherryPick(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (c *Client) CherryPick(ctx context.Context, wt core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
 	return c.call(ctx, "CherryPick", cherryPickParams{Wt: wt, Shas: shas, Opts: opts}, nil)
 }
 
@@ -89,10 +89,10 @@ func (c *Client) Commit(ctx context.Context, wt core.WorktreeID, message string,
 
 type commitDetailsParams struct {
 	Wt  core.WorktreeID `json:"wt"`
-	Sha string          `json:"sha"`
+	Sha core.SHA        `json:"sha"`
 }
 
-func (c *Client) CommitDetails(ctx context.Context, wt core.WorktreeID, sha string) (core.CommitDetails, error) {
+func (c *Client) CommitDetails(ctx context.Context, wt core.WorktreeID, sha core.SHA) (core.CommitDetails, error) {
 	var result core.CommitDetails
 	err := c.call(ctx, "CommitDetails", commitDetailsParams{Wt: wt, Sha: sha}, &result)
 	return result, err
@@ -100,11 +100,11 @@ func (c *Client) CommitDetails(ctx context.Context, wt core.WorktreeID, sha stri
 
 type compareCommitsParams struct {
 	Wt core.WorktreeID `json:"wt"`
-	A  string          `json:"a"`
-	B  string          `json:"b"`
+	A  core.SHA        `json:"a"`
+	B  core.SHA        `json:"b"`
 }
 
-func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a string, b string) ([]core.ChangedFile, error) {
+func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA) ([]core.ChangedFile, error) {
 	var result []core.ChangedFile
 	err := c.call(ctx, "CompareCommits", compareCommitsParams{Wt: wt, A: a, B: b}, &result)
 	return result, err
@@ -112,10 +112,10 @@ func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a strin
 
 type compareWithWorkingParams struct {
 	Wt  core.WorktreeID `json:"wt"`
-	Sha string          `json:"sha"`
+	Sha core.SHA        `json:"sha"`
 }
 
-func (c *Client) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha string) ([]core.ChangedFile, error) {
+func (c *Client) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha core.SHA) ([]core.ChangedFile, error) {
 	var result []core.ChangedFile
 	err := c.call(ctx, "CompareWithWorking", compareWithWorkingParams{Wt: wt, Sha: sha}, &result)
 	return result, err
@@ -163,13 +163,13 @@ func (c *Client) DeleteBranch(ctx context.Context, wt core.WorktreeID, name stri
 
 type diffAgainstWorkingParams struct {
 	Wt      core.WorktreeID  `json:"wt"`
-	Sha     string           `json:"sha"`
+	Sha     core.SHA         `json:"sha"`
 	Path    string           `json:"path"`
 	OldPath string           `json:"oldPath"`
 	Opts    core.DiffOptions `json:"opts"`
 }
 
-func (c *Client) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (c *Client) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	var result core.DiffFile
 	err := c.call(ctx, "DiffAgainstWorking", diffAgainstWorkingParams{Wt: wt, Sha: sha, Path: path, OldPath: oldPath, Opts: opts}, &result)
 	return result, err
@@ -177,13 +177,13 @@ func (c *Client) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha
 
 type diffFileParams struct {
 	Wt      core.WorktreeID  `json:"wt"`
-	Sha     string           `json:"sha"`
+	Sha     core.SHA         `json:"sha"`
 	Path    string           `json:"path"`
 	OldPath string           `json:"oldPath"`
 	Opts    core.DiffOptions `json:"opts"`
 }
 
-func (c *Client) DiffFile(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (c *Client) DiffFile(ctx context.Context, wt core.WorktreeID, sha core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	var result core.DiffFile
 	err := c.call(ctx, "DiffFile", diffFileParams{Wt: wt, Sha: sha, Path: path, OldPath: oldPath, Opts: opts}, &result)
 	return result, err
@@ -191,14 +191,14 @@ func (c *Client) DiffFile(ctx context.Context, wt core.WorktreeID, sha string, p
 
 type diffRangeParams struct {
 	Wt      core.WorktreeID  `json:"wt"`
-	A       string           `json:"a"`
-	B       string           `json:"b"`
+	A       core.SHA         `json:"a"`
+	B       core.SHA         `json:"b"`
 	Path    string           `json:"path"`
 	OldPath string           `json:"oldPath"`
 	Opts    core.DiffOptions `json:"opts"`
 }
 
-func (c *Client) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b string, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (c *Client) DiffRange(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	var result core.DiffFile
 	err := c.call(ctx, "DiffRange", diffRangeParams{Wt: wt, A: a, B: b, Path: path, OldPath: oldPath, Opts: opts}, &result)
 	return result, err
@@ -240,10 +240,10 @@ func (c *Client) DiscardLines(ctx context.Context, wt core.WorktreeID, path stri
 
 type dropStashParams struct {
 	Wt  core.WorktreeID `json:"wt"`
-	Sha string          `json:"sha"`
+	Sha core.SHA        `json:"sha"`
 }
 
-func (c *Client) DropStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+func (c *Client) DropStash(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
 	return c.call(ctx, "DropStash", dropStashParams{Wt: wt, Sha: sha}, nil)
 }
 
@@ -260,10 +260,10 @@ func (c *Client) Fetch(ctx context.Context, wt core.WorktreeID, remote string) (
 
 type fixupParams struct {
 	Wt   core.WorktreeID `json:"wt"`
-	Shas []string        `json:"shas"`
+	Shas []core.SHA      `json:"shas"`
 }
 
-func (c *Client) Fixup(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashResult, error) {
+func (c *Client) Fixup(ctx context.Context, wt core.WorktreeID, shas []core.SHA) (core.SquashResult, error) {
 	var result core.SquashResult
 	err := c.call(ctx, "Fixup", fixupParams{Wt: wt, Shas: shas}, &result)
 	return result, err
@@ -309,10 +309,10 @@ func (c *Client) LoadLog(ctx context.Context, wt core.WorktreeID) error {
 
 type logIndexOfParams struct {
 	Wt  core.WorktreeID `json:"wt"`
-	Sha string          `json:"sha"`
+	Sha core.SHA        `json:"sha"`
 }
 
-func (c *Client) LogIndexOf(ctx context.Context, wt core.WorktreeID, sha string) (core.LogIndexResult, error) {
+func (c *Client) LogIndexOf(ctx context.Context, wt core.WorktreeID, sha core.SHA) (core.LogIndexResult, error) {
 	var result core.LogIndexResult
 	err := c.call(ctx, "LogIndexOf", logIndexOfParams{Wt: wt, Sha: sha}, &result)
 	return result, err
@@ -342,11 +342,11 @@ func (c *Client) MainWorktree(ctx context.Context, gitDir core.RepoPath) (core.W
 
 type mergeParams struct {
 	Wt    core.WorktreeID `json:"wt"`
-	Ref   string          `json:"ref"`
+	Ref   core.RefName    `json:"ref"`
 	Stash bool            `json:"stash"`
 }
 
-func (c *Client) Merge(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+func (c *Client) Merge(ctx context.Context, wt core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
 	var result core.IntegrateResult
 	err := c.call(ctx, "Merge", mergeParams{Wt: wt, Ref: ref, Stash: stash}, &result)
 	return result, err
@@ -401,10 +401,10 @@ func (c *Client) OpenWorktree(ctx context.Context, path core.RepoPath) (core.Wor
 
 type popStashParams struct {
 	Wt  core.WorktreeID `json:"wt"`
-	Sha string          `json:"sha"`
+	Sha core.SHA        `json:"sha"`
 }
 
-func (c *Client) PopStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+func (c *Client) PopStash(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
 	return c.call(ctx, "PopStash", popStashParams{Wt: wt, Sha: sha}, nil)
 }
 
@@ -462,11 +462,11 @@ func (c *Client) PushTarget(ctx context.Context, wt core.WorktreeID) (core.PushT
 
 type rebaseParams struct {
 	Wt    core.WorktreeID `json:"wt"`
-	Ref   string          `json:"ref"`
+	Ref   core.RefName    `json:"ref"`
 	Stash bool            `json:"stash"`
 }
 
-func (c *Client) Rebase(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+func (c *Client) Rebase(ctx context.Context, wt core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
 	var result core.IntegrateResult
 	err := c.call(ctx, "Rebase", rebaseParams{Wt: wt, Ref: ref, Stash: stash}, &result)
 	return result, err
@@ -529,11 +529,11 @@ func (c *Client) ReopenConflict(ctx context.Context, wt core.WorktreeID, path st
 
 type resetParams struct {
 	Wt   core.WorktreeID `json:"wt"`
-	Sha  string          `json:"sha"`
+	Sha  core.SHA        `json:"sha"`
 	Mode core.ResetMode  `json:"mode"`
 }
 
-func (c *Client) Reset(ctx context.Context, wt core.WorktreeID, sha string, mode core.ResetMode) (core.ResetResult, error) {
+func (c *Client) Reset(ctx context.Context, wt core.WorktreeID, sha core.SHA, mode core.ResetMode) (core.ResetResult, error) {
 	var result core.ResetResult
 	err := c.call(ctx, "Reset", resetParams{Wt: wt, Sha: sha, Mode: mode}, &result)
 	return result, err
@@ -551,11 +551,11 @@ func (c *Client) ResolveConflict(ctx context.Context, wt core.WorktreeID, path s
 
 type revertParams struct {
 	Wt   core.WorktreeID  `json:"wt"`
-	Shas []string         `json:"shas"`
+	Shas []core.SHA       `json:"shas"`
 	Opts core.PickOptions `json:"opts"`
 }
 
-func (c *Client) Revert(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (c *Client) Revert(ctx context.Context, wt core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
 	return c.call(ctx, "Revert", revertParams{Wt: wt, Shas: shas, Opts: opts}, nil)
 }
 
@@ -639,11 +639,11 @@ func (c *Client) SkipOperation(ctx context.Context, wt core.WorktreeID) error {
 
 type squashParams struct {
 	Wt      core.WorktreeID `json:"wt"`
-	Shas    []string        `json:"shas"`
+	Shas    []core.SHA      `json:"shas"`
 	Message string          `json:"message"`
 }
 
-func (c *Client) Squash(ctx context.Context, wt core.WorktreeID, shas []string, message string) (core.SquashResult, error) {
+func (c *Client) Squash(ctx context.Context, wt core.WorktreeID, shas []core.SHA, message string) (core.SquashResult, error) {
 	var result core.SquashResult
 	err := c.call(ctx, "Squash", squashParams{Wt: wt, Shas: shas, Message: message}, &result)
 	return result, err
@@ -651,10 +651,10 @@ func (c *Client) Squash(ctx context.Context, wt core.WorktreeID, shas []string, 
 
 type squashCheckParams struct {
 	Wt   core.WorktreeID `json:"wt"`
-	Shas []string        `json:"shas"`
+	Shas []core.SHA      `json:"shas"`
 }
 
-func (c *Client) SquashCheck(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashCheck, error) {
+func (c *Client) SquashCheck(ctx context.Context, wt core.WorktreeID, shas []core.SHA) (core.SquashCheck, error) {
 	var result core.SquashCheck
 	err := c.call(ctx, "SquashCheck", squashCheckParams{Wt: wt, Shas: shas}, &result)
 	return result, err

@@ -173,7 +173,7 @@ func TestRepoLogIndicesOfMapsSHAsToRowIndices(t *testing.T) {
 	gen, _ := r.LogBeginLoad()
 	r.LogAppend(gen, core.LogCommit{SHA: "a"}, core.LogCommit{SHA: "b"}, core.LogCommit{SHA: "c"})
 
-	indices, resultGen := r.LogIndicesOf(map[string]bool{"c": true, "a": true, "z": true})
+	indices, resultGen := r.LogIndicesOf(map[core.SHA]bool{"c": true, "a": true, "z": true})
 
 	if !slices.Equal(indices, []int{0, 2}) {
 		t.Errorf("indices = %v, want [0 2] (a and c, in row order; z absent)", indices)
@@ -190,7 +190,7 @@ func TestWorktreeLogIndicesOfPrefersTheFilteredViewWhenActive(t *testing.T) {
 	filterGen := w.FilterBegin(core.LogFilter{Path: "x"}, func() {})
 	w.FilterAppend(filterGen, core.LogCommit{SHA: "filtered"})
 
-	indices, gen, filtered := w.LogIndicesOf(map[string]bool{"filtered": true, "base": true})
+	indices, gen, filtered := w.LogIndicesOf(map[core.SHA]bool{"filtered": true, "base": true})
 
 	if !filtered {
 		t.Error("filtered = false, want true: a filter is active")
@@ -208,7 +208,7 @@ func TestWorktreeLogIndicesOfFallsBackToTheBaseLogWithNoFilterActive(t *testing.
 	gen, _ := w.Repo.LogBeginLoad()
 	w.Repo.LogAppend(gen, core.LogCommit{SHA: "a"})
 
-	indices, resultGen, filtered := w.LogIndicesOf(map[string]bool{"a": true})
+	indices, resultGen, filtered := w.LogIndicesOf(map[core.SHA]bool{"a": true})
 
 	if filtered {
 		t.Error("filtered = true, want false: no filter active")

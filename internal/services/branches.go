@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -35,17 +36,11 @@ func (c *Core) CreateBranch(ctx context.Context, id core.WorktreeID, name, start
 	if checkout {
 		args = []string{"switch", "-c", name, "--end-of-options", start} // atomic: no orphan branch if the checkout fails
 	}
-	if startsAtARemoteBranch(start) { // its own first push gives it its own upstream, not this one's
+	if core.RefName(start).IsRemoteBranch() { // its own first push gives it its own upstream, not this one's
 		args = slices.Insert(args, 1, "--no-track")
 	}
 	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
 	return remapDirty(err, result)
-}
-
-// startsAtARemoteBranch reports whether start is a remote-tracking branch's
-// full ref.
-func startsAtARemoteBranch(start string) bool {
-	return strings.HasPrefix(start, "refs/remotes/")
 }
 
 // validateBranchName rejects an invalid name before any mutating call as
@@ -65,7 +60,7 @@ func validateBranchName(ctx context.Context, r git.Runner, dir, name string) err
 // ref with --track: a bare name's DWIM refuses when a tag has that name.
 func (c *Core) Checkout(ctx context.Context, id core.WorktreeID, branch string) error {
 	args := []string{"switch", "--end-of-options", branch}
-	if startsAtARemoteBranch(branch) {
+	if core.RefName(branch).IsRemoteBranch() {
 		args = []string{"switch", "--track", "--end-of-options", branch}
 	}
 	result, err := c.runLocked(ctx, id, args...)
@@ -73,15 +68,18 @@ func (c *Core) Checkout(ctx context.Context, id core.WorktreeID, branch string) 
 }
 
 // CheckoutCommit implements core.API.
-func (c *Core) CheckoutCommit(ctx context.Context, id core.WorktreeID, sha string) error {
-	result, err := c.runLocked(ctx, id, "switch", "--detach", "--end-of-options", sha)
+func (c *Core) CheckoutCommit(ctx context.Context, id core.WorktreeID, sha core.SHA) error {
+	result, err := c.runLocked(ctx, id, "switch", "--detach", "--end-of-options", string(sha))
 	return remapDirty(err, result)
 }
 
 // Reset implements core.API.
-func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha string, mode core.ResetMode) (core.ResetResult, error) {
+func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha core.SHA, mode core.ResetMode) (core.ResetResult, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
+		return core.ResetResult{}, err
+	}
+	if err := sha.Validate(); err != nil {
 		return core.ResetResult{}, err
 	}
 	flag, err := resetFlag(mode)
@@ -96,8 +94,8 @@ func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha string, mode c
 	if err != nil {
 		return core.ResetResult{}, err
 	}
-	// no --end-of-options: sha is always an already-resolved hash
-	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"reset", flag, sha}}); err != nil {
+	// no --end-of-options: reset refuses it; a valid sha never starts with "-"
+	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"reset", flag, string(sha)}}); err != nil {
 		return core.ResetResult{}, err
 	}
 	return core.ResetResult{PreviousHead: previous}, nil
@@ -232,8 +230,8 @@ func markBranchesInUse(branches []core.Branch, inUse map[string]branchInUse) {
 // parsedRef is one for-each-ref record, before bucketing into core.Refs'
 // three lists.
 type parsedRef struct {
-	Name          string // full refname, e.g. "refs/heads/main"
-	SHA           string // %(*objectname) if non-empty, else %(objectname)
+	Name          core.RefName
+	SHA           core.SHA // %(*objectname) if non-empty, else %(objectname)
 	Upstream      string
 	Ahead, Behind int
 	UpstreamGone  bool
@@ -253,13 +251,9 @@ func parseRefRecords(out []byte) []parsedRef {
 
 func parseRefRecord(record string) parsedRef {
 	f := strings.Split(record, "\x1f")
-	sha := f[1]
-	if f[2] != "" {
-		sha = f[2]
-	}
 	ahead, behind, gone := parseTrack(f[4])
 	return parsedRef{
-		Name: f[0], SHA: sha, Upstream: f[3],
+		Name: core.RefName(f[0]), SHA: core.SHA(cmp.Or(f[2], f[1])), Upstream: f[3],
 		Ahead: ahead, Behind: behind, UpstreamGone: gone,
 		Current: f[5] == "*", Worktree: f[6],
 	}
@@ -295,12 +289,12 @@ func toRefs(parsed []parsedRef, remoteNames []string) core.Refs {
 	}
 	for _, p := range parsed {
 		switch {
-		case strings.HasPrefix(p.Name, "refs/heads/"):
+		case p.Name.IsBranch():
 			refs.Branches = append(refs.Branches, toBranch(p))
-		case strings.HasPrefix(p.Name, "refs/tags/"):
-			refs.Tags = append(refs.Tags, core.Tag{Name: strings.TrimPrefix(p.Name, "refs/tags/"), SHA: p.SHA})
-		case strings.HasPrefix(p.Name, "refs/remotes/"):
-			remote, branch, ok := splitRemoteBranch(strings.TrimPrefix(p.Name, "refs/remotes/"), remoteNames)
+		case p.Name.IsTag():
+			refs.Tags = append(refs.Tags, core.Tag{Name: p.Name.Short(), SHA: p.SHA})
+		case p.Name.IsRemoteBranch():
+			remote, branch, ok := splitRemoteBranch(p.Name.Short(), remoteNames)
 			if ok && branch != "HEAD" { // <remote>/HEAD is the remote's symbolic HEAD, not a branch
 				addRemoteBranch(&refs, remote, core.RemoteBranch{Name: branch, SHA: p.SHA})
 			}
@@ -311,7 +305,7 @@ func toRefs(parsed []parsedRef, remoteNames []string) core.Refs {
 
 func toBranch(p parsedRef) core.Branch {
 	return core.Branch{
-		Name: strings.TrimPrefix(p.Name, "refs/heads/"), SHA: p.SHA,
+		Name: p.Name.Short(), SHA: p.SHA,
 		Upstream: p.Upstream, Ahead: p.Ahead, Behind: p.Behind,
 		UpstreamGone: p.UpstreamGone, Current: p.Current, CheckedOutIn: p.Worktree,
 	}

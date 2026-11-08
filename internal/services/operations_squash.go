@@ -20,7 +20,7 @@ const todoEditor = `while IFS= read -r line; do printf '%s\n' "$line"; done < "$
 // selection is what SquashCheck, Squash and Fixup learn about the commits
 // to fold.
 type selection struct {
-	head     string          // HEAD's commit before any rewrite
+	head     core.SHA        // HEAD's commit before any rewrite
 	upstream bool            // the branch has an upstream that exists
 	chain    []chainCommit   // lineOf: from the oldest selected commit up to HEAD
 	selected map[string]bool // the selected shas
@@ -48,7 +48,7 @@ func (s selection) inChainOrder() []string {
 }
 
 // SquashCheck implements core.API.
-func (c *Core) SquashCheck(ctx context.Context, id core.WorktreeID, shas []string) (core.SquashCheck, error) {
+func (c *Core) SquashCheck(ctx context.Context, id core.WorktreeID, shas []core.SHA) (core.SquashCheck, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return core.SquashCheck{}, err
@@ -66,7 +66,7 @@ func (c *Core) SquashCheck(ctx context.Context, id core.WorktreeID, shas []strin
 }
 
 // Squash implements core.API.
-func (c *Core) Squash(ctx context.Context, id core.WorktreeID, shas []string, message string) (core.SquashResult, error) {
+func (c *Core) Squash(ctx context.Context, id core.WorktreeID, shas []core.SHA, message string) (core.SquashResult, error) {
 	message = strings.TrimSpace(message)
 	if message == "" {
 		return core.SquashResult{}, core.Errorf(core.Internal, "squash needs a message")
@@ -75,16 +75,22 @@ func (c *Core) Squash(ctx context.Context, id core.WorktreeID, shas []string, me
 }
 
 // Fixup implements core.API.
-func (c *Core) Fixup(ctx context.Context, id core.WorktreeID, shas []string) (core.SquashResult, error) {
+func (c *Core) Fixup(ctx context.Context, id core.WorktreeID, shas []core.SHA) (core.SquashResult, error) {
 	return c.fold(ctx, id, shas, "")
 }
 
 // fold is Squash's and Fixup's shared body: message "" keeps the oldest
-// commit's message.
-func (c *Core) fold(ctx context.Context, id core.WorktreeID, shas []string, message string) (core.SquashResult, error) {
+// commit's message. The shas go into the rebase todo, where git would not
+// refuse a malformed one, so they are validated first.
+func (c *Core) fold(ctx context.Context, id core.WorktreeID, shas []core.SHA, message string) (core.SquashResult, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return core.SquashResult{}, err
+	}
+	for _, sha := range shas {
+		if err := sha.Validate(); err != nil {
+			return core.SquashResult{}, err
+		}
 	}
 	wt.Lock() // the rebase writes this worktree's HEAD, index and files
 	defer wt.Unlock()
@@ -110,10 +116,10 @@ func (c *Core) fold(ctx context.Context, id core.WorktreeID, shas []string, mess
 
 // inspectSelection reads shas' chain and the worktree's state, and names
 // the first blocker.
-func inspectSelection(ctx context.Context, wt *session.Worktree, shas []string) (selection, error) {
+func inspectSelection(ctx context.Context, wt *session.Worktree, shas []core.SHA) (selection, error) {
 	selected := map[string]bool{}
 	for _, sha := range shas {
-		selected[sha] = true
+		selected[string(sha)] = true
 	}
 	if len(selected) < 2 {
 		return selection{}, core.Errorf(core.Internal, "squash needs two or more commits, got %d", len(selected))
@@ -122,7 +128,7 @@ func inspectSelection(ctx context.Context, wt *session.Worktree, shas []string) 
 	if err != nil {
 		return selection{}, err
 	}
-	chain, err := lineOf(ctx, wt, shas)
+	chain, err := lineOf(ctx, wt, shaArgs(shas))
 	if err != nil {
 		return selection{}, err
 	}
@@ -154,7 +160,7 @@ func (s selection) firstBlocker(op string, st headStatus) *core.Error {
 }
 
 type headStatus struct {
-	head               string
+	head               core.SHA
 	detached, upstream bool
 	dirty              bool // tracked files have staged, unstaged or conflicted changes
 	conflicted         bool
@@ -174,7 +180,7 @@ func readHeadStatus(ctx context.Context, wt *session.Worktree) (headStatus, erro
 	for _, rec := range nulRecords(result.Stdout) {
 		switch {
 		case strings.HasPrefix(rec, "# branch.oid "):
-			st.head = strings.TrimPrefix(rec, "# branch.oid ")
+			st.head = core.SHA(strings.TrimPrefix(rec, "# branch.oid "))
 		case rec == "# branch.head (detached)":
 			st.detached = true
 		case strings.HasPrefix(rec, "# branch.ab "): // only when the upstream exists

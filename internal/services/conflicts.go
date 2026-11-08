@@ -349,45 +349,44 @@ func labelSides(ctx context.Context, wt *session.Worktree, out *core.ConflictFil
 
 // stateSHA returns the first line of the state file name in gitDir, "" if
 // there is none.
-func stateSHA(gitDir, name string) string {
+func stateSHA(gitDir, name string) core.SHA {
 	data, err := os.ReadFile(filepath.Join(gitDir, name))
 	if err != nil {
 		return ""
 	}
 	line, _, _ := strings.Cut(string(data), "\n")
-	return strings.TrimSpace(line)
+	return core.SHA(strings.TrimSpace(line))
 }
 
 // refAt returns the short name of a ref pointing at sha: a local branch,
 // else a remote branch, else a tag, the first by name. "" if there is none.
-func refAt(ctx context.Context, r git.Runner, dir, sha string) (string, error) {
+func refAt(ctx context.Context, r git.Runner, dir string, sha core.SHA) (string, error) {
 	if sha == "" {
 		return "", nil
 	}
 	// for-each-ref sorts by full name, and heads < remotes < tags.
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
-		Args: []string{"for-each-ref", "--points-at=" + sha, "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags"},
+		Args: []string{"for-each-ref", "--points-at=" + string(sha), "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags"},
 	})
 	if err != nil {
 		return "", err
 	}
 	for name := range strings.FieldsSeq(string(result.Stdout)) {
-		if strings.HasPrefix(name, "refs/remotes/") && strings.HasSuffix(name, "/HEAD") {
+		ref := core.RefName(name)
+		if ref.IsRemoteBranch() && strings.HasSuffix(name, "/HEAD") {
 			continue // a remote's default-branch alias
 		}
-		if short, ok := shortRefName(name); ok {
-			return short, nil
-		}
+		return ref.Short(), nil
 	}
 	return "", nil
 }
 
 // subjectOf returns commit sha's subject line.
-func subjectOf(ctx context.Context, r git.Runner, dir, sha string) (string, error) {
+func subjectOf(ctx context.Context, r git.Runner, dir string, sha core.SHA) (string, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true,
-		Args: []string{"log", "--no-walk", "--format=%s", "--end-of-options", sha},
+		Args: []string{"log", "--no-walk", "--format=%s", "--end-of-options", string(sha)},
 	})
 	return strings.TrimSpace(string(result.Stdout)), err
 }

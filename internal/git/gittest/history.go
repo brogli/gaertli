@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git"
 )
 
@@ -29,7 +30,7 @@ type Step struct {
 // fast-import run, then checks out master. It returns each commit's SHA in
 // order. A merge commit starts from its first parent's tree: Files must
 // bring in what the second parent added.
-func History(t *testing.T, dir string, steps ...Step) []string {
+func History(t *testing.T, dir string, steps ...Step) []core.SHA {
 	t.Helper()
 	marks := filepath.Join(t.TempDir(), "marks")
 	_, err := (git.Runner{}).Run(context.Background(), git.Call{
@@ -74,20 +75,20 @@ func fastImportStream(steps []Step, start int64) []byte {
 }
 
 // shasFromMarks reads fast-import's exported marks (":N sha" lines).
-func shasFromMarks(t *testing.T, path string, n int) []string {
+func shasFromMarks(t *testing.T, path string, n int) []core.SHA {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	shas := make([]string, n)
+	shas := make([]core.SHA, n)
 	for line := range strings.Lines(string(data)) {
 		var mark int
 		var sha string
 		if _, err := fmt.Sscanf(line, ":%d %s", &mark, &sha); err != nil {
 			t.Fatalf("marks line %q: %v", line, err)
 		}
-		shas[mark-1] = sha
+		shas[mark-1] = core.SHA(sha)
 	}
 	return shas
 }

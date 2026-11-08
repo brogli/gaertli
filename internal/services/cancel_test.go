@@ -29,7 +29,7 @@ func TestACancelledFetchLeavesNoLockAndTheNextFetchWorks(t *testing.T) {
 	assertNoLock(t, repo.Dir)
 	hook.release()
 	waitForJobState(t, c, wt, jobID(t)(c.Fetch(t.Context(), wt, "origin")), core.JobDone)
-	if got, _ := refSHA(t, repo.Dir, "refs/remotes/origin/master"); got != tip {
+	if got, _ := refSHA(t, repo.Dir, "refs/remotes/origin/master"); core.SHA(got) != tip {
 		t.Errorf("refs/remotes/origin/master = %q, want %q", got, tip)
 	}
 }
@@ -64,10 +64,10 @@ func TestACancelledPushLeavesNoLockAndTheNextPushWorks(t *testing.T) {
 	assertNoLock(t, repo.Dir)
 	hook.release()
 	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")), core.JobDone)
-	if got, _ := refSHA(t, origin, "refs/heads/master"); got != local {
+	if got, _ := refSHA(t, origin, "refs/heads/master"); core.SHA(got) != local {
 		t.Errorf("origin's master = %q, want %q", got, local)
 	}
-	if got, _ := refSHA(t, repo.Dir, "refs/remotes/origin/master"); got != local {
+	if got, _ := refSHA(t, repo.Dir, "refs/remotes/origin/master"); core.SHA(got) != local {
 		t.Errorf("refs/remotes/origin/master = %q, want %q", got, local)
 	}
 }

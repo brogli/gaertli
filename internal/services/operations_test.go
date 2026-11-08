@@ -20,7 +20,7 @@ import (
 // "rebase", "cherry-pick", "revert"), conflicted on files (conflictPath(kind)
 // if none given). Merge and rebase stop on a local diverged branch, cherry-pick
 // and revert via realConflictFixture. Returns HEAD before the operation.
-func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Core, wt core.WorktreeID, beforeHEAD string) {
+func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Core, wt core.WorktreeID, beforeHEAD core.SHA) {
 	t.Helper()
 	c = New(func(core.Event) {})
 
@@ -37,9 +37,9 @@ func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Cor
 	info := openOn(t, c, repo.Dir)
 	var opErr error
 	if kind == "cherry-pick" {
-		opErr = c.CherryPick(t.Context(), info.ID, []string{sha}, core.PickOptions{})
+		opErr = c.CherryPick(t.Context(), info.ID, []core.SHA{sha}, core.PickOptions{})
 	} else {
-		opErr = c.Revert(t.Context(), info.ID, []string{sha}, core.PickOptions{})
+		opErr = c.Revert(t.Context(), info.ID, []core.SHA{sha}, core.PickOptions{})
 	}
 	if opErr == nil {
 		t.Fatalf("%s: want a conflict, got nil error", kind)
@@ -49,7 +49,7 @@ func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Cor
 
 // stoppedByLocalOperation merges or rebases branch side into master, where
 // both changed every file.
-func stoppedByLocalOperation(t *testing.T, c *Core, kind string, files []string) (string, *Core, core.WorktreeID, string) {
+func stoppedByLocalOperation(t *testing.T, c *Core, kind string, files []string) (string, *Core, core.WorktreeID, core.SHA) {
 	t.Helper()
 	dir := gittest.New(t).Dir
 	contents := func(content string) map[string]string {
@@ -193,7 +193,7 @@ func TestSkipOperationNeverWaitsOnAnEditorTheSequenceAsksFor(t *testing.T) {
 	gittest.Commit(t, dir, "three.txt", "3\n", "three")
 	three := gittest.HeadSHA(t, dir)
 	// Newest first: reverting c2 conflicts with c3.
-	tryGit(t, dir, "-c", "core.editor=true", "revert", "--edit", three, conflicting, one)
+	tryGit(t, dir, "-c", "core.editor=true", "revert", "--edit", string(three), string(conflicting), string(one))
 	if !fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
 		t.Fatal("fixture did not stop on the conflicting revert")
 	}
@@ -272,7 +272,7 @@ func TestAContinueThatStopsForAnotherReasonThanAConflictIsAStop(t *testing.T) {
 	l := lineFixture(t, repo.Dir)
 	writeHook(t, repo.Dir, "prepare-commit-msg", refuseAmendHook) // fails the squash's amend step
 	c, wt := openWorktree(t, repo.Dir)
-	_, err := c.Squash(t.Context(), wt, []string{l.B, l.D}, "Folded")
+	_, err := c.Squash(t.Context(), wt, []core.SHA{l.B, l.D}, "Folded")
 	coretest.AssertCode(t, err, core.Stopped)
 
 	err = c.ContinueOperation(t.Context(), wt)
@@ -405,7 +405,7 @@ func TestSkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheSurvivor(t
 	gittest.Run(t, dir, "config", "core.editor", "false") // the rest of the sequence needs no editor
 	c, wt := openWorktree(t, dir)
 	// oldest-first: conflictSHA (older) is attempted before cleanSHA.
-	if err := c.CherryPick(t.Context(), wt, []string{cleanSHA, conflictSHA}, core.PickOptions{}); err == nil {
+	if err := c.CherryPick(t.Context(), wt, []core.SHA{cleanSHA, conflictSHA}, core.PickOptions{}); err == nil {
 		t.Fatal("CherryPick = nil, want a conflict on conflictSHA")
 	}
 	if !fileExists(filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")) {
@@ -444,7 +444,7 @@ func TestSkipOperationRevertDropsTheConflictingRevertAndAppliesTheSurvivor(t *te
 	gittest.Run(t, dir, "config", "core.editor", "false") // the rest of the sequence needs no editor
 	c, wt := openWorktree(t, dir)
 	// newest-first: conflictSHA (newer) is attempted before cleanSHA.
-	if err := c.Revert(t.Context(), wt, []string{cleanSHA, conflictSHA}, core.PickOptions{}); err == nil {
+	if err := c.Revert(t.Context(), wt, []core.SHA{cleanSHA, conflictSHA}, core.PickOptions{}); err == nil {
 		t.Fatal("Revert = nil, want a conflict on conflictSHA")
 	}
 	if !fileExists(filepath.Join(dir, ".git", "REVERT_HEAD")) {
