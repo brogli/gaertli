@@ -61,6 +61,7 @@
             with pkgs;
             frontendTools pkgs
             ++ [
+              git # the tests run on the latest git, whatever the machine's
               golangci-lint
               treefmt
               nixfmt

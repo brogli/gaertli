@@ -10,7 +10,6 @@ const (
 	appName            textID = "appName" // every dialog's title, and the empty-selection window's
 	usage              textID = "usage"
 	missingGit         textID = "missingGit"
-	gitOutdated        textID = "gitOutdated"
 	settingsPathErr    textID = "settingsPathErr"
 	settingsLoadErr    textID = "settingsLoadErr"
 	startupFailed      textID = "startupFailed" // a.Run failed after git was found: the web view is missing
@@ -28,7 +27,6 @@ var texts = map[textID]string{
 	appName:            "Gärtli",
 	usage:              "usage: gaertli [path]",
 	missingGit:         "Gärtli needs git. Install git and make sure it is on your PATH, then start Gärtli again.",
-	gitOutdated:        "Gärtli needs git {minVersion} or newer; the installed version is {version}. Update git, then start Gärtli again.",
 	settingsPathErr:    "could not determine the settings location: {error}",
 	settingsLoadErr:    "could not load settings: {error}",
 	startupFailed:      "Gärtli could not start its web view. On Windows, install the WebView2 runtime; on Linux, install the webkitgtk package. ({error})",

@@ -464,8 +464,8 @@ func NewManager(sink core.EventSink) *Manager {
 
 // Resolve validates path and returns its worktree's identity (toplevel, git
 // dir, repo key) without minting or reusing a session, so listing a repo's
-// worktrees starts no poller or watcher. A missing or too old git is Code
-// GitTooOld; a path outside a work tree is Code NotARepo.
+// worktrees starts no poller or watcher. A git that cannot be run is Code
+// GitMissing; a path outside a work tree is Code NotARepo.
 func (m *Manager) Resolve(ctx context.Context, path core.RepoPath) (toplevel, gitDir, repoKey string, err error) {
 	if _, err := m.discover.CheckVersion(ctx); err != nil {
 		return "", "", "", err

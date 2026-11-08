@@ -80,21 +80,6 @@ tasks:
       - go test -parallel {{.PARALLEL | default 16}} {{.FLAGS}} ./internal/...
         ./cmd/{{.APP_NAME}}-core/... ./build/windows/bin/...
 
-  test:go:oldgit:
-    summary:
-      Runs the Go tests whose behaviour depends on the git version (the git-2-42 CI job), i.e. the
-      core set without internal/app, the Wails shell, which alone needs cgo and the GTK/WebKit
-      headers
-    deps:
-      - task: build:core:embed
-    env:
-      GOPROXY: off
-      GOFLAGS: -mod=readonly
-      GOTOOLCHAIN: local
-    cmds:
-      - go test -parallel 16 {{.FLAGS}} $(go list ./internal/... | grep -v '/internal/app$')
-        ./cmd/{{.APP_NAME}}-core/... ./build/windows/bin/...
-
   test:frontend:
     summary: Runs the Vitest component tests offline
     deps:

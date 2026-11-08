@@ -1,9 +1,8 @@
-// Requirements: DIST-01
+// Requirements: DIST-01, QA-COMP-04
 
 package app
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/brogli/gaertli/internal/git"
@@ -18,34 +17,21 @@ func TestMain(m *testing.M) {
 	testbin.Main(m, testbin.Bin{Path: &fakegit, Pkg: "github.com/brogli/gaertli/internal/git/testdata/fakegit"})
 }
 
-func TestChecksGitPresence(t *testing.T) {
-	ok, msg := checkGit(t.Context(), git.Runner{Git: "/does/not/exist"})
-	if ok {
-		t.Fatal("checkGit() ok = true for a missing git")
-	}
-	if !strings.Contains(msg, "git") {
-		t.Errorf("msg = %q, want it to mention git", msg)
+func TestRefusesAMissingGit(t *testing.T) {
+	if gitRuns(t.Context(), git.Runner{Git: "/does/not/exist"}) {
+		t.Error("gitRuns() = true for a missing git")
 	}
 }
 
-func TestChecksGitVersion(t *testing.T) {
+func TestAcceptsAnOldGit(t *testing.T) {
 	t.Setenv("FAKEGIT_STDOUT", "git version 2.30.0\n")
-
-	ok, msg := checkGit(t.Context(), git.Runner{Git: fakegit})
-
-	if ok {
-		t.Fatal("checkGit() ok = true for git 2.30.0")
-	}
-	for _, want := range []string{"2.30.0", git.MinVersion.String()} {
-		if !strings.Contains(msg, want) {
-			t.Errorf("msg = %q, want it to contain %q", msg, want)
-		}
+	if !gitRuns(t.Context(), git.Runner{Git: fakegit}) {
+		t.Error("gitRuns() = false for git 2.30.0")
 	}
 }
 
 func TestAcceptsInstalledGit(t *testing.T) {
-	ok, msg := checkGit(t.Context(), git.Runner{})
-	if !ok {
-		t.Fatalf("checkGit() ok = false with the real, installed git; msg = %q", msg)
+	if !gitRuns(t.Context(), git.Runner{}) {
+		t.Error("gitRuns() = false with the real, installed git")
 	}
 }

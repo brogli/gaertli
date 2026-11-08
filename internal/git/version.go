@@ -14,12 +14,26 @@ import (
 // Version is git's own version, as reported by "git --version".
 type Version struct{ Major, Minor, Patch int }
 
-// MinVersion is the oldest supported git.
-var MinVersion = Version{Major: 2, Minor: 42, Patch: 0}
+// Latest is the newest git release (endoflife.date's newest cycle), the one
+// the app supports. Renovate bumps it.
+const Latest = "2.56.0" // renovate: datasource=endoflife-date depName=git
 
-// Less reports whether v is older than o.
-func (v Version) Less(o Version) bool {
-	return cmp.Or(cmp.Compare(v.Major, o.Major), cmp.Compare(v.Minor, o.Minor), cmp.Compare(v.Patch, o.Patch)) < 0
+var latest = must(parseVersion(Latest))
+
+// LatestCycle is Latest's release cycle, e.g. "2.56".
+func LatestCycle() string { return fmt.Sprintf("%d.%d", latest.Major, latest.Minor) }
+
+func must(v Version, err error) Version {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// Outdated reports whether v is from an older release cycle than Latest.
+// A zero Version, one git did not report readably, is outdated.
+func (v Version) Outdated() bool {
+	return cmp.Or(cmp.Compare(v.Major, latest.Major), cmp.Compare(v.Minor, latest.Minor)) < 0
 }
 
 func (v Version) String() string {
@@ -31,11 +45,10 @@ func (v Version) String() string {
 // every worktree open asks.
 var versions sync.Map
 
-// CheckVersion runs "git --version" and returns *core.Error{Code: GitTooOld}
-// if git cannot be started, its output cannot be parsed, or it is older
-// than MinVersion. A passed check is remembered for the process; a failed
-// one is repeated, so an installed or upgraded git is seen on the next
-// call.
+// CheckVersion runs "git --version" and returns *core.Error{Code: GitMissing}
+// if git cannot be run. Output it cannot read gives the zero Version. A
+// passed check is remembered for the process; a failed one is repeated, so
+// an installed git is seen on the next call.
 func (r Runner) CheckVersion(ctx context.Context) (Version, error) {
 	if v, ok := versions.Load(r.Git); ok {
 		return v.(Version), nil
@@ -51,16 +64,9 @@ func (r Runner) CheckVersion(ctx context.Context) (Version, error) {
 func (r Runner) checkVersion(ctx context.Context) (Version, error) {
 	result, err := r.Run(ctx, Call{Args: []string{"--version"}, ReadOnly: true})
 	if err != nil {
-		return Version{}, core.Errorf(core.GitTooOld, "git --version: %v", err)
+		return Version{}, core.Errorf(core.GitMissing, "git --version: %v", err)
 	}
-	v, err := parseVersion(string(result.Stdout))
-	if err != nil {
-		return Version{}, core.Errorf(core.GitTooOld, "%v", err)
-	}
-	if v.Less(MinVersion) {
-		args := map[string]string{"version": v.String(), "minVersion": MinVersion.String()}
-		return Version{}, core.ErrorfArgs(core.GitTooOld, "gitTooOld", args, "git %s is older than the minimum %s", v, MinVersion)
-	}
+	v, _ := parseVersion(string(result.Stdout))
 	return v, nil
 }
 

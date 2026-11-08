@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -35,6 +36,19 @@ export function createSandbox(): Sandbox {
 export function editorCalls(sandbox: Sandbox): string[] {
   if (!fs.existsSync(sandbox.editorLog)) return []
   return fs.readFileSync(sandbox.editorLog, 'utf8').split('\n').filter(Boolean)
+}
+
+// reportGitVersion puts a git first on the sandbox's PATH whose --version
+// reports version and which runs the real git for everything else.
+export function reportGitVersion(sandbox: Sandbox, version: string): void {
+  const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim()
+  const script = [
+    '#!/bin/sh',
+    `if [ "$1" = --version ]; then echo 'git version ${version}'; exit 0; fi`,
+    `exec '${realGit}' "$@"`,
+    '',
+  ].join('\n')
+  fs.writeFileSync(path.join(sandbox.dir, 'bin', 'git'), script, { mode: 0o755 })
 }
 
 // writeStandIn writes a program that logs its name and arguments instead

@@ -158,6 +158,12 @@ func (s *AppService) NewWindow() {
 	s.reg.NewWindow()
 }
 
+// TakeGitWarnings returns the outdated gits' warnings no window has shown
+// yet.
+func (s *AppService) TakeGitWarnings() []GitWarning {
+	return s.reg.TakeGitWarnings()
+}
+
 // RecentRepos lists the remembered repos, most-recently-opened first.
 func (s *AppService) RecentRepos() []settings.RecentRepo {
 	return s.store.Get().RecentRepos

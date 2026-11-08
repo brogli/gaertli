@@ -47,7 +47,8 @@ no auto-update. Installing a newer version over the old one keeps your settings.
 
 You also need:
 
-- **git** 2.42 or newer, on `PATH`.
+- **git**, the latest release, on `PATH` ([git-scm.com/downloads](https://git-scm.com/downloads)).
+  An older git works, but Gärtli warns at start that some features may not.
 - **The OS web view**: WebView2 on Windows (preinstalled on Windows 11, a small Microsoft installer
   on Windows 10), or WebKitGTK 6.0 on Linux, which the deb/rpm install.
 
@@ -71,9 +72,8 @@ nix develop --command task setup   # downloads Go modules and frontend packages
 
 ## First start
 
-Gärtli checks both prerequisites at launch and says which one is missing or too old: on Windows in a
-message box, on Linux only in the terminal output. If it doesn't open on Linux, start it from a
-terminal.
+Gärtli checks both prerequisites at launch and says which one is missing: on Windows in a message
+box, on Linux only in the terminal output. If it doesn't open on Linux, start it from a terminal.
 
 ## Start from a terminal
 

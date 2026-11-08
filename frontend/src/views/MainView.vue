@@ -7,6 +7,7 @@ import { AppService } from '../../bindings/github.com/brogli/gaertli/internal/ap
 import SettingsPanel from '@/components/SettingsPanel.vue'
 import RepoPicker from '@/components/RepoPicker.vue'
 import DebugArea from '@/components/DebugArea.vue'
+import GitWarningDialog from '@/components/GitWarningDialog.vue'
 import WorktreeContent from './WorktreeContent.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useShortcut } from '@/composables/useShortcut'
@@ -66,4 +67,5 @@ useShortcut(
   >
     <SettingsPanel @close="showSettings = false" />
   </Dialog>
+  <GitWarningDialog />
 </template>

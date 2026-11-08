@@ -60,9 +60,7 @@ pipelines do, `docs/releasing.md` how builds and releases work.
   source in a comment (OSS-05).
 - Destructive or history-writing paths (discard, reset, stash, squash, cherry-pick, revert, worktree
   remove) get a correctness review that reproduces with real git in a scratch repo before merging.
-- Code that rewrites history or parses git output is also tested against a current git
-  (`nix build nixpkgs#git --print-out-paths`, its `bin` first on PATH), since a machine's git may be
-  older than CI's. The app needs git 2.42 or newer.
+- The app supports only the latest git release; the Nix shell provides it, so tests run on it.
 
 ## Checks and commits
 

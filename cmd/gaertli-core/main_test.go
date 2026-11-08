@@ -45,7 +45,7 @@ func TestStdioCoreAnswersVersionAndExitsWhenStdinCloses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != (core.Version{App: "dev", Protocol: core.Protocol}) {
+	if v.App != "dev" || v.Protocol != core.Protocol {
 		t.Errorf("Version = %+v", v)
 	}
 

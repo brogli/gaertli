@@ -93,6 +93,9 @@ type Registry struct {
 	distros       map[string]distroCorer         // lazily created, one per distro in use
 	newDistroCore func(distro string, sink core.EventSink) distroCorer
 
+	gitWarned   map[string]bool // by distro, "" for the host: each git warns once per run
+	gitWarnings []GitWarning    // not yet shown, oldest first
+
 	focusMu sync.Mutex // orders setFocused's core calls
 
 	quitting atomic.Bool // set by Quitting; the windows closing after it stay remembered
@@ -107,6 +110,7 @@ func NewRegistry() *Registry {
 		diffWindows: make(map[diffWindowKey]*windowEntry),
 		pages:       make(map[shellWindow]*windowEntry),
 		distros:     make(map[string]distroCorer),
+		gitWarned:   make(map[string]bool),
 	}
 	r.newDistroCore = func(distro string, sink core.EventSink) distroCorer {
 		return remote.NewDistroCore(distro, buildinfo.App, remote.WslRun, r.consent, sink, r.log)
@@ -140,7 +144,10 @@ func (r *Registry) distroCore(distro string) distroCorer {
 		return dc
 	}
 	dc := r.newDistroCore(distro, r.sinkFor(distro))
-	dc.OnConnect(func(ctx context.Context, c *remote.Client) { r.pushEditorProfile(ctx, c) })
+	dc.OnConnect(func(ctx context.Context, c *remote.Client) {
+		r.pushEditorProfile(ctx, c)
+		r.noteGit(ctx, distro, c)
+	})
 	r.distros[distro] = dc
 	return dc
 }

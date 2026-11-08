@@ -59,21 +59,6 @@ describe('ErrorBanner', () => {
     expect(wrapper.get('p').text()).toBe('"main" has no upstream configured.')
   })
 
-  it('a too-old git, local or from a WSL repo, names its version and the minimum', () => {
-    const wrapper = mount(ErrorBanner, {
-      props: {
-        error: {
-          code: Code.GitTooOld,
-          message: 'stale message, not what should be shown',
-          key: 'gitTooOld',
-          args: { version: '2.30.0', minVersion: '2.42.0' },
-        },
-      },
-    })
-
-    expect(wrapper.get('p').text()).toBe('git 2.30.0 is older than the minimum 2.42.0')
-  })
-
   it('an error with a key en.json has no entry for falls back to the message', () => {
     const wrapper = mount(ErrorBanner, {
       props: {
