@@ -13,6 +13,7 @@ import (
 	"github.com/brogli/gaertli/internal/git"
 	"github.com/brogli/gaertli/internal/git/gittest"
 	"github.com/brogli/gaertli/internal/jobs"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
@@ -65,7 +66,7 @@ func TestJobsPollsGrowingProgressThenCancelKillsProcess(t *testing.T) {
 func waitForJob(t *testing.T, c *Core, id core.WorktreeID, want func(core.JobInfo) bool) core.JobInfo {
 	t.Helper()
 	var match core.JobInfo
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		list, err := c.Jobs(t.Context(), id)
 		if err != nil {
 			t.Fatal(err)

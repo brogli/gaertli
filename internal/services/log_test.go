@@ -13,11 +13,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git/gittest"
 	"github.com/brogli/gaertli/internal/testbin"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 // fakegit is internal/git/testdata/fakegit, for the tests that inject a
@@ -391,7 +391,7 @@ func TestLargeLoadWritesCommitGraphOnce(t *testing.T) {
 	loadLog(t, c, smallInfo.ID)
 
 	// The write runs after the done signal, so wait for its recorded call.
-	waitFor(t, func() bool { return countCommands(largeRec, "git commit-graph write") > 0 })
+	testwait.Until(func() bool { return countCommands(largeRec, "git commit-graph write") > 0 })
 	largeGraph := filepath.Join(large.Dir, ".git", "objects", "info", "commit-graph")
 	if _, err := os.Stat(largeGraph); err != nil {
 		t.Errorf("large repo commit-graph missing: %v", err)
@@ -494,7 +494,7 @@ func TestLoadLogOnALoadedRepoReemitsItsProgress(t *testing.T) {
 	wt := openOn(t, c, repo.Dir)
 	loadLog(t, c, wt.ID)
 	// The load's done progress is emitted after LogRows reports it done.
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		mu.Lock()
 		defer mu.Unlock()
 		return slices.ContainsFunc(progress, func(p core.LogProgress) bool { return p.Done })
@@ -613,22 +613,12 @@ func waitForLog(t *testing.T, c *Core, id core.WorktreeID) []core.LogCommit {
 	return res.Rows
 }
 
-// waitFor polls cond until it holds. It sets no time limit, so a loaded
-// runner cannot fail it: a condition that never holds fails at go test's
-// timeout, with every goroutine's stack.
-func waitFor(t *testing.T, cond func() bool) {
-	t.Helper()
-	for !cond() {
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 // waitForFirstRow polls LogRows until id's load, filtered or not, holds a
 // row, and returns that first row's result.
 func waitForFirstRow(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsResult {
 	t.Helper()
 	var res core.LogRowsResult
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		var err error
 		res, err = c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
@@ -644,7 +634,7 @@ func waitForFirstRow(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsResu
 func waitForLogRows(t *testing.T, c *Core, id core.WorktreeID) core.LogRowsResult {
 	t.Helper()
 	var res core.LogRowsResult
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		var err error
 		res, err = c.LogRows(t.Context(), id, 0, 1000)
 		if err != nil {

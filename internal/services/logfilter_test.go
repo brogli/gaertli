@@ -10,6 +10,7 @@ import (
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/testwait"
 )
 
 func TestLogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
@@ -308,7 +309,7 @@ func TestSetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	waitFor(t, func() bool {
+	testwait.Until(func() bool {
 		res, err := c.LogRows(t.Context(), id, 0, 1)
 		if err != nil {
 			t.Fatal(err)
