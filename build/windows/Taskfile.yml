@@ -68,11 +68,12 @@ tasks:
       - task: create:nsis:installer
     cmds:
       - mkdir -p dist
-      - rm -f dist/{{.APP_NAME}}-windows-amd64.zip
-      - zip -j dist/{{.APP_NAME}}-windows-amd64.zip {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE
-      - cd build/windows && zip ../../dist/{{.APP_NAME}}-windows-amd64.zip bin/{{.APP_NAME}}
+      - rm -f dist/{{.ASSET_NAME}}-windows-amd64.zip
+      - zip -j dist/{{.ASSET_NAME}}-windows-amd64.zip {{.BIN_DIR}}/{{.APP_NAME}}.exe LICENSE
+      - cd build/windows && zip ../../dist/{{.ASSET_NAME}}-windows-amd64.zip bin/{{.APP_NAME}}
         bin/{{.APP_NAME}}.cmd
-      - cp {{.BIN_DIR}}/{{.APP_NAME}}-amd64-installer.exe dist/{{.APP_NAME}}-windows-amd64-setup.exe
+      - cp {{.BIN_DIR}}/{{.APP_NAME}}-amd64-installer.exe
+        dist/{{.ASSET_NAME}}-windows-amd64-setup.exe
 
   generate:syso:
     summary: Generates Windows `.syso` file

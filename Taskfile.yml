@@ -15,6 +15,7 @@ vars:
   # (build/release-version.sh) and the short commit, set by the release
   # workflow; "dev" and no commit for every local build.
   VERSION: '{{.VERSION | default "dev"}}'
+  ASSET_NAME: '{{.APP_NAME}}-{{.VERSION}}'
   COMMIT: '{{.COMMIT | default ""}}'
   # The numeric version installers and packages need: 0.0.0 outside releases.
   PRODUCT_VERSION:

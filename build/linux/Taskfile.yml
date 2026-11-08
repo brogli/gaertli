@@ -58,9 +58,9 @@ tasks:
       - task: create:rpm
       - task: create:tarball
       - mkdir -p dist
-      - mv {{.BIN_DIR}}/{{.APP_NAME}}.deb dist/{{.APP_NAME}}-linux-amd64.deb
-      - mv {{.BIN_DIR}}/{{.APP_NAME}}.rpm dist/{{.APP_NAME}}-linux-amd64.rpm
-      - mv {{.BIN_DIR}}/{{.APP_NAME}}.tar.gz dist/{{.APP_NAME}}-linux-amd64.tar.gz
+      - mv {{.BIN_DIR}}/{{.APP_NAME}}.deb dist/{{.ASSET_NAME}}-linux-amd64.deb
+      - mv {{.BIN_DIR}}/{{.APP_NAME}}.rpm dist/{{.ASSET_NAME}}-linux-amd64.rpm
+      - mv {{.BIN_DIR}}/{{.APP_NAME}}.tar.gz dist/{{.ASSET_NAME}}-linux-amd64.tar.gz
 
   create:tarball:
     summary:

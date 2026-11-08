@@ -75,7 +75,7 @@ tasks:
       - task: package
     cmds:
       - mkdir -p dist
-      - sh -c 'cd {{.BIN_DIR}} && zip -r -y ../dist/{{.APP_NAME}}-darwin-arm64.zip
+      - sh -c 'cd {{.BIN_DIR}} && zip -r -y ../dist/{{.ASSET_NAME}}-darwin-arm64.zip
         {{.APP_NAME}}.app'
 
   package:universal:
