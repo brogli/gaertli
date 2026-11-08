@@ -14,10 +14,11 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same pull request cancels the run in progress.
+# A newer push to the same pull request, or a newer merge to main, cancels the
+# run in progress.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   linux:
