@@ -64,6 +64,19 @@ tasks:
       # Tests mostly wait on git, so more of them run at once than there are cores.
       - go test -parallel 16 ./...
 
+  test:go:race:
+    summary:
+      Runs the Go tests under the race detector, with the concurrency tests that exist only for it
+      (the *_race_test.go files)
+    deps:
+      - task: common:build:frontend
+    env:
+      GOPROXY: off
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    cmds:
+      - go test -race -count=1 -parallel 16 ./...
+
   test:go:core:
     summary:
       Runs the Go tests that need no frontend build (the windows CI job); FLAGS=-race adds the race
@@ -209,6 +222,7 @@ tasks:
       - task: common:build:frontend
     cmds:
       - task: test:go
+      - task: test:go:race
 
   ci:build:
     summary: The Linux build, the Windows cross-build and installer

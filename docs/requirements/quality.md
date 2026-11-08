@@ -62,6 +62,7 @@
 | QA-REL-01 | A failed git action never crashes the app.                                                                                                                                                         |
 | QA-REL-02 | Unexpected repo states (detached HEAD, empty repo, missing worktree folder, shallow clone) are shown, not hidden, and do not break the app.                                                        |
 | QA-REL-03 | When the app's backend for a repo stops (a crash, a WSL shutdown), nothing is lost: the next action starts it again, the window recovers without being reopened, and a typed commit message stays. |
+| QA-REL-04 | Several windows, background jobs and the repo watching acting at once never corrupt what the app shows or does.                                                                                    |
 
 ## Usability
 

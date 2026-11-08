@@ -11,6 +11,9 @@ Tests are the proof that a requirement holds (QA-MNT-01, QA-MNT-02).
 - **The cheapest level that proves it.** Unit tests for parsers and the graph layout; integration
   tests for every core method; protocol tests for the WSL transport, against a real core process
   without WSL; component tests with mocked bindings for the UI.
+- **Races by dedicated tests.** Shared state that goroutines touch at once (jobs, log loading,
+  watching, windows, the WSL connection) has a test that drives those calls in parallel. These tests
+  exist only under the race detector, which also runs the rest of the Go suite (QA-REL-04).
 - **End to end only where nothing cheaper reaches.** A mock-backend suite for what a component test
   cannot see (virtual scrolling, cross-view keyboard flow). A real-backend suite, the app in Wails'
   server mode on scratch repos, for an outside change reaching the UI and one flow per family of
