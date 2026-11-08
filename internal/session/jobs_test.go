@@ -5,9 +5,6 @@ package session
 import (
 	"context"
 	"encoding/json"
-	"runtime"
-	"slices"
-	"sync"
 	"testing"
 
 	"github.com/brogli/gaertli/internal/core"
@@ -31,44 +28,34 @@ func TestRepoJobsEmitsJobUpdateEventsScopedToTheRepo(t *testing.T) {
 
 	sawProgress, sawDone := false, false
 	for !sawProgress || !sawDone {
-		{
-			e := <-events
-			if e.Name != "job:update" {
-				continue
-			}
-			if e.Worktree != "" {
-				t.Errorf("job:update Worktree = %q, want empty (repo-scoped)", e.Worktree)
-			}
-			if e.Repo != wt.Repo.Key {
-				t.Errorf("job:update Repo = %q, want %q", e.Repo, wt.Repo.Key)
-			}
-			var info core.JobInfo
-			if err := json.Unmarshal(e.Payload, &info); err != nil {
-				t.Fatal(err)
-			}
-			if info.Progress == 50 {
-				sawProgress = true
-			}
-			if info.State == core.JobDone {
-				sawDone = true
-			}
+		e := <-events
+		if e.Name != "job:update" {
+			continue
+		}
+		if e.Worktree != "" {
+			t.Errorf("job:update Worktree = %q, want empty (repo-scoped)", e.Worktree)
+		}
+		if e.Repo != wt.Repo.Key {
+			t.Errorf("job:update Repo = %q, want %q", e.Repo, wt.Repo.Key)
+		}
+		var info core.JobInfo
+		if err := json.Unmarshal(e.Payload, &info); err != nil {
+			t.Fatal(err)
+		}
+		if info.Progress == 50 {
+			sawProgress = true
+		}
+		if info.State == core.JobDone {
+			sawDone = true
 		}
 	}
 }
 
-// A job whose fn takes the worktree lock is no bypass: a concurrent direct
-// Lock() waits for it.
+// A job whose fn takes the worktree lock is no bypass: while the job holds
+// it, a direct Lock() cannot take it.
 func TestJobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
-
-	var mu sync.Mutex
-	var order []string
-	record := func(step string) {
-		mu.Lock()
-		defer mu.Unlock()
-		order = append(order, step)
-	}
 
 	locked, release := make(chan struct{}), make(chan struct{})
 	m.Start(t.Context(), "test", func(ctx context.Context, progress jobs.Progress) (any, error) {
@@ -76,33 +63,17 @@ func TestJobHoldingWorktreeLockSerialisesWithADirectLock(t *testing.T) {
 		defer wt.Unlock()
 		close(locked)
 		<-release
-		record("job released")
 		return nil, nil
 	})
 	<-locked
+	defer close(release)
 
-	attempting, direct := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(direct)
-		close(attempting)
-		wt.Lock()
-		defer wt.Unlock()
-		record("direct lock acquired")
-	}()
-	<-attempting
-	// Give a lock that does not serialise the chance to be acquired first.
-	for range 1000 {
-		runtime.Gosched()
-	}
-	close(release)
-	<-direct
-
-	if want := []string{"job released", "direct lock acquired"}; !slices.Equal(order, want) {
-		t.Errorf("order = %v, want %v (direct Lock() must wait for the job)", order, want)
+	if wt.writeMu.TryLock() {
+		wt.writeMu.Unlock()
+		t.Error("the worktree lock was free while the job held it")
 	}
 }
 
-// fetch and push touch refs and objects only, so their jobs take no lock.
 func TestJobWithNoLockNeverBlocksOnAConcurrentWorktreeLock(t *testing.T) {
 	wt := &Worktree{}
 	m := jobs.NewManager(func(jobs.Job) {})
