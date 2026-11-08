@@ -163,7 +163,7 @@ func TestRemapAuthFailedClassifiesVerifiedPrefixes(t *testing.T) {
 			if strings.Contains(ce.Message, url) || strings.Contains(ce.Message, "s3cret") {
 				t.Errorf("message leaks the URL or credential text: %q", ce.Message)
 			}
-			for _, hint := range []string{"from a terminal", "never asks for, stores or sees credentials"} {
+			for _, hint := range []string{"from a terminal", "Gärtli never asks for, stores or sees credentials"} {
 				if !strings.Contains(ce.Message, hint) {
 					t.Errorf("message lacks %q: %q", hint, ce.Message)
 				}

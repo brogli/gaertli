@@ -643,7 +643,7 @@ var authFailurePrefixes = []string{"fatal: could not read Username for", "fatal:
 // credential; git's own stderr stays in GitStderr.
 func remapAuthFailed(err error, result git.Result) error {
 	if ce := gitFailure(err); ce != nil && containsAny(string(result.Stderr), authFailurePrefixes) {
-		ce.Retag(core.AuthFailed, "authFailed", nil, "Could not sign in to the remote. Sign in once from a terminal (credential helper, SSH agent or cached login), then try again; gaertli never asks for, stores or sees credentials.")
+		ce.Retag(core.AuthFailed, "authFailed", nil, "Could not sign in to the remote. Sign in once from a terminal (credential helper, SSH agent or cached login), then try again; Gärtli never asks for, stores or sees credentials.")
 	}
 	return err
 }
