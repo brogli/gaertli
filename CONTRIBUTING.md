@@ -1,10 +1,10 @@
 # Contributing
 
-Thanks for your interest. nebegit is pre-alpha. Bug reports and small fixes are welcome as issues
-and pull requests. For a new feature or a behaviour change, open an issue first: every behaviour is
-a requirement row in `docs/requirements/` before it is built, and the row is where we agree on it.
+Thanks for your interest. Gärtli is pre-alpha. Bug reports and small fixes are welcome as issues and
+pull requests. For a new feature or a behaviour change, open an issue first: every behaviour is a
+requirement row in `docs/requirements/` before it is built, and the row is where we agree on it.
 
-An issue needs the nebegit version, the OS, what you did and what happened, and the lines from the
+An issue needs the Gärtli version, the OS, what you did and what happened, and the lines from the
 app log (the README says where it is) when there are any.
 
 ## Set up
@@ -20,14 +20,14 @@ task test            # Go and Vitest tests
 task fmt             # fixes lint findings and formatting
 task lint            # the same as a check
 task e2e             # Playwright against a mock backend
-task build           # -> bin/nebegit
-task windows:build   # -> bin/nebegit.exe
+task build           # -> bin/gaertli
+task windows:build   # -> bin/gaertli.exe
 task dev             # hot reload
 task ci              # CI's Linux checks, except e2e
 ```
 
 Binaries built in the shell use its libraries and run only inside it, e.g.
-`nix develop --command bin/nebegit`.
+`nix develop --command bin/gaertli`.
 
 ### Ubuntu 24.04
 

@@ -12,7 +12,7 @@ const en: unknown = JSON.parse(readFileSync('src/locales/en.json', 'utf-8'))
 
 // Proper names the guard lets through as plain text: the app's own name,
 // git itself, and the detached-HEAD state.
-const ALLOWED_WORDS = new Set(['nebegit', 'git', 'HEAD'])
+const ALLOWED_WORDS = new Set(['Gärtli', 'git', 'HEAD'])
 
 const ATTRS = ['title', 'aria-label', 'placeholder', 'label', 'header']
 

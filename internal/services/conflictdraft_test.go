@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 // sampleMergeDraft is a draft made for path's conflict as it is now.

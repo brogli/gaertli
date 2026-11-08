@@ -3,8 +3,8 @@ package editor
 import (
 	"os/exec"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/proc"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/proc"
 )
 
 // start launches argv[0] with argv[1:], detached: the caller never waits

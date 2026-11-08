@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 // smallConfig is a fast-to-build stand-in for Params, big enough to exercise

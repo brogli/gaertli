@@ -8,7 +8,7 @@ import ClearableInput from './ClearableInput.vue'
 import { useLogStore } from '@/stores/log'
 import { useRefsStore } from '@/stores/refs'
 import { refGroups } from '@/lib/refOptions'
-import type { LogFilter } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { LogFilter } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // FilterBar is the log filter: free-text author/path (debounced 300ms) and
 // branches or tags narrow the log; the search field highlights matches

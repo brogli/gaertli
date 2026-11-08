@@ -1,27 +1,27 @@
-name: 'nebegit'
+name: 'gaertli'
 arch: ${GOARCH}
 platform: 'linux'
 version: '${PRODUCT_VERSION}'
 section: 'default'
 priority: 'extra'
-maintainer: 'nebegit <28339986+brogli@users.noreply.github.com>'
+maintainer: 'Gärtli <28339986+brogli@users.noreply.github.com>'
 description: 'Desktop git GUI that sits beside your editor'
-vendor: 'nebegit'
-homepage: 'https://github.com/brogli/nebegit'
+vendor: 'Gärtli'
+homepage: 'https://github.com/brogli/gaertli'
 license: 'BSD-3-Clause'
 release: '1'
 
 contents:
-  - src: './bin/nebegit'
-    dst: '/usr/bin/nebegit'
+  - src: './bin/gaertli'
+    dst: '/usr/bin/gaertli'
   - src: './build/appicon.png'
-    dst: '/usr/share/icons/hicolor/1024x1024/apps/nebegit.png'
-  - src: './build/linux/nebegit.desktop'
-    dst: '/usr/share/applications/nebegit.desktop'
+    dst: '/usr/share/icons/hicolor/1024x1024/apps/gaertli.png'
+  - src: './build/linux/gaertli.desktop'
+    dst: '/usr/share/applications/gaertli.desktop'
   # Ubuntu's AppArmor denies user namespaces to programs without a profile;
   # WebKitGTK's sandbox needs them. Inert where AppArmor does not run.
-  - src: './build/linux/apparmor/nebegit'
-    dst: '/etc/apparmor.d/nebegit'
+  - src: './build/linux/apparmor/gaertli'
+    dst: '/etc/apparmor.d/gaertli'
     type: config
     packager: deb
 

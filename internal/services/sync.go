@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/jobs"
-	"github.com/brogli/nebegit/internal/session"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/jobs"
+	"github.com/brogli/gaertli/internal/session"
 )
 
 // remoteTimeout is git.Call's own safety-net Timeout for a remote call,
@@ -128,7 +128,7 @@ func containsAny(s string, subs []string) bool {
 // stashSubjectPrefix starts the subject of every stash entry the app makes around an integrate,
 // so Summary's WaitingStash tells it apart from a stash made outside the app. git prefixes the
 // branch ("On main: "); the verb (pull, merge or rebase) follows.
-const stashSubjectPrefix = "nebegit: local changes before "
+const stashSubjectPrefix = "Gärtli: local changes before "
 
 // integrateWithStash is integrateStep with local changes stashed around it.
 func integrateWithStash(ctx context.Context, wt *session.Worktree, integrateArgs []string) error {
@@ -643,7 +643,7 @@ var authFailurePrefixes = []string{"fatal: could not read Username for", "fatal:
 // credential; git's own stderr stays in GitStderr.
 func remapAuthFailed(err error, result git.Result) error {
 	if ce := gitFailure(err); ce != nil && containsAny(string(result.Stderr), authFailurePrefixes) {
-		ce.Retag(core.AuthFailed, "authFailed", nil, "Could not sign in to the remote. Sign in once from a terminal (credential helper, SSH agent or cached login), then try again; nebegit never asks for, stores or sees credentials.")
+		ce.Retag(core.AuthFailed, "authFailed", nil, "Could not sign in to the remote. Sign in once from a terminal (credential helper, SSH agent or cached login), then try again; gaertli never asks for, stores or sees credentials.")
 	}
 	return err
 }

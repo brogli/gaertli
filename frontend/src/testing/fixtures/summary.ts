@@ -1,4 +1,4 @@
-import { Operation, type Summary } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { Operation, type Summary } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // summaryFixture is a Summary answer.
 export function summaryFixture(overrides: Partial<Summary> = {}): Summary {

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import type { ChangedFiles } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import type { ChangedFiles } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // changes holds a worktree's current uncommitted changes, kept current by
 // the repo:changed{scope:"index"} listener of the view showing them

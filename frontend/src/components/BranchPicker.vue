@@ -4,13 +4,13 @@ import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import type { MenuItem } from 'openvue/menuitem'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   Code,
   type Branch,
   type BranchInUse,
   type IntegrateResult,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { useRefsStore } from '@/stores/refs'
 import { useRepoStore } from '@/stores/repo'
 import { useLogStore } from '@/stores/log'

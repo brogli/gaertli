@@ -1,7 +1,7 @@
 // Requirements: FR-UX-06
 import { describe, expect, it } from 'vitest'
 import { Theme as ThemeService } from '@openuxkit/themes'
-import { Theme } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+import { Theme } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 import { contrastRatio } from '@/testing/colour'
 import { applyTheme, darkThemes } from '../themes'
 

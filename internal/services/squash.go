@@ -6,16 +6,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/session"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/session"
 )
 
 // todoEditor is GIT_SEQUENCE_EDITOR for a todo prepared in the file
-// NEBEGIT_TODO_FILE names. git runs the value through its own shell,
+// GAERTLI_TODO_FILE names. git runs the value through its own shell,
 // appending "$@" (its todo file); read, printf and the redirects are shell
 // builtins, so it needs nothing beyond the sh git runs hooks with.
-const todoEditor = `while IFS= read -r line; do printf '%s\n' "$line"; done < "$NEBEGIT_TODO_FILE" >`
+const todoEditor = `while IFS= read -r line; do printf '%s\n' "$line"; done < "$GAERTLI_TODO_FILE" >`
 
 // selection is what SquashCheck, Squash and Fixup learn about the commits
 // to fold.
@@ -297,14 +297,14 @@ func rebaseWithTodo(ctx context.Context, wt *session.Worktree, sel selection, so
 			"rebase", "--interactive", "--no-autostash", "--no-update-refs", "--empty=keep",
 			"--reschedule-failed-exec", upstream,
 		},
-		Env: []string{"GIT_SEQUENCE_EDITOR=" + todoEditor, "NEBEGIT_TODO_FILE=" + filepath.ToSlash(todo)},
+		Env: []string{"GIT_SEQUENCE_EDITOR=" + todoEditor, "GAERTLI_TODO_FILE=" + filepath.ToSlash(todo)},
 	})
 	return stopOf(ctx, wt, err)
 }
 
 // writeTodo writes todo to a temporary file for todoEditor to read.
 func writeTodo(todo string) (string, error) {
-	f, err := os.CreateTemp("", "nebegit-todo-*")
+	f, err := os.CreateTemp("", "gaertli-todo-*")
 	if err == nil {
 		_, err = f.WriteString(todo)
 		if closeErr := f.Close(); err == nil {

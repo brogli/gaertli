@@ -7,10 +7,10 @@ import { useLogStore } from '@/stores/log'
 import { useCompareStore } from '@/stores/compare'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
-import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { DiffKind, fileTarget } from '@/lib/diffTarget'
 import { exactDate, shortSha, timeAgo } from '@/lib/format'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ChangedFiles from './ChangedFiles.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import CompareView from './CompareView.vue'
@@ -69,7 +69,7 @@ const committerDiffers = computed(() => {
     v-else-if="log.details"
     layout="vertical"
     class="commit-details flex-1 min-h-0 h-full"
-    state-key="nebegit.layout.commitDetail"
+    state-key="gaertli.layout.commitDetail"
     state-storage="local"
   >
     <SplitterPanel

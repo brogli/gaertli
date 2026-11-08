@@ -12,18 +12,18 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/brogli/nebegit/internal/applog"
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/services"
-	"github.com/brogli/nebegit/internal/settings"
-	"github.com/brogli/nebegit/internal/userpath"
+	"github.com/brogli/gaertli/internal/applog"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/services"
+	"github.com/brogli/gaertli/internal/settings"
+	"github.com/brogli/gaertli/internal/userpath"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	wailslog "github.com/wailsapp/wails/v3/pkg/services/log"
 )
 
-const singleInstanceID = "nebegit" // stable per machine; no reverse-domain owner to use
+const singleInstanceID = "gaertli" // stable per machine; no reverse-domain owner to use
 
 // Run starts the shell. args is os.Args (argv[0] included, see launchPath).
 func Run(assets fs.FS, args []string) error {
@@ -113,7 +113,7 @@ func openSettings() (*settings.Store, error) {
 // Builds no window and starts nothing, so it is testable without a display.
 func options(assets fs.FS, reg *Registry, onSecondInstance func(path string), logger *slog.Logger) application.Options {
 	return application.Options{
-		Name:        "nebegit",
+		Name:        "gaertli",
 		Description: "The git tool that sits beside your editor",
 		Logger:      logger,
 		Assets: application.AssetOptions{

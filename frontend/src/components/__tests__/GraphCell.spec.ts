@@ -3,7 +3,7 @@ import { mount, type DOMWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import GraphCell from '../GraphCell.vue'
 import { LANE_PALETTE_SIZE, laneColourClass } from '@/lib/laneColours'
-import { EdgeKind, type GraphRow } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { EdgeKind, type GraphRow } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const HEIGHT = 24
 const LANE_WIDTH = 14

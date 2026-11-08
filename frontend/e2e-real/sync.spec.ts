@@ -40,7 +40,7 @@ const test = base.extend<{ loginProtectedRemote: LoginProtectedRemote }>({
     const authorizations: string[] = []
     const server = http.createServer((req, res) => {
       authorizations.push(req.headers.authorization ?? '')
-      res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="nebegit-e2e"' }).end()
+      res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="gaertli-e2e"' }).end()
     })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const address = server.address()

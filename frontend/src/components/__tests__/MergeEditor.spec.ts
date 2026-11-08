@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const { Facade } = vi.hoisted(() => ({
   Facade: { SaveConflict: vi.fn(), SetMergeDraft: vi.fn(), MergeDraft: vi.fn() },
 }))
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { type Extension } from '@codemirror/state'
@@ -21,7 +21,7 @@ import { resolveBothConflicts } from '@/testing/resolveConflicts'
 import {
   RegionKind,
   type ConflictFile,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 beforeEach(() => useMergeDrafts().keepOnly('/repo', []))
 

@@ -2,7 +2,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import ErrorBanner from '../ErrorBanner.vue'
-import { Code } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { Code } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { findButton } from '@/testing/findButton'
 
 describe('ErrorBanner', () => {

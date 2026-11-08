@@ -30,15 +30,15 @@ import { iconClass, type IconName } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { useRepoChanged } from '@/lib/windowEvents'
 import { DiffKind, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { DiffMode } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { DiffMode } from '../../bindings/github.com/brogli/gaertli/internal/settings'
 import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 import {
   ChangeScope,
   type DiffHunk,
   type LineSelection,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // DiffView shows target's file diff, read-only: a file of a commit, a file
 // between two commits, a commit against the working tree, or an
@@ -465,7 +465,7 @@ const toolbar = computed<ToolbarButton[]>(() => {
           v-if="mode === DiffMode.SideBySideDiff"
           class="min-h-64"
           layout="horizontal"
-          state-key="nebegit.layout.diffSides"
+          state-key="gaertli.layout.diffSides"
           state-storage="local"
         >
           <SplitterPanel :size="50" :min-size="15"

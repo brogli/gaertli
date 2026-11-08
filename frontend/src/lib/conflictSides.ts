@@ -3,7 +3,7 @@ import { shortSha } from '@/lib/format'
 import {
   Operation,
   type ConflictSide,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 interface Roles {
   current: string

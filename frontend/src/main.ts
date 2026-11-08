@@ -8,7 +8,7 @@ import '@openvue/openicons/openicons.css'
 import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
 import App from './App.vue'
-import { NebegitPreset } from '@/theme/preset'
+import { GaertliPreset } from '@/theme/preset'
 import { installErrorLogging } from '@/lib/errorLogging'
 import { i18n } from './i18n'
 import { openvueLocale } from '@/lib/openvueLocale'
@@ -31,9 +31,9 @@ app
   .use(i18n)
   .use(PrimeVueConfig, {
     theme: {
-      preset: NebegitPreset,
+      preset: GaertliPreset,
       options: {
-        darkModeSelector: '.nebegit-dark',
+        darkModeSelector: '.gaertli-dark',
         cssLayer: { name: 'openvue', order: 'theme, base, openvue, components, utilities' },
       },
     },

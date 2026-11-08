@@ -6,7 +6,7 @@ import { useToast } from 'openvue/usetoast'
 
 const { Facade } = vi.hoisted(() => ({ Facade: { Reset: vi.fn(), UncommittedCount: vi.fn() } }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { mountNotices } from '@/testing/mountNotices'

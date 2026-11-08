@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import type {
   DiffFile,
   DiffHunk,
   DiffOptions,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DiffKind, type DiffTarget } from '@/lib/diffTarget'
 
 // diff holds the currently viewed file's diff, cached per path for the

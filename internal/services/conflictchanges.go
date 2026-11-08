@@ -5,8 +5,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // changeRegions finds the changes only one side made, which git applied to Result. text is Result

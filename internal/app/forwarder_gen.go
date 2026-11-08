@@ -5,7 +5,7 @@ package app
 import (
 	"context"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 func (f *Forwarder) AbortOperation(ctx context.Context, wt core.WorktreeID) error {

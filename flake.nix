@@ -1,5 +1,5 @@
 {
-  description = "nebegit dev shell: everything except Go";
+  description = "Gärtli dev shell: everything except Go";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -78,7 +78,7 @@
 
           shellHook = ''
             if ! command -v go >/dev/null; then
-              echo "nebegit: Go is not provided by this shell. Install Go $(sed -n 's/^go //p' go.mod) or newer natively (see CONTRIBUTING.md)." >&2
+              echo "Gärtli: Go is not provided by this shell. Install Go $(sed -n 's/^go //p' go.mod) or newer natively (see CONTRIBUTING.md)." >&2
             fi
             export PLAYWRIGHT_BROWSERS_PATH=${pkgs.playwright-driver.browsers}
             export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
@@ -129,7 +129,7 @@
             # Ubuntu 24.04 permits no bwrap to an unprofiled program (its
             # profile for /usr/bin/bwrap came with 25.04).
             if ! ${bwrapShim}/bin/bwrap --ro-bind / / --unshare-user true 2>/dev/null; then
-              echo "nebegit: this host denies bwrap a user namespace, so the app built here cannot start its web-process sandbox. See CONTRIBUTING.md, 'Ubuntu 24.04'." >&2
+              echo "Gärtli: this host denies bwrap a user namespace, so the app built here cannot start its web-process sandbox. See CONTRIBUTING.md, 'Ubuntu 24.04'." >&2
             fi
           '';
         };

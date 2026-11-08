@@ -16,13 +16,13 @@ import { useRefsStore } from '@/stores/refs'
 import { useSettingsStore } from '@/stores/settings'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { darkThemes } from '@/theme/themes'
-import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService, Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   PullMode,
   type EditorProfile,
   type Version,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
-import { DiffMode, Theme } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
+import { DiffMode, Theme } from '../../bindings/github.com/brogli/gaertli/internal/settings'
 import ErrorBanner from './ErrorBanner.vue'
 import FormField from './FormField.vue'
 
@@ -148,7 +148,7 @@ const distros = ref<string[]>([])
 const version = ref<Version | null>(null)
 const versionLabel = computed(() =>
   version.value
-    ? `nebegit ${version.value.app}${version.value.commit ? ` (${version.value.commit})` : ''}`
+    ? `Gärtli ${version.value.app}${version.value.commit ? ` (${version.value.commit})` : ''}`
     : '',
 )
 const logPath = ref('')

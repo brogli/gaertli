@@ -5,8 +5,8 @@ package remote
 import (
 	"context"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/tools/gencore/testdata/fixture"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/tools/gencore/testdata/fixture"
 )
 
 var _ fixture.API = (*Client)(nil)

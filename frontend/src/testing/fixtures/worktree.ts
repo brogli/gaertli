@@ -1,4 +1,4 @@
-import type { Worktree } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { Worktree } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // worktreeFixture is one worktree.
 export function worktreeFixture(overrides: Partial<Worktree> = {}): Worktree {

@@ -6,13 +6,13 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "nebegit"
+    !define INFO_PROJECTNAME "gaertli"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "brogli"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "nebegit"
+    !define INFO_PRODUCTNAME "Gärtli"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "0.0.1"

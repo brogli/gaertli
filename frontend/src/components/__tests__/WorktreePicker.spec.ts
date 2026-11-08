@@ -7,10 +7,10 @@ import { mountNotices } from '@/testing/mountNotices'
 import { editorNotFound, wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
 import { popoverShows } from '@/testing/popover'
-import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { ChangeScope } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { AppService, Facade, resetMainWindowApp } from '@/testing/mainWindowApp'

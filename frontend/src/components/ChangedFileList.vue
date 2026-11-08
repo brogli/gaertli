@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { basename, parentPath } from '@/lib/path'
 import type { ChangedFileAction } from './changedFileAction'
 import ChangedFileButton from './ChangedFileButton.vue'

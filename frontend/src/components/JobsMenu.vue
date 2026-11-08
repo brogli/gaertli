@@ -9,7 +9,7 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { useWindowEvent } from '@/lib/windowEvents'
 import { iconClass, spinClass } from '@/lib/icons'
 import { ICON_BUTTON, useToolbarButton } from '@/lib/layout'
-import { JobKind, type JobInfo } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { JobKind, type JobInfo } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
 // JobsMenu is the toolbar's jobs menu: a fixed-size button naming how many

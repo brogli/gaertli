@@ -7,9 +7,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/applog"
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/settings"
+	"github.com/brogli/gaertli/internal/applog"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/settings"
 )
 
 // fakeEmitter records every event emitted to all windows, after running
@@ -111,8 +111,8 @@ func TestSetSwitchesTheLogLevelAtOnce(t *testing.T) {
 	}
 }
 
-func TestSetKeepsDebugWhenNebegitLogForcesIt(t *testing.T) {
-	t.Setenv("NEBEGIT_LOG", "debug")
+func TestSetKeepsDebugWhenGaertliLogForcesIt(t *testing.T) {
+	t.Setenv("GAERTLI_LOG", "debug")
 	reg, _ := newTestRegistry()
 	store := newTestStore(t)
 	level := &slog.LevelVar{}
@@ -124,7 +124,7 @@ func TestSetKeepsDebugWhenNebegitLogForcesIt(t *testing.T) {
 	}
 
 	if level.Level() != slog.LevelDebug {
-		t.Errorf("level = %v, want Debug (forced by NEBEGIT_LOG)", level.Level())
+		t.Errorf("level = %v, want Debug (forced by GAERTLI_LOG)", level.Level())
 	}
 }
 

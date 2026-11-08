@@ -4,12 +4,12 @@ import { useI18n } from '@/i18n'
 import Popover from 'openvue/popover'
 import Button from 'openvue/button'
 import type { MenuItem } from 'openvue/menuitem'
-import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService, Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   ChangeScope,
   Code,
   type Worktree,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useConfirmAction } from '@/composables/useConfirmAction'

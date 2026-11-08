@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // DistroCore owns one distro's headless core process: spawns it (deploying
@@ -144,7 +144,7 @@ func (d *DistroCore) requireWSL2(listed distroListing) error {
 	}
 	i := slices.IndexFunc(distros, d.matches)
 	if i >= 0 && distros[i].Version == 1 {
-		return core.ErrorfArgs(core.WslUnsupported, "wsl1Unsupported", map[string]string{"distro": d.distro}, "WSL distro %s runs on WSL 1; nebegit needs WSL 2.", d.distro)
+		return core.ErrorfArgs(core.WslUnsupported, "wsl1Unsupported", map[string]string{"distro": d.distro}, "WSL distro %s runs on WSL 1; Gärtli needs WSL 2.", d.distro)
 	}
 	return nil
 }

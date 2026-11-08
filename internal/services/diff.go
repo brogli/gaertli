@@ -16,8 +16,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
 )
 
 // maxDiffFileSize caps a Diff* call's auto-loaded content. Force bypasses

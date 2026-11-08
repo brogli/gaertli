@@ -2,14 +2,14 @@
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { ChangeScope } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const { Facade, AppService } = vi.hoisted(() => ({
   Facade: { Summary: vi.fn() },
   AppService: { UpdateWindowTitle: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade, AppService }))
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { Events, emit } from '@/testing/runtime'

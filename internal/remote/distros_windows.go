@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/proc"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/proc"
 )
 
 // ListDistros names the installed distros from wsl.exe --list --quiet and

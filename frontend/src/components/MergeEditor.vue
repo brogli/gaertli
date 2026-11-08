@@ -42,11 +42,11 @@ import { conflictSideTitles } from '@/lib/conflictSides'
 import { regionAnchors, tieScrollY, type Anchor } from '@/lib/conflictScroll'
 import { iconClass } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   RegionKind,
   type ConflictFile,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
     <Splitter
       layout="horizontal"
       class="min-h-0 flex-1"
-      state-key="nebegit.layout.mergePanes"
+      state-key="gaertli.layout.mergePanes"
       state-storage="local"
     >
       <SplitterPanel

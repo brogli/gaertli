@@ -1,4 +1,4 @@
-import type { GraphRow } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { GraphRow } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // A "+k" overflow marker takes two lanes' width right of the highest lane.
 const OVERFLOW_LANES = 2

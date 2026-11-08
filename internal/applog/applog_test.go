@@ -20,13 +20,13 @@ func platformStateDir(t *testing.T) string {
 	switch runtime.GOOS {
 	case "windows":
 		t.Setenv("LocalAppData", tmp)
-		return filepath.Join(tmp, "nebegit", "logs", "nebegit.log")
+		return filepath.Join(tmp, "gaertli", "logs", "gaertli.log")
 	case "darwin":
 		t.Setenv("HOME", tmp)
-		return filepath.Join(tmp, "Library", "Logs", "nebegit", "nebegit.log")
+		return filepath.Join(tmp, "Library", "Logs", "gaertli", "gaertli.log")
 	default:
 		t.Setenv("XDG_STATE_HOME", tmp)
-		return filepath.Join(tmp, "nebegit", "nebegit.log")
+		return filepath.Join(tmp, "gaertli", "gaertli.log")
 	}
 }
 
@@ -81,7 +81,7 @@ func TestOpenRotatesAnOversizedLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(rotated, old) {
-		t.Error("nebegit.log.1 does not hold the old content")
+		t.Error("gaertli.log.1 does not hold the old content")
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -106,9 +106,9 @@ func TestOpenStartsAtInfo(t *testing.T) {
 	}
 }
 
-func TestOpenStartsAtDebugWhenNebegitLogIsDebug(t *testing.T) {
+func TestOpenStartsAtDebugWhenGaertliLogIsDebug(t *testing.T) {
 	platformStateDir(t)
-	t.Setenv("NEBEGIT_LOG", "debug")
+	t.Setenv("GAERTLI_LOG", "debug")
 
 	_, _, closer, level, err := Open(false)
 	if err != nil {
@@ -142,13 +142,13 @@ func TestSetLevelDebugModeFalseSetsInfo(t *testing.T) {
 	}
 }
 
-func TestSetLevelNebegitLogDebugForcesDebugEvenWhenDebugModeFalse(t *testing.T) {
-	t.Setenv("NEBEGIT_LOG", "debug")
+func TestSetLevelGaertliLogDebugForcesDebugEvenWhenDebugModeFalse(t *testing.T) {
+	t.Setenv("GAERTLI_LOG", "debug")
 	level := &slog.LevelVar{}
 
 	SetLevel(level, false)
 
 	if level.Level() != slog.LevelDebug {
-		t.Errorf("level = %v, want Debug (forced by NEBEGIT_LOG)", level.Level())
+		t.Errorf("level = %v, want Debug (forced by GAERTLI_LOG)", level.Level())
 	}
 }

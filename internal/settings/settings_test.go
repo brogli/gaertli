@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/settings"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/settings"
 )
 
 func TestPathIsUnderTheOSUserConfigDir(t *testing.T) {
@@ -26,7 +26,7 @@ func TestPathIsUnderTheOSUserConfigDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := filepath.Join("nebegit", "settings.json")
+	want := filepath.Join("gaertli", "settings.json")
 	if !strings.HasSuffix(got, want) {
 		t.Errorf("Path() = %q, want a suffix of %q", got, want)
 	}
@@ -89,7 +89,7 @@ func TestASavedStoreHasAFileAndDirectoryOnlyItsOwnerCanRead(t *testing.T) {
 		t.Skip("POSIX file modes")
 	}
 	for _, existing := range []bool{false, true} {
-		dir := filepath.Join(t.TempDir(), "nebegit")
+		dir := filepath.Join(t.TempDir(), "gaertli")
 		path := filepath.Join(dir, "settings.json")
 		if existing {
 			if err := os.Mkdir(dir, 0o755); err != nil {

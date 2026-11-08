@@ -5,7 +5,7 @@ import { reactive } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { pressKey } from '@/testing/pressKey'
@@ -21,7 +21,7 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 // reassigned mid-test to prove the button follows a live change, the way a
 // save in another window reaches this one (stores/settings.ts). save mimics
 // the real store's: it applies the next value, so a menu choice shows.
-import type { Preferences } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+import type { Preferences } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 const settingsStore = reactive<{ settings: Preferences | null; save: ReturnType<typeof vi.fn> }>({
   settings: null,
   save: vi.fn(),
@@ -43,7 +43,7 @@ import {
   JobState,
   PullMode,
   type Branch,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { findButton } from '@/testing/findButton'
 import { refsFixture } from '@/testing/fixtures/refs'

@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // Stream runs call like Run, but calls onRecord once per record as output

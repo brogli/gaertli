@@ -57,7 +57,7 @@ func TestHistoryWritesBranchesAndMergeInOneRun(t *testing.T) {
 	if got := Out(t, repo.Dir, "status", "--porcelain"); got != "" {
 		t.Errorf("working tree not clean: %q", got)
 	}
-	want := "Bea <bea@nebegit.invalid> / nebegit test <test@nebegit.invalid> / side change\n\nbody"
+	want := "Bea <bea@gaertli.invalid> / gaertli test <test@gaertli.invalid> / side change\n\nbody"
 	if got := Out(t, repo.Dir, "log", "-1", "--format=%an <%ae> / %cn <%ce> / %B", shas[1]); got != want {
 		t.Errorf("identity and message = %q, want %q", got, want)
 	}

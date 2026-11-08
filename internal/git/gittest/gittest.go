@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/testbin"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/testbin"
 )
 
 // Repo is a temp git repository for tests: real git, isolated HOME and
@@ -21,8 +21,8 @@ type Repo struct {
 
 // The test identity git commits with: Main configures it, History writes it.
 const (
-	identityName  = "nebegit test"
-	identityEmail = "test@nebegit.invalid"
+	identityName  = "gaertli test"
+	identityEmail = "test@gaertli.invalid"
 )
 
 // Main is the TestMain of every package whose tests call New. It builds bins

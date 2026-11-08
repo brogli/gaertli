@@ -9,12 +9,12 @@ import (
 
 func TestWithEntryAppendsOnceAndKeepsOtherEntriesVerbatim(t *testing.T) {
 	path := `C:\a;%USERPROFILE%\b`
-	dir := `C:\Apps\nebegit\bin`
+	dir := `C:\Apps\gaertli\bin`
 
 	once := withEntry(path, dir)
 	twice := withEntry(once, dir)
 
-	want := `C:\a;%USERPROFILE%\b;C:\Apps\nebegit\bin`
+	want := `C:\a;%USERPROFILE%\b;C:\Apps\gaertli\bin`
 	if once != want {
 		t.Fatalf("withEntry(%q, %q) = %q, want %q", path, dir, once, want)
 	}
@@ -25,7 +25,7 @@ func TestWithEntryAppendsOnceAndKeepsOtherEntriesVerbatim(t *testing.T) {
 
 func TestWithEntryKeepsEveryCharacterOfALongPath(t *testing.T) {
 	long := strings.Repeat(`C:\dir;`, 300) // 2100 characters
-	dir := `C:\Apps\nebegit\bin`
+	dir := `C:\Apps\gaertli\bin`
 
 	got := withEntry(long, dir)
 
@@ -36,8 +36,8 @@ func TestWithEntryKeepsEveryCharacterOfALongPath(t *testing.T) {
 }
 
 func TestWithEntryIgnoresCaseAndATrailingBackslash(t *testing.T) {
-	path := `C:\a;C:\APPS\NEBEGIT\BIN\;C:\b`
-	dir := `C:\Apps\nebegit\bin`
+	path := `C:\a;C:\APPS\GAERTLI\BIN\;C:\b`
+	dir := `C:\Apps\gaertli\bin`
 
 	got := withEntry(path, dir)
 
@@ -47,8 +47,8 @@ func TestWithEntryIgnoresCaseAndATrailingBackslash(t *testing.T) {
 }
 
 func TestWithoutEntryDropsEveryMatchAndKeepsTheRestInOrder(t *testing.T) {
-	path := `C:\a;C:\Apps\nebegit\bin;C:\b;C:\APPS\NEBEGIT\BIN\;C:\c`
-	dir := `C:\Apps\nebegit\bin`
+	path := `C:\a;C:\Apps\gaertli\bin;C:\b;C:\APPS\GAERTLI\BIN\;C:\c`
+	dir := `C:\Apps\gaertli\bin`
 
 	got := withoutEntry(path, dir)
 
@@ -59,7 +59,7 @@ func TestWithoutEntryDropsEveryMatchAndKeepsTheRestInOrder(t *testing.T) {
 }
 
 func TestWithoutEntryOnAnEmptyPathStaysEmpty(t *testing.T) {
-	if got := withoutEntry("", `C:\Apps\nebegit\bin`); got != "" {
+	if got := withoutEntry("", `C:\Apps\gaertli\bin`); got != "" {
 		t.Fatalf(`withoutEntry("", dir) = %q, want ""`, got)
 	}
 }

@@ -21,7 +21,7 @@ const { AppService, Facade } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ AppService, Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ AppService, Facade }))
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
@@ -38,7 +38,7 @@ import {
   Operation,
   type Refs,
   type Summary,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { DiffKind } from '@/lib/diffTarget'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { branchFixture } from '@/testing/fixtures/branch'

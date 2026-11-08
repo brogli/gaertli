@@ -6,5 +6,5 @@ import type { RemovableRef } from '@vueuse/core'
 // detail view, the diff window, the changes view), synced live across
 // windows.
 export function useFileTreeChoice(): RemovableRef<boolean> {
-  return useLocalStorage('nebegit.changedFiles.tree', false)
+  return useLocalStorage('gaertli.changedFiles.tree', false)
 }

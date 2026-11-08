@@ -1,9 +1,9 @@
 import { definePreset } from '@openuxkit/themes'
 import Aura from '@openuxkit/themes/aura'
 
-// NebegitPreset is Aura with the app's design-token overrides, the one place
+// GaertliPreset is Aura with the app's design-token overrides, the one place
 // OpenVue's look may change.
-export const NebegitPreset = definePreset(Aura, {
+export const GaertliPreset = definePreset(Aura, {
   components: {
     // Aura draws a severity's toast as its colour mixed with transparent,
     // plus a blur, so the window behind shows through. Here the same colour

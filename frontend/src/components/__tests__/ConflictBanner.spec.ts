@@ -13,7 +13,7 @@ const { Facade, AppService } = vi.hoisted(() => ({
   AppService: { OpenDiff: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade, AppService }))
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
@@ -27,7 +27,7 @@ import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import { DiffKind } from '@/lib/diffTarget'
-import { Operation } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { Operation } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // mountDuring mounts ConflictBanner while operation is in progress.
 function mountDuring(operation: Operation) {

@@ -4,8 +4,8 @@
 abi <abi/4.0>,
 include <tunables/global>
 
-profile nebegit /usr/bin/nebegit flags=(unconfined) {
+profile gaertli /usr/bin/gaertli flags=(unconfined) {
   userns,
 
-  include if exists <local/nebegit>
+  include if exists <local/gaertli>
 }

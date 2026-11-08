@@ -11,7 +11,7 @@ const { Facade } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 import { emit } from '@/testing/runtime'
 

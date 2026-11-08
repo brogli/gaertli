@@ -28,7 +28,7 @@ func TestTheConsentNamesTheDistroAndOnlyTheHelper(t *testing.T) {
 }
 
 func TestTextWithNoArgsReturnsThePlainEntry(t *testing.T) {
-	if got := text(appName, nil); got != "nebegit" {
-		t.Errorf("text(appName, nil) = %q, want %q", got, "nebegit")
+	if got := text(appName, nil); got != "Gärtli" {
+		t.Errorf("text(appName, nil) = %q, want %q", got, "Gärtli")
 	}
 }

@@ -104,13 +104,13 @@ func TestFrontendWrapperFailsWithoutNodeModules(t *testing.T) {
 func TestGoLintWrapperLintsEachPackageOnce(t *testing.T) {
 	log := fakeTool(t, "golangci-lint")
 
-	run(t, "./lint-go-packages", "internal/app/a.go", "internal/app/b.go", "cmd/nebegit/main.go")
+	run(t, "./lint-go-packages", "internal/app/a.go", "internal/app/b.go", "cmd/gaertli/main.go")
 
 	got := runs(t, log)
 	if len(got) != 1 {
 		t.Fatalf("golangci-lint ran %d times, want once: %q", len(got), got)
 	}
-	if args := got[0][1:]; !slices.Equal(args, []string{"run", "--fix", "./cmd/nebegit", "./internal/app"}) {
-		t.Errorf("golangci-lint args = %q, want run --fix ./cmd/nebegit ./internal/app", args)
+	if args := got[0][1:]; !slices.Equal(args, []string{"run", "--fix", "./cmd/gaertli", "./internal/app"}) {
+		t.Errorf("golangci-lint args = %q, want run --fix ./cmd/gaertli ./internal/app", args)
 	}
 }

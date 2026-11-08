@@ -1,8 +1,8 @@
 import {
   DiffKind,
   type DiffTarget,
-} from '../../bindings/github.com/brogli/nebegit/internal/app/models'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/app/models'
+import type { ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // What a diff window shows. Imported from the generated models file, not
 // the bindings barrel: unit tests and the e2e build replace the barrel.

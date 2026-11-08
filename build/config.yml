@@ -4,8 +4,8 @@ version: '3'
 
 info:
   companyName: 'brogli'
-  productName: 'nebegit'
-  productIdentifier: 'ch.nebegit.app'
+  productName: 'Gärtli'
+  productIdentifier: 'ch.gaertli.app'
   description: 'The git tool that sits beside your editor'
   copyright: 'Copyright (c) 2026, brogli'
   comments: ''

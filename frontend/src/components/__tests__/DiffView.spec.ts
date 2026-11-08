@@ -20,7 +20,7 @@ const { Facade, SettingsService } = vi.hoisted(() => ({
   SettingsService: { Get: vi.fn(), Set: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({
   Facade,
   SettingsService,
 }))
@@ -37,7 +37,7 @@ import DiffView from '../DiffView.vue'
 import { DiffKind } from '@/lib/diffTarget'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
-import { DiffMode } from '../../../bindings/github.com/brogli/nebegit/internal/settings'
+import { DiffMode } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
 import { editorViews } from '@/testing/editorView'
@@ -46,7 +46,7 @@ import {
   ChangeScope,
   Code,
   type DiffFile,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 const settings = defaultSettingsFixture()
 

@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/app"
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/app"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // stubCore answers Version and records Summary's id. The embedded

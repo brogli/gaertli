@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Tree, { type TreeExpandedKeys, type TreePassThroughMethodOptions } from 'openvue/tree'
 import type { TreeNode } from 'openvue/treenode'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { fileTree, folderKeys } from '@/lib/fileTree'
 import { iconClass } from '@/lib/icons'
 import type { ChangedFileAction } from './changedFileAction'

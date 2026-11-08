@@ -13,7 +13,7 @@
 The app needs only git and the platform's web view, and no package bundles either.
 
 - **Windows**: an installer (no administrator rights, per user) and a portable zip. Both carry a
-  `nebegit` command for Windows and WSL terminals that starts the app and returns at once
+  `gaertli` command for Windows and WSL terminals that starts the app and returns at once
   (FR-REPO-06); the installer puts it on the user PATH. The app's own exe edits the PATH, since the
   installer's script language cannot hold a long one.
 - **Linux**: `.deb` and `.rpm` that depend on GTK, WebKitGTK and git, and a `.tar.gz`. The `.deb`

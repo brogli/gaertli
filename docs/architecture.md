@@ -1,6 +1,6 @@
-# Architecture — nebegit
+# Architecture — Gärtli
 
-How nebegit is built. What it does is in `requirements.md`, how its code is written in
+How Gärtli is built. What it does is in `requirements.md`, how its code is written in
 `conventions.md`.
 
 ## Principles
@@ -16,17 +16,17 @@ How nebegit is built. What it does is in `requirements.md`, how its code is writ
 
 ```mermaid
 C4Context
-  Person(dev, "Developer", "Works in a terminal and an editor beside nebegit")
-  System(nebegit, "nebegit", "Desktop git GUI")
+  Person(dev, "Developer", "Works in a terminal and an editor beside Gärtli")
+  System(gaertli, "Gärtli", "Desktop git GUI")
   System_Ext(git, "git", "The user's git, with their config, hooks and credentials")
   System_Ext(editor, "External editor", "The user's configured editor")
   SystemDb_Ext(repo, "Repository", "Git dir and worktrees")
   System_Ext(remote, "Git remotes", "Reached only through git")
 
-  Rel(dev, nebegit, "Browses history, stages, commits, syncs")
-  Rel(nebegit, git, "Runs")
-  Rel(nebegit, editor, "Starts")
-  Rel(nebegit, repo, "Watches")
+  Rel(dev, gaertli, "Browses history, stages, commits, syncs")
+  Rel(gaertli, git, "Runs")
+  Rel(gaertli, editor, "Starts")
+  Rel(gaertli, repo, "Watches")
   Rel(git, repo, "Reads, writes")
   Rel(git, remote, "Fetches, pushes")
 ```
@@ -38,7 +38,7 @@ C4Container
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
   Person(dev, "Developer")
 
-  System_Boundary(nebegit, "nebegit") {
+  System_Boundary(gaertli, "Gärtli") {
     Container(ui, "UI", "Vue 3, TypeScript, WebView", "One per window: log, changes, diff, merge editor")
     Container(app, "Desktop app", "Go, Wails v3", "Windows, settings, app log; runs the core for local repos and routes each call to its core")
     ContainerDb(settings, "Settings", "JSON file", "Recent repos, open windows, preferences")

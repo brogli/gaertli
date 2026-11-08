@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock(
-  '../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { editorNotFound } from '@/testing/errors'
@@ -18,7 +18,7 @@ import MainView from '@/views/MainView.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { mountInBody } from '@/testing/mountInBody'
-import { Theme } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+import { Theme } from '../../bindings/github.com/brogli/gaertli/internal/settings'
 
 describe('App', () => {
   beforeEach(() => {
@@ -29,11 +29,11 @@ describe('App', () => {
 
   afterEach(() => {
     window.history.pushState({}, '', '/')
-    document.documentElement.classList.remove('nebegit-dark')
+    document.documentElement.classList.remove('gaertli-dark')
   })
 
   it('renders the app name with no worktree open', () => {
-    expect(mount(App).text()).toContain('nebegit')
+    expect(mount(App).text()).toContain('Gärtli')
   })
 
   it('routes ?view=diff to DiffWindowView with its worktree and target, not MainView', async () => {
@@ -94,12 +94,12 @@ describe('App', () => {
     const wrapper = mount(App)
     await flushPromises()
 
-    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(true)
+    expect(document.documentElement.classList.contains('gaertli-dark')).toBe(true)
 
     useSettingsStore().settings!.theme = Theme.LightTheme
     await flushPromises()
 
-    expect(document.documentElement.classList.contains('nebegit-dark')).toBe(false)
+    expect(document.documentElement.classList.contains('gaertli-dark')).toBe(false)
 
     wrapper.unmount()
     matchMediaSpy.mockRestore()

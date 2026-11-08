@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // Version is git's own version, as reported by "git --version".

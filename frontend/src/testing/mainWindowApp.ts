@@ -9,7 +9,7 @@ import { summaryFixture } from '@/testing/fixtures/summary'
 // here:
 //
 //   vi.mock(
-//     '../../bindings/github.com/brogli/nebegit/internal/app',
+//     '../../bindings/github.com/brogli/gaertli/internal/app',
 //     () => import('../testing/mainWindowApp'),
 //   )
 export const Facade = mocks(
@@ -88,7 +88,7 @@ export function resetMainWindowApp(): void {
   Facade.Version.mockResolvedValue({ app: 'dev', protocol: 1 })
   AppService.RecentRepos.mockResolvedValue([])
   AppService.ListWSLDistros.mockResolvedValue([])
-  AppService.LogPath.mockResolvedValue({ path: '/mock/nebegit.log', error: '' })
+  AppService.LogPath.mockResolvedValue({ path: '/mock/gaertli.log', error: '' })
   SettingsService.Get.mockResolvedValue(defaultSettingsFixture())
 }
 

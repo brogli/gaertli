@@ -11,16 +11,16 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/git"
-	"github.com/brogli/nebegit/internal/git/gittest"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/git"
+	"github.com/brogli/gaertli/internal/git/gittest"
 )
 
 // nonexistentGit makes every call fail before any git runs, so the timer
 // tests can run in a synctest bubble: its fake clock advances only while
 // every goroutine in it is durably blocked, which one waiting on a child
 // process never is.
-const nonexistentGit = "/nonexistent/nebegit-test-git"
+const nonexistentGit = "/nonexistent/gaertli-test-git"
 
 func TestWorktreePollerObservesAWorkingFileEditDirectly(t *testing.T) {
 	setInterval(t, &PollInterval, 30*time.Millisecond)

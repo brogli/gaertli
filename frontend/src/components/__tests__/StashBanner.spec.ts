@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({ Facade: { PopStash: vi.fn(), DropStash: vi.fn() } }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
@@ -18,7 +18,7 @@ import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
 import { summaryFixture } from '@/testing/fixtures/summary'
-import type { ChangedFile } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // mountWithStash mounts StashBanner with waitingStash set and conflicted
 // files remaining.

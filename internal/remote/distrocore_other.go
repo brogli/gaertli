@@ -6,7 +6,7 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // WslRun only exists on Windows (WSL is Windows-only).

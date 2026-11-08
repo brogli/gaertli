@@ -8,7 +8,7 @@ const { Facade, AppService } = vi.hoisted(() => ({
   AppService: { PickFolder: vi.fn(), OpenPath: vi.fn() },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade, AppService }))
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import CreateWorktreeDialog from '../CreateWorktreeDialog.vue'

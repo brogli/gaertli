@@ -11,10 +11,10 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/settings"
-	"github.com/brogli/nebegit/internal/userpath"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/settings"
+	"github.com/brogli/gaertli/internal/userpath"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -129,9 +129,9 @@ func TestLaunchPath(t *testing.T) {
 		wantPath string
 		wantOK   bool
 	}{
-		{[]string{"nebegit"}, "", true},
-		{[]string{"nebegit", abs}, abs, true},
-		{[]string{"nebegit", abs, abs}, "", false},
+		{[]string{"gaertli"}, "", true},
+		{[]string{"gaertli", abs}, abs, true},
+		{[]string{"gaertli", abs, abs}, "", false},
 	}
 	for _, c := range cases {
 		path, ok := launchPath(c.args, t.TempDir())
@@ -144,7 +144,7 @@ func TestLaunchPath(t *testing.T) {
 func TestLaunchPathThenOpenOrFocusOpensAWindow(t *testing.T) {
 	r, opener := newTestRegistry()
 
-	path, ok := launchPath([]string{"nebegit", "/a"}, "/wd")
+	path, ok := launchPath([]string{"gaertli", "/a"}, "/wd")
 	if !ok {
 		t.Fatal("launchPath ok = false")
 	}
@@ -165,9 +165,9 @@ func TestLaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
 		args     []string
 		wantPath string
 	}{
-		{[]string{"nebegit", "."}, wslDir},
-		{[]string{"nebegit", abs}, abs},
-		{[]string{"nebegit"}, ""},
+		{[]string{"gaertli", "."}, wslDir},
+		{[]string{"gaertli", abs}, abs},
+		{[]string{"gaertli"}, ""},
 	}
 	for _, c := range cases {
 		path, ok := launchPath(c.args, wslDir)
@@ -176,7 +176,7 @@ func TestLaunchPathResolvesAgainstTheWorkingDir(t *testing.T) {
 		}
 	}
 
-	resolved, _ := launchPath([]string{"nebegit", "."}, wslDir)
+	resolved, _ := launchPath([]string{"gaertli", "."}, wslDir)
 	distro, linuxPath, ok := remote.ClassifyWSLPath(resolved)
 	if !ok || distro != "Ubuntu" || linuxPath != "/home/u/repo" {
 		t.Errorf("ClassifyWSLPath(%q) = (%q, %q, %v), want (Ubuntu, /home/u/repo, true)", resolved, distro, linuxPath, ok)
@@ -194,7 +194,7 @@ func TestASecondInstancesPathResolvesAgainstItsOwnWorkingDir(t *testing.T) {
 		var got string
 		opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path }, nil)
 
-		opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"nebegit", c.arg}, WorkingDir: launchDir})
+		opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"gaertli", c.arg}, WorkingDir: launchDir})
 
 		if got != c.want {
 			t.Errorf("relayed path for %q = %q, want %q", c.arg, got, c.want)
@@ -206,7 +206,7 @@ func TestASecondInstanceWithoutAPathRelaysNone(t *testing.T) {
 	got := "unset"
 	opts := options(fstest.MapFS{}, NewRegistry(), func(path string) { got = path }, nil)
 
-	opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"nebegit"}, WorkingDir: t.TempDir()})
+	opts.SingleInstance.OnSecondInstanceLaunch(application.SecondInstanceData{Args: []string{"gaertli"}, WorkingDir: t.TempDir()})
 
 	if got != "" {
 		t.Errorf("relayed path = %q, want \"\" (restore)", got)
@@ -236,7 +236,7 @@ func TestRestoreOpensAWindowForEachRememberedSelection(t *testing.T) {
 		t.Errorf("opened = %v, want both /p1 and /p2", opened)
 	}
 	for _, w := range opener.windows {
-		if w.title == "nebegit" {
+		if w.title == "Gärtli" {
 			t.Errorf("a window opened with the empty-selection placeholder title, want none (OpenOrFocus never called with \"\")")
 		}
 	}
@@ -255,8 +255,8 @@ func TestRestoreOpensOneEmptySelectionWindowWhenNothingWasOpen(t *testing.T) {
 	if len(opener.windows) != 1 {
 		t.Fatalf("windows opened = %d, want 1", len(opener.windows))
 	}
-	if got := opener.windows[0].title; got != "nebegit" {
-		t.Errorf("window title = %q, want %q (OpenOrFocus(\"\", \"\", \"\") called exactly once)", got, "nebegit")
+	if got := opener.windows[0].title; got != "Gärtli" {
+		t.Errorf("window title = %q, want %q (OpenOrFocus(\"\", \"\", \"\") called exactly once)", got, "Gärtli")
 	}
 }
 
@@ -274,7 +274,7 @@ func TestRestoreFallsBackToTheEmptySelectionWindowWhenNoRememberedWorktreeOpens(
 	if notify.calls != 2 {
 		t.Errorf("notify.Show calls = %d, want 2", notify.calls)
 	}
-	if len(opener.windows) != 1 || opener.windows[0].title != "nebegit" {
+	if len(opener.windows) != 1 || opener.windows[0].title != "Gärtli" {
 		t.Fatalf("windows = %d, want the one empty-selection window", len(opener.windows))
 	}
 }
@@ -428,11 +428,11 @@ func TestPathActionForDispatchesTheInstallerFlagsOnly(t *testing.T) {
 		args []string
 		want func(string) error
 	}{
-		{[]string{"nebegit", "--add-to-path"}, userpath.Add},
-		{[]string{"nebegit", "--remove-from-path"}, userpath.Remove},
-		{[]string{"nebegit"}, nil},
-		{[]string{"nebegit", `C:\repo`}, nil},
-		{[]string{"nebegit", "--add-to-path", "extra"}, nil},
+		{[]string{"gaertli", "--add-to-path"}, userpath.Add},
+		{[]string{"gaertli", "--remove-from-path"}, userpath.Remove},
+		{[]string{"gaertli"}, nil},
+		{[]string{"gaertli", `C:\repo`}, nil},
+		{[]string{"gaertli", "--add-to-path", "extra"}, nil},
 	}
 	for _, c := range cases {
 		if got := pathActionFor(c.args); fmt.Sprintf("%p", got) != fmt.Sprintf("%p", c.want) {

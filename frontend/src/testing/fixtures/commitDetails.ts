@@ -1,4 +1,4 @@
-import type { CommitDetails } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import type { CommitDetails } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // commitDetailsFixture is a CommitDetails answer: Alice's "Fix the bug",
 // committed by Bob, with no files.

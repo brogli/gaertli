@@ -13,13 +13,13 @@ import { useJobNotices } from '@/composables/useJobNotices'
 import { usePush } from '@/composables/usePush'
 import { useShortcut } from '@/composables/useShortcut'
 import { useWithShortcut } from '@/composables/useWithShortcut'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   Code,
   JobKind,
   PullMode,
   type JobInfo,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { iconClass } from '@/lib/icons'
 import { useLayout, useToolbarButton } from '@/lib/layout'
 import ErrorBanner from './ErrorBanner.vue'

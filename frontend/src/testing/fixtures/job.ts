@@ -2,7 +2,7 @@ import {
   JobKind,
   JobState,
   type JobInfo,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // jobFixture is a running fetch job.
 export function jobFixture(overrides: Partial<JobInfo> = {}): JobInfo {

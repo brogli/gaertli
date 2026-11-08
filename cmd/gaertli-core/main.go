@@ -1,4 +1,4 @@
-// Command nebegit-core is the headless core: started by the shell inside a
+// Command gaertli-core is the headless core: started by the shell inside a
 // WSL distro, it serves core.API over JSON-RPC on stdio. Pure Go. Logs go
 // to stderr; stdout is the wire.
 package main
@@ -9,10 +9,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/brogli/nebegit/internal/buildinfo"
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/remote"
-	"github.com/brogli/nebegit/internal/services"
+	"github.com/brogli/gaertli/internal/buildinfo"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/remote"
+	"github.com/brogli/gaertli/internal/services"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func run(args []string) int {
 }
 
 func usage() int {
-	fmt.Fprintln(os.Stderr, "usage: nebegit-core --stdio | --version")
+	fmt.Fprintln(os.Stderr, "usage: gaertli-core --stdio | --version")
 	return 2
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from '@/i18n'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { useFileTreeChoice } from '@/composables/useFileTreeChoice'
 import ChangedFileList from './ChangedFileList.vue'
 import ChangedFileTree from './ChangedFileTree.vue'

@@ -19,8 +19,8 @@ import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useAutoFetch } from '@/composables/useAutoFetch'
 import { useShortcut } from '@/composables/useShortcut'
 import { useWithShortcut } from '@/composables/useWithShortcut'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { BranchInUse, ChangeScope } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { BranchInUse, ChangeScope } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from '@/components/ErrorBanner.vue'
 import JobsMenu from '@/components/JobsMenu.vue'
 import LogView from '@/components/LogView.vue'
@@ -235,7 +235,7 @@ const sideView = computed<'details' | 'changes'>(() =>
       v-if="layout === 'wide'"
       layout="horizontal"
       class="worktree-body flex min-h-0 flex-1"
-      state-key="nebegit.layout.wide"
+      state-key="gaertli.layout.wide"
       state-storage="local"
     >
       <SplitterPanel :size="50" :min-size="20">
@@ -252,7 +252,7 @@ const sideView = computed<'details' | 'changes'>(() =>
       v-else-if="layout === 'medium'"
       layout="horizontal"
       class="worktree-body flex min-h-0 flex-1"
-      state-key="nebegit.layout.medium"
+      state-key="gaertli.layout.medium"
       state-storage="local"
     >
       <SplitterPanel :size="60" :min-size="25">

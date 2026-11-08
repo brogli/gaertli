@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 import { watchDebounced } from '@vueuse/core'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   ChangeScope,
   type ChangedFile,
   type CommitDetails,
   type LogCommit,
   type LogFilter,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { onRepoChanged, onWindowEvent } from '@/lib/windowEvents'
 import type { CoreError } from '@/composables/useCoreCall'
 

@@ -5,11 +5,11 @@ import { useEventListener } from '@vueuse/core'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
   ChangeScope,
   type ChangedFile,
-} from '../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
 import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
 import { useChangesStore } from '@/stores/changes'
@@ -200,7 +200,7 @@ useEventListener(
   <Splitter
     layout="horizontal"
     class="flex h-full min-h-0"
-    state-key="nebegit.layout.diffWindow"
+    state-key="gaertli.layout.diffWindow"
     state-storage="local"
   >
     <SplitterPanel :size="25" :min-size="10" class="flex min-h-0 flex-col">

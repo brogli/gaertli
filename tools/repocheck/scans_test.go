@@ -174,7 +174,7 @@ func TestReleaseVersionIsConfigsSemanticVersion(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "release-version.sh"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	config := "version: '3'\n\ninfo:\n  productName: 'nebegit'\n  version: '2.7.1'\n"
+	config := "version: '3'\n\ninfo:\n  productName: 'gaertli'\n  version: '2.7.1'\n"
 	if err := os.WriteFile(filepath.Join(dir, "config.yml"), []byte(config), 0o644); err != nil {
 		t.Fatal(err)
 	}

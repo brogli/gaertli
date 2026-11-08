@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 
-	"github.com/brogli/nebegit/internal/core"
-	"github.com/brogli/nebegit/internal/jobs"
+	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/jobs"
 )
 
 // Jobs implements core.API.

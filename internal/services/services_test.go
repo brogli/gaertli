@@ -5,7 +5,7 @@ package services
 import (
 	"testing"
 
-	"github.com/brogli/nebegit/internal/buildinfo"
+	"github.com/brogli/gaertli/internal/buildinfo"
 )
 
 func TestVersionReturnsAppAndCommit(t *testing.T) {

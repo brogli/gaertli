@@ -1,4 +1,4 @@
-module github.com/brogli/nebegit
+module github.com/brogli/gaertli
 
 go 1.27
 

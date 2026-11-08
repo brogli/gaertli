@@ -3,7 +3,7 @@ import { semantic as auraSemantic } from '@openuxkit/themes/aura/base'
 // From @openuxkit/styled, not @openuxkit/themes: the latter re-exports them
 // with types that reject the { dark } palette form and palette()'s result.
 import { updatePreset, updatePrimaryPalette, updateSurfacePalette } from '@openuxkit/styled'
-import { Theme } from '../../bindings/github.com/brogli/nebegit/internal/settings'
+import { Theme } from '../../bindings/github.com/brogli/gaertli/internal/settings'
 
 export interface ThemeCredit {
   name: string
@@ -131,7 +131,7 @@ const auraPrimary = auraSemantic.primary
 const auraDarkSurface = auraSemantic.colorScheme?.dark?.surface
 const auraDarkPrimaryColor = auraSemantic.colorScheme?.dark?.primary?.color
 
-// applyTheme sets the .nebegit-dark class for the setting and the OS
+// applyTheme sets the .gaertli-dark class for the setting and the OS
 // preference, and swaps @openuxkit/themes' primary and dark surface
 // palettes: a dark theme's hand-written palette, or Aura's own otherwise.
 export function applyTheme(setting: Theme, osPrefersDark: boolean): void {
@@ -140,7 +140,7 @@ export function applyTheme(setting: Theme, osPrefersDark: boolean): void {
     theme !== undefined ||
     setting === Theme.DarkTheme ||
     (setting !== Theme.LightTheme && osPrefersDark)
-  document.documentElement.classList.toggle('nebegit-dark', dark)
+  document.documentElement.classList.toggle('gaertli-dark', dark)
 
   updatePrimaryPalette(theme ? palette(theme.accent) : auraPrimary)
   updateSurfacePalette({ dark: theme ? theme.surface : auraDarkSurface })

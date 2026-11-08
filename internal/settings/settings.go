@@ -1,4 +1,4 @@
-// Package settings persists nebegit's own configuration as JSON in the OS
+// Package settings persists gaertli's own configuration as JSON in the OS
 // user config directory. No Wails/cgo import.
 package settings
 
@@ -12,7 +12,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // maxRecent bounds RecentRepos.
@@ -107,13 +107,13 @@ func Default() Settings {
 	return Settings{ProtectedBranches: []string{"main", "master"}, DefaultPullMode: core.PullMerge, DiffMode: UnifiedDiff}
 }
 
-// Path is <os.UserConfigDir()>/nebegit/settings.json.
+// Path is <os.UserConfigDir()>/gaertli/settings.json.
 func Path() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "nebegit", "settings.json"), nil
+	return filepath.Join(dir, "gaertli", "settings.json"), nil
 }
 
 // Load reads path. A missing file returns Default(), nil (first run).

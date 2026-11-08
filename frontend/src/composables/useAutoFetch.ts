@@ -1,7 +1,7 @@
 import { useIntervalFn } from '@vueuse/core'
 import { watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
-import { Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 
 // useAutoFetch fetches every settings.autoFetchIntervalMinutes while
 // mounted; 0 (the default) is off. A background fetch's failure is not

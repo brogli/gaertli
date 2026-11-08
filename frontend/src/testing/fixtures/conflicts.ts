@@ -3,7 +3,7 @@ import {
   Operation,
   RegionKind,
   type ConflictFile,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // conflictResult is a working file with two marker blocks, as git writes
 // them in merge style.

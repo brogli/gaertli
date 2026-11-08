@@ -2,10 +2,10 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ChangeScope } from '../../../bindings/github.com/brogli/nebegit/internal/core'
+import { ChangeScope } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 vi.mock(
-  '../../../bindings/github.com/brogli/nebegit/internal/app',
+  '../../../bindings/github.com/brogli/gaertli/internal/app',
   () => import('@/testing/mainWindowApp'),
 )
 import { pressKey } from '@/testing/pressKey'
@@ -427,7 +427,7 @@ describe('DiffWindowView', () => {
   })
 
   it('a choice already stored (by the commit detail view) shows the files as trees, the toggle pressed', async () => {
-    localStorage.setItem('nebegit.changedFiles.tree', 'true')
+    localStorage.setItem('gaertli.changedFiles.tree', 'true')
 
     const wrapper = await mountWindow(commitA)
 

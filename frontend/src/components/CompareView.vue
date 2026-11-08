@@ -7,13 +7,13 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useShortcut } from '@/composables/useShortcut'
 import { useWithShortcut } from '@/composables/useWithShortcut'
-import { AppService } from '../../bindings/github.com/brogli/nebegit/internal/app'
+import { AppService } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { DiffKind, fileTarget } from '@/lib/diffTarget'
 import { iconClass } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import ChangedFiles from './ChangedFiles.vue'
 import ErrorBanner from './ErrorBanner.vue'
-import type { ChangedFile } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { ChangedFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // CompareView shows the compare store's two selected commits, their
 // direction and a swap action, and their changed files. Escape leaves the

@@ -1,5 +1,5 @@
-import { AppService, Facade } from '../../bindings/github.com/brogli/nebegit/internal/app'
-import { Code } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import { AppService, Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { Code } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import type { CoreError } from '@/composables/useCoreCall'
 import { DiffKind, fileTarget } from './diffTarget'
 

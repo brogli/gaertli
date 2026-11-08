@@ -1,4 +1,4 @@
-// Package applog opens nebegit's own log file: one process, one text
+// Package applog opens gaertli's own log file: one process, one text
 // handler, rotated by size at open.
 package applog
 
@@ -13,10 +13,10 @@ import (
 // maxSize is how large the log file may grow before Open rotates it.
 const maxSize = 5 * 1024 * 1024
 
-// Open opens (creating if needed) nebegit's log file at its platform
+// Open opens (creating if needed) gaertli's log file at its platform
 // location, rotating an oversized one first, and returns a logger writing
 // to it and the LevelVar controlling its level, set by SetLevel from
-// debugMode. NEBEGIT_LOG=debug forces Debug for the whole run regardless of
+// debugMode. GAERTLI_LOG=debug forces Debug for the whole run regardless of
 // later SetLevel calls, for problems before Settings load.
 //
 // On failure the returned logger still works, writing to stderr instead;
@@ -33,10 +33,10 @@ func Open(debugMode bool) (logger *slog.Logger, path string, closer io.Closer, l
 	return slog.New(slog.NewTextHandler(f, opts)), path, f, level, nil
 }
 
-// SetLevel sets level to Debug when debugMode is true or NEBEGIT_LOG=debug
+// SetLevel sets level to Debug when debugMode is true or GAERTLI_LOG=debug
 // is set, else Info.
 func SetLevel(level *slog.LevelVar, debugMode bool) {
-	if debugMode || os.Getenv("NEBEGIT_LOG") == "debug" {
+	if debugMode || os.Getenv("GAERTLI_LOG") == "debug" {
 		level.Set(slog.LevelDebug)
 		return
 	}
@@ -68,7 +68,7 @@ func rotate(path string) {
 	_ = os.Rename(path, path+".1")
 }
 
-// logPath is nebegit's log file for the current platform.
+// logPath is gaertli's log file for the current platform.
 func logPath() (string, error) {
 	switch runtime.GOOS {
 	case "windows":
@@ -77,13 +77,13 @@ func logPath() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return filepath.Join(dir, "nebegit", "logs", "nebegit.log"), nil
+		return filepath.Join(dir, "gaertli", "logs", "gaertli.log"), nil
 	case "darwin":
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", err
 		}
-		return filepath.Join(home, "Library", "Logs", "nebegit", "nebegit.log"), nil
+		return filepath.Join(home, "Library", "Logs", "gaertli", "gaertli.log"), nil
 	default:
 		dir := os.Getenv("XDG_STATE_HOME")
 		if dir == "" {
@@ -93,6 +93,6 @@ func logPath() (string, error) {
 			}
 			dir = filepath.Join(home, ".local", "state")
 		}
-		return filepath.Join(dir, "nebegit", "nebegit.log"), nil
+		return filepath.Join(dir, "gaertli", "gaertli.log"), nil
 	}
 }

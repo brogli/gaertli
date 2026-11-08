@@ -1,6 +1,6 @@
 import { Change, type Chunk } from '@codemirror/merge'
 import type { Text } from '@codemirror/state'
-import type { DiffHunk } from '../../bindings/github.com/brogli/nebegit/internal/core'
+import type { DiffHunk } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // hunksIn returns the hunks chunk shows: one, or those CodeMirror joined
 // into it. a and b are the chunk's old and new documents. A hunk belongs to

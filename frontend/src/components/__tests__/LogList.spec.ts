@@ -23,7 +23,7 @@ const { Facade, AppService } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../../bindings/github.com/brogli/nebegit/internal/app', () => ({ Facade, AppService }))
+vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade, AppService }))
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import LogList from '../LogList.vue'
@@ -33,7 +33,7 @@ import {
   EdgeKind,
   RefKind,
   type LogCommit,
-} from '../../../bindings/github.com/brogli/nebegit/internal/core'
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { commitRow } from '@/testing/fixtures/log-rows'
 import { commitDetailsFixture } from '@/testing/fixtures/commitDetails'
 import { clickMenuItem, menuLabels } from '@/testing/contextMenu'

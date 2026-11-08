@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brogli/nebegit/internal/core"
+	"github.com/brogli/gaertli/internal/core"
 )
 
 // dispatchLogged runs a name event carrying record for wt through a
