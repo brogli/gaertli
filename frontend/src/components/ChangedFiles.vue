@@ -32,9 +32,7 @@ const listeners = {
   <div class="changed-files flex flex-1 flex-col min-h-0 gap-1">
     <div class="flex flex-none items-center justify-between gap-1.5">
       <h3>{{ t('commitDetailView.changedFiles', { n: files.length }, files.length) }}</h3>
-      <div class="flex gap-1.5">
-        <FileTreeControls v-model:as-tree="asTree" v-model:folded="folded" />
-      </div>
+      <FileTreeControls v-model:as-tree="asTree" v-model:folded="folded" />
     </div>
     <div class="file-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       <ChangedFileTree

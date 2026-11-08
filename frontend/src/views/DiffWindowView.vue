@@ -207,9 +207,7 @@ useEventListener(
     <SplitterPanel :size="25" :min-size="10" class="flex min-h-0 flex-col">
       <ErrorBanner v-if="error" :error="error" class="mx-2.5 mt-2.5" />
       <aside class="file-list min-h-0 flex-1 overflow-auto pl-2.5">
-        <div class="flex gap-1.5">
-          <FileTreeControls v-model:as-tree="asTree" v-model:folded="folded" />
-        </div>
+        <FileTreeControls v-model:as-tree="asTree" v-model:folded="folded" />
         <template v-for="g in groups" :key="g.title">
           <template v-if="g.files.length">
             <h3 v-if="g.title" class="mt-2 mb-1 text-sm">{{ g.title }}</h3>

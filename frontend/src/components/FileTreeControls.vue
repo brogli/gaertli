@@ -22,24 +22,26 @@ const foldLabel = computed(() =>
 </script>
 
 <template>
-  <Button
-    v-bind="ICON_BUTTON"
-    :text="!asTree"
-    :icon="iconClass(asTree ? 'fileList' : 'fileTree')"
-    data-test="file-tree-toggle"
-    :title="treeLabel"
-    :aria-label="treeLabel"
-    :aria-pressed="asTree"
-    @click="asTree = !asTree"
-  />
-  <Button
-    v-if="asTree"
-    v-bind="ICON_BUTTON"
-    text
-    :icon="iconClass(folded ? 'unfoldAll' : 'foldAll')"
-    data-test="fold-toggle"
-    :title="foldLabel"
-    :aria-label="foldLabel"
-    @click="folded = !folded"
-  />
+  <div class="flex gap-1.5">
+    <Button
+      v-bind="ICON_BUTTON"
+      :text="!asTree"
+      :icon="iconClass(asTree ? 'fileList' : 'fileTree')"
+      data-test="file-tree-toggle"
+      :title="treeLabel"
+      :aria-label="treeLabel"
+      :aria-pressed="asTree"
+      @click="asTree = !asTree"
+    />
+    <Button
+      v-if="asTree"
+      v-bind="ICON_BUTTON"
+      text
+      :icon="iconClass(folded ? 'unfoldAll' : 'foldAll')"
+      data-test="fold-toggle"
+      :title="foldLabel"
+      :aria-label="foldLabel"
+      @click="folded = !folded"
+    />
+  </div>
 </template>
