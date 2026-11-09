@@ -94,8 +94,7 @@ func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha core.SHA, mode
 	if err != nil {
 		return core.ResetResult{}, err
 	}
-	// no --end-of-options: reset refuses it; a valid sha never starts with "-"
-	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"reset", flag, string(sha)}}); err != nil {
+	if _, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"reset", flag, "--end-of-options", string(sha)}}); err != nil {
 		return core.ResetResult{}, err
 	}
 	return core.ResetResult{PreviousHead: previous}, nil

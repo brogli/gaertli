@@ -65,6 +65,11 @@ func (c *Core) SetLogFilter(ctx context.Context, id core.WorktreeID, filter core
 	if err != nil {
 		return err
 	}
+	for _, ref := range filter.Branches {
+		if err := ref.Validate(); err != nil {
+			return err
+		}
+	}
 	if filter.Empty() {
 		wt.FilterClear()
 		return nil

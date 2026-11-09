@@ -28,11 +28,10 @@ const (
 	tagNamespace          = "refs/tags/"
 )
 
-// BranchRefName is the full name of the local branch name.
-func BranchRefName(name string) RefName { return RefName(branchNamespace + name) }
-
 func (r RefName) Validate() error {
-	if r.Short() == "" {
+	short := r.Short()
+	noRemoteBranch := r.IsRemoteBranch() && !strings.Contains(short, "/")
+	if short == "" || strings.HasSuffix(short, "/") || noRemoteBranch {
 		return Errorf(Internal, "%q is not a full ref name", r)
 	}
 	return nil

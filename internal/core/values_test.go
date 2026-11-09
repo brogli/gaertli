@@ -47,6 +47,10 @@ func TestRefNameTellsItsNamespaceAndShortName(t *testing.T) {
 		{"main", false, "", false, false, false},
 		{"refs/stash", false, "", false, false, false},
 		{"refs/heads/", false, "", true, false, false},
+		{"refs/tags/", false, "", false, false, true},
+		{"refs/remotes/", false, "", false, true, false},
+		{"refs/remotes/origin", false, "origin", false, true, false},
+		{"refs/remotes/origin/", false, "origin/", false, true, false},
 	} {
 		if err := tc.ref.Validate(); (err == nil) != tc.valid {
 			t.Errorf("%q: Validate() = %v, want valid %v", tc.ref, err, tc.valid)
@@ -63,11 +67,5 @@ func TestRefNameTellsItsNamespaceAndShortName(t *testing.T) {
 		if got := tc.ref.IsTag(); got != tc.tag {
 			t.Errorf("%q: IsTag() = %v", tc.ref, got)
 		}
-	}
-}
-
-func TestBranchRefNameIsTheLocalBranchsFullName(t *testing.T) {
-	if got := core.BranchRefName("feature"); got != "refs/heads/feature" {
-		t.Errorf("BranchRefName = %q", got)
 	}
 }

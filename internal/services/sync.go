@@ -251,7 +251,7 @@ func branchMoved(ctx context.Context, wt *session.Worktree, b branchUpstream) (a
 	}
 	commits := 0
 	if newSHA != b.sha {
-		commits, err = revListCount(ctx, wt.Runner, wt.Path, string(b.sha+".."+newSHA))
+		commits, err = revListCount(ctx, wt.Runner, wt.Path, string(b.sha)+".."+string(newSHA))
 		if err != nil {
 			return nil, err
 		}

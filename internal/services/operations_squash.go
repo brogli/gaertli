@@ -80,17 +80,11 @@ func (c *Core) Fixup(ctx context.Context, id core.WorktreeID, shas []core.SHA) (
 }
 
 // fold is Squash's and Fixup's shared body: message "" keeps the oldest
-// commit's message. The shas go into the rebase todo, where git would not
-// refuse a malformed one, so they are validated first.
+// commit's message.
 func (c *Core) fold(ctx context.Context, id core.WorktreeID, shas []core.SHA, message string) (core.SquashResult, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return core.SquashResult{}, err
-	}
-	for _, sha := range shas {
-		if err := sha.Validate(); err != nil {
-			return core.SquashResult{}, err
-		}
 	}
 	wt.Lock() // the rebase writes this worktree's HEAD, index and files
 	defer wt.Unlock()
@@ -115,8 +109,14 @@ func (c *Core) fold(ctx context.Context, id core.WorktreeID, shas []core.SHA, me
 }
 
 // inspectSelection reads shas' chain and the worktree's state, and names
-// the first blocker.
+// the first blocker. The shas go into the rebase todo, where git would not
+// refuse a malformed one, so they are validated first.
 func inspectSelection(ctx context.Context, wt *session.Worktree, shas []core.SHA) (selection, error) {
+	for _, sha := range shas {
+		if err := sha.Validate(); err != nil {
+			return selection{}, err
+		}
+	}
 	selected := map[string]bool{}
 	for _, sha := range shas {
 		selected[string(sha)] = true

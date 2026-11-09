@@ -9,13 +9,14 @@ import (
 	"time"
 
 	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
 	"github.com/brogli/gaertli/internal/git/gittest"
 	"github.com/brogli/gaertli/internal/testwait"
 )
 
 func TestLogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
 	t.Parallel()
-	args := LogArgs(core.LogFilter{Author: "a", Branches: []core.RefName{"main"}, Path: "p"})
+	args := LogArgs(core.LogFilter{Author: "a", Branches: []core.RefName{"refs/heads/main"}, Path: "p"})
 	if slices.ContainsFunc(args, func(a string) bool { return strings.HasPrefix(a, "--grep") }) {
 		t.Errorf("args = %v, want no --grep: LogArgs does not search", args)
 	}
@@ -23,7 +24,7 @@ func TestLogArgsHasNoGrepFlatOnlyWithAuthor(t *testing.T) {
 	if !(core.LogFilter{Author: "a"}).Flat() {
 		t.Error("Flat() = false for an Author filter, want true")
 	}
-	if (core.LogFilter{Branches: []core.RefName{"main"}}).Flat() || (core.LogFilter{Path: "p"}).Flat() {
+	if (core.LogFilter{Branches: []core.RefName{"refs/heads/main"}}).Flat() || (core.LogFilter{Path: "p"}).Flat() {
 		t.Error("Flat() = true for Branches or Path alone, want false")
 	}
 }
@@ -305,7 +306,7 @@ func TestSetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	c, id := openWorktree(t, repo.Dir)
 	streamFakeLog(t, c, id, 5, 100)
 
-	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"whatever"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"refs/heads/whatever"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -321,7 +322,7 @@ func TestSetLogFilterSupersedesARunningFilteredLoad(t *testing.T) {
 	// and start a second filter.
 	streamFakeLog(t, c, id, 2, 0)
 
-	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"other"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"refs/heads/other"}}); err != nil {
 		t.Fatal(err)
 	}
 	res := waitForLogRows(t, c, id)
@@ -338,7 +339,7 @@ func TestFirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	streamFakeLog(t, c, id, 5, 200) // 5 records * 200ms = 1s unstreamed
 
 	start := time.Now()
-	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"whatever"}}); err != nil {
+	if err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"refs/heads/whatever"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -349,4 +350,14 @@ func TestFirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	}
 
 	waitForLogRows(t, c, id) // drain the background stream so it doesn't leak noise into later tests
+}
+
+func TestSetLogFilterRefusesABranchThatIsNoFullRefName(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	c, id := openWorktree(t, repo.Dir)
+
+	err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"main"}})
+
+	coretest.AssertCode(t, err, core.Internal)
 }
