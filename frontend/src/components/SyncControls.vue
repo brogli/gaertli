@@ -48,7 +48,7 @@ const NO_BRANCH_TOOLTIP = t('toolbar.noBranchTooltip')
 const remoteNames = computed(() => (refs.refs?.remotes ?? []).map((r) => r.name))
 const hasRemote = computed(() => remoteNames.value.length > 0)
 
-// Pull and Push need both a remote and a checked-out branch; this names
+// Pull and Push need both a remote and a current branch; this names
 // why they're disabled, or '' when they can act.
 const disabledReason = computed(() => {
   if (!hasRemote.value) return NO_REMOTE_TOOLTIP
