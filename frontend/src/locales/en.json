@@ -394,7 +394,7 @@
       "mergedBranch": "merged branch",
       "rebasedOnto": "rebased onto",
       "commitBeingReplayed": "commit being replayed",
-      "pickedCommit": "picked commit",
+      "pickedCommit": "cherry-picked commit",
       "stateBeforeRevertedCommit": "state before the reverted commit"
     },
     "changePosition": "Change {n} of {total} · {left} left",
