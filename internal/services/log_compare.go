@@ -9,8 +9,8 @@ import (
 )
 
 // CompareCommits implements core.API.
-func (c *Core) CompareCommits(ctx context.Context, id core.WorktreeID, a, b core.SHA) ([]core.ChangedFile, error) {
-	return c.changedFiles(ctx, id, a, b)
+func (c *Core) CompareCommits(ctx context.Context, id core.WorktreeID, from, to core.SHA) ([]core.ChangedFile, error) {
+	return c.changedFiles(ctx, id, from, to)
 }
 
 // CompareWithWorking implements core.API.
@@ -35,11 +35,11 @@ func (c *Core) changedFiles(ctx context.Context, id core.WorktreeID, revs ...cor
 }
 
 // DiffRange implements core.API.
-func (c *Core) DiffRange(ctx context.Context, id core.WorktreeID, a, b core.SHA, path, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (c *Core) DiffRange(ctx context.Context, id core.WorktreeID, from, to core.SHA, path, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	old := cmp.Or(oldPath, path)
 	d := fileDiff{
-		path: path, oldPath: oldPath, oldRev: string(a) + ":" + old, newRev: string(b) + ":" + path,
-		cmd: "diff", args: []string{"-M", "--end-of-options", string(a), string(b), "--", literalPath(old), literalPath(path)},
+		path: path, oldPath: oldPath, oldRev: string(from) + ":" + old, newRev: string(to) + ":" + path,
+		cmd: "diff", args: []string{"-M", "--end-of-options", string(from), string(to), "--", literalPath(old), literalPath(path)},
 	}
 	return c.diff(ctx, id, d, opts)
 }

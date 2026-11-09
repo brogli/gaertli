@@ -7,7 +7,7 @@ import "context"
 type Conflicts interface {
 	// Conflict reads path's conflict for the merge editor or the choice panel:
 	// its kind, the operation and sides' labels, and for Kind text the three
-	// sides, the working file as the result, its regions, its line ending and a
+	// sides, the working file as the result, its changes, its line ending and a
 	// fingerprint. All text has LF line breaks. A path with no unmerged entry is
 	// GitFailed (key notConflicted); a text conflict whose working file is gone
 	// is FileNotFound.
@@ -48,15 +48,15 @@ type Conflicts interface {
 // ConflictFile is one conflicted file as the merge editor or the choice
 // panel needs it.
 type ConflictFile struct {
-	Path       string           `json:"path"`
-	Kind       ConflictKind     `json:"kind"`
-	Operation  Operation        `json:"operation"` // "" for a conflict no operation records (a stash pop)
-	Base       ConflictSide     `json:"base"`
-	Current    ConflictSide     `json:"current"`          // stage 2, the side checked out
-	Incoming   ConflictSide     `json:"incoming"`         // stage 3, the side brought in
-	Result     string           `json:"result,omitempty"` // Kind text: the working file
-	MarkerSize int              `json:"markerSize,omitempty"`
-	Regions    []ConflictRegion `json:"regions,omitempty"` // Kind text, in Result order
+	Path       string        `json:"path"`
+	Kind       ConflictKind  `json:"kind"`
+	Operation  Operation     `json:"operation"` // "" for a conflict no operation records (a stash pop)
+	Base       ConflictSide  `json:"base"`
+	Current    ConflictSide  `json:"current"`          // stage 2, the side checked out
+	Incoming   ConflictSide  `json:"incoming"`         // stage 3, the side brought in
+	Result     string        `json:"result,omitempty"` // Kind text: the working file
+	MarkerSize int           `json:"markerSize,omitempty"`
+	Changes    []MergeChange `json:"changes,omitempty"` // Kind text, in Result order
 	// Kind text: where each side differs from the base, in the side's lines.
 	CurrentChanges  []SideChange `json:"currentChanges,omitempty"`
 	IncomingChanges []SideChange `json:"incomingChanges,omitempty"`
@@ -75,29 +75,30 @@ type ConflictSide struct {
 	Subject string `json:"subject,omitempty"` // SHA's subject, for a side that is one commit
 }
 
-// RegionKind says who made the change a ConflictRegion is.
-type RegionKind string
+// MergeChange is one change of a conflicted file: a run of lines where the
+// two sides differ, and where its text sits in Result and in each side, as
+// DiffHunk numbers lines: 1-based Start; with Lines 0, Start is the line
+// after which the change would be. A conflict is a marker block of Result.
+// Any other change is applied in Result already; its Result range holds the
+// lines of the changed side. Added: the change added lines and replaced none
+// of the base's.
+type MergeChange struct {
+	Kind     MergeChangeKind `json:"kind"`
+	Added    bool            `json:"added,omitempty"`
+	Result   LineRange       `json:"result"`
+	Base     LineRange       `json:"base"`
+	Current  LineRange       `json:"current"`
+	Incoming LineRange       `json:"incoming"`
+}
+
+// MergeChangeKind says who made a MergeChange.
+type MergeChangeKind string
 
 const (
-	RegionConflict RegionKind = "conflict" // both sides changed the same lines differently
-	RegionCurrent  RegionKind = "current"  // only the current side changed them
-	RegionIncoming RegionKind = "incoming" // only the incoming side changed them
+	ConflictChange     MergeChangeKind = "conflict" // both sides changed the lines differently
+	CurrentOnlyChange  MergeChangeKind = "current"  // only the current side changed them
+	IncomingOnlyChange MergeChangeKind = "incoming" // only the incoming side changed them
 )
-
-// ConflictRegion is one change of the merge and where its text sits in
-// Result and each side, as DiffHunk numbers lines: 1-based Start; with Lines
-// 0, Start is the line after which the region would be. A conflict is a
-// marker block of Result. Any other change is applied in Result already; its
-// Result range holds the lines of the changed side. Added: the change added
-// lines and replaced none of the base's.
-type ConflictRegion struct {
-	Kind     RegionKind `json:"kind"`
-	Added    bool       `json:"added,omitempty"`
-	Result   LineRange  `json:"result"`
-	Base     LineRange  `json:"base"`
-	Current  LineRange  `json:"current"`
-	Incoming LineRange  `json:"incoming"`
-}
 
 // SideChange is a run of a side's lines that differ from the base: lines the
 // side added (Added) or changed.
@@ -107,18 +108,19 @@ type SideChange struct {
 }
 
 // MergeDraft is a merge result with unsaved edits: its text (LF line
-// breaks), the conflict regions in it with their states, the fingerprint of
+// breaks), its changes with their states, the fingerprint of
 // the working file it was read from and the ConflictID of the conflict it was
 // made for.
 type MergeDraft struct {
 	Text        string        `json:"text"`
 	Fingerprint string        `json:"fingerprint"`
 	ConflictID  string        `json:"conflictId"`
-	Regions     []DraftRegion `json:"regions"`
+	Changes     []DraftChange `json:"changes"`
 }
 
-// DraftRegion is one conflict region of a MergeDraft's text.
-type DraftRegion struct {
+// DraftChange is one change (a conflict or a one-side change) of a MergeDraft's text and whether the user
+// resolved it.
+type DraftChange struct {
 	Range    LineRange `json:"range"`
 	Resolved bool      `json:"resolved"`
 }

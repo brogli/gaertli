@@ -26,8 +26,8 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import {
-  RegionKind,
-  type ConflictRegion,
+  MergeChangeKind,
+  type MergeChange,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DEFAULT_MARKER_SIZE, isMarkerLine } from './conflictMarkers'
 import type { Pane } from './conflictPanes'
@@ -93,14 +93,14 @@ const HANDLED = 'cm-conflict-resolved'
 // regionTint is the tint of a region in a pane. A side pane shows a change
 // only one side made on the side that made it; its other side has no tint.
 export function regionTint(
-  { kind, added }: Pick<ConflictRegion, 'kind' | 'added'>,
+  { kind, added }: Pick<MergeChange, 'kind' | 'added'>,
   pane: Pane,
 ): RegionTint | undefined {
-  if (kind === RegionKind.RegionConflict) return CONFLICT_TINT
+  if (kind === MergeChangeKind.ConflictChange) return CONFLICT_TINT
   const changedHere =
     pane === 'result' ||
-    (kind === RegionKind.RegionCurrent && pane === 'current') ||
-    (kind === RegionKind.RegionIncoming && pane === 'incoming')
+    (kind === MergeChangeKind.CurrentOnlyChange && pane === 'current') ||
+    (kind === MergeChangeKind.IncomingOnlyChange && pane === 'incoming')
   if (!changedHere) return undefined
   return added ? 'cm-change-added' : 'cm-change-changed'
 }

@@ -18,9 +18,9 @@ describe('conflictText', () => {
 
   it('a conflict without a base leaves its regions empty', () => {
     const file = conflictFileFixture({ base: { present: false } })
-    const regions = file.regions!.map((region) => ({ ...region, base: { start: 0, lines: 0 } }))
+    const regions = file.changes!.map((region) => ({ ...region, base: { start: 0, lines: 0 } }))
 
-    expect(resultFromBase({ ...file, regions })).toEqual({
+    expect(resultFromBase({ ...file, changes: regions })).toEqual({
       text: 'a\nb\nz',
       regions: [
         { start: 1, lines: 0 },
@@ -32,7 +32,7 @@ describe('conflictText', () => {
   it('the result holds the base lines of every change, also one with no lines in the result', () => {
     const file = changesFileFixture()
     const deleted = {
-      ...file.regions![0]!,
+      ...file.changes![0]!,
       result: { start: 1, lines: 0 },
       base: { start: 2, lines: 1 },
     }
@@ -40,14 +40,14 @@ describe('conflictText', () => {
       ...file,
       base: { present: true, content: 'x\nold\ny' },
       result: 'x\ny',
-      regions: [deleted],
+      changes: [deleted],
     }
 
     expect(resultFromBase(state)).toEqual({
       text: 'x\nold\ny',
       regions: [{ start: 2, lines: 1 }],
     })
-    expect(resultFromBase({ ...file, regions: file.regions!.slice(0, 1) }).text).toBe(
+    expect(resultFromBase({ ...file, changes: file.changes!.slice(0, 1) }).text).toBe(
       'a\no1\nb\n<<<<<<< HEAD\nc2\n=======\ni2\n>>>>>>> side\nc\ni3\nz\nnew',
     )
   })

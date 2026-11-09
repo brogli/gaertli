@@ -110,7 +110,7 @@ func TestClosingAClientDoesNotWaitForTheCoresOutputToEnd(t *testing.T) {
 }
 
 func TestVersionCallCrossesThePipe(t *testing.T) {
-	want := core.Version{App: "1.2.3", Protocol: 7}
+	want := core.Version{App: "1.2.3", Protocol: 99}
 	c := pipeClient(t, &fake{version: func() (core.Version, error) { return want, nil }}, nil)
 
 	got, err := c.Version(t.Context())
@@ -126,7 +126,7 @@ func TestMergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
 	c := pipeClient(t, &fake{}, nil)
 	want := &core.MergeDraft{
 		Text: "a\nb\n", Fingerprint: "fp",
-		Regions: []core.DraftRegion{{Range: core.LineRange{Start: 2, Lines: 1}, Resolved: true}},
+		Changes: []core.DraftChange{{Range: core.LineRange{Start: 2, Lines: 1}, Resolved: true}},
 	}
 
 	if err := c.SetMergeDraft(t.Context(), "/wt", "a.txt", want); err != nil {

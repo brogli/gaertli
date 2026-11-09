@@ -241,7 +241,7 @@ func readConflictText(ctx context.Context, r git.Runner, dir string, out core.Co
 	if err != nil {
 		return core.ConflictFile{}, err
 	}
-	if out.Regions, err = conflictRegions(ctx, r, dir, out, toCurrent, toIncoming); err != nil {
+	if out.Changes, err = conflictRegions(ctx, r, dir, out, toCurrent, toIncoming); err != nil {
 		return core.ConflictFile{}, err
 	}
 	out.CurrentChanges = sideChanges(out.Base, out.Current.Content, toCurrent)

@@ -19,7 +19,7 @@ import { useMergeDrafts } from '@/composables/useMergeDrafts'
 import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
 import { resolveBothConflicts } from '@/testing/resolveConflicts'
 import {
-  RegionKind,
+  MergeChangeKind,
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
@@ -124,7 +124,7 @@ describe('MergeEditor layout', () => {
     const file = {
       ...base,
       base: { present: false },
-      regions: base.regions!.map((region) => ({ ...region, base: { start: 0, lines: 0 } })),
+      changes: base.changes!.map((region) => ({ ...region, base: { start: 0, lines: 0 } })),
     }
     const wrapper = await mountEditor(file)
     const result = viewAt(wrapper, RESULT)
@@ -150,9 +150,9 @@ describe('MergeEditor layout', () => {
       current: { ...base.current, content: 'A\nB\nC\nx' },
       incoming: { ...base.incoming, content: 'A\nY\nC\nx' },
       result: 'A\n<<<<<<< HEAD\nB\n=======\nY\n>>>>>>> side\nC\nx',
-      regions: [
+      changes: [
         {
-          kind: RegionKind.RegionConflict,
+          kind: MergeChangeKind.ConflictChange,
           result: { start: 2, lines: 5 },
           base: { start: 2, lines: 1 },
           current: { start: 2, lines: 1 },
@@ -177,7 +177,7 @@ describe('MergeEditor layout', () => {
     const file = {
       ...base,
       incoming: { ...base.incoming, content: 'a\ni1\nb\nz' },
-      regions: [base.regions![0]!, { ...base.regions![1]!, incoming: { start: 4, lines: 0 } }],
+      changes: [base.changes![0]!, { ...base.changes![1]!, incoming: { start: 4, lines: 0 } }],
     }
     const wrapper = await mountEditor(file)
     const placeholder = viewAt(wrapper, INCOMING).dom.querySelector('.cm-conflict-placeholder')!
@@ -195,7 +195,7 @@ function threeRegionFile(): ConflictFile {
   const block = (n: number) => ['<<<<<<< HEAD', `c${n}`, '=======', `i${n}`, '>>>>>>> side']
   const result = ['a', ...block(1), 'b', ...block(2), 'c', ...block(3), 'z'].join('\n')
   const region = (n: number, resultStart: number) => ({
-    kind: RegionKind.RegionConflict,
+    kind: MergeChangeKind.ConflictChange,
     result: { start: resultStart, lines: 5 },
     base: { start: 2 * n, lines: 1 },
     current: { start: 2 * n, lines: 1 },
@@ -206,7 +206,7 @@ function threeRegionFile(): ConflictFile {
   return {
     ...base,
     result,
-    regions: [region(1, 2), region(2, 8), region(3, 14)],
+    changes: [region(1, 2), region(2, 8), region(3, 14)],
     base: { ...base.base, content: side('o').join('\n') },
     current: { ...base.current, content: side('c').join('\n') },
     incoming: { ...base.incoming, content: side('i').join('\n') },
@@ -304,7 +304,7 @@ describe('MergeEditor actions and navigation', () => {
     useMergeDrafts().set('/repo', 'a.txt', '', () => ({
       text: 'a\no1\nb\no2\nc\no3\nz',
       fingerprint: 'fp',
-      regions: [{ range: { start: 2, lines: 1 }, resolved: false }],
+      changes: [{ range: { start: 2, lines: 1 }, resolved: false }],
     }))
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const wrapper = await mountEditor(file)

@@ -184,6 +184,6 @@ func TestConflictRegionsIgnoreTheDiffAttribute(t *testing.T) {
 }
 
 // conflictRegionsOf returns the regions of f that are conflicts.
-func conflictRegionsOf(f core.ConflictFile) []core.ConflictRegion {
-	return slices.DeleteFunc(slices.Clone(f.Regions), func(r core.ConflictRegion) bool { return r.Kind != core.RegionConflict })
+func conflictRegionsOf(f core.ConflictFile) []core.MergeChange {
+	return slices.DeleteFunc(slices.Clone(f.Changes), func(r core.MergeChange) bool { return r.Kind != core.ConflictChange })
 }

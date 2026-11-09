@@ -110,7 +110,7 @@ func baseDiffs(ctx context.Context, r git.Runner, dir string, out core.ConflictF
 // side, which gives the side's lines for the block. The base lines are the
 // block's base section where it has one, else they come from the current
 // lines through toCurrent, the diff of base against current.
-func conflictRegions(ctx context.Context, r git.Runner, dir string, out core.ConflictFile, toCurrent, toIncoming []core.DiffHunk) ([]core.ConflictRegion, error) {
+func conflictRegions(ctx context.Context, r git.Runner, dir string, out core.ConflictFile, toCurrent, toIncoming []core.DiffHunk) ([]core.MergeChange, error) {
 	blocks := parseMarkerBlocks(out.Result, out.MarkerSize)
 	if len(blocks) == 0 {
 		return nil, nil
@@ -124,10 +124,10 @@ func conflictRegions(ctx context.Context, r git.Runner, dir string, out core.Con
 	if err != nil {
 		return nil, err
 	}
-	regions := make([]core.ConflictRegion, len(blocks))
+	regions := make([]core.MergeChange, len(blocks))
 	for i, b := range blocks {
-		regions[i] = core.ConflictRegion{
-			Kind:     core.RegionConflict,
+		regions[i] = core.MergeChange{
+			Kind:     core.ConflictChange,
 			Result:   core.LineRange{Start: b.open + 1, Lines: b.close - b.open + 1},
 			Current:  current[i],
 			Incoming: incoming[i],
@@ -177,7 +177,7 @@ func locateSection(base, section []string, estimate core.LineRange, from int) co
 // withoutMovedOut is a region's base less the lines the merge and zdiff3 styles moved out of the
 // markers because both sides changed them alike. The diff3 style moves none out, so its sides'
 // sections reach as far as the base section.
-func withoutMovedOut(base core.LineRange, region core.ConflictRegion, toCurrent, toIncoming []core.DiffHunk) core.LineRange {
+func withoutMovedOut(base core.LineRange, region core.MergeChange, toCurrent, toIncoming []core.DiffHunk) core.LineRange {
 	currentBefore, currentAfter := movedOut(toCurrent, region.Current)
 	incomingBefore, incomingAfter := movedOut(toIncoming, region.Incoming)
 	start := edgeStart(base) + min(currentBefore, incomingBefore)

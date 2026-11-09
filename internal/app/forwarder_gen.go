@@ -82,13 +82,13 @@ func (f *Forwarder) CommitDetails(ctx context.Context, wt core.WorktreeID, sha c
 	return c.CommitDetails(ctx, coreID, sha)
 }
 
-func (f *Forwarder) CompareCommits(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA) ([]core.ChangedFile, error) {
+func (f *Forwarder) CompareCommits(ctx context.Context, wt core.WorktreeID, from core.SHA, to core.SHA) ([]core.ChangedFile, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero []core.ChangedFile
 		return zero, err
 	}
-	return c.CompareCommits(ctx, coreID, a, b)
+	return c.CompareCommits(ctx, coreID, from, to)
 }
 
 func (f *Forwarder) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha core.SHA) ([]core.ChangedFile, error) {
@@ -151,13 +151,13 @@ func (f *Forwarder) DiffFile(ctx context.Context, wt core.WorktreeID, sha core.S
 	return c.DiffFile(ctx, coreID, sha, path, oldPath, opts)
 }
 
-func (f *Forwarder) DiffRange(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (f *Forwarder) DiffRange(ctx context.Context, wt core.WorktreeID, from core.SHA, to core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.DiffFile
 		return zero, err
 	}
-	return c.DiffRange(ctx, coreID, a, b, path, oldPath, opts)
+	return c.DiffRange(ctx, coreID, from, to, path, oldPath, opts)
 }
 
 func (f *Forwarder) DiffWorking(ctx context.Context, wt core.WorktreeID, path string, oldPath string, staged bool, opts core.DiffOptions) (core.DiffFile, error) {

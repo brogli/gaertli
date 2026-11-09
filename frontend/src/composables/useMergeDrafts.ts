@@ -3,14 +3,14 @@ import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import type { ResultRegion } from '@/lib/conflictRegions'
 import { toCoreError, type CoreError } from './useCoreCall'
 
-// MergeDraft holds a conflicted file's unsaved edits: its text, the conflict
-// regions in it with their states, the fingerprint of the working file it
-// was read from and the conflictId of the conflict it was made for.
+// MergeDraft holds a conflicted file's unsaved edits: its text, its changes
+// with their states, the fingerprint of the working file it was read
+// from and the conflictId of the conflict it was made for.
 export interface MergeDraft {
   text: string
   fingerprint: string
   conflictId: string
-  regions: ResultRegion[]
+  changes: ResultRegion[]
 }
 
 // ReadDraft reads a draft's content from where it is kept, an editor or a
@@ -144,7 +144,7 @@ export function useMergeDrafts(): MergeDrafts {
       const content = {
         text: stored.text,
         fingerprint: stored.fingerprint,
-        regions: stored.regions ?? [],
+        changes: stored.changes ?? [],
       }
       drafts.set(key, { conflictId, read: () => content })
     },

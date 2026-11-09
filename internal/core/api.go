@@ -57,7 +57,7 @@ type Version struct {
 }
 
 // Protocol is bumped whenever the wire format of API changes.
-const Protocol = 6
+const Protocol = 7
 
 // WorktreeID names a worktree session. Issued by the core that owns the
 // repo; opaque to the UI. The shell and the UI name a WSL distro's

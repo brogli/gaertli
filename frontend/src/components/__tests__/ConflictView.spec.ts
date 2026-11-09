@@ -182,7 +182,7 @@ describe('ConflictView', () => {
     resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
     await findButton(wrapper, 'Save and mark resolved')!.trigger('click')
     Facade.Conflict.mockResolvedValue(
-      conflictFileFixture({ result: 'on disk', regions: [], fingerprint: 'fp2' }),
+      conflictFileFixture({ result: 'on disk', changes: [], fingerprint: 'fp2' }),
     )
 
     expect(wrapper.text()).toContain('a.txt changed since it was opened.')
@@ -297,7 +297,7 @@ describe('ConflictView', () => {
 
       finishSave('fpA2')
       await flushPromises()
-      answerRead(conflictFileFixture({ path: 'b.txt', result: 'other', regions: [] }))
+      answerRead(conflictFileFixture({ path: 'b.txt', result: 'other', changes: [] }))
       await flushPromises()
 
       expect(resultView(wrapper).state.doc.toString()).toBe('other')
@@ -305,11 +305,11 @@ describe('ConflictView', () => {
 
     it('a changed file shows as it is now, but keeps unsaved edits and says so; Reload drops them', async () => {
       const wrapper = await mountView()
-      await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
+      await reread({ result: 'on disk', changes: [], fingerprint: 'fp2' })
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk')
 
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
-      await reread({ result: 'on disk again', regions: [], fingerprint: 'fp3' })
+      await reread({ result: 'on disk again', changes: [], fingerprint: 'fp3' })
       expect(resultView(wrapper).state.doc.toString()).toMatch(/^typed /)
       expect(wrapper.text()).toContain('a.txt changed on disk.')
 
@@ -321,7 +321,7 @@ describe('ConflictView', () => {
     })
 
     it.each([
-      ['a changed file', { result: 'on disk', regions: [], fingerprint: 'fp2' }],
+      ['a changed file', { result: 'on disk', changes: [], fingerprint: 'fp2' }],
       ['the same file', {}],
     ])(
       '%s read as a new conflict in the path shows afresh, without the edits made for the earlier one',
@@ -342,7 +342,7 @@ describe('ConflictView', () => {
       const wrapper = await mountView()
       resultView(wrapper).dispatch({ changes: { from: 0, insert: 'typed ' } })
       const [, , stored] = Facade.SetMergeDraft.mock.lastCall!
-      await reread({ result: 'on disk', regions: [], fingerprint: 'fp2' })
+      await reread({ result: 'on disk', changes: [], fingerprint: 'fp2' })
       let cored: unknown = stored
       let finishWrite: () => void = () => undefined
       Facade.SetMergeDraft.mockImplementation(

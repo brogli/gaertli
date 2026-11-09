@@ -44,7 +44,7 @@ import { iconClass } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import {
-  RegionKind,
+  MergeChangeKind,
   type ConflictFile,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
@@ -84,7 +84,7 @@ const fileChanged = ref<CoreError | null>(null)
 // shownError is the last core call's failure, else the draft's failed write.
 const shownError = computed(() => error.value ?? drafts.writeError(props.wt, props.file.path))
 
-const regions = computed(() => props.file.regions ?? [])
+const regions = computed(() => props.file.changes ?? [])
 const markerSize = computed(() => props.file.markerSize ?? DEFAULT_MARKER_SIZE)
 
 const hosts: Partial<Record<Pane, HTMLElement>> = {}
@@ -171,7 +171,9 @@ const openOneSided = computed(() => {
   const state = resultState.value
   if (!state) return []
   return regions.value.flatMap((region, i) =>
-    region.kind !== RegionKind.RegionConflict && i < regionCount(state) && isUnresolved(state, i)
+    region.kind !== MergeChangeKind.ConflictChange &&
+    i < regionCount(state) &&
+    isUnresolved(state, i)
       ? [i]
       : [],
   )
@@ -213,7 +215,7 @@ function storeDraft(result: EditorView): void {
   drafts.set(props.wt, props.file.path, conflictId, () => ({
     text: result.state.doc.toString(),
     fingerprint: fingerprint.value,
-    regions: resultRegions(result.state),
+    changes: resultRegions(result.state),
   }))
 }
 
@@ -309,7 +311,7 @@ function createViews(shared: Extension[]): void {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         regionsExtension(
-          draft?.regions ?? initial.regions.map((range) => ({ range, resolved: false })),
+          draft?.changes ?? initial.regions.map((range) => ({ range, resolved: false })),
           markerSize.value,
           t('mergeEditor.emptyChange'),
           regions.value.map((region) => regionTint(region, 'result')),
@@ -389,7 +391,7 @@ function applyNonConflicting(): void {
   const result = views.result
   if (!result) return
   const takes = openOneSided.value.map((region) => {
-    const incoming = regions.value[region]?.kind === RegionKind.RegionIncoming
+    const incoming = regions.value[region]?.kind === MergeChangeKind.IncomingOnlyChange
     return { region, lines: takenLines(props.file, region, incoming ? 'incoming' : 'current') }
   })
   result.dispatch(takeRegions(result.state, takes))

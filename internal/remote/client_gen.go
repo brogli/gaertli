@@ -99,14 +99,14 @@ func (c *Client) CommitDetails(ctx context.Context, wt core.WorktreeID, sha core
 }
 
 type compareCommitsParams struct {
-	Wt core.WorktreeID `json:"wt"`
-	A  core.SHA        `json:"a"`
-	B  core.SHA        `json:"b"`
+	Wt   core.WorktreeID `json:"wt"`
+	From core.SHA        `json:"from"`
+	To   core.SHA        `json:"to"`
 }
 
-func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA) ([]core.ChangedFile, error) {
+func (c *Client) CompareCommits(ctx context.Context, wt core.WorktreeID, from core.SHA, to core.SHA) ([]core.ChangedFile, error) {
 	var result []core.ChangedFile
-	err := c.call(ctx, "CompareCommits", compareCommitsParams{Wt: wt, A: a, B: b}, &result)
+	err := c.call(ctx, "CompareCommits", compareCommitsParams{Wt: wt, From: from, To: to}, &result)
 	return result, err
 }
 
@@ -191,16 +191,16 @@ func (c *Client) DiffFile(ctx context.Context, wt core.WorktreeID, sha core.SHA,
 
 type diffRangeParams struct {
 	Wt      core.WorktreeID  `json:"wt"`
-	A       core.SHA         `json:"a"`
-	B       core.SHA         `json:"b"`
+	From    core.SHA         `json:"from"`
+	To      core.SHA         `json:"to"`
 	Path    string           `json:"path"`
 	OldPath string           `json:"oldPath"`
 	Opts    core.DiffOptions `json:"opts"`
 }
 
-func (c *Client) DiffRange(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (c *Client) DiffRange(ctx context.Context, wt core.WorktreeID, from core.SHA, to core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	var result core.DiffFile
-	err := c.call(ctx, "DiffRange", diffRangeParams{Wt: wt, A: a, B: b, Path: path, OldPath: oldPath, Opts: opts}, &result)
+	err := c.call(ctx, "DiffRange", diffRangeParams{Wt: wt, From: from, To: to, Path: path, OldPath: oldPath, Opts: opts}, &result)
 	return result, err
 }
 
