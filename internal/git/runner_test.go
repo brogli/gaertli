@@ -345,10 +345,12 @@ func TestNothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	// git has ended once its shell is gone and the child has recorded its pid.
+	// The Runner knows git ended once its Wait reaped the shell, which takes
+	// the shell out of /proc; a zombie shell still counts as running.
 	gitEnded := func() bool {
 		shell, child := readPID(dir+"/shell"), readPID(dir+"/pid")
-		return shell != "" && child != "" && processGone(shell)
+		_, err := os.Stat("/proc/" + shell)
+		return shell != "" && child != "" && err != nil
 	}
 	err := runCancelledWhen(t, gitEnded, `echo $$ >`+dir+`/shell; (sleep 5 & echo $! >`+dir+`/pid; wait) &`)
 
