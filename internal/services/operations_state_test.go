@@ -178,3 +178,64 @@ func TestSummaryReadsACherryPickStoppedInsideARebaseAsTheCherryPick(t *testing.T
 
 	assertOperation(t, c, openOn(t, c, dir).ID, core.CherryPickOperation)
 }
+
+func TestSummaryReadsAMergeStepARebaseStoppedOnAsTheRebase(t *testing.T) {
+	t.Parallel()
+	dir := gittest.New(t).Dir
+	gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: map[string]string{"f.txt": "base\n"}},
+		gittest.Step{Branch: "side", From: "master", Message: "side", Files: map[string]string{"f.txt": "side\n"}},
+		gittest.Step{Branch: "onto", From: "master", Message: "onto", Files: map[string]string{"g.txt": "g\n"}},
+		gittest.Step{Message: "master", Files: map[string]string{"f.txt": "master\n"}},
+		gittest.Step{Message: "merge side", Merge: "side", Files: map[string]string{"f.txt": "merged\n"}},
+	)
+	gitStops(t, dir, "rebase", "--rebase-merges", "onto")
+	c := New(func(core.Event) {})
+
+	assertOperation(t, c, openOn(t, c, dir).ID, core.RebaseOperation)
+}
+
+func TestSummaryReadsAPickARebaseStoppedOnAsEmptyAsTheRebase(t *testing.T) {
+	t.Parallel()
+	dir := gittest.New(t).Dir
+	gittest.History(t, dir,
+		gittest.Step{Message: "base", Files: map[string]string{"f.txt": "base\n"}},
+		gittest.Step{Branch: "topic", From: "master", Message: "x", Files: map[string]string{"x.txt": "x\n"}},
+		gittest.Step{Message: "x again", Files: map[string]string{"x.txt": "x\n"}},
+	)
+	gittest.Run(t, dir, "checkout", "-q", "topic")
+	gitStops(t, dir, "rebase", "--reapply-cherry-picks", "--empty=stop", "master")
+	c := New(func(core.Event) {})
+
+	assertOperation(t, c, openOn(t, c, dir).ID, core.RebaseOperation)
+}
+
+// A sequence keeps going after the user commits its conflicted step: git
+// leaves no head file then, only the sequence's remaining steps.
+func TestSummaryReadsASequenceWhoseConflictedStepTheUserCommittedAsTheSequence(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []core.OperationKind{core.CherryPickOperation, core.RevertOperation} {
+		t.Run(string(kind), func(t *testing.T) {
+			t.Parallel()
+			dir := gittest.New(t).Dir
+			gittest.History(t, dir,
+				gittest.Step{Message: "base", Files: map[string]string{"f.txt": "base\n"}},
+				gittest.Step{Branch: "side", From: "master", Message: "a", Files: map[string]string{"a.txt": "a\n"}},
+				gittest.Step{Branch: "side", Message: "b", Files: map[string]string{"f.txt": "b\n"}},
+				gittest.Step{Branch: "side", Message: "c", Files: map[string]string{"f.txt": "c\n"}},
+				gittest.Step{Message: "master", Files: map[string]string{"f.txt": "master\n"}},
+			)
+			if kind == core.RevertOperation {
+				gittest.Run(t, dir, "reset", "-q", "--hard", "side")
+				gitStops(t, dir, "revert", "--no-edit", "side~1", "side~2")
+			} else {
+				gitStops(t, dir, "cherry-pick", "side~2", "side~1", "side")
+			}
+			writeFile(t, dir, "f.txt", "resolved\n")
+			gittest.Run(t, dir, "commit", "-qa", "--no-edit")
+			c := New(func(core.Event) {})
+
+			assertOperation(t, c, openOn(t, c, dir).ID, kind)
+		})
+	}
+}

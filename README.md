@@ -106,6 +106,9 @@ command. Each WSL distro has its own editor setting, since the command runs wher
   through a small helper that Gärtli copies there, after asking you.
 - **SSH passphrase**: Gärtli cannot ask you for a passphrase. A key that has one must already be
   unlocked in a running `ssh-agent`, or the git call fails.
+- **Mailed patches**: when `git am` stops on a conflict, Gärtli shows it as a rebase in progress.
+  The banner's Continue, Skip and Abort cannot finish it (git refuses), and merge, rebase, squash
+  and pull stay blocked. Finish it in a terminal with `git am --continue` or `git am --abort`.
 - **Windows SmartScreen**: Gärtli isn't code-signed, so SmartScreen warns on first run. Choose "More
   info", then "Run anyway".
 
