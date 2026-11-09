@@ -110,7 +110,7 @@ func TestClosingAClientDoesNotWaitForTheCoresOutputToEnd(t *testing.T) {
 }
 
 func TestVersionCallCrossesThePipe(t *testing.T) {
-	want := core.Version{App: "1.2.3", Protocol: 7}
+	want := core.Version{App: "1.2.3", Protocol: 99}
 	c := pipeClient(t, &fake{version: func() (core.Version, error) { return want, nil }}, nil)
 
 	got, err := c.Version(t.Context())
