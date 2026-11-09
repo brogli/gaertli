@@ -1,7 +1,7 @@
 {
   "errors": {
     "INTERNAL": "Something went wrong.",
-    "notARepo": "{path} is not a git repository",
+    "notARepo": "{path} is not a git repo",
     "noWorktreeLeft": "{path} has no worktree left",
     "editorNotOnPath": "\"{command}\" is not on PATH",
     "editorStartFailed": "Could not start \"{command}\".",
@@ -394,7 +394,7 @@
       "mergedBranch": "merged branch",
       "rebasedOnto": "rebased onto",
       "commitBeingReplayed": "commit being replayed",
-      "pickedCommit": "picked commit",
+      "pickedCommit": "cherry-picked commit",
       "stateBeforeRevertedCommit": "state before the reverted commit"
     },
     "changePosition": "Change {n} of {total} · {left} left",
@@ -447,7 +447,7 @@
     "uncommittedChanges": "Uncommitted changes",
     "locked": "Locked",
     "main": "main",
-    "bareRepo": "bare repository",
+    "bareRepo": "bare repo",
     "missing": "missing",
     "removeConfirmDirty": "Remove the worktree at {path}? It has uncommitted changes that will be lost.",
     "removeConfirmClean": "Remove the worktree at {path}?",

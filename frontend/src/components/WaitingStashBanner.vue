@@ -10,7 +10,7 @@ import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import ErrorBanner from './ErrorBanner.vue'
 
-// StashBanner offers to restore or drop the stash a pull, merge or rebase with stash made
+// WaitingStashBanner offers to restore or drop the stash a pull, merge or rebase with stash made
 // (Summary.WaitingStash) once no conflicted file remains.
 const props = defineProps<{ wt: string }>()
 const repo = useWorktreesStore()
@@ -35,7 +35,7 @@ function onDrop(): void {
 
 <template>
   <template v-if="visible">
-    <Message severity="info" data-test="stash-banner">
+    <Message severity="info" data-test="waiting-stash-banner">
       <div class="flex flex-wrap items-center gap-2">
         <span>{{ t('notices.stashedHint') }}</span>
         <Button :label="t('notices.restore')" size="small" @click="onRestore" />

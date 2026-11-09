@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import {
   commitFiles,
-  conflictBanner,
+  operationBanner,
   fileRow,
   logRow,
   pickFromContextMenu,
@@ -85,7 +85,7 @@ test('a pick that stops on conflicts shows the operation and the conflicted file
 
   await selectRange(app, 'pick three', 'pick one')
   await pickFromContextMenu(app, logRow(app, 'pick two'), 'Cherry-pick')
-  const banner = conflictBanner(app)
+  const banner = operationBanner(app)
   for (const button of ['Continue', 'Skip', 'Abort…']) {
     await expect(banner.getByRole('button', { name: button })).toBeVisible()
   }

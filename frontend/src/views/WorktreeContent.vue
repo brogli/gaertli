@@ -26,8 +26,8 @@ import JobsMenu from '@/components/JobsMenu.vue'
 import LogView from '@/components/LogView.vue'
 import CommitDetailView from '@/components/CommitDetailView.vue'
 import ChangesView from '@/components/ChangesView.vue'
-import ConflictBanner from '@/components/ConflictBanner.vue'
-import StashBanner from '@/components/StashBanner.vue'
+import OperationBanner from '@/components/OperationBanner.vue'
+import WaitingStashBanner from '@/components/WaitingStashBanner.vue'
 import BranchPicker from '@/components/BranchPicker.vue'
 import RepoPicker from '@/components/RepoPicker.vue'
 import WorktreePicker from '@/components/WorktreePicker.vue'
@@ -229,8 +229,8 @@ const sideView = computed<'details' | 'changes'>(() =>
         @click="emit('open-settings')"
       />
     </header>
-    <ConflictBanner :wt="wt" />
-    <StashBanner :wt="wt" />
+    <OperationBanner :wt="wt" />
+    <WaitingStashBanner :wt="wt" />
     <Splitter
       v-if="layout === 'wide'"
       layout="horizontal"

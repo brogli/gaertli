@@ -20,7 +20,7 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
-import ConflictBanner from '../ConflictBanner.vue'
+import OperationBanner from '../OperationBanner.vue'
 import { useWorktreesStore } from '@/stores/worktrees'
 import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
@@ -29,13 +29,13 @@ import { summaryFixture } from '@/testing/fixtures/summary'
 import { DiffKind } from '@/lib/diffTarget'
 import { OperationKind } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
-// mountDuring mounts ConflictBanner while operation is in progress.
+// mountDuring mounts OperationBanner while operation is in progress.
 function mountDuring(operation: OperationKind) {
   useWorktreesStore().summary = summaryFixture({ operation })
-  return mount(ConflictBanner, { props: { wt: '/repo' } })
+  return mount(OperationBanner, { props: { wt: '/repo' } })
 }
 
-describe('ConflictBanner', () => {
+describe('OperationBanner', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     Facade.ContinueOperation.mockReset().mockResolvedValue(undefined)
@@ -56,7 +56,7 @@ describe('ConflictBanner', () => {
     useChangesStore().files = changedFilesFixture({ conflicted: [] })
     const wrapper = mountDuring(operation)
 
-    expect(wrapper.find('[data-test="conflict-banner"]').exists()).toBe(
+    expect(wrapper.find('[data-test="operation-banner"]').exists()).toBe(
       operation !== OperationKind.$zero,
     )
     expect(findButton(wrapper, 'Resolve conflicts')).toBeUndefined()

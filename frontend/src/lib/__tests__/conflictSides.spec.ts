@@ -21,7 +21,11 @@ describe('conflictSideTitles', () => {
       'main · rebased onto',
       'abcdef0 Fix it · commit being replayed',
     ],
-    [OperationKind.CherryPickOperation, 'main · current branch', 'abcdef0 Fix it · picked commit'],
+    [
+      OperationKind.CherryPickOperation,
+      'main · current branch',
+      'abcdef0 Fix it · cherry-picked commit',
+    ],
     [
       OperationKind.RevertOperation,
       'main · current branch',

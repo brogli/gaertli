@@ -12,7 +12,7 @@ import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { OperationKind } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
-// ConflictBanner shows while a merge, rebase, cherry-pick, or revert is
+// OperationBanner shows while a merge, rebase, cherry-pick, or revert is
 // stopped on conflicts: Resolve conflicts (opens the diff window while a
 // conflicted file remains), Continue (once no conflicted file remains), Skip
 // (cherry-pick and revert only: merge has no --skip, rebase's is not
@@ -56,7 +56,7 @@ function onAbort(): void {
 
 <template>
   <template v-if="repo.summary?.operation">
-    <Message severity="warn" data-test="conflict-banner">
+    <Message severity="warn" data-test="operation-banner">
       <div class="flex flex-wrap items-center gap-2">
         <span>{{ t('notices.conflictStopped', { operation: repo.summary.operation }) }}</span>
         <Button
