@@ -99,7 +99,7 @@ func TestRunSequenceRejectsEmptyShasBeforeAnyGitCall(t *testing.T) {
 	// without the guard, "git log --no-walk" with no revision defaults to HEAD
 	wt := &session.Worktree{}
 
-	err := runSequence(t.Context(), wt, nil, "cherry-pick", "CHERRY_PICK_HEAD", true, core.PickOptions{})
+	err := runSequence(t.Context(), wt, nil, core.CherryPickOperation, true, core.PickOptions{})
 
 	coretest.AssertCode(t, err, core.Internal)
 }

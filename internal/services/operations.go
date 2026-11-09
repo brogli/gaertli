@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -89,18 +88,18 @@ func runIntegrate(ctx context.Context, wt *session.Worktree, verb integrateVerb,
 	return nil
 }
 
-// refuseIntegrate is the refusal before git runs: an operation in progress
-// or a detached HEAD.
+// refuseIntegrate is integrateRefusal for wt's operation and HEAD.
 func refuseIntegrate(ctx context.Context, wt *session.Worktree) error {
-	if op := operation(wt.GitDir); op != "" {
-		return core.ErrorfArgs(core.GitFailed, "operationInProgress", map[string]string{"operation": op}, "A %s is in progress. Continue or abort it first.", op)
+	op := operation(wt.GitDir)
+	detached := false
+	if op == "" {
+		var err error
+		if _, detached, err = headBranch(ctx, wt.Runner, wt.Path); err != nil {
+			return err
+		}
 	}
-	_, detached, err := headBranch(ctx, wt.Runner, wt.Path)
-	if err != nil {
-		return err
-	}
-	if detached {
-		return core.ErrorfArgs(core.GitFailed, "detachedHead", nil, "HEAD is detached. Check out a branch first.")
+	if refusal := integrateRefusal(op, detached); refusal != nil {
+		return refusal
 	}
 	return nil
 }
@@ -161,10 +160,9 @@ func (c *Core) SkipOperation(ctx context.Context, id core.WorktreeID) error {
 }
 
 // runOperationVerb runs flag against the in-progress operation, whose kind
-// ("merge", "rebase", "cherry-pick", "revert") is itself the git subcommand.
-// Only a cherry-pick or revert is skipped (merge has no --skip, rebase's is
-// not offered). A refusal stands in for git's own, as GitFailed. Continue
-// and skip may commit with a message, so no editor waits; abort never commits.
+// is itself the git subcommand. Only a skippable one is skipped. A refusal
+// stands in for git's own, as GitFailed. Continue and skip may commit with a
+// message, so no editor waits; abort never commits.
 func (c *Core) runOperationVerb(ctx context.Context, id core.WorktreeID, flag string) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
@@ -177,10 +175,10 @@ func (c *Core) runOperationVerb(ctx context.Context, id core.WorktreeID, flag st
 	switch {
 	case kind == "":
 		return core.ErrorfArgs(core.GitFailed, "noOperation", nil, "No merge, rebase, cherry-pick or revert is in progress.")
-	case flag == "--skip" && kind != "cherry-pick" && kind != "revert":
-		return core.ErrorfArgs(core.GitFailed, "operationNotSkippable", map[string]string{"operation": kind}, "A %s can't be skipped; only a cherry-pick or revert can.", kind)
+	case flag == "--skip" && !skippable(kind):
+		return core.ErrorfArgs(core.GitFailed, "operationNotSkippable", map[string]string{"operation": string(kind)}, "A %s can't be skipped; only a cherry-pick or revert can.", kind)
 	}
-	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, NoEditor: flag != "--abort", Timeout: operationTimeout, Args: []string{kind, flag}})
+	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, NoEditor: flag != "--abort", Timeout: operationTimeout, Args: []string{string(kind), flag}})
 	return stopOf(ctx, wt, err)
 }
 
@@ -194,18 +192,6 @@ func stopOf(ctx context.Context, wt *session.Worktree, err error) error {
 	}
 	st, statusErr := readHeadStatus(context.WithoutCancel(ctx), wt)
 	return asStop(err, statusErr == nil && st.conflicted)
-}
-
-// asStop reclassifies err, from a step that left an operation in progress,
-// as a stop: Code Conflicted with conflicted files, else Code Stopped,
-// whatever err's code was (a timeout included).
-func asStop(err error, conflicted bool) error {
-	ce := core.ErrorOf(err)
-	ce.Code = core.Stopped
-	if conflicted {
-		ce.Code = core.Conflicted
-	}
-	return ce
 }
 
 // operationTimeout bounds a rebase, or one --continue/--abort/--skip of an
@@ -275,33 +261,4 @@ func matchesHead(ctx context.Context, wt *session.Worktree) bool {
 	_, _ = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: []string{"update-index", "-q", "--refresh"}})
 	_, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, ReadOnly: true, Args: []string{"diff-index", "--quiet", "--ignore-submodules", "HEAD", "--"}})
 	return err == nil
-}
-
-// operation names the operation in progress in the worktree whose own git
-// dir is gitDir, from git's state files: "merge", "cherry-pick", "revert",
-// "rebase", or "" for none. File checks only, no subprocess.
-func operation(gitDir string) string {
-	for _, f := range []struct{ name, op string }{
-		{"MERGE_HEAD", "merge"}, {"CHERRY_PICK_HEAD", "cherry-pick"}, {"REVERT_HEAD", "revert"},
-	} {
-		if fileExists(filepath.Join(gitDir, f.name)) {
-			return f.op
-		}
-	}
-	for _, dir := range []string{"rebase-merge", "rebase-apply"} {
-		if fileExists(filepath.Join(gitDir, dir)) {
-			return "rebase"
-		}
-	}
-	return ""
-}
-
-// remapIfPending reclassifies git's failure as Code Conflicted if pending: an
-// operation-state file was left behind, so git stopped mid-way rather than
-// refusing outright.
-func remapIfPending(err error, pending bool) error {
-	if ce := gitFailure(err); ce != nil && pending {
-		ce.Code = core.Conflicted
-	}
-	return err
 }

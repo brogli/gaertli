@@ -143,17 +143,12 @@ func worktreeGitDir(worktreePath string) (dir string, ok bool) {
 	return target, true
 }
 
-// rebasingBranch reads gitDir's rebase state (rebase-merge, the default and
-// rebase -i, else rebase-apply): the branch its head-name names, "" if
-// neither is running or the rebase was started on a detached HEAD
+// rebasingBranch reads gitDir's rebase state: the branch its head-name
+// names, "" if no rebase is running or it was started on a detached HEAD
 // (head-name then holds "detached HEAD", not a ref).
 func rebasingBranch(gitDir string) (branch string, ok bool) {
-	for _, sub := range []string{"rebase-merge", "rebase-apply"} {
-		content, err := os.ReadFile(filepath.Join(gitDir, sub, "head-name"))
-		if err != nil {
-			continue
-		}
-		if b, ok := strings.CutPrefix(strings.TrimSpace(string(content)), "refs/heads/"); ok {
+	for _, headName := range rebaseStateFiles(gitDir, "head-name") {
+		if b, ok := strings.CutPrefix(headName, "refs/heads/"); ok {
 			return b, true
 		}
 	}

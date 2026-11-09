@@ -27,10 +27,10 @@ import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import { DiffKind } from '@/lib/diffTarget'
-import { Operation } from '../../../bindings/github.com/brogli/gaertli/internal/core'
+import { OperationKind } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // mountDuring mounts ConflictBanner while operation is in progress.
-function mountDuring(operation: Operation) {
+function mountDuring(operation: OperationKind) {
   useRepoStore().summary = summaryFixture({ operation })
   return mount(ConflictBanner, { props: { wt: '/repo' } })
 }
@@ -47,17 +47,17 @@ describe('ConflictBanner', () => {
   })
 
   it.each([
-    { hidden: 'the banner while no operation is in progress', operation: Operation.$zero },
+    { hidden: 'the banner while no operation is in progress', operation: OperationKind.$zero },
     {
       hidden: '"Resolve conflicts" once no file is conflicted',
-      operation: Operation.MergeOperation,
+      operation: OperationKind.MergeOperation,
     },
   ])('shows no $hidden', ({ operation }) => {
     useChangesStore().files = changedFilesFixture({ conflicted: [] })
     const wrapper = mountDuring(operation)
 
     expect(wrapper.find('[data-test="conflict-banner"]').exists()).toBe(
-      operation !== Operation.$zero,
+      operation !== OperationKind.$zero,
     )
     expect(findButton(wrapper, 'Resolve conflicts')).toBeUndefined()
   })
@@ -66,7 +66,7 @@ describe('ConflictBanner', () => {
     const changes = useChangesStore()
     changes.files = changedFilesFixture({ conflicted: [{ path: 'a.txt', status: 'UU' }] })
 
-    const wrapper = mountDuring(Operation.MergeOperation)
+    const wrapper = mountDuring(OperationKind.MergeOperation)
     expect(findButton(wrapper, 'Continue')!.attributes('disabled')).not.toBeUndefined()
 
     changes.files = changedFilesFixture({ conflicted: [] })
@@ -82,7 +82,7 @@ describe('ConflictBanner', () => {
     ]
     Facade.Status.mockResolvedValue(changedFilesFixture({ conflicted }))
     useChangesStore().files = changedFilesFixture({ conflicted })
-    const wrapper = mountDuring(Operation.MergeOperation)
+    const wrapper = mountDuring(OperationKind.MergeOperation)
 
     await findButton(wrapper, 'Resolve conflicts')!.trigger('click')
     await flushPromises()
@@ -96,7 +96,7 @@ describe('ConflictBanner', () => {
   })
 
   it('clicking Abort confirms before calling Facade.AbortOperation', async () => {
-    const wrapper = mountDuring(Operation.MergeOperation)
+    const wrapper = mountDuring(OperationKind.MergeOperation)
     await findButton(wrapper, 'Abort…')!.trigger('click')
 
     expect(confirmRequire).toHaveBeenCalledTimes(1)
@@ -109,9 +109,9 @@ describe('ConflictBanner', () => {
   })
 
   it.each([
-    { operation: Operation.CherryPickOperation, skips: true },
-    { operation: Operation.RevertOperation, skips: true },
-    { operation: Operation.MergeOperation, skips: false },
+    { operation: OperationKind.CherryPickOperation, skips: true },
+    { operation: OperationKind.RevertOperation, skips: true },
+    { operation: OperationKind.MergeOperation, skips: false },
   ])(
     'Skip is offered only while a cherry-pick or revert is stopped ($operation)',
     ({ operation, skips }) => {
@@ -122,7 +122,7 @@ describe('ConflictBanner', () => {
   )
 
   it('clicking Skip calls Facade.SkipOperation', async () => {
-    const wrapper = mountDuring(Operation.CherryPickOperation)
+    const wrapper = mountDuring(OperationKind.CherryPickOperation)
     await findButton(wrapper, 'Skip')!.trigger('click')
 
     expect(Facade.SkipOperation).toHaveBeenCalledWith('/repo')

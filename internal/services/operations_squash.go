@@ -139,10 +139,10 @@ func inspectSelection(ctx context.Context, wt *session.Worktree, shas []core.SHA
 
 // firstBlocker is why the selection cannot be folded, in the order
 // SquashCheck documents; nil if it can.
-func (s selection) firstBlocker(op string, st headStatus) *core.Error {
+func (s selection) firstBlocker(op core.OperationKind, st headStatus) *core.Error {
 	switch {
 	case op != "":
-		return core.ErrorfArgs(core.GitFailed, "squashOperationInProgress", map[string]string{"operation": op}, "a %s is in progress", op)
+		return core.ErrorfArgs(core.GitFailed, "squashOperationInProgress", map[string]string{"operation": string(op)}, "a %s is in progress", op)
 	case st.detached:
 		return core.ErrorfArgs(core.GitFailed, "squashDetached", nil, "HEAD is detached; squash and fixup need the current branch")
 	case len(s.inChainOrder()) != len(s.selected):

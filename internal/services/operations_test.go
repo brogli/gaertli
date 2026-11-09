@@ -20,11 +20,11 @@ import (
 // "rebase", "cherry-pick", "revert"), conflicted on files (conflictPath(kind)
 // if none given). Merge and rebase stop on a local diverged branch, cherry-pick
 // and revert via realConflictFixture. Returns HEAD before the operation.
-func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Core, wt core.WorktreeID, beforeHEAD core.SHA) {
+func stoppedRepo(t *testing.T, kind core.OperationKind, files ...string) (dir string, c *Core, wt core.WorktreeID, beforeHEAD core.SHA) {
 	t.Helper()
 	c = New(func(core.Event) {})
 
-	if kind == "merge" || kind == "rebase" {
+	if kind == core.MergeOperation || kind == core.RebaseOperation {
 		if len(files) == 0 {
 			files = []string{"seed.txt"}
 		}
@@ -32,11 +32,11 @@ func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Cor
 	}
 
 	repo := gittest.New(t)
-	sha := realConflictFixture(t, repo.Dir, kind, files...)
+	sha := realConflictFixture(t, repo.Dir, string(kind), files...)
 	beforeHEAD = gittest.HeadSHA(t, repo.Dir)
 	info := openOn(t, c, repo.Dir)
 	var opErr error
-	if kind == "cherry-pick" {
+	if kind == core.CherryPickOperation {
 		opErr = c.CherryPick(t.Context(), info.ID, []core.SHA{sha}, core.PickOptions{})
 	} else {
 		opErr = c.Revert(t.Context(), info.ID, []core.SHA{sha}, core.PickOptions{})
@@ -49,7 +49,7 @@ func stoppedRepo(t *testing.T, kind string, files ...string) (dir string, c *Cor
 
 // stoppedByLocalOperation merges or rebases branch side into master, where
 // both changed every file.
-func stoppedByLocalOperation(t *testing.T, c *Core, kind string, files []string) (string, *Core, core.WorktreeID, core.SHA) {
+func stoppedByLocalOperation(t *testing.T, c *Core, kind core.OperationKind, files []string) (string, *Core, core.WorktreeID, core.SHA) {
 	t.Helper()
 	dir := gittest.New(t).Dir
 	contents := func(content string) map[string]string {
@@ -65,24 +65,25 @@ func stoppedByLocalOperation(t *testing.T, c *Core, kind string, files []string)
 		gittest.Step{Message: "local commit", Files: contents("local change\n")},
 	)
 	beforeHEAD := gittest.HeadSHA(t, dir)
-	gitStops(t, dir, kind, "side")
+	gitStops(t, dir, string(kind), "side")
 	info := openOn(t, c, dir)
 	return dir, c, info.ID, beforeHEAD
 }
 
 // conflictPath is the file stoppedRepo's own fixture conflicts on for kind.
-func conflictPath(kind string) string {
-	if kind == "merge" || kind == "rebase" {
+func conflictPath(kind core.OperationKind) string {
+	if kind == core.MergeOperation || kind == core.RebaseOperation {
 		return "seed.txt"
 	}
 	return "conflict.txt"
 }
 
-var operationKinds = []string{"merge", "rebase", "cherry-pick", "revert"}
+// operationKinds are everyOperation's kinds, without none.
+var operationKinds = everyOperation[1:]
 
 // assertOperation asserts that Summary names want as the operation in
 // progress, "" for none.
-func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.Operation) {
+func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.OperationKind) {
 	t.Helper()
 	summary, err := c.Summary(t.Context(), wt)
 	if err != nil {
@@ -96,7 +97,7 @@ func assertOperation(t *testing.T, c *Core, wt core.WorktreeID, want core.Operat
 func TestContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			dir, c, wt, beforeHEAD := stoppedRepo(t, kind)
 			if err := c.StageFile(t.Context(), wt, conflictPath(kind)); err != nil {
 				t.Fatal(err)
@@ -106,8 +107,8 @@ func TestContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
 				t.Fatalf("ContinueOperation = %v, want nil, no hang on a commit-message editor", err)
 			}
 
-			if fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
-				t.Errorf("%s present, want gone once the operation completed", operationStateFile[kind])
+			if fileExists(filepath.Join(dir, ".git", stateFile(kind))) {
+				t.Errorf("%s present, want gone once the operation completed", stateFile(kind))
 			}
 			if got := gittest.HeadSHA(t, dir); got == beforeHEAD {
 				t.Error("HEAD did not advance with the completed operation's own commit")
@@ -117,27 +118,18 @@ func TestContinueOperationSucceedsOnceTheOnlyConflictIsResolved(t *testing.T) {
 	}
 }
 
-// operationStateFile is the file (under .git) each kind's own stop leaves
-// behind, and AbortOperation removes.
-var operationStateFile = map[string]string{
-	"merge":       "MERGE_HEAD",
-	"rebase":      "rebase-merge",
-	"cherry-pick": "CHERRY_PICK_HEAD",
-	"revert":      "REVERT_HEAD",
-}
-
 func TestAbortOperationRestoresTheFreshStop(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			dir, c, wt, beforeHEAD := stoppedRepo(t, kind)
 
 			if err := c.AbortOperation(t.Context(), wt); err != nil {
 				t.Fatalf("AbortOperation = %v, want nil", err)
 			}
 
-			if fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
-				t.Errorf("%s present, want gone after abort", operationStateFile[kind])
+			if fileExists(filepath.Join(dir, ".git", stateFile(kind))) {
+				t.Errorf("%s present, want gone after abort", stateFile(kind))
 			}
 			if got := gittest.HeadSHA(t, dir); got != beforeHEAD {
 				t.Errorf("HEAD = %s, want back at the pre-operation commit %s", got, beforeHEAD)
@@ -159,7 +151,7 @@ func TestAbortOperationRestoresTheFreshStop(t *testing.T) {
 func TestAbortOperationKeepsTheUsersEditorEnvironment(t *testing.T) {
 	unsetEditorEnv(t)
 	for _, kind := range operationKinds {
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			dir, c, wt, _ := stoppedRepo(t, kind)
 			gittest.Run(t, dir, "config", "core.editor", "false")
 			seen := filepath.ToSlash(filepath.Join(t.TempDir(), "editor"))
@@ -245,7 +237,7 @@ func TestContinueAbortAndSkipOperationSayNoOperationIsInProgress(t *testing.T) {
 func TestContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			dir, c, wt, _ := stoppedRepo(t, kind, conflictPath(kind), "other.txt")
 			// resolves only one of the two conflicted files
 			if err := c.StageFile(t.Context(), wt, conflictPath(kind)); err != nil {
@@ -258,10 +250,10 @@ func TestContinueOperationRefusesWhileAConflictedFileRemains(t *testing.T) {
 			if ce.GitStderr == "" {
 				t.Error("GitStderr empty, want git's own explanation")
 			}
-			if !fileExists(filepath.Join(dir, ".git", operationStateFile[kind])) {
-				t.Errorf("%s missing, want it left in place (still stopped)", operationStateFile[kind])
+			if !fileExists(filepath.Join(dir, ".git", stateFile(kind))) {
+				t.Errorf("%s missing, want it left in place (still stopped)", stateFile(kind))
 			}
-			assertOperation(t, c, wt, core.Operation(kind))
+			assertOperation(t, c, wt, kind)
 		})
 	}
 }
@@ -289,10 +281,10 @@ func TestAContinueThatStopsForAnotherReasonThanAConflictIsAStop(t *testing.T) {
 func TestSummaryAndStatusDetectEveryStoppedOperationKind(t *testing.T) {
 	t.Parallel()
 	for _, kind := range operationKinds {
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			_, c, wt, _ := stoppedRepo(t, kind)
 
-			assertOperation(t, c, wt, core.Operation(kind))
+			assertOperation(t, c, wt, kind)
 
 			status := statusOf(t, c, wt)
 			want := core.ChangedFile{Status: "UU", Path: conflictPath(kind)}

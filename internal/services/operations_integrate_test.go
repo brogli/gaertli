@@ -56,12 +56,16 @@ func TestMergeAndRebaseRefuseBeforeGitRunsWithAnOperationOrDetachedHead(t *testi
 	}
 	sideTip := gittest.Out(t, repo.Dir, "rev-parse", "side")
 	coretest.AssertCode(t, c.CherryPick(t.Context(), wt, []core.SHA{core.SHA(sideTip)}, core.PickOptions{}), core.Conflicted)
+	rec := recordCommands(t, c, wt)
 
 	for name, call := range calls {
 		ce := coretest.AsError(t, call(), core.GitFailed)
 		if ce.Key != "operationInProgress" || ce.Args["operation"] != "cherry-pick" {
 			t.Errorf("%s: error = %+v, want key operationInProgress, operation cherry-pick", name, ce)
 		}
+	}
+	if got := len(rec.snapshot()); got != 0 {
+		t.Errorf("git calls = %d, want 0 while an operation is in progress", got)
 	}
 
 	gittest.Run(t, repo.Dir, "cherry-pick", "--abort")

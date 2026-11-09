@@ -128,17 +128,17 @@ func resolveCandidates(ctx context.Context, r git.Runner, dir string, shas []str
 	return parseCandidates(result.Stdout)
 }
 
-// pickArgs builds verb's flags from opts. revert always gets --no-edit, so
+// pickArgs builds kind's flags from opts. revert always gets --no-edit, so
 // it never waits on an editor, and never -x.
-func pickArgs(verb string, opts core.PickOptions) []string {
-	args := []string{verb}
+func pickArgs(kind core.OperationKind, opts core.PickOptions) []string {
+	args := []string{string(kind)}
 	if opts.NoCommit {
 		args = append(args, "-n")
 	}
-	if opts.RecordOrigin && verb == "cherry-pick" {
+	if opts.RecordOrigin && kind == core.CherryPickOperation {
 		args = append(args, "-x")
 	}
-	if verb == "revert" {
+	if kind == core.RevertOperation {
 		args = append(args, "--no-edit")
 	}
 	return append(args, "--end-of-options")
@@ -146,9 +146,9 @@ func pickArgs(verb string, opts core.PickOptions) []string {
 
 // runSequence is CherryPick's and Revert's shared body: resolve
 // shas, refuse the whole call up front if any is a merge commit, then run
-// verb under wt's write lock. A failure that leaves headFile behind stopped
-// mid-way: Code Conflicted.
-func runSequence(ctx context.Context, wt *session.Worktree, shas []core.SHA, verb, headFile string, oldestFirst bool, opts core.PickOptions) error {
+// kind under wt's write lock. A failure that leaves kind's state file behind
+// stopped mid-way: Code Conflicted.
+func runSequence(ctx context.Context, wt *session.Worktree, shas []core.SHA, kind core.OperationKind, oldestFirst bool, opts core.PickOptions) error {
 	if len(shas) == 0 {
 		return core.Errorf(core.Internal, "no commits given")
 	}
@@ -161,16 +161,16 @@ func runSequence(ctx context.Context, wt *session.Worktree, shas []core.SHA, ver
 		return err
 	}
 	if merge, ok := firstMerge(candidates); ok {
-		args := map[string]string{"sha": merge.ShortSHA, "verb": verb}
-		return core.ErrorfArgs(core.GitFailed, "mergeCommitNotPickable", args, "%s is a merge commit; %s does not support a merge commit", merge.ShortSHA, verb)
+		args := map[string]string{"sha": merge.ShortSHA, "verb": string(kind)}
+		return core.ErrorfArgs(core.GitFailed, "mergeCommitNotPickable", args, "%s is a merge commit; %s does not support a merge commit", merge.ShortSHA, kind)
 	}
 
 	ordered, err := orderedSHAs(ctx, wt.Runner, wt.Path, candidates, oldestFirst)
 	if err != nil {
 		return err
 	}
-	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: append(pickArgs(verb, opts), ordered...)})
-	return remapIfPending(err, fileExists(filepath.Join(wt.GitDir, headFile)))
+	_, err = wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: append(pickArgs(kind, opts), ordered...)})
+	return remapIfPending(err, fileExists(filepath.Join(wt.GitDir, stateFile(kind))))
 }
 
 // CherryPick implements core.API.
@@ -179,7 +179,7 @@ func (c *Core) CherryPick(ctx context.Context, id core.WorktreeID, shas []core.S
 	if err != nil {
 		return err
 	}
-	return runSequence(ctx, wt, shas, "cherry-pick", "CHERRY_PICK_HEAD", true, opts)
+	return runSequence(ctx, wt, shas, core.CherryPickOperation, true, opts)
 }
 
 // Revert implements core.API.
@@ -188,5 +188,5 @@ func (c *Core) Revert(ctx context.Context, id core.WorktreeID, shas []core.SHA, 
 	if err != nil {
 		return err
 	}
-	return runSequence(ctx, wt, shas, "revert", "REVERT_HEAD", false, opts)
+	return runSequence(ctx, wt, shas, core.RevertOperation, false, opts)
 }

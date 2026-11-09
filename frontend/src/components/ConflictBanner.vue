@@ -9,7 +9,7 @@ import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { openConflicts } from '@/lib/openConflicts'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
-import { Operation } from '../../bindings/github.com/brogli/gaertli/internal/core'
+import { OperationKind } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
 // ConflictBanner shows while a merge, rebase, cherry-pick, or revert is
@@ -28,7 +28,9 @@ const { t } = useI18n()
 const unresolvedCount = computed(() => changes.files?.conflicted?.length ?? 0)
 const skippable = computed(() => {
   const operation = repo.summary?.operation
-  return operation === Operation.CherryPickOperation || operation === Operation.RevertOperation
+  return (
+    operation === OperationKind.CherryPickOperation || operation === OperationKind.RevertOperation
+  )
 })
 
 function onContinue(): void {

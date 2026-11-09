@@ -83,14 +83,16 @@ type Operations interface {
 	DropStash(ctx context.Context, wt WorktreeID, sha SHA) error
 }
 
-// Operation is a merge, rebase, cherry-pick or revert in progress.
-type Operation string
+// OperationKind is the merge, rebase, cherry-pick or revert git left in
+// progress after a stop; "" means none. It is also the subcommand continue,
+// skip and abort are given to.
+type OperationKind string
 
 const (
-	MergeOperation      Operation = "merge"
-	RebaseOperation     Operation = "rebase"
-	CherryPickOperation Operation = "cherry-pick"
-	RevertOperation     Operation = "revert"
+	MergeOperation      OperationKind = "merge"
+	RebaseOperation     OperationKind = "rebase"
+	CherryPickOperation OperationKind = "cherry-pick"
+	RevertOperation     OperationKind = "revert"
 )
 
 // IntegrateResult is Merge's and Rebase's result.

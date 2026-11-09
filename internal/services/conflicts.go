@@ -310,10 +310,10 @@ func conflictAttrs(ctx context.Context, r git.Runner, dir, path string) (mergeAt
 // HEAD, except in a rebase, where it is the commit rebased onto.
 func labelSides(ctx context.Context, wt *session.Worktree, out *core.ConflictFile) error {
 	op := operation(wt.GitDir)
-	out.Operation = core.Operation(op)
+	out.Operation = op
 
 	var err error
-	if op != "rebase" {
+	if op != core.RebaseOperation {
 		if out.Current.SHA, err = verifyRev(ctx, wt.Runner, wt.Path, "HEAD"); err != nil {
 			return err
 		}
@@ -323,25 +323,22 @@ func labelSides(ctx context.Context, wt *session.Worktree, out *core.ConflictFil
 	}
 
 	switch op {
-	case "merge":
+	case core.MergeOperation:
 		out.Incoming.SHA = stateSHA(wt.GitDir, "MERGE_HEAD")
 		out.Incoming.Ref, err = refAt(ctx, wt.Runner, wt.Path, out.Incoming.SHA)
-	case "rebase":
-		out.Current.SHA = cmp.Or(
-			stateSHA(wt.GitDir, filepath.Join("rebase-merge", "onto")),
-			stateSHA(wt.GitDir, filepath.Join("rebase-apply", "onto")),
-		)
+	case core.RebaseOperation:
+		out.Current.SHA = core.SHA(cmp.Or(rebaseStateFiles(wt.GitDir, "onto")...))
 		out.Current.Ref, err = refAt(ctx, wt.Runner, wt.Path, out.Current.SHA)
 		out.Incoming.SHA = stateSHA(wt.GitDir, "REBASE_HEAD")
-	case "cherry-pick":
+	case core.CherryPickOperation:
 		out.Incoming.SHA = stateSHA(wt.GitDir, "CHERRY_PICK_HEAD")
-	case "revert":
+	case core.RevertOperation:
 		out.Incoming.SHA = stateSHA(wt.GitDir, "REVERT_HEAD")
 	}
 	if err != nil {
 		return err
 	}
-	if op != "merge" && out.Incoming.SHA != "" {
+	if op != core.MergeOperation && out.Incoming.SHA != "" {
 		out.Incoming.Subject, err = subjectOf(ctx, wt.Runner, wt.Path, out.Incoming.SHA)
 	}
 	return err
