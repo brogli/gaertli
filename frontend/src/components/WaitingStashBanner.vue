@@ -8,10 +8,12 @@ import { useChangesStore } from '@/stores/changes'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
+import { OperationKind } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import ErrorBanner from './ErrorBanner.vue'
 
 // WaitingStashBanner offers to restore or drop the stash a pull, merge or rebase with stash made
-// (Summary.WaitingStash) once no conflicted file remains.
+// (Summary.WaitingStash) once no conflicted file remains and no operation is in progress: a stash
+// restored into an open merge would land in the merge commit.
 const props = defineProps<{ wt: string }>()
 const repo = useWorktreesStore()
 const changes = useChangesStore()
@@ -20,7 +22,12 @@ const { confirmAction } = useConfirmAction()
 const { t } = useI18n()
 
 const stashRef = computed(() => repo.summary?.waitingStash ?? '')
-const visible = computed(() => !!stashRef.value && !changes.files?.conflicted?.length)
+const visible = computed(
+  () =>
+    !!stashRef.value &&
+    !changes.files?.conflicted?.length &&
+    repo.summary?.operation === OperationKind.$zero,
+)
 
 function onRestore(): void {
   void run(() => Facade.PopStash(props.wt, stashRef.value))
