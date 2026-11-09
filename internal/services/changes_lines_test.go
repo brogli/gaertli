@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03
+// Requirements: FR-CHG-03, FR-CHG-10
 
 package services
 
@@ -696,5 +696,59 @@ func TestStageLinesOfAPatternNamedFileStagesOnlyThatFile(t *testing.T) {
 	}
 	if got := indexBlob(t, repo.Dir, "f.txt"); got != "a\nb\nc" {
 		t.Errorf("index f.txt = %q, want it untouched", got)
+	}
+}
+
+func TestSelectionPatchFromKeepsTheSelectedChangesOrRefuses(t *testing.T) {
+	t.Parallel()
+	header := "diff --git a/f.txt b/f.txt\nindex 1111111..2222222 100644\n--- a/f.txt\n+++ b/f.txt\n"
+	diff := []byte(header + "@@ -1,4 +1,4 @@\n a\n-b\n+B\n c\n-d\n+D\n")
+	file, err := parsePatch(diff, "f.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shown := fingerprint(sides(file.TextFragments[0]))
+	tests := map[string]struct {
+		diff      []byte
+		sel       core.LineSelection
+		reverse   bool
+		want      string
+		wantError string
+	}{
+		"a selection": {
+			diff: diff, sel: core.LineSelection{Old: []int{2}, New: []int{2}, Fingerprint: shown},
+			want: header + "@@ -1,4 +1,4 @@\n a\n-b\n+B\n c\n d\n",
+		},
+		"a reversed selection": {
+			diff: diff, sel: core.LineSelection{Old: []int{4}, New: []int{4}, Fingerprint: shown}, reverse: true,
+			want: header + "@@ -1,4 +1,4 @@\n a\n B\n c\n-d\n+D\n",
+		},
+		"a stale fingerprint": {
+			diff: diff, sel: core.LineSelection{Old: []int{2}, Fingerprint: "stale"},
+			wantError: "f.txt changed since it was shown",
+		},
+		"context lines only": {
+			diff: diff, sel: core.LineSelection{Old: []int{1}, New: []int{1}, Fingerprint: shown},
+			wantError: "line selection matches no changed line of f.txt's current diff",
+		},
+		"a diff without the path": {
+			diff: nil, sel: core.LineSelection{Old: []int{2}, Fingerprint: shown},
+			wantError: "f.txt has no changes to stage or unstage",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got, err := selectionPatchFrom(tc.diff, "f.txt", tc.sel, tc.reverse)
+			if tc.wantError != "" {
+				if ce := coretest.AsError(t, err, core.Internal); ce.Message != tc.wantError {
+					t.Errorf("Message = %q, want %q", ce.Message, tc.wantError)
+				}
+				return
+			}
+			if err != nil || string(got) != tc.want {
+				t.Errorf("selectionPatchFrom = %q, %v, want %q", got, err, tc.want)
+			}
+		})
 	}
 }

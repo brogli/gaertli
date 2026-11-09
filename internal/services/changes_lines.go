@@ -22,22 +22,6 @@ func diffArgsFor(path string, staged bool) []string {
 	return patchArgs("diff", args...)
 }
 
-// hunkFragments re-diffs path and parses it.
-func hunkFragments(ctx context.Context, r git.Runner, dir, path string, staged bool) (frags []*gitdiff.TextFragment, header []byte, err error) {
-	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: diffArgsFor(path, staged)})
-	if err != nil {
-		return nil, nil, err
-	}
-	file, err := parsePatch(result.Stdout, path)
-	if err != nil {
-		return nil, nil, err
-	}
-	if file == nil { // git diff lists no file for an untracked or unchanged path
-		return nil, nil, core.Errorf(core.Internal, "%s has no changes to stage or unstage", path)
-	}
-	return file.TextFragments, fileHeaderLines(result.Stdout), nil
-}
-
 // fileHeaderLines returns everything before the first hunk header — only
 // the "@@ ... @@" line and body differ per hunk — except a mode change: a
 // hunk action changes lines, never the mode.
@@ -314,17 +298,32 @@ func writeBlock(body *hunkBody, from, onto blockSide) {
 }
 
 // selectionPatch re-diffs path (the staged diff if staged, else the unstaged
-// one) and rebuilds it keeping only the selected lines the re-diff changes,
-// for git apply [--reverse if reverse]. A selected line it shows unchanged
-// is skipped, so a selection taken from another diff of the same sides,
-// such as git diff -w's, changes nothing outside itself. Code Internal if
-// the re-diff's sides differ from the shown ones (path changed since it was
-// shown), or if no selected line is a change.
+// one) and builds the patch for sel from it, for git apply [--reverse if
+// reverse].
 func selectionPatch(ctx context.Context, r git.Runner, dir, path string, sel core.LineSelection, staged, reverse bool) ([]byte, error) {
-	frags, header, err := hunkFragments(ctx, r, dir, path, staged)
+	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: diffArgsFor(path, staged)})
 	if err != nil {
 		return nil, err
 	}
+	return selectionPatchFrom(result.Stdout, path, sel, reverse)
+}
+
+// selectionPatchFrom rebuilds diff, git's full-context diff of path, keeping
+// only the selected lines it changes, for git apply [--reverse if reverse]. A
+// selected line it shows unchanged is skipped, so a selection taken from
+// another diff of the same sides, such as git diff -w's, changes nothing
+// outside itself. Code Internal if diff lists no change to path, if its sides
+// differ from the shown ones (path changed since it was shown), or if no
+// selected line is a change.
+func selectionPatchFrom(diff []byte, path string, sel core.LineSelection, reverse bool) ([]byte, error) {
+	file, err := parsePatch(diff, path)
+	if err != nil {
+		return nil, err
+	}
+	if file == nil { // git diff lists no file for an untracked or unchanged path
+		return nil, core.Errorf(core.Internal, "%s has no changes to stage or unstage", path)
+	}
+	frags := file.TextFragments
 	if len(frags) != 1 || fingerprint(sides(frags[0])) != sel.Fingerprint {
 		return nil, core.Errorf(core.Internal, "%s changed since it was shown", path)
 	}
@@ -332,7 +331,7 @@ func selectionPatch(ctx context.Context, r git.Runner, dir, path string, sel cor
 	if len(selected) == 0 {
 		return nil, core.Errorf(core.Internal, "line selection matches no changed line of %s's current diff", path)
 	}
-	return append(header, buildPartialPatch(frags[0], selected, reverse)...), nil
+	return append(fileHeaderLines(diff), buildPartialPatch(frags[0], selected, reverse)...), nil
 }
 
 // StageLines implements core.API: it applies selectionPatch to the index
