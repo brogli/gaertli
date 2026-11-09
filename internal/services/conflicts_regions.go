@@ -93,10 +93,12 @@ func splitLines(text string) []string {
 // textDiffs holds git's -U0 hunks between the texts conflictChanges places by:
 // the base against each side (none without a base), and each side against the
 // result with every block filled from that side (none when the result has no
-// block).
+// block). currentInKept and incomingInKept are where each block's section sits in
+// that filled result.
 type textDiffs struct {
 	baseToCurrent, baseToIncoming []core.DiffHunk
 	currentToKept, incomingToKept []core.DiffHunk
+	currentInKept, incomingInKept []core.LineRange
 }
 
 // readTextDiffs runs the diffs conflictChanges needs; text is file.Result with
@@ -115,11 +117,13 @@ func readTextDiffs(ctx context.Context, r git.Runner, dir string, file core.Conf
 	if len(text.blocks) == 0 {
 		return d, nil
 	}
-	keptCurrent, _ := text.keeping(currentSection)
+	keptCurrent, currentInKept := text.keeping(currentSection)
+	d.currentInKept = currentInKept
 	if d.currentToKept, err = diffHunks(ctx, r, dir, file.Current.Content, keptCurrent); err != nil {
 		return textDiffs{}, err
 	}
-	keptIncoming, _ := text.keeping(incomingSection)
+	keptIncoming, incomingInKept := text.keeping(incomingSection)
+	d.incomingInKept = incomingInKept
 	if d.incomingToKept, err = diffHunks(ctx, r, dir, file.Incoming.Content, keptIncoming); err != nil {
 		return textDiffs{}, err
 	}
@@ -140,15 +144,13 @@ func conflictChanges(file core.ConflictFile, text markedText, d textDiffs) []cor
 	if len(text.blocks) == 0 {
 		return nil
 	}
-	_, currentInKept := text.keeping(currentSection)
-	_, incomingInKept := text.keeping(incomingSection)
 	conflicts := make([]core.MergeChange, len(text.blocks))
 	for i, b := range text.blocks {
 		conflicts[i] = core.MergeChange{
 			Kind:     core.ConflictChange,
 			Result:   core.LineRange{Start: b.open + 1, Lines: b.close - b.open + 1},
-			Current:  mapToOld(d.currentToKept, currentInKept[i]),
-			Incoming: mapToOld(d.incomingToKept, incomingInKept[i]),
+			Current:  mapToOld(d.currentToKept, d.currentInKept[i]),
+			Incoming: mapToOld(d.incomingToKept, d.incomingInKept[i]),
 		}
 	}
 	if !file.Base.Present {

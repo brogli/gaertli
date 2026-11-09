@@ -103,8 +103,7 @@ func TestConflictRegionsLeaveOutAChangeBothSidesMadeAlike(t *testing.T) {
 
 func TestConflictChangesPlaceEveryChangeInEachText(t *testing.T) {
 	t.Parallel()
-	// Each triple's hunks are what git diff -U0 --inter-hunk-context=0 --no-index printed for its
-	// texts; git's zdiff3 style wrote the same results as diff3.
+	// Each triple holds three texts and the -U0 hunks between them.
 	type triple struct {
 		base, current, incoming string
 		d                       textDiffs
@@ -179,6 +178,9 @@ func TestConflictChangesPlaceEveryChangeInEachText(t *testing.T) {
 				d.baseToCurrent, d.baseToIncoming = nil, nil
 			}
 			text := markedText{lines: splitLines(tc.result), blocks: parseMarkerBlocks(tc.result, 7)}
+
+			_, d.currentInKept = text.keeping(currentSection)
+			_, d.incomingInKept = text.keeping(incomingSection)
 
 			if got := conflictChanges(file, text, d); !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("conflictChanges =\n%+v\nwant\n%+v", got, tc.want)

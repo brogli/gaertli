@@ -16,16 +16,14 @@ import (
 // range is then settled on the lines it must hold: the unchanged side's and the base's hold the
 // same text, and the changed side's the Result's.
 func changes(file core.ConflictFile, text markedText, d textDiffs) []core.MergeChange {
-	var out []core.MergeChange
-	_, currentInKept := text.keeping(currentSection)
-	keptCurrent := keptSide{text: text, inKept: currentInKept, hunks: d.currentToKept}
-	_, incomingInKept := text.keeping(incomingSection)
-	keptIncoming := keptSide{text: text, inKept: incomingInKept, hunks: d.incomingToKept}
+	var found []core.MergeChange
+	keptCurrent := keptSide{text: text, inKept: d.currentInKept, hunks: d.currentToKept}
+	keptIncoming := keptSide{text: text, inKept: d.incomingInKept, hunks: d.incomingToKept}
 	for _, h := range keptCurrent.hunks {
 		own := oldLines(h)
 		inResult := keptCurrent.inResult(newLines(h))
 		base := settle(file.Base.Content, linesAt(file.Current.Content, own), mapToOld(d.baseToCurrent, own))
-		out = append(out, core.MergeChange{
+		found = append(found, core.MergeChange{
 			Kind: core.IncomingOnlyChange, Added: own.Lines == 0,
 			Result: inResult, Base: base, Current: own,
 			Incoming: settle(file.Incoming.Content, linesAt(file.Result, inResult), mapRange(d.baseToIncoming, base, oldLines, newLines)),
@@ -35,13 +33,13 @@ func changes(file core.ConflictFile, text markedText, d textDiffs) []core.MergeC
 		own := oldLines(h)
 		inResult := keptIncoming.inResult(newLines(h))
 		base := settle(file.Base.Content, linesAt(file.Incoming.Content, own), mapToOld(d.baseToIncoming, own))
-		out = append(out, core.MergeChange{
+		found = append(found, core.MergeChange{
 			Kind: core.CurrentOnlyChange, Added: own.Lines == 0,
 			Result: inResult, Base: base, Incoming: own,
 			Current: settle(file.Current.Content, linesAt(file.Result, inResult), mapRange(d.baseToCurrent, base, oldLines, newLines)),
 		})
 	}
-	return out
+	return found
 }
 
 // settle returns the range of content that holds want: estimate if it does, else the nearest
@@ -98,8 +96,8 @@ func (k keptSide) resultEdge(edge int) int {
 }
 
 // sortChanges orders changes by their place in Result, then in the base.
-func sortChanges(changes []core.MergeChange) {
-	slices.SortStableFunc(changes, func(a, b core.MergeChange) int {
+func sortChanges(list []core.MergeChange) {
+	slices.SortStableFunc(list, func(a, b core.MergeChange) int {
 		return cmp.Or(cmp.Compare(edgeStart(a.Result), edgeStart(b.Result)), cmp.Compare(edgeStart(a.Base), edgeStart(b.Base)))
 	})
 }
