@@ -2,7 +2,6 @@ package services
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"errors"
 	"os"
@@ -327,10 +326,7 @@ func labelSides(ctx context.Context, wt *session.Worktree, out *core.ConflictFil
 		out.Incoming.SHA = stateSHA(wt.GitDir, "MERGE_HEAD")
 		out.Incoming.Ref, err = refAt(ctx, wt.Runner, wt.Path, out.Incoming.SHA)
 	case core.RebaseOperation:
-		out.Current.SHA = cmp.Or(
-			stateSHA(wt.GitDir, filepath.Join("rebase-merge", "onto")),
-			stateSHA(wt.GitDir, filepath.Join("rebase-apply", "onto")),
-		)
+		out.Current.SHA = core.SHA(strings.TrimSpace(rebaseStateFile(wt.GitDir, "onto")))
 		out.Current.Ref, err = refAt(ctx, wt.Runner, wt.Path, out.Current.SHA)
 		out.Incoming.SHA = stateSHA(wt.GitDir, "REBASE_HEAD")
 	case core.CherryPickOperation:

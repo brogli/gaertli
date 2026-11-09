@@ -1,6 +1,7 @@
 package services
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/brogli/gaertli/internal/core"
@@ -32,6 +33,20 @@ func operation(gitDir string) core.OperationKind {
 	for _, f := range stateFiles {
 		if fileExists(filepath.Join(gitDir, f.name)) {
 			return f.kind
+		}
+	}
+	return ""
+}
+
+// rebaseStateFile is the content of the file name in the rebase directory
+// gitDir holds, either rebase-merge or rebase-apply; "" if there is none.
+func rebaseStateFile(gitDir, name string) string {
+	for _, f := range stateFiles {
+		if f.kind != core.RebaseOperation {
+			continue
+		}
+		if data, err := os.ReadFile(filepath.Join(gitDir, f.name, name)); err == nil {
+			return string(data)
 		}
 	}
 	return ""
