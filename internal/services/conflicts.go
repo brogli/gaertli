@@ -237,15 +237,14 @@ func readConflictText(ctx context.Context, r git.Runner, dir string, out core.Co
 	out.Result = text(texts[0])
 	out.Base.Content, out.Current.Content, out.Incoming.Content = text(texts[1]), text(texts[2]), text(texts[3])
 	out.MarkerSize = attrs.markerSize
-	toCurrent, toIncoming, err := baseDiffs(ctx, r, dir, out)
+	marked := markedText{lines: splitLines(out.Result), blocks: parseMarkerBlocks(out.Result, out.MarkerSize)}
+	d, err := readTextDiffs(ctx, r, dir, out, marked)
 	if err != nil {
 		return core.ConflictFile{}, err
 	}
-	if out.Changes, err = conflictRegions(ctx, r, dir, out, toCurrent, toIncoming); err != nil {
-		return core.ConflictFile{}, err
-	}
-	out.CurrentChanges = sideChanges(out.Base, out.Current.Content, toCurrent)
-	out.IncomingChanges = sideChanges(out.Base, out.Incoming.Content, toIncoming)
+	out.Changes = conflictChanges(out, marked, d)
+	out.CurrentChanges = sideChanges(out.Base, out.Current.Content, d.baseToCurrent)
+	out.IncomingChanges = sideChanges(out.Base, out.Incoming.Content, d.baseToIncoming)
 	out.Fingerprint = fingerprintOf(working)
 	return out, nil
 }

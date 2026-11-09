@@ -100,3 +100,112 @@ func TestConflictRegionsLeaveOutAChangeBothSidesMadeAlike(t *testing.T) {
 		t.Errorf("Changes = %+v, want only the conflict", got.Changes)
 	}
 }
+
+func TestConflictChangesPlaceEveryChangeInEachText(t *testing.T) {
+	t.Parallel()
+	// Each triple's hunks are what git diff -U0 --inter-hunk-context=0 --no-index printed for its
+	// texts; git's zdiff3 style wrote the same results as diff3.
+	type triple struct {
+		base, current, incoming string
+		d                       textDiffs
+	}
+	deleted := triple{"a\nb\nc\n", "a\nc\n", "a\nB\nc\n", textDiffs{
+		baseToCurrent:  []core.DiffHunk{hunk(2, 1, 1, 0)},
+		baseToIncoming: []core.DiffHunk{hunk(2, 1, 2, 1)},
+	}}
+	two := triple{twoConflictsBase, twoConflictsCurrent, twoConflictsIncoming, textDiffs{
+		baseToCurrent:  []core.DiffHunk{hunk(2, 1, 2, 1), hunk(12, 1, 12, 2)},
+		baseToIncoming: []core.DiffHunk{hunk(2, 1, 2, 1), hunk(7, 1, 7, 3), hunk(12, 1, 14, 1)},
+		currentToKept:  []core.DiffHunk{hunk(7, 1, 7, 3)},
+	}}
+	oneSided := triple{"1\n2\n3\n4\n5\n6\n7\n", "C1\n2\n3\nC4\n5\n6\n7\n", "1\n2\n3\nI4\n5\n6\nI7\n", textDiffs{
+		baseToCurrent:  []core.DiffHunk{hunk(1, 1, 1, 1), hunk(4, 1, 4, 1)},
+		baseToIncoming: []core.DiffHunk{hunk(4, 1, 4, 1), hunk(7, 1, 7, 1)},
+		currentToKept:  []core.DiffHunk{hunk(7, 1, 7, 1)},
+		incomingToKept: []core.DiffHunk{hunk(1, 1, 1, 1)},
+	}}
+	twoMid := "f1\nf2\nf3\nf4\nM1\nM2\nM3\nf5\nf6\nf7\nf8\n"
+	change := func(kind core.MergeChangeKind, result, base, current, incoming core.LineRange) core.MergeChange {
+		return core.MergeChange{Kind: kind, Result: result, Base: base, Current: current, Incoming: incoming}
+	}
+	tests := map[string]struct {
+		texts  triple
+		noBase bool
+		result string
+		want   []core.MergeChange
+	}{
+		"a deleted side, merge": {deleted, false, "a\n<<<<<<< HEAD\n=======\nB\n>>>>>>> side\nc\n", []core.MergeChange{
+			change(core.ConflictChange, span(2, 4), span(2, 1), span(1, 0), span(2, 1)),
+		}},
+		"a deleted side, diff3": {deleted, false, "a\n<<<<<<< HEAD\n||||||| base\nb\n=======\nB\n>>>>>>> side\nc\n", []core.MergeChange{
+			change(core.ConflictChange, span(2, 6), span(2, 1), span(1, 0), span(2, 1)),
+		}},
+		"no base": {deleted, true, "a\n<<<<<<< HEAD\n=======\nB\n>>>>>>> side\nc\n", []core.MergeChange{
+			change(core.ConflictChange, span(2, 4), core.LineRange{}, span(1, 0), span(2, 1)),
+		}},
+		"no block": {deleted, false, "a\nB\nc\n", nil},
+		"two conflicts, merge": {two, false, "top\n<<<<<<< HEAD\nc1\n=======\ni1\n>>>>>>> side\n" + twoMid + "<<<<<<< HEAD\nc2a\nc2b\n=======\ni2\n>>>>>>> side\nbottom\n", []core.MergeChange{
+			change(core.ConflictChange, span(2, 5), span(2, 1), span(2, 1), span(2, 1)),
+			change(core.IncomingOnlyChange, span(11, 3), span(7, 1), span(7, 1), span(7, 3)),
+			change(core.ConflictChange, span(18, 6), span(12, 1), span(12, 2), span(14, 1)),
+		}},
+		"two conflicts, diff3": {two, false, "top\n<<<<<<< HEAD\nc1\n||||||| base\nx1\n=======\ni1\n>>>>>>> side\n" + twoMid + "<<<<<<< HEAD\nc2a\nc2b\n||||||| base\nx2\n=======\ni2\n>>>>>>> side\nbottom\n", []core.MergeChange{
+			change(core.ConflictChange, span(2, 7), span(2, 1), span(2, 1), span(2, 1)),
+			change(core.IncomingOnlyChange, span(13, 3), span(7, 1), span(7, 1), span(7, 3)),
+			change(core.ConflictChange, span(20, 8), span(12, 1), span(12, 2), span(14, 1)),
+		}},
+		"one-sided changes around a conflict, merge": {oneSided, false, "C1\n2\n3\n<<<<<<< HEAD\nC4\n=======\nI4\n>>>>>>> side\n5\n6\nI7\n", []core.MergeChange{
+			change(core.CurrentOnlyChange, span(1, 1), span(1, 1), span(1, 1), span(1, 1)),
+			change(core.ConflictChange, span(4, 5), span(4, 1), span(4, 1), span(4, 1)),
+			change(core.IncomingOnlyChange, span(11, 1), span(7, 1), span(7, 1), span(7, 1)),
+		}},
+		"one-sided changes around a conflict, diff3": {oneSided, false, "C1\n2\n3\n<<<<<<< HEAD\nC4\n||||||| base\n4\n=======\nI4\n>>>>>>> side\n5\n6\nI7\n", []core.MergeChange{
+			change(core.CurrentOnlyChange, span(1, 1), span(1, 1), span(1, 1), span(1, 1)),
+			change(core.ConflictChange, span(4, 7), span(4, 1), span(4, 1), span(4, 1)),
+			change(core.IncomingOnlyChange, span(13, 1), span(7, 1), span(7, 1), span(7, 1)),
+		}},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			file := core.ConflictFile{
+				Result:   tc.result,
+				Base:     core.ConflictSide{Present: !tc.noBase, Content: tc.texts.base},
+				Current:  core.ConflictSide{Present: true, Content: tc.texts.current},
+				Incoming: core.ConflictSide{Present: true, Content: tc.texts.incoming},
+			}
+			d := tc.texts.d
+			if tc.noBase {
+				d.baseToCurrent, d.baseToIncoming = nil, nil
+			}
+			text := markedText{lines: splitLines(tc.result), blocks: parseMarkerBlocks(tc.result, 7)}
+
+			if got := conflictChanges(file, text, d); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("conflictChanges =\n%+v\nwant\n%+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSettleKeepsAnEstimateThatHoldsTheLinesElseFindsTheNearest(t *testing.T) {
+	t.Parallel()
+	content := "a\nb\nc\nb\n"
+	tests := map[string]struct {
+		want     []string
+		estimate core.LineRange
+		expect   core.LineRange
+	}{
+		"an estimate that holds":      {[]string{"b\n"}, span(4, 1), span(4, 1)},
+		"an estimate that does not":   {[]string{"b\n"}, span(3, 1), span(2, 1)},
+		"no lines wanted, a point":    {nil, span(2, 1), span(1, 0)},
+		"lines nowhere, the estimate": {[]string{"z\n"}, span(2, 1), span(2, 1)},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := settle(content, tc.want, tc.estimate); got != tc.expect {
+				t.Errorf("settle = %+v, want %+v", got, tc.expect)
+			}
+		})
+	}
+}

@@ -90,69 +90,83 @@ func splitLines(text string) []string {
 	return lines
 }
 
-// baseDiffs returns the diffs of the base against the current and the incoming side, none without a
-// base.
-func baseDiffs(ctx context.Context, r git.Runner, dir string, out core.ConflictFile) (toCurrent, toIncoming []core.DiffHunk, err error) {
-	if !out.Base.Present {
-		return nil, nil, nil
-	}
-	if toCurrent, err = diffHunks(ctx, r, dir, out.Base.Content, out.Current.Content); err != nil {
-		return nil, nil, err
-	}
-	if toIncoming, err = diffHunks(ctx, r, dir, out.Base.Content, out.Incoming.Content); err != nil {
-		return nil, nil, err
-	}
-	return toCurrent, toIncoming, nil
+// textDiffs holds git's -U0 hunks between the texts conflictChanges places by:
+// the base against each side (none without a base), and each side against the
+// result with every block filled from that side (none when the result has no
+// block).
+type textDiffs struct {
+	baseToCurrent, baseToIncoming []core.DiffHunk
+	currentToKept, incomingToKept []core.DiffHunk
 }
 
-// conflictRegions places each block of out.Result in every side. The result
-// with each block replaced by one side's section is diffed against that
-// side, which gives the side's lines for the block. The base lines are the
-// block's base section where it has one, else they come from the current
-// lines through toCurrent, the diff of base against current.
-func conflictRegions(ctx context.Context, r git.Runner, dir string, out core.ConflictFile, toCurrent, toIncoming []core.DiffHunk) ([]core.MergeChange, error) {
-	blocks := parseMarkerBlocks(out.Result, out.MarkerSize)
-	if len(blocks) == 0 {
-		return nil, nil
+// readTextDiffs runs the diffs conflictChanges needs; text is file.Result with
+// its marker blocks.
+func readTextDiffs(ctx context.Context, r git.Runner, dir string, file core.ConflictFile, text markedText) (textDiffs, error) {
+	var d textDiffs
+	var err error
+	if file.Base.Present {
+		if d.baseToCurrent, err = diffHunks(ctx, r, dir, file.Base.Content, file.Current.Content); err != nil {
+			return textDiffs{}, err
+		}
+		if d.baseToIncoming, err = diffHunks(ctx, r, dir, file.Base.Content, file.Incoming.Content); err != nil {
+			return textDiffs{}, err
+		}
 	}
-	result := markedText{lines: splitLines(out.Result), blocks: blocks}
-	current, err := sideRanges(ctx, r, dir, result, func(b markerBlock) []string { return b.current }, out.Current.Content)
-	if err != nil {
-		return nil, err
+	if len(text.blocks) == 0 {
+		return d, nil
 	}
-	incoming, err := sideRanges(ctx, r, dir, result, func(b markerBlock) []string { return b.incoming }, out.Incoming.Content)
-	if err != nil {
-		return nil, err
+	keptCurrent, _ := text.keeping(currentSection)
+	if d.currentToKept, err = diffHunks(ctx, r, dir, file.Current.Content, keptCurrent); err != nil {
+		return textDiffs{}, err
 	}
-	regions := make([]core.MergeChange, len(blocks))
-	for i, b := range blocks {
-		regions[i] = core.MergeChange{
+	keptIncoming, _ := text.keeping(incomingSection)
+	if d.incomingToKept, err = diffHunks(ctx, r, dir, file.Incoming.Content, keptIncoming); err != nil {
+		return textDiffs{}, err
+	}
+	return d, nil
+}
+
+func currentSection(b markerBlock) []string  { return b.current }
+func incomingSection(b markerBlock) []string { return b.incoming }
+
+// conflictChanges places each block of text, file.Result with its marker
+// blocks, in every side: a block's range in a side is where its section sits
+// in the result with each block filled from that side, mapped back through the
+// side's diff against it. The base lines are the block's base section where it
+// has one, else they come from the current lines through d.baseToCurrent.
+// Without a base it lists the conflicts alone, else also the changes only one
+// side made.
+func conflictChanges(file core.ConflictFile, text markedText, d textDiffs) []core.MergeChange {
+	if len(text.blocks) == 0 {
+		return nil
+	}
+	_, currentInKept := text.keeping(currentSection)
+	_, incomingInKept := text.keeping(incomingSection)
+	conflicts := make([]core.MergeChange, len(text.blocks))
+	for i, b := range text.blocks {
+		conflicts[i] = core.MergeChange{
 			Kind:     core.ConflictChange,
 			Result:   core.LineRange{Start: b.open + 1, Lines: b.close - b.open + 1},
-			Current:  current[i],
-			Incoming: incoming[i],
+			Current:  mapToOld(d.currentToKept, currentInKept[i]),
+			Incoming: mapToOld(d.incomingToKept, incomingInKept[i]),
 		}
 	}
-	if !out.Base.Present {
-		return regions, nil
+	if !file.Base.Present {
+		return conflicts
 	}
-	baseLines := splitLines(out.Base.Content)
-	from := 0 // the base line after the previous region
-	for i := range regions {
-		base := mapToOld(toCurrent, regions[i].Current)
-		if blocks[i].hasBase {
-			base = locateSection(baseLines, blocks[i].base, base, from)
+	baseLines := splitLines(file.Base.Content)
+	from := 0 // the base line after the previous conflict
+	for i := range conflicts {
+		base := mapToOld(d.baseToCurrent, conflicts[i].Current)
+		if text.blocks[i].hasBase {
+			base = locateSection(baseLines, text.blocks[i].base, base, from)
 		}
-		regions[i].Base = withoutMovedOut(base, regions[i], toCurrent, toIncoming)
-		from = edgeEnd(regions[i].Base)
+		conflicts[i].Base = withoutMovedOut(base, conflicts[i], d.baseToCurrent, d.baseToIncoming)
+		from = edgeEnd(conflicts[i].Base)
 	}
-	changes, err := changeRegions(ctx, r, dir, out, result, toCurrent, toIncoming)
-	if err != nil {
-		return nil, err
-	}
-	regions = append(regions, changes...)
-	sortRegions(regions)
-	return regions, nil
+	conflicts = append(conflicts, changes(file, text, d)...)
+	sortChanges(conflicts)
+	return conflicts
 }
 
 // locateSection finds where a base section sits in the base's lines: the occurrence at or after
@@ -174,12 +188,12 @@ func locateSection(base, section []string, estimate core.LineRange, from int) co
 	return estimate
 }
 
-// withoutMovedOut is a region's base less the lines the merge and zdiff3 styles moved out of the
+// withoutMovedOut is a conflict's base less the lines the merge and zdiff3 styles moved out of the
 // markers because both sides changed them alike. The diff3 style moves none out, so its sides'
 // sections reach as far as the base section.
-func withoutMovedOut(base core.LineRange, region core.MergeChange, toCurrent, toIncoming []core.DiffHunk) core.LineRange {
-	currentBefore, currentAfter := movedOut(toCurrent, region.Current)
-	incomingBefore, incomingAfter := movedOut(toIncoming, region.Incoming)
+func withoutMovedOut(base core.LineRange, change core.MergeChange, toCurrent, toIncoming []core.DiffHunk) core.LineRange {
+	currentBefore, currentAfter := movedOut(toCurrent, change.Current)
+	incomingBefore, incomingAfter := movedOut(toIncoming, change.Incoming)
 	start := edgeStart(base) + min(currentBefore, incomingBefore)
 	end := edgeEnd(base) - min(currentAfter, incomingAfter)
 	return rangeOfEdges(start, max(start, end))
@@ -253,21 +267,6 @@ func (m markedText) keeping(section func(markerBlock) []string) (string, []core.
 	}
 	kept = append(kept, m.lines[next:]...)
 	return strings.Join(kept, ""), ranges
-}
-
-// sideRanges returns where each block's section sits in side. section picks the block's lines of
-// that side.
-func sideRanges(ctx context.Context, r git.Runner, dir string, text markedText, section func(markerBlock) []string, side string) ([]core.LineRange, error) {
-	kept, inKept := text.keeping(section)
-	hunks, err := diffHunks(ctx, r, dir, side, kept)
-	if err != nil {
-		return nil, err
-	}
-	mapped := make([]core.LineRange, len(inKept))
-	for i, rng := range inKept {
-		mapped[i] = mapToOld(hunks, rng)
-	}
-	return mapped, nil
 }
 
 // diffHunks is git's -U0 diff of oldText against newText as hunk headers.
