@@ -1,7 +1,7 @@
 import {
   ConflictKind,
   Operation,
-  RegionKind,
+  MergeChangeKind,
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
@@ -47,16 +47,16 @@ export function conflictFileFixture(overrides: Partial<ConflictFile> = {}): Conf
     },
     result: conflictResult,
     markerSize: 7,
-    regions: [
+    changes: [
       {
-        kind: RegionKind.RegionConflict,
+        kind: MergeChangeKind.ConflictChange,
         result: { start: 2, lines: 5 },
         base: { start: 2, lines: 1 },
         current: { start: 2, lines: 1 },
         incoming: { start: 2, lines: 1 },
       },
       {
-        kind: RegionKind.RegionConflict,
+        kind: MergeChangeKind.ConflictChange,
         result: { start: 8, lines: 5 },
         base: { start: 4, lines: 1 },
         current: { start: 4, lines: 1 },
@@ -97,7 +97,7 @@ export function scrollConflictFixture(): ConflictFile {
   const regionStart = (gaps: number[], regionLines: number, i: number) =>
     gaps.slice(0, i + 1).reduce((sum, gap) => sum + gap, 0) + i * regionLines + 1
   const conflicts = [0, 1, 2].map((i) => ({
-    kind: RegionKind.RegionConflict,
+    kind: MergeChangeKind.ConflictChange,
     result: { start: regionStart(currentGaps, 5, i), lines: 5 },
     base: { start: regionStart(currentGaps, 1, i), lines: 1 },
     current: { start: regionStart(currentGaps, 1, i), lines: 1 },
@@ -107,7 +107,7 @@ export function scrollConflictFixture(): ConflictFile {
   const currentChange = (line: number, added: boolean) => {
     const one = { start: line, lines: 1 }
     return {
-      kind: RegionKind.RegionCurrent,
+      kind: MergeChangeKind.CurrentOnlyChange,
       added,
       result: one,
       base: one,
@@ -125,7 +125,7 @@ export function scrollConflictFixture(): ConflictFile {
     current: { ...fixture.current, content: currentLines.join('\n') },
     incoming: { ...fixture.incoming, content: incomingLines.join('\n') },
     result: resultLines.join('\n'),
-    regions,
+    changes: regions,
     currentChanges: [
       { lines: { start: 5, lines: 1 }, added: false },
       { lines: { start: 6, lines: 1 }, added: true },
@@ -159,30 +159,30 @@ export function changesFileFixture(): ConflictFile {
       'z',
       'new',
     ].join('\n'),
-    regions: [
+    changes: [
       {
-        kind: RegionKind.RegionCurrent,
+        kind: MergeChangeKind.CurrentOnlyChange,
         result: lines(2, 1),
         base: lines(2, 1),
         current: lines(2, 1),
         incoming: lines(2, 1),
       },
       {
-        kind: RegionKind.RegionConflict,
+        kind: MergeChangeKind.ConflictChange,
         result: lines(4, 5),
         base: lines(4, 1),
         current: lines(4, 1),
         incoming: lines(4, 1),
       },
       {
-        kind: RegionKind.RegionIncoming,
+        kind: MergeChangeKind.IncomingOnlyChange,
         result: lines(10, 1),
         base: lines(6, 1),
         current: lines(6, 1),
         incoming: lines(6, 1),
       },
       {
-        kind: RegionKind.RegionIncoming,
+        kind: MergeChangeKind.IncomingOnlyChange,
         added: true,
         result: lines(12, 1),
         base: lines(7, 0),

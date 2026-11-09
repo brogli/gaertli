@@ -126,7 +126,7 @@ func TestMergeDraftRoundTripsThroughTheProtocol(t *testing.T) {
 	c := pipeClient(t, &fake{}, nil)
 	want := &core.MergeDraft{
 		Text: "a\nb\n", Fingerprint: "fp",
-		Regions: []core.DraftRegion{{Range: core.LineRange{Start: 2, Lines: 1}, Resolved: true}},
+		Changes: []core.DraftChange{{Range: core.LineRange{Start: 2, Lines: 1}, Resolved: true}},
 	}
 
 	if err := c.SetMergeDraft(t.Context(), "/wt", "a.txt", want); err != nil {

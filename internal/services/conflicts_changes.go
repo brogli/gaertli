@@ -17,8 +17,8 @@ import (
 // of the side's own diff against the base, and the changed side's lines are the Result lines. Each
 // range is then settled on the lines it must hold: the unchanged side's and the base's hold the
 // same text, and the changed side's the Result's.
-func changeRegions(ctx context.Context, r git.Runner, dir string, out core.ConflictFile, text markedText, toCurrent, toIncoming []core.DiffHunk) ([]core.ConflictRegion, error) {
-	var regions []core.ConflictRegion
+func changeRegions(ctx context.Context, r git.Runner, dir string, out core.ConflictFile, text markedText, toCurrent, toIncoming []core.DiffHunk) ([]core.MergeChange, error) {
+	var regions []core.MergeChange
 	keptCurrent, err := newKeptSide(ctx, r, dir, text, out.Current.Content, func(b markerBlock) []string { return b.current })
 	if err != nil {
 		return nil, err
@@ -31,8 +31,8 @@ func changeRegions(ctx context.Context, r git.Runner, dir string, out core.Confl
 		own := oldLines(h)
 		inResult := keptCurrent.inResult(newLines(h))
 		base := settle(out.Base.Content, linesAt(out.Current.Content, own), mapToOld(toCurrent, own))
-		regions = append(regions, core.ConflictRegion{
-			Kind: core.RegionIncoming, Added: own.Lines == 0,
+		regions = append(regions, core.MergeChange{
+			Kind: core.IncomingOnlyChange, Added: own.Lines == 0,
 			Result: inResult, Base: base, Current: own,
 			Incoming: settle(out.Incoming.Content, linesAt(out.Result, inResult), mapRange(toIncoming, base, oldLines, newLines)),
 		})
@@ -41,8 +41,8 @@ func changeRegions(ctx context.Context, r git.Runner, dir string, out core.Confl
 		own := oldLines(h)
 		inResult := keptIncoming.inResult(newLines(h))
 		base := settle(out.Base.Content, linesAt(out.Incoming.Content, own), mapToOld(toIncoming, own))
-		regions = append(regions, core.ConflictRegion{
-			Kind: core.RegionCurrent, Added: own.Lines == 0,
+		regions = append(regions, core.MergeChange{
+			Kind: core.CurrentOnlyChange, Added: own.Lines == 0,
 			Result: inResult, Base: base, Incoming: own,
 			Current: settle(out.Current.Content, linesAt(out.Result, inResult), mapRange(toCurrent, base, oldLines, newLines)),
 		})
@@ -113,8 +113,8 @@ func (k keptSide) resultEdge(edge int) int {
 }
 
 // sortRegions orders regions by their place in Result, then in the base.
-func sortRegions(regions []core.ConflictRegion) {
-	slices.SortStableFunc(regions, func(a, b core.ConflictRegion) int {
+func sortRegions(regions []core.MergeChange) {
+	slices.SortStableFunc(regions, func(a, b core.MergeChange) int {
 		return cmp.Or(cmp.Compare(edgeStart(a.Result), edgeStart(b.Result)), cmp.Compare(edgeStart(a.Base), edgeStart(b.Base)))
 	})
 }

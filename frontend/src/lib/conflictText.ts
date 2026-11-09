@@ -12,7 +12,7 @@ function linesIn(content: string | undefined, range: LineRange): string[] {
 }
 
 function regionLines(file: ConflictFile, region: number, side: Side): string[] {
-  const range = file.regions?.[region]?.[side]
+  const range = file.changes?.[region]?.[side]
   return range ? linesIn(file[side].content, range) : []
 }
 
@@ -25,7 +25,7 @@ export function resultFromBase(file: ConflictFile): { text: string; regions: Lin
   const out: string[] = []
   const regions: LineRange[] = []
   let next = 0
-  file.regions?.forEach((region, i) => {
+  file.changes?.forEach((region, i) => {
     const before = region.result.lines > 0 ? region.result.start - 1 : region.result.start
     out.push(...lines.slice(next, before))
     const base = regionLines(file, i, 'base')

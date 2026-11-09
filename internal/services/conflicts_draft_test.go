@@ -15,7 +15,7 @@ func sampleMergeDraft(t *testing.T, c *Core, wt core.WorktreeID, path string) *c
 	t.Helper()
 	return &core.MergeDraft{
 		Text: "one\nmine\n", Fingerprint: "fp", ConflictID: readConflict(t, c, wt, path).ConflictID,
-		Regions: []core.DraftRegion{{Range: core.LineRange{Start: 2, Lines: 1}, Resolved: true}},
+		Changes: []core.DraftChange{{Range: core.LineRange{Start: 2, Lines: 1}, Resolved: true}},
 	}
 }
 

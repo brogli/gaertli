@@ -40,10 +40,10 @@ type Log interface {
 	// and changed files vs. its first parent.
 	CommitDetails(ctx context.Context, wt WorktreeID, sha SHA) (CommitDetails, error)
 
-	// CompareCommits lists the files that differ between a and b: a direct
-	// two-revision diff, never a merge-base diff, so swapping a and b
-	// mirrors every status.
-	CompareCommits(ctx context.Context, wt WorktreeID, a, b SHA) ([]ChangedFile, error)
+	// CompareCommits lists the files that differ between from and to: a
+	// direct two-revision diff, never a merge-base diff, so swapping from and
+	// to mirrors every status.
+	CompareCommits(ctx context.Context, wt WorktreeID, from, to SHA) ([]ChangedFile, error)
 
 	// CompareWithWorking lists the files that differ between sha and wt's
 	// working tree (git diff <sha>).
@@ -59,8 +59,8 @@ type Log interface {
 	// stay exact.
 	DiffFile(ctx context.Context, wt WorktreeID, sha SHA, path, oldPath string, opts DiffOptions) (DiffFile, error)
 
-	// DiffRange is DiffFile for two arbitrary revisions a and b.
-	DiffRange(ctx context.Context, wt WorktreeID, a, b SHA, path, oldPath string, opts DiffOptions) (DiffFile, error)
+	// DiffRange is DiffFile from commit from to commit to.
+	DiffRange(ctx context.Context, wt WorktreeID, from, to SHA, path, oldPath string, opts DiffOptions) (DiffFile, error)
 
 	// DiffAgainstWorking returns path at sha (at oldPath for a rename)
 	// against the working-tree file, bypassing the index (git diff <sha>).

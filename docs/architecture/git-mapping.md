@@ -65,14 +65,14 @@ A conflicted file is read from what git left, never merged a second time.
    NUL in the first 8000 bytes or a `merge` attribute of `binary` makes it binary, as for git; text
    that is not UTF-8 goes to the external editor.
 3. For text, the result is the working file as git wrote it, in the user's conflict style, with any
-   edits since; the sides are their blobs in working-tree form (`cat-file --filters`). Conflict
-   regions are its marker blocks (marker size from the `conflict-marker-size` attribute). Where each
-   region sits in each side comes from git: the result with every block filled from one side is
-   diffed against that side (`diff --no-index -U0`), and each side against the base the same way.
-   With the blocks filled from one side, what still differs is a change only the other side made,
-   which git applied. A change both sides made alike is listed nowhere. Starting every region from
-   the base means taking the current side everywhere gives the current side's file, and taking every
-   one-side change plus the current side in conflicts gives `merge -X ours`.
+   edits since; the sides are their blobs in working-tree form (`cat-file --filters`). Conflicts are
+   its marker blocks (marker size from the `conflict-marker-size` attribute). Where each change sits
+   in each side comes from git: the result with every block filled from one side is diffed against
+   that side (`diff --no-index -U0`), and each side against the base the same way. With the blocks
+   filled from one side, what still differs is a change only the other side made, which git applied.
+   A change both sides made alike is listed nowhere. Starting every region from the base means
+   taking the current side everywhere gives the current side's file, and taking every one-side
+   change plus the current side in conflicts gives `merge -X ours`.
 4. Text reaches the UI with LF line breaks. Saving writes the file's own line endings back, refuses
    when the file changed since it was read, and stages it only when no marker line is left.
 5. Choosing a side is `checkout --ours`/`--theirs` and `add`; deleting is `rm`.

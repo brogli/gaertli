@@ -47,8 +47,8 @@ scrollbar and keyboard scrolling.
 
 Three editors: the current and incoming sides read-only around the editable result (FR-CONF-05).
 
-- The core computes one list of regions: the conflicts and the changes only one side made. A change
-  both sides made alike is not a region.
+- The core computes one list of changes: the conflicts and the changes only one side made. A change
+  both sides made alike is not listed.
 - The result starts with every region at the base version, so nothing enters it until the user takes
   it. Each region tracks its range through edits and carries an explicit state, unresolved or
   resolved; saving waits until all are resolved.

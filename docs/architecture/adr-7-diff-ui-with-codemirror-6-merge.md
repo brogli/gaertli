@@ -10,7 +10,7 @@ align repeated lines differently.
 **Decision.** Git computes every diff; CodeMirror only draws it, with git's hunks pinned in place of
 its own. Staging belongs to Go: the UI names the lines, Go re-diffs, refuses if the file changed
 since it was shown, and applies a patch of just those lines. The merge editor likewise draws the
-regions git produced and computes no diff of its own.
+changes git produced and computes no diff of its own.
 
 Rejected: CodeMirror's own diff (ignores git's algorithm, filters and line endings) and an own
 renderer (every mode to rebuild).

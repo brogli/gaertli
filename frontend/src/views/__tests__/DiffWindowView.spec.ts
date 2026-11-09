@@ -348,8 +348,8 @@ describe('DiffWindowView', () => {
     Facade.Status.mockResolvedValue(twoConflicted())
     await mountWindow(oneOfTwo)
     const drafts = useMergeDrafts()
-    drafts.set('/repo', 'one.txt', '', () => ({ text: 'x', fingerprint: 'fp', regions: [] }))
-    drafts.set('/repo', 'two.txt', '', () => ({ text: 'y', fingerprint: 'fp', regions: [] }))
+    drafts.set('/repo', 'one.txt', '', () => ({ text: 'x', fingerprint: 'fp', changes: [] }))
+    drafts.set('/repo', 'two.txt', '', () => ({ text: 'y', fingerprint: 'fp', changes: [] }))
 
     Facade.Status.mockResolvedValue(
       changedFilesFixture({ conflicted: [{ path: 'one.txt', status: 'UU' }] }),
@@ -382,7 +382,7 @@ describe('DiffWindowView', () => {
     useMergeDrafts().set('/repo', 'a.txt', '', () => ({
       text: 'x',
       fingerprint: 'fp',
-      regions: [],
+      changes: [],
     }))
 
     pressKey('Escape')

@@ -70,24 +70,24 @@ func assertBaseInBounds(t *testing.T, got core.ConflictFile) {
 }
 
 // regionTake is the lines a take puts in a region's place.
-type regionTake func(core.ConflictFile, core.ConflictRegion) []string
+type regionTake func(core.ConflictFile, core.MergeChange) []string
 
-func takeCurrent(f core.ConflictFile, r core.ConflictRegion) []string {
+func takeCurrent(f core.ConflictFile, r core.MergeChange) []string {
 	return linesAt(f.Current.Content, r.Current)
 }
 
-func takeIncoming(f core.ConflictFile, r core.ConflictRegion) []string {
+func takeIncoming(f core.ConflictFile, r core.MergeChange) []string {
 	return linesAt(f.Incoming.Content, r.Incoming)
 }
 
 // applyingNonConflicting takes the changed side of each change only one side made and conflict
 // for each conflict.
 func applyingNonConflicting(conflict regionTake) regionTake {
-	return func(f core.ConflictFile, r core.ConflictRegion) []string {
+	return func(f core.ConflictFile, r core.MergeChange) []string {
 		switch r.Kind {
-		case core.RegionIncoming:
+		case core.IncomingOnlyChange:
 			return takeIncoming(f, r)
-		case core.RegionCurrent:
+		case core.CurrentOnlyChange:
 			return takeCurrent(f, r)
 		}
 		return conflict(f, r)
@@ -101,7 +101,7 @@ func resolvedWith(t *testing.T, got core.ConflictFile, take regionTake) string {
 	result := splitLines(got.Result)
 	var out []string
 	next := 0
-	for _, region := range got.Regions {
+	for _, region := range got.Changes {
 		start, end := edges(region.Result)
 		if start < next {
 			t.Fatalf("region %+v overlaps the one before it", region)
@@ -224,13 +224,13 @@ func mergedPreferring(t *testing.T, dir, strategy string) string {
 // lines are the base's.
 func assertRegionsAligned(t *testing.T, got core.ConflictFile) {
 	t.Helper()
-	for i, r := range got.Regions {
+	for i, r := range got.Changes {
 		changed, unchanged, changedText := r.Incoming, r.Current, got.Incoming.Content
 		unchangedText := got.Current.Content
 		switch r.Kind {
-		case core.RegionCurrent:
+		case core.CurrentOnlyChange:
 			changed, unchanged, changedText, unchangedText = r.Current, r.Incoming, got.Current.Content, got.Incoming.Content
-		case core.RegionConflict:
+		case core.ConflictChange:
 			continue
 		}
 		if have, want := selected(changedText, changed), selected(got.Result, r.Result); have != want {

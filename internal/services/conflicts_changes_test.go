@@ -28,7 +28,7 @@ func TestConflictSideChangesMarkWhereASideDiffersFromTheBase(t *testing.T) {
 		t.Errorf("IncomingChanges = %+v, want %+v", got.IncomingChanges, wantIncoming)
 	}
 	if len(conflictRegionsOf(got)) != 1 || conflictRegionsOf(got)[0].Current.Start != 5 || conflictRegionsOf(got)[0].Incoming.Start != 5 {
-		t.Errorf("Regions = %+v, want one at line 5 in both sides", conflictRegionsOf(got))
+		t.Errorf("Changes = %+v, want one at line 5 in both sides", conflictRegionsOf(got))
 	}
 }
 
@@ -78,14 +78,14 @@ func TestConflictRegionsListEveryChangeWithItsKindAndRanges(t *testing.T) {
 	got := readConflict(t, c, wt, "a.txt")
 
 	rng := func(start, lines int) core.LineRange { return core.LineRange{Start: start, Lines: lines} }
-	want := []core.ConflictRegion{
-		{Kind: core.RegionCurrent, Result: rng(2, 1), Base: rng(2, 1), Current: rng(2, 1), Incoming: rng(2, 1)},
-		{Kind: core.RegionConflict, Result: rng(5, 5), Base: rng(5, 1), Current: rng(5, 1), Incoming: rng(5, 1)},
-		{Kind: core.RegionIncoming, Result: rng(12, 1), Base: rng(8, 1), Current: rng(8, 1), Incoming: rng(8, 1)},
-		{Kind: core.RegionIncoming, Added: true, Result: rng(15, 1), Base: rng(10, 0), Current: rng(10, 0), Incoming: rng(11, 1)},
+	want := []core.MergeChange{
+		{Kind: core.CurrentOnlyChange, Result: rng(2, 1), Base: rng(2, 1), Current: rng(2, 1), Incoming: rng(2, 1)},
+		{Kind: core.ConflictChange, Result: rng(5, 5), Base: rng(5, 1), Current: rng(5, 1), Incoming: rng(5, 1)},
+		{Kind: core.IncomingOnlyChange, Result: rng(12, 1), Base: rng(8, 1), Current: rng(8, 1), Incoming: rng(8, 1)},
+		{Kind: core.IncomingOnlyChange, Added: true, Result: rng(15, 1), Base: rng(10, 0), Current: rng(10, 0), Incoming: rng(11, 1)},
 	}
-	if !reflect.DeepEqual(got.Regions, want) {
-		t.Errorf("Regions = %+v\nwant %+v\nresult:\n%s", got.Regions, want, got.Result)
+	if !reflect.DeepEqual(got.Changes, want) {
+		t.Errorf("Changes = %+v\nwant %+v\nresult:\n%s", got.Changes, want, got.Result)
 	}
 }
 
@@ -96,7 +96,7 @@ func TestConflictRegionsLeaveOutAChangeBothSidesMadeAlike(t *testing.T) {
 
 	got := readConflict(t, c, wt, "a.txt")
 
-	if len(got.Regions) != 1 || got.Regions[0].Kind != core.RegionConflict {
-		t.Errorf("Regions = %+v, want only the conflict", got.Regions)
+	if len(got.Changes) != 1 || got.Changes[0].Kind != core.ConflictChange {
+		t.Errorf("Changes = %+v, want only the conflict", got.Changes)
 	}
 }

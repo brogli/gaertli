@@ -39,7 +39,7 @@ func handlers(api core.API) handler.Map {
 			return api.CommitDetails(ctx, p.Wt, p.Sha)
 		}),
 		"CompareCommits": handler.New(func(ctx context.Context, p compareCommitsParams) ([]core.ChangedFile, error) {
-			return api.CompareCommits(ctx, p.Wt, p.A, p.B)
+			return api.CompareCommits(ctx, p.Wt, p.From, p.To)
 		}),
 		"CompareWithWorking": handler.New(func(ctx context.Context, p compareWithWorkingParams) ([]core.ChangedFile, error) {
 			return api.CompareWithWorking(ctx, p.Wt, p.Sha)
@@ -63,7 +63,7 @@ func handlers(api core.API) handler.Map {
 			return api.DiffFile(ctx, p.Wt, p.Sha, p.Path, p.OldPath, p.Opts)
 		}),
 		"DiffRange": handler.New(func(ctx context.Context, p diffRangeParams) (core.DiffFile, error) {
-			return api.DiffRange(ctx, p.Wt, p.A, p.B, p.Path, p.OldPath, p.Opts)
+			return api.DiffRange(ctx, p.Wt, p.From, p.To, p.Path, p.OldPath, p.Opts)
 		}),
 		"DiffWorking": handler.New(func(ctx context.Context, p diffWorkingParams) (core.DiffFile, error) {
 			return api.DiffWorking(ctx, p.Wt, p.Path, p.OldPath, p.Staged, p.Opts)
