@@ -1,5 +1,7 @@
 # ADR-2: Wails v3
 
+**Status.** Approved.
+
 **Context.** The backend is Go (ADR-1). The shell must host a web UI on Windows and Linux, generate
 TypeScript bindings for Go, and open several windows in one process (ADR-8).
 

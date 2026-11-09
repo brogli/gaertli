@@ -1,5 +1,7 @@
 # ADR-3: One core interface, two placements
 
+**Status.** Approved.
+
 **Context.** On Windows, repos often live inside a WSL 2 distro (G6), and results must equal the
 user's WSL terminal: git, hooks and the editor run inside the distro (QA-PORT-02). Windows git on
 `\\wsl$` paths is slow, sees another config and gets no file notifications.

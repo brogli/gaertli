@@ -1,5 +1,7 @@
 # ADR-8: One process, one selection per window
 
+**Status.** Approved.
+
 **Context.** Users work in several worktrees of one repo at once (FR-WT-05, FR-WT-08 to FR-WT-11).
 Loading a 100k-commit log per window would break the memory budget (QA-PERF-07), and two windows
 writing one worktree must not race.

@@ -1,5 +1,7 @@
 # ADR-1: Shell out to git
 
+**Status.** Approved.
+
 **Context.** Gärtli must behave exactly like the git command line (G5, QA-COMP-01): the user's
 config, hooks, credential helpers and attributes all apply. No pure-Go git library covers rebase,
 cherry-pick, `apply` and linked worktrees.
