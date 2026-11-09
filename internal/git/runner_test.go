@@ -317,7 +317,9 @@ func TestCancelKillsAChildOfGitThatIgnoresTheInterrupt(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	err := runCancelledWhen(t, fileExists(dir+"/started"),
+	// The child may start before git has recorded its pid; a cancel in between kills git first.
+	started := func() bool { return fileExists(dir+"/started")() && readPID(dir+"/pid") != "" }
+	err := runCancelledWhen(t, started,
 		`(trap '' TERM; : >`+dir+`/started; exec sleep 60) >/dev/null 2>&1 & echo $! >`+dir+`/pid; wait`)
 
 	coretest.AssertCode(t, err, core.Cancelled)
