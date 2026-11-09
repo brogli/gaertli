@@ -10,7 +10,7 @@ import { DIALOG } from '@/lib/layout'
 import { basename, repoPath } from '@/lib/path'
 import ErrorBanner from './ErrorBanner.vue'
 
-// BranchInWorktreeDialog offers to switch this window to the worktree that
+// BranchInUseDialog offers to switch this window to the worktree that
 // has branch checked out: git checks a branch out in one worktree only.
 // path is as the branch's own worktree gives it (POSIX even for a WSL
 // repo); distro turns it into this window's id. inUse names the rebase or

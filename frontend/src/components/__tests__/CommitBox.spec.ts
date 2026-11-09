@@ -213,7 +213,7 @@ describe('CommitBox', () => {
   it('does not re-save a restored draft that was never edited', async () => {
     const wrapper = mount(CommitBox, { props })
     // Summary (and its draft) arrives asynchronously, after CommitBox has
-    // already mounted and is watching `message` for edits to save.
+    // already mounted and is watching `messageDraft` for edits to save.
     useWorktreesStore().summary = summaryFixture({ messageDraft: 'restored' })
     await wrapper.vm.$nextTick()
     await vi.advanceTimersByTimeAsync(300)

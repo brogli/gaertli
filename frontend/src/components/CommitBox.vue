@@ -31,8 +31,8 @@ const { t } = useI18n()
 
 // The message lives in the changes store, where the window finds it on a
 // core restart; each commit box (one per worktree) starts it empty.
-const { message } = storeToRefs(changes)
-message.value = ''
+const { messageDraft } = storeToRefs(changes)
+messageDraft.value = ''
 const amend = ref(false)
 const pushAfterCommit = ref(false)
 const committing = ref(false)
@@ -48,7 +48,7 @@ watch(
   () => repo.summary?.messageDraft,
   (draft) => {
     if (draftLoaded || draft === undefined) return
-    message.value = draft
+    messageDraft.value = draft
     lastSyncedDraft = draft
     draftLoaded = true
   },
@@ -59,14 +59,14 @@ const saveDraft = useDebounceFn((text: string) => {
   lastSyncedDraft = text
   void Facade.SetMessageDraft(props.wt, text)
 }, 300)
-watch(message, (text) => {
+watch(messageDraft, (text) => {
   if (text !== lastSyncedDraft) void saveDraft(text)
 })
-onBeforeUnmount(() => void Facade.SetMessageDraft(props.wt, message.value))
+onBeforeUnmount(() => void Facade.SetMessageDraft(props.wt, messageDraft.value))
 
 const stagedCount = computed(() => changes.files?.staged?.length ?? 0)
 const commitDisabled = computed(
-  () => committing.value || !message.value.trim() || (!amend.value && stagedCount.value === 0),
+  () => committing.value || !messageDraft.value.trim() || (!amend.value && stagedCount.value === 0),
 )
 const commitLabel = computed(() =>
   amend.value
@@ -99,9 +99,9 @@ async function onAmendChange(checked: boolean): Promise<void> {
   // Pre-fill from HEAD's own message only when the field is still empty:
   // never clobber a typed or restored draft.
   const sha = repo.summary?.sha
-  if (checked && !message.value.trim() && sha) {
+  if (checked && !messageDraft.value.trim() && sha) {
     const details = await run(() => Facade.CommitDetails(props.wt, sha))
-    if (details) message.value = details.body
+    if (details) messageDraft.value = details.body
   }
 }
 
@@ -113,9 +113,9 @@ async function onCommit(): Promise<void> {
   const pushAfter = pushAfterCommit.value && !pushAfterCommitDisabled.value
   try {
     await runAndClose(
-      () => Facade.Commit(props.wt, message.value, amend.value),
+      () => Facade.Commit(props.wt, messageDraft.value, amend.value),
       () => {
-        message.value = ''
+        messageDraft.value = ''
         amend.value = false
       },
     )
@@ -140,7 +140,7 @@ useShortcut(
   <section class="commit-box flex flex-col gap-2">
     <ErrorBanner v-if="error" :error="error" />
     <Textarea
-      v-model="message"
+      v-model="messageDraft"
       rows="6"
       fluid
       auto-resize
