@@ -147,8 +147,10 @@ func worktreeGitDir(worktreePath string) (dir string, ok bool) {
 // names, "" if no rebase is running or it was started on a detached HEAD
 // (head-name then holds "detached HEAD", not a ref).
 func rebasingBranch(gitDir string) (branch string, ok bool) {
-	if b, ok := strings.CutPrefix(strings.TrimSpace(rebaseStateFile(gitDir, "head-name")), "refs/heads/"); ok {
-		return b, true
+	for _, headName := range rebaseStateFiles(gitDir, "head-name") {
+		if b, ok := strings.CutPrefix(headName, "refs/heads/"); ok {
+			return b, true
+		}
 	}
 	return "", false
 }

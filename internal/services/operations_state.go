@@ -3,17 +3,15 @@ package services
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/brogli/gaertli/internal/core"
 )
 
 // stateFiles are what a stopped operation leaves in its worktree's git dir,
-// in the order operation checks them. MERGE_HEAD, CHERRY_PICK_HEAD and
-// REVERT_HEAD are documented pseudorefs (gitrevisions(7)). rebase-merge/
-// and rebase-apply/ are documented in no man page, yet they are the only
-// state every rebase stop leaves (REBASE_HEAD is absent at a break or exec
-// stop and lingers after a finished rebase), and git's own status command
-// reads them.
+// in the order operation checks them. The rebase directories, not
+// REBASE_HEAD, mark a rebase stop: REBASE_HEAD is absent at a break or exec
+// stop and lingers after a finished rebase.
 var stateFiles = []struct {
 	name string
 	kind core.OperationKind
@@ -38,18 +36,30 @@ func operation(gitDir string) core.OperationKind {
 	return ""
 }
 
-// rebaseStateFile is the content of the file name in the rebase directory
-// gitDir holds, either rebase-merge or rebase-apply; "" if there is none.
-func rebaseStateFile(gitDir, name string) string {
+// stateFile is the file kind's stop leaves in a git dir, rebase-merge for a
+// rebase.
+func stateFile(kind core.OperationKind) string {
+	for _, f := range stateFiles {
+		if f.kind == kind {
+			return f.name
+		}
+	}
+	return ""
+}
+
+// rebaseStateFiles are the trimmed contents of the file name in each rebase
+// directory gitDir holds, rebase-merge first.
+func rebaseStateFiles(gitDir, name string) []string {
+	var contents []string
 	for _, f := range stateFiles {
 		if f.kind != core.RebaseOperation {
 			continue
 		}
 		if data, err := os.ReadFile(filepath.Join(gitDir, f.name, name)); err == nil {
-			return string(data)
+			contents = append(contents, strings.TrimSpace(string(data)))
 		}
 	}
-	return ""
+	return contents
 }
 
 // integrateRefusal is the error the app gives before git runs a merge or

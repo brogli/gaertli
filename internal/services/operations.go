@@ -90,11 +90,15 @@ func runIntegrate(ctx context.Context, wt *session.Worktree, verb integrateVerb,
 
 // refuseIntegrate is integrateRefusal for wt's operation and HEAD.
 func refuseIntegrate(ctx context.Context, wt *session.Worktree) error {
-	_, detached, err := headBranch(ctx, wt.Runner, wt.Path)
-	if err != nil {
-		return err
+	op := operation(wt.GitDir)
+	detached := false
+	if op == "" {
+		var err error
+		if _, detached, err = headBranch(ctx, wt.Runner, wt.Path); err != nil {
+			return err
+		}
 	}
-	if refusal := integrateRefusal(operation(wt.GitDir), detached); refusal != nil {
+	if refusal := integrateRefusal(op, detached); refusal != nil {
 		return refusal
 	}
 	return nil
@@ -156,8 +160,9 @@ func (c *Core) SkipOperation(ctx context.Context, id core.WorktreeID) error {
 }
 
 // runOperationVerb runs flag against the in-progress operation, whose kind
-// is itself the git subcommand. Only a skippable one is skipped. A refusal stands in for git's own, as GitFailed. Continue
-// and skip may commit with a message, so no editor waits; abort never commits.
+// is itself the git subcommand. Only a skippable one is skipped. A refusal
+// stands in for git's own, as GitFailed. Continue and skip may commit with a
+// message, so no editor waits; abort never commits.
 func (c *Core) runOperationVerb(ctx context.Context, id core.WorktreeID, flag string) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {

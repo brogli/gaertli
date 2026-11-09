@@ -114,6 +114,21 @@ func TestAStopIsConflictedOrStoppedWhileAPendingFailureIsConflictedOnlyWhenGitFa
 	}
 }
 
+func TestRebasingBranchFallsBackToTheApplyDirectoryWhenTheMergeOneNamesNoBranch(t *testing.T) {
+	t.Parallel()
+	gitDir := t.TempDir()
+	for dir, headName := range map[string]string{"rebase-merge": "detached HEAD\n", "rebase-apply": "refs/heads/topic\n"} {
+		if err := os.MkdirAll(filepath.Join(gitDir, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(gitDir, dir), "head-name", headName)
+	}
+
+	if branch, ok := rebasingBranch(gitDir); branch != "topic" || !ok {
+		t.Errorf("rebasingBranch = %q, %v; want topic, true", branch, ok)
+	}
+}
+
 func TestOnlyACherryPickOrRevertIsSkippable(t *testing.T) {
 	t.Parallel()
 	for _, op := range everyOperation {
