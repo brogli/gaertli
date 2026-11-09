@@ -18,12 +18,19 @@ import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
 import { summaryFixture } from '@/testing/fixtures/summary'
-import type { ChangedFile } from '../../../bindings/github.com/brogli/gaertli/internal/core'
+import {
+  OperationKind,
+  type ChangedFile,
+} from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 // mountWithStash mounts WaitingStashBanner with waitingStash set and conflicted
 // files remaining.
-function mountWithStash(waitingStash: string, conflicted: ChangedFile[] = []) {
-  useWorktreesStore().summary = summaryFixture({ waitingStash })
+function mountWithStash(
+  waitingStash: string,
+  conflicted: ChangedFile[] = [],
+  operation: OperationKind = OperationKind.$zero,
+) {
+  useWorktreesStore().summary = summaryFixture({ waitingStash, operation })
   useChangesStore().files = changedFilesFixture({ conflicted })
   return mount(WaitingStashBanner, { props: { wt: '/repo' } })
 }
@@ -55,6 +62,12 @@ describe('WaitingStashBanner', () => {
 
     expect(wrapper.find('[data-test="waiting-stash-banner"]').exists()).toBe(shown)
     expect(wrapper.text().includes('Local changes from before a pull, merge or rebase')).toBe(shown)
+  })
+
+  it('with a waiting stash and nothing conflicted the banner stays hidden while an operation is in progress', () => {
+    const wrapper = mountWithStash('stash@{0}', [], OperationKind.MergeOperation)
+
+    expect(wrapper.find('[data-test="waiting-stash-banner"]').exists()).toBe(false)
   })
 
   it('clicking Restore calls Facade.PopStash with the stash ref', async () => {
