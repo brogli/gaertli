@@ -74,7 +74,7 @@ func (f fakeAPI) Summary(_ context.Context, wt core.WorktreeID) (core.Summary, e
 	return core.Summary{}, nil
 }
 
-func (f fakeAPI) CompareCommits(_ context.Context, wt core.WorktreeID, _, _ string) ([]core.ChangedFile, error) {
+func (f fakeAPI) CompareCommits(_ context.Context, wt core.WorktreeID, _, _ core.SHA) ([]core.ChangedFile, error) {
 	f.record("CompareCommits", wt)
 	return nil, nil
 }

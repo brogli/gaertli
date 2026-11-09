@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git"
 	"github.com/brogli/gaertli/internal/testbin"
 )
@@ -130,7 +131,7 @@ func CommitAll(t *testing.T, dir, msg string) {
 }
 
 // HeadSHA is dir's HEAD commit.
-func HeadSHA(t *testing.T, dir string) string {
+func HeadSHA(t *testing.T, dir string) core.SHA {
 	t.Helper()
-	return Out(t, dir, "rev-parse", "HEAD")
+	return core.SHA(Out(t, dir, "rev-parse", "HEAD"))
 }

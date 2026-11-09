@@ -11,8 +11,8 @@ import (
 )
 
 // headBranch returns HEAD's branch name, or detached if HEAD is not a
-// symbolic ref. The prefix is cut here: --short prints heads/<name> when a
-// tag has the same name.
+// symbolic ref. The namespace is cut here: --short prints heads/<name> when
+// a tag has the same name.
 func headBranch(ctx context.Context, r git.Runner, dir string) (branch string, detached bool, err error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
@@ -21,15 +21,15 @@ func headBranch(ctx context.Context, r git.Runner, dir string) (branch string, d
 	if quietFailure(err, result) {
 		return "", true, nil
 	}
-	return strings.TrimPrefix(strings.TrimSpace(string(result.Stdout)), "refs/heads/"), false, err
+	return core.RefName(strings.TrimSpace(string(result.Stdout))).Short(), false, err
 }
 
 // literalPath is a pathspec that matches path only, never as a pattern.
 func literalPath(path string) string { return ":(literal)" + path }
 
-// verifyRev resolves rev to its object name, "" if rev does not exist (an
+// verifyRev resolves rev to its commit, "" if rev does not exist (an
 // unborn HEAD, no stash).
-func verifyRev(ctx context.Context, r git.Runner, dir, rev string) (string, error) {
+func verifyRev(ctx context.Context, r git.Runner, dir, rev string) (core.SHA, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
 		Args: []string{"rev-parse", "-q", "--verify", "--end-of-options", rev},
@@ -37,16 +37,34 @@ func verifyRev(ctx context.Context, r git.Runner, dir, rev string) (string, erro
 	if err != nil && !quietFailure(err, result) {
 		return "", err
 	}
-	return strings.TrimSpace(string(result.Stdout)), nil
+	return core.SHA(strings.TrimSpace(string(result.Stdout))), nil
 }
 
-// revParse resolves ref to its SHA, read-only.
-func revParse(ctx context.Context, r git.Runner, dir, ref string) (string, error) {
+// revParse resolves ref to its commit, read-only.
+func revParse(ctx context.Context, r git.Runner, dir, ref string) (core.SHA, error) {
 	result, err := r.Run(ctx, git.Call{Dir: dir, ReadOnly: true, Args: []string{"rev-parse", "--verify", "--end-of-options", ref}})
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(result.Stdout)), nil
+	return core.SHA(strings.TrimSpace(string(result.Stdout))), nil
+}
+
+// toSHAs types the object names git printed.
+func toSHAs(names []string) []core.SHA {
+	shas := make([]core.SHA, len(names))
+	for i, name := range names {
+		shas[i] = core.SHA(name)
+	}
+	return shas
+}
+
+// shaArgs is shas as git arguments.
+func shaArgs(shas []core.SHA) []string {
+	args := make([]string, len(shas))
+	for i, sha := range shas {
+		args[i] = string(sha)
+	}
+	return args
 }
 
 // nulRecords splits a %00-terminated git stream into records, stripping the

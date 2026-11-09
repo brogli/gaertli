@@ -17,7 +17,7 @@ import (
 // line is a linear history on master: base, then B, C, D, E, each adding
 // its own file (b.txt …) with message "<X> subject\n\n<X> body". B is
 // authored by "Bea".
-type line struct{ base, B, C, D, E string }
+type line struct{ base, B, C, D, E core.SHA }
 
 func lineFixture(t *testing.T, dir string) line {
 	t.Helper()
@@ -85,7 +85,7 @@ func TestSquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldes
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
 
-	result, err := c.Squash(t.Context(), wt, []string{l.D, l.B}, "B and D\n\n#123 stays\n")
+	result, err := c.Squash(t.Context(), wt, []core.SHA{l.D, l.B}, "B and D\n\n#123 stays\n")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,13 +105,31 @@ func TestSquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldes
 	}
 }
 
+func TestSquashAndFixupRefuseARevisionThatIsNoCommitHash(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	l := lineFixture(t, repo.Dir)
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, squashErr := c.Squash(t.Context(), wt, []core.SHA{"HEAD~1", l.E}, "folded")
+	_, fixupErr := c.Fixup(t.Context(), wt, []core.SHA{"HEAD~1", l.E})
+	_, checkErr := c.SquashCheck(t.Context(), wt, []core.SHA{"HEAD~1", l.E})
+
+	coretest.AssertCode(t, squashErr, core.Internal)
+	coretest.AssertCode(t, checkErr, core.Internal)
+	coretest.AssertCode(t, fixupErr, core.Internal)
+	if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
+		t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
+	}
+}
+
 func TestFixupKeepsTheOldestMessageWhateverOrderTheShasCome(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Fixup(t.Context(), wt, []string{l.E, l.C, l.D}); err != nil {
+	if _, err := c.Fixup(t.Context(), wt, []core.SHA{l.E, l.C, l.D}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +145,7 @@ func TestFixupIntoTheRootCommit(t *testing.T) {
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Fixup(t.Context(), wt, []string{l.base, l.C}); err != nil {
+	if _, err := c.Fixup(t.Context(), wt, []core.SHA{l.base, l.C}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -152,7 +170,7 @@ func TestTheMessageIsKeptExactlyWhateverTheCleanupConfig(t *testing.T) {
 				gittest.Run(t, repo.Dir, "config", "core.commentChar", commentChar)
 				c, wt := openWorktree(t, repo.Dir)
 
-				if _, err := c.Squash(t.Context(), wt, []string{l.D, l.B}, uncleanMessage); err != nil {
+				if _, err := c.Squash(t.Context(), wt, []core.SHA{l.D, l.B}, uncleanMessage); err != nil {
 					t.Fatal(err)
 				}
 
@@ -178,7 +196,7 @@ func TestFixupKeepsTheOldestMessageExactly(t *testing.T) {
 	gittest.Run(t, repo.Dir, "config", "commit.cleanup", "strip")
 	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Fixup(t.Context(), wt, []string{shas[2], shas[1]}); err != nil {
+	if _, err := c.Fixup(t.Context(), wt, []core.SHA{shas[2], shas[1]}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -189,7 +207,7 @@ func TestFixupKeepsTheOldestMessageExactly(t *testing.T) {
 
 // conflictLine is base, B (b.txt, message uncleanMessage), C and D, which
 // both set f.txt: D no longer applies once moved up next to B.
-func conflictLine(t *testing.T, dir string) (b, d string) {
+func conflictLine(t *testing.T, dir string) (b, d core.SHA) {
 	t.Helper()
 	shas := gittest.History(t, dir,
 		gittest.Step{Message: "base", Files: map[string]string{"f.txt": "base\n"}},
@@ -204,14 +222,14 @@ func TestAConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
-		fold func(c *Core, wt core.WorktreeID, shas []string) error
+		fold func(c *Core, wt core.WorktreeID, shas []core.SHA) error
 		want string
 	}{
-		{"squash", func(c *Core, wt core.WorktreeID, shas []string) error {
+		{"squash", func(c *Core, wt core.WorktreeID, shas []core.SHA) error {
 			_, err := c.Squash(t.Context(), wt, shas, "Folded\n\n# kept\ntrailing  ")
 			return err
 		}, "Folded\n\n# kept\ntrailing"},
-		{"fixup", func(c *Core, wt core.WorktreeID, shas []string) error {
+		{"fixup", func(c *Core, wt core.WorktreeID, shas []core.SHA) error {
 			_, err := c.Fixup(t.Context(), wt, shas)
 			return err
 		}, uncleanMessage},
@@ -222,7 +240,7 @@ func TestAConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
 			gittest.Run(t, repo.Dir, "config", "commit.cleanup", "strip")
 			c, wt := openWorktree(t, repo.Dir)
 
-			err := tc.fold(c, wt, []string{b, d})
+			err := tc.fold(c, wt, []core.SHA{b, d})
 
 			coretest.AssertCode(t, err, core.Conflicted)
 			if operation(filepath.Join(repo.Dir, ".git")) != "rebase" {
@@ -252,7 +270,7 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
 	c, wt := openWorktree(t, repo.Dir)
-	check := func(t *testing.T, shas ...string) core.SquashCheck {
+	check := func(t *testing.T, shas ...core.SHA) core.SquashCheck {
 		t.Helper()
 		res, err := c.SquashCheck(t.Context(), wt, shas)
 		if err != nil {
@@ -269,7 +287,7 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 
 		writeFile(t, repo.Dir, "b.txt", "edited")
 		assertBlocker(t, check(t, l.D, l.E).Blocker, core.DirtyWorktree, "squashUncommittedChanges")
-		_, err := c.Fixup(t.Context(), wt, []string{l.D, l.E})
+		_, err := c.Fixup(t.Context(), wt, []core.SHA{l.D, l.E})
 		coretest.AssertCode(t, err, core.DirtyWorktree)
 		if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
 			t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
@@ -278,14 +296,14 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	})
 
 	t.Run("a commit off the current branch blocks", func(t *testing.T) {
-		gittest.Run(t, repo.Dir, "switch", "-c", "side", l.C)
+		gittest.Run(t, repo.Dir, "switch", "-c", "side", string(l.C))
 		gittest.Commit(t, repo.Dir, "side.txt", "side", "side")
 		side := gittest.HeadSHA(t, repo.Dir)
 		gittest.Run(t, repo.Dir, "switch", "master")
 		const emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-		orphan := gittest.Out(t, repo.Dir, "commit-tree", "-m", "unrelated root", emptyTree)
+		orphan := core.SHA(gittest.Out(t, repo.Dir, "commit-tree", "-m", "unrelated root", emptyTree))
 
-		for name, shas := range map[string][]string{
+		for name, shas := range map[string][]core.SHA{
 			"on another branch":   {l.B, side},
 			"no common ancestor":  {l.D, orphan},
 			"only another branch": {side, orphan},
@@ -297,12 +315,12 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	})
 
 	t.Run("a detached head or a running operation blocks", func(t *testing.T) {
-		gittest.Run(t, repo.Dir, "switch", "--detach", l.E)
+		gittest.Run(t, repo.Dir, "switch", "--detach", string(l.E))
 		assertBlocker(t, check(t, l.D, l.E).Blocker, core.GitFailed, "squashDetached")
 		gittest.Run(t, repo.Dir, "switch", "master")
 
 		cherryPickHead := filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD")
-		writeFile(t, repo.Dir, filepath.Join(".git", "CHERRY_PICK_HEAD"), l.B+"\n")
+		writeFile(t, repo.Dir, filepath.Join(".git", "CHERRY_PICK_HEAD"), string(l.B)+"\n")
 		args := assertBlocker(t, check(t, l.D, l.E).Blocker, core.GitFailed, "squashOperationInProgress")
 		if args["operation"] != "cherry-pick" {
 			t.Errorf("operation = %q, want cherry-pick", args["operation"])
@@ -313,13 +331,13 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	})
 
 	t.Run("fewer than two commits or a blank message is a bad request", func(t *testing.T) {
-		_, err := c.Fixup(t.Context(), wt, []string{l.E})
+		_, err := c.Fixup(t.Context(), wt, []core.SHA{l.E})
 		coretest.AssertCode(t, err, core.Internal)
-		_, err = c.Fixup(t.Context(), wt, []string{l.E, l.E})
+		_, err = c.Fixup(t.Context(), wt, []core.SHA{l.E, l.E})
 		coretest.AssertCode(t, err, core.Internal)
-		_, err = c.SquashCheck(t.Context(), wt, []string{l.D, l.D})
+		_, err = c.SquashCheck(t.Context(), wt, []core.SHA{l.D, l.D})
 		coretest.AssertCode(t, err, core.Internal)
-		_, err = c.Squash(t.Context(), wt, []string{l.D, l.E}, " \n")
+		_, err = c.Squash(t.Context(), wt, []core.SHA{l.D, l.E}, " \n")
 		coretest.AssertCode(t, err, core.Internal)
 		if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
 			t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
@@ -342,15 +360,15 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 		}
 
 		bareRemote(t, repo, "origin")
-		gittest.Run(t, repo.Dir, "push", "origin", l.C+":refs/heads/master")
+		gittest.Run(t, repo.Dir, "push", "origin", string(l.C)+":refs/heads/master")
 		gittest.Run(t, repo.Dir, "branch", "--set-upstream-to=origin/master")
 		for _, tc := range []struct {
-			shas []string
+			shas []core.SHA
 			want bool
 		}{
-			{[]string{l.D, l.E}, false},
-			{[]string{l.E, l.C}, true},
-			{[]string{l.B, l.E}, true},
+			{[]core.SHA{l.D, l.E}, false},
+			{[]core.SHA{l.E, l.C}, true},
+			{[]core.SHA{l.B, l.E}, true},
 		} {
 			if got := check(t, tc.shas...).Pushed; got != tc.want {
 				t.Errorf("Pushed for %v = %v, want %v", tc.shas, got, tc.want)
@@ -359,7 +377,7 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 	})
 
 	t.Run("a merge commit in the way blocks and is named", func(t *testing.T) {
-		gittest.Run(t, repo.Dir, "switch", "-c", "merged", l.base)
+		gittest.Run(t, repo.Dir, "switch", "-c", "merged", string(l.base))
 		gittest.Commit(t, repo.Dir, "m.txt", "m", "merged side")
 		gittest.Run(t, repo.Dir, "switch", "master")
 		gittest.Run(t, repo.Dir, "merge", "--no-ff", "-m", "Merge branch 'merged'", "merged")
@@ -367,7 +385,7 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 		gittest.Commit(t, repo.Dir, "x.txt", "x", "after the merge")
 
 		args := assertBlocker(t, check(t, l.E, gittest.HeadSHA(t, repo.Dir)).Blocker, core.GitFailed, "squashMergeInTheWay")
-		if !strings.HasPrefix(merge, args["sha"]) || args["sha"] == "" {
+		if !strings.HasPrefix(string(merge), args["sha"]) || args["sha"] == "" {
 			t.Errorf("sha = %q, want the merge %s abbreviated", args["sha"], merge)
 		}
 	})
@@ -376,7 +394,7 @@ func TestSquashCheckBlocksAndReportsThePushedFlagAndMessage(t *testing.T) {
 func TestSquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *testing.T) {
 	repo := gittest.New(t)
 	l := lineFixture(t, repo.Dir)
-	gittest.Run(t, repo.Dir, "branch", "stacked", l.C)
+	gittest.Run(t, repo.Dir, "branch", "stacked", string(l.C))
 	for _, kv := range [][2]string{
 		{"sequence.editor", "false"},
 		{"core.editor", "false"},
@@ -390,7 +408,7 @@ func TestSquashIgnoresTheUsersEditorsAutostashCleanupAndUpdateRefs(t *testing.T)
 	unsetEditorEnv(t)
 	c, wt := openWorktree(t, repo.Dir)
 
-	if _, err := c.Squash(t.Context(), wt, []string{l.B, l.D}, "#1 folded"); err != nil {
+	if _, err := c.Squash(t.Context(), wt, []core.SHA{l.B, l.D}, "#1 folded"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -407,10 +425,10 @@ func TestAStopThatIsNoConflictLeavesTheRebaseOpenAndAbortRestores(t *testing.T) 
 	const untracked = "untracked, not to be lost\n"
 	for _, tc := range []struct {
 		name    string
-		fixture func(t *testing.T, dir string) (shas []string)
+		fixture func(t *testing.T, dir string) (shas []core.SHA)
 		atStop  func(t *testing.T, dir string)
 	}{
-		{"an untracked file in the way of a later commit", func(t *testing.T, dir string) []string {
+		{"an untracked file in the way of a later commit", func(t *testing.T, dir string) []core.SHA {
 			t.Helper()
 			gittest.Commit(t, dir, "base.txt", "base\n", "base")
 			gittest.Commit(t, dir, "b.txt", "b\n", "B")
@@ -420,21 +438,21 @@ func TestAStopThatIsNoConflictLeavesTheRebaseOpenAndAbortRestores(t *testing.T) 
 			gittest.CommitAll(t, dir, "D deletes z")
 			d := gittest.HeadSHA(t, dir)
 			writeFile(t, dir, "z.txt", untracked)
-			return []string{b, d}
+			return []core.SHA{b, d}
 		}, func(t *testing.T, dir string) {
 			t.Helper()
 			if got := readFile(t, dir, "z.txt"); got != untracked {
 				t.Errorf("z.txt at the stop = %q, want it untouched", got)
 			}
 		}},
-		{"a commit folded with its own revert", func(t *testing.T, dir string) []string {
+		{"a commit folded with its own revert", func(t *testing.T, dir string) []core.SHA {
 			t.Helper()
 			gittest.Commit(t, dir, "base.txt", "base\n", "base")
 			gittest.Commit(t, dir, "g.txt", "g\n", "B adds g")
 			b := gittest.HeadSHA(t, dir)
 			gittest.Run(t, dir, "rm", "-q", "g.txt")
 			gittest.CommitAll(t, dir, "D removes g")
-			return []string{b, gittest.HeadSHA(t, dir)}
+			return []core.SHA{b, gittest.HeadSHA(t, dir)}
 		}, func(t *testing.T, dir string) {
 			t.Helper()
 			index, base := gittest.Out(t, dir, "write-tree"), gittest.Out(t, dir, "rev-parse", "HEAD~1^{tree}")
@@ -484,7 +502,7 @@ func TestAFailedAmendStopsAndContinueRunsItAgain(t *testing.T) {
 	writeHook(t, repo.Dir, "prepare-commit-msg", refuseAmendHook)
 	c, wt := openWorktree(t, repo.Dir)
 
-	_, err := c.Squash(t.Context(), wt, []string{l.B, l.D}, "Folded")
+	_, err := c.Squash(t.Context(), wt, []core.SHA{l.B, l.D}, "Folded")
 
 	ce := coretest.AsError(t, err, core.Stopped)
 	if !strings.Contains(ce.GitStderr, "refusing") {
@@ -511,14 +529,14 @@ func TestACommitMadeAfterTheCheckStopsTheRebaseInsteadOfBeingDropped(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	sel, err := inspectSelection(t.Context(), session, []string{l.B, l.C})
+	sel, err := inspectSelection(t.Context(), session, []core.SHA{l.B, l.C})
 	if err != nil || sel.blocker != nil {
 		t.Fatal(err, sel.blocker)
 	}
 	gittest.Commit(t, repo.Dir, "late.txt", "late\n", "a commit made by another program")
 	late := gittest.HeadSHA(t, repo.Dir)
 
-	err = rebaseWithTodo(t.Context(), session, sel, l.B)
+	err = rebaseWithTodo(t.Context(), session, sel, string(l.B))
 
 	coretest.AssertCode(t, err, core.Stopped)
 	if err := c.AbortOperation(t.Context(), wt); err != nil {

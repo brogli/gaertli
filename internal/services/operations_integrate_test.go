@@ -55,7 +55,7 @@ func TestMergeAndRebaseRefuseBeforeGitRunsWithAnOperationOrDetachedHead(t *testi
 		},
 	}
 	sideTip := gittest.Out(t, repo.Dir, "rev-parse", "side")
-	coretest.AssertCode(t, c.CherryPick(t.Context(), wt, []string{sideTip}, core.PickOptions{}), core.Conflicted)
+	coretest.AssertCode(t, c.CherryPick(t.Context(), wt, []core.SHA{core.SHA(sideTip)}, core.PickOptions{}), core.Conflicted)
 
 	for name, call := range calls {
 		ce := coretest.AsError(t, call(), core.GitFailed)
@@ -99,6 +99,22 @@ func TestMergeFastForwards(t *testing.T) {
 	}
 }
 
+func TestMergeAndRebaseRefuseABareName(t *testing.T) {
+	t.Parallel()
+	repo := divergedFixture(t)
+	before := gittest.HeadSHA(t, repo.Dir)
+	c, wt := openWorktree(t, repo.Dir)
+
+	_, mergeErr := c.Merge(t.Context(), wt, "side", false)
+	_, rebaseErr := c.Rebase(t.Context(), wt, "side", false)
+
+	coretest.AssertCode(t, mergeErr, core.Internal)
+	coretest.AssertCode(t, rebaseErr, core.Internal)
+	if got := gittest.HeadSHA(t, repo.Dir); got != before {
+		t.Errorf("HEAD = %s, want unchanged %s", got, before)
+	}
+}
+
 func TestMergeMakesAMergeCommitRunsHooksAndIgnoresHostileConfig(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)
@@ -118,7 +134,7 @@ func TestMergeMakesAMergeCommitRunsHooksAndIgnoresHostileConfig(t *testing.T) {
 	if got.Outcome != core.IntegrateMerged {
 		t.Errorf("Outcome = %q, want %q", got.Outcome, core.IntegrateMerged)
 	}
-	if parents := gittest.Out(t, repo.Dir, "rev-list", "--parents", "-n1", "HEAD"); !strings.HasSuffix(parents, mainTip+" "+sideTip) {
+	if parents := gittest.Out(t, repo.Dir, "rev-list", "--parents", "-n1", "HEAD"); !strings.HasSuffix(parents, string(mainTip)+" "+sideTip) {
 		t.Errorf("parents line = %q, want parents %s %s", parents, mainTip, sideTip)
 	}
 	if subject := gittest.Out(t, repo.Dir, "log", "-1", "--format=%s"); subject != "Merge branch 'side'" {
@@ -159,11 +175,14 @@ func TestMergeAcceptsRemoteBranchesAndTags(t *testing.T) {
 	mainTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	for _, tc := range []struct{ ref, want string }{
+	for _, tc := range []struct {
+		ref  core.RefName
+		want string
+	}{
 		{"refs/remotes/origin/side", "Merge remote-tracking branch 'origin/side'"},
 		{"refs/tags/v1", "Merge tag 'v1'"},
 	} {
-		gittest.Run(t, repo.Dir, "reset", "--hard", mainTip)
+		gittest.Run(t, repo.Dir, "reset", "--hard", string(mainTip))
 		if _, err := c.Merge(t.Context(), wt, tc.ref, false); err != nil {
 			t.Fatalf("Merge(%s): %v", tc.ref, err)
 		}
@@ -254,7 +273,7 @@ func TestRebaseFlattensMergesAndMovesNoOtherBranch(t *testing.T) {
 				gittest.Step{Message: "main commit", Files: map[string]string{"main.txt": "main\n"}},
 			)
 			midTip := shas[2]
-			gittest.Run(t, repo.Dir, "branch", "mid", midTip)
+			gittest.Run(t, repo.Dir, "branch", "mid", string(midTip))
 			gittest.Run(t, repo.Dir, "checkout", "feat")
 			gittest.Run(t, repo.Dir, "config", "rebase.rebaseMerges", "true")
 			gittest.Run(t, repo.Dir, "config", "rebase.updateRefs", "true")
@@ -272,7 +291,7 @@ func TestRebaseFlattensMergesAndMovesNoOtherBranch(t *testing.T) {
 			if merges := gittest.Out(t, repo.Dir, "rev-list", "--merges", "master..HEAD"); merges != "" {
 				t.Errorf("merge commits after the rebase = %q, want none", merges)
 			}
-			if mid := gittest.Out(t, repo.Dir, "rev-parse", "mid"); mid != midTip {
+			if mid := gittest.Out(t, repo.Dir, "rev-parse", "mid"); core.SHA(mid) != midTip {
 				t.Errorf("mid = %q, want unchanged %q", mid, midTip)
 			}
 		})
@@ -384,7 +403,7 @@ func TestMergeWithStashKeepsTheEntryOnConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := gittest.Out(t, repo.Dir, "rev-parse", "refs/stash"); summary.WaitingStash != want {
+	if want := gittest.Out(t, repo.Dir, "rev-parse", "refs/stash"); summary.WaitingStash != core.SHA(want) {
 		t.Errorf("Summary.WaitingStash = %q, want %q", summary.WaitingStash, want)
 	}
 }
@@ -402,7 +421,7 @@ func TestWaitingStashFindsAnEntryWithTheOlderPullSubject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if summary.WaitingStash != sha {
+	if summary.WaitingStash != core.SHA(sha) {
 		t.Errorf("Summary.WaitingStash = %q, want %q", summary.WaitingStash, sha)
 	}
 }

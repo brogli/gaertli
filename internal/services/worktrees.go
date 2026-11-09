@@ -90,7 +90,7 @@ func (c *Core) AddWorktree(ctx context.Context, path core.RepoPath, target, bran
 		if start != "" { // none: git branches from HEAD
 			args = append(args, start)
 		}
-		if startsAtARemoteBranch(start) { // its own first push gives it its own upstream, not this one's
+		if core.RefName(start).IsRemoteBranch() { // its own first push gives it its own upstream, not this one's
 			args = slices.Insert(args, 2, "--no-track")
 		}
 	}
@@ -194,9 +194,9 @@ func parseWorktreeRecord(block []byte, main bool) core.Worktree {
 		case "worktree":
 			wt.Path = value
 		case "HEAD":
-			wt.SHA = value
+			wt.SHA = core.SHA(value)
 		case "branch":
-			wt.Branch = strings.TrimPrefix(value, "refs/heads/")
+			wt.Branch = core.RefName(value).Short()
 		case "locked":
 			wt.Locked = true
 		case "prunable":

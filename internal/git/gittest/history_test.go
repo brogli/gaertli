@@ -45,10 +45,10 @@ func TestHistoryWritesBranchesAndMergeInOneRun(t *testing.T) {
 	if got := HeadSHA(t, repo.Dir); got != shas[3] {
 		t.Errorf("HEAD = %s, want the merge %s", got, shas[3])
 	}
-	if got := Out(t, repo.Dir, "rev-parse", "side"); got != shas[1] {
+	if got := Out(t, repo.Dir, "rev-parse", "side"); got != string(shas[1]) {
 		t.Errorf("side = %s, want %s", got, shas[1])
 	}
-	if got := Out(t, repo.Dir, "rev-list", "--parents", "-1", "HEAD"); got != shas[3]+" "+shas[2]+" "+shas[1] {
+	if got := Out(t, repo.Dir, "rev-list", "--parents", "-1", "HEAD"); got != string(shas[3]+" "+shas[2]+" "+shas[1]) {
 		t.Errorf("merge parents = %q", got)
 	}
 	if got := Out(t, repo.Dir, "ls-files"); got != "a.txt\nm.txt\ns.txt" {
@@ -58,7 +58,7 @@ func TestHistoryWritesBranchesAndMergeInOneRun(t *testing.T) {
 		t.Errorf("working tree not clean: %q", got)
 	}
 	want := "Bea <bea@gaertli.invalid> / gaertli test <test@gaertli.invalid> / side change\n\nbody"
-	if got := Out(t, repo.Dir, "log", "-1", "--format=%an <%ae> / %cn <%ce> / %B", shas[1]); got != want {
+	if got := Out(t, repo.Dir, "log", "-1", "--format=%an <%ae> / %cn <%ce> / %B", string(shas[1])); got != want {
 		t.Errorf("identity and message = %q, want %q", got, want)
 	}
 }

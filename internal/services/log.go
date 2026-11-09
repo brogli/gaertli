@@ -119,7 +119,7 @@ func (c *Core) reloadFilterIfActive(ctx context.Context, wt *session.Worktree) {
 }
 
 // LogIndexOf implements core.API.
-func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha string) (core.LogIndexResult, error) {
+func (c *Core) LogIndexOf(ctx context.Context, id core.WorktreeID, sha core.SHA) (core.LogIndexResult, error) {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return core.LogIndexResult{}, err
@@ -174,7 +174,7 @@ func streamCommits(ctx context.Context, wt *session.Worktree, filter core.LogFil
 		commit.CheckedOutIn = checkedOut[commit.SHA]
 		if !flat {
 			commit.Graph = toGraphRow(layout.Next(graph.Commit{
-				SHA: commit.SHA, Parents: parents, BranchTip: isBranchTip(commit),
+				SHA: string(commit.SHA), Parents: parents, BranchTip: isBranchTip(commit),
 			}))
 		}
 		appendRow(commit)
@@ -238,7 +238,7 @@ func refTips(ctx context.Context, r git.Runner, dir string) (map[string]string, 
 	if err != nil {
 		return nil, err
 	}
-	tips["HEAD"] = sha
+	tips["HEAD"] = string(sha)
 	return tips, nil
 }
 
@@ -271,7 +271,7 @@ func parseLogRecord(record []byte) (commit core.LogCommit, parents []string, err
 	}
 	parents = strings.Fields(fields[2])
 	commit = core.LogCommit{
-		SHA:      fields[0],
+		SHA:      core.SHA(fields[0]),
 		ShortSHA: fields[1],
 		Author:   fields[3],
 		AuthorAt: authorAt,
@@ -328,12 +328,12 @@ func toGraphRow(row graph.Row) core.GraphRow {
 
 // worktreeCheckouts maps a commit SHA to every worktree path currently at
 // that HEAD. Any worktree of the repo lists every worktree of it.
-func worktreeCheckouts(ctx context.Context, r git.Runner, dir string, background bool) (map[string][]string, error) {
+func worktreeCheckouts(ctx context.Context, r git.Runner, dir string, background bool) (map[core.SHA][]string, error) {
 	worktrees, err := worktreeList(ctx, r, dir, background)
 	if err != nil {
 		return nil, err
 	}
-	checkouts := map[string][]string{}
+	checkouts := map[core.SHA][]string{}
 	for _, wt := range worktrees {
 		if wt.Path != "" && wt.SHA != "" {
 			checkouts[wt.SHA] = append(checkouts[wt.SHA], wt.Path)

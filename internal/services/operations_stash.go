@@ -15,7 +15,7 @@ import (
 const stashSubjectPrefix = "Gärtli: local changes before "
 
 // popStash pops the stash entry whose commit is sha.
-func popStash(ctx context.Context, wt *session.Worktree, sha string) error {
+func popStash(ctx context.Context, wt *session.Worktree, sha core.SHA) error {
 	ref, err := resolveStashRef(ctx, wt.Runner, wt.Path, sha)
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func withStash(ctx context.Context, wt *session.Worktree, verb string, integrate
 	}
 
 	stashed := after != before
-	var head string
+	var head core.SHA
 	if stashed {
 		if head, err = revParse(ctx, wt.Runner, wt.Path, "HEAD"); err != nil {
 			return err
@@ -62,18 +62,18 @@ func withStash(ctx context.Context, wt *session.Worktree, verb string, integrate
 }
 
 // PopStash implements core.API.
-func (c *Core) PopStash(ctx context.Context, id core.WorktreeID, sha string) error {
+func (c *Core) PopStash(ctx context.Context, id core.WorktreeID, sha core.SHA) error {
 	return c.stashVerb(ctx, id, "pop", sha)
 }
 
 // DropStash implements core.API.
-func (c *Core) DropStash(ctx context.Context, id core.WorktreeID, sha string) error {
+func (c *Core) DropStash(ctx context.Context, id core.WorktreeID, sha core.SHA) error {
 	return c.stashVerb(ctx, id, "drop", sha)
 }
 
 // stashVerb runs git stash verb on the entry whose commit is sha, resolved
 // to its current stash@{n} under the same write lock the verb runs under.
-func (c *Core) stashVerb(ctx context.Context, id core.WorktreeID, verb, sha string) error {
+func (c *Core) stashVerb(ctx context.Context, id core.WorktreeID, verb string, sha core.SHA) error {
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ const stashListFormat = "%H%x1f%gd"
 // resolveStashRef finds sha's current stash@{n} in dir's stash list. Code
 // Internal if sha names no current entry: a stale caller-supplied ID
 // (already popped or dropped elsewhere), not a git failure.
-func resolveStashRef(ctx context.Context, r git.Runner, dir, sha string) (string, error) {
+func resolveStashRef(ctx context.Context, r git.Runner, dir string, sha core.SHA) (string, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
 		Args: []string{"stash", "list", "--format=" + stashListFormat, "-z"},
@@ -105,7 +105,7 @@ func resolveStashRef(ctx context.Context, r git.Runner, dir, sha string) (string
 	}
 	for _, rec := range nulRecords(result.Stdout) {
 		commit, ref, ok := strings.Cut(rec, "\x1f")
-		if ok && commit == sha {
+		if ok && core.SHA(commit) == sha {
 			return ref, nil
 		}
 	}
@@ -114,7 +114,7 @@ func resolveStashRef(ctx context.Context, r git.Runner, dir, sha string) (string
 
 // waitingStash returns the commit of the newest stash entry the app made around an integrate, ""
 // if none. git stash list is newest-first.
-func waitingStash(ctx context.Context, r git.Runner, dir string) (string, error) {
+func waitingStash(ctx context.Context, r git.Runner, dir string) (core.SHA, error) {
 	result, err := r.Run(ctx, git.Call{
 		Dir: dir, ReadOnly: true, Background: true,
 		Args: []string{"stash", "list", "--format=%H%x1f%gs", "-z"},
@@ -125,7 +125,7 @@ func waitingStash(ctx context.Context, r git.Runner, dir string) (string, error)
 	for _, rec := range nulRecords(result.Stdout) {
 		sha, subject, ok := strings.Cut(rec, "\x1f")
 		if ok && strings.Contains(subject, stashSubjectPrefix) {
-			return sha, nil
+			return core.SHA(sha), nil
 		}
 	}
 	return "", nil

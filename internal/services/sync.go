@@ -143,7 +143,7 @@ func (c *Core) PushTarget(ctx context.Context, id core.WorktreeID) (core.PushTar
 	}
 	return core.PushTarget{
 		Remote: remote, AutoSetUpstream: autoSetUpstream,
-		Branch: strings.TrimPrefix(ref, "refs/heads/"), HasUpstream: hasUpstream,
+		Branch: core.RefName(ref).Short(), HasUpstream: hasUpstream,
 	}, nil
 }
 
@@ -251,7 +251,7 @@ func branchMoved(ctx context.Context, wt *session.Worktree, b branchUpstream) (a
 	}
 	commits := 0
 	if newSHA != b.sha {
-		commits, err = revListCount(ctx, wt.Runner, wt.Path, b.sha+".."+newSHA)
+		commits, err = revListCount(ctx, wt.Runner, wt.Path, string(b.sha)+".."+string(newSHA))
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +282,8 @@ const branchUpstreamFormat = "%(objectname)%1f%(upstream:remotename)%1f%(upstrea
 // upstreamRef are "" if no upstream is configured, checkedOutIn "" if the
 // branch is checked out nowhere.
 type branchUpstream struct {
-	name, sha, remote, upstreamRef, checkedOutIn string
+	name, remote, upstreamRef, checkedOutIn string
+	sha                                     core.SHA
 }
 
 // branchUpstreamInfo reads branch's branchUpstream in one read-only
@@ -300,7 +301,7 @@ func branchUpstreamInfo(ctx context.Context, r git.Runner, dir, branch string) (
 		return branchUpstream{}, core.Errorf(core.Internal, "branch %q not found", branch)
 	}
 	f := strings.Split(records[0], "\x1f")
-	return branchUpstream{name: branch, sha: f[0], remote: f[1], upstreamRef: f[2], checkedOutIn: f[3]}, nil
+	return branchUpstream{name: branch, sha: core.SHA(f[0]), remote: f[1], upstreamRef: f[2], checkedOutIn: f[3]}, nil
 }
 
 // revListCount counts the commits in rangeExpr (e.g. "<old>..<new>"), read-only.

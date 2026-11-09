@@ -88,8 +88,8 @@ const (
 // job ends done.
 type UpdateBranchResult struct {
 	Outcome UpdateOutcome `json:"outcome"`
-	From    string        `json:"from"`    // branch's SHA before
-	To      string        `json:"to"`      // branch's SHA after
+	From    SHA           `json:"from"`    // the branch before
+	To      SHA           `json:"to"`      // the branch after
 	Commits int           `json:"commits"` // commits reachable from To not From; 0 when BranchUpToDate
 }
 

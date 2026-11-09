@@ -5,9 +5,8 @@ import "context"
 // Operations change the current branch by merging or replaying commits: the
 // operation a stop leaves in progress, and the waiting stash.
 type Operations interface {
-	// Merge merges ref (a full ref name: refs/heads/x, refs/remotes/o/x,
-	// refs/tags/x) into wt's current branch: a fast-forward when possible,
-	// else a merge commit with git's default message; hooks run. Refused
+	// Merge merges ref into wt's current branch: a fast-forward when
+	// possible, else a merge commit with git's default message; hooks run. Refused
 	// before git runs: an operation in progress (GitFailed, key
 	// operationInProgress), a detached HEAD (GitFailed, key detachedHead).
 	// Local changes in the way are DirtyWorktree (key mergeBlockedByChanges)
@@ -15,23 +14,23 @@ type Operations interface {
 	// merge, as PullWithStash does. A stop is left for the conflict flow:
 	// Code Conflicted while files conflict, else Code Stopped with git's
 	// reason.
-	Merge(ctx context.Context, wt WorktreeID, ref string, stash bool) (IntegrateResult, error)
+	Merge(ctx context.Context, wt WorktreeID, ref RefName, stash bool) (IntegrateResult, error)
 
 	// Rebase rebases wt's current branch onto ref, flattening merge commits
 	// and moving no other branch. Same refusals, stash and stops as Merge
 	// (DirtyWorktree key rebaseBlockedByChanges).
-	Rebase(ctx context.Context, wt WorktreeID, ref string, stash bool) (IntegrateResult, error)
+	Rebase(ctx context.Context, wt WorktreeID, ref RefName, stash bool) (IntegrateResult, error)
 
 	// CherryPick applies shas onto wt's HEAD, oldest first by committer date
 	// (same-second ties in topological order). A merge commit
 	// among shas refuses the whole call before git runs. A stop that leaves
 	// CHERRY_PICK_HEAD (a conflict or an empty result) is Code Conflicted,
 	// left in place; any other refusal is GitFailed.
-	CherryPick(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
+	CherryPick(ctx context.Context, wt WorktreeID, shas []SHA, opts PickOptions) error
 
 	// Revert is CherryPick's counterpart, applied newest first, with the
 	// same merge refusal and errors; opts.RecordOrigin is ignored.
-	Revert(ctx context.Context, wt WorktreeID, shas []string, opts PickOptions) error
+	Revert(ctx context.Context, wt WorktreeID, shas []SHA, opts PickOptions) error
 
 	// SquashCheck tells whether Squash and Fixup can fold shas (two or more
 	// commits, any order), and what to say first. Blocker, in this order: an
@@ -39,7 +38,7 @@ type Operations interface {
 	// or shas with no common ancestor, a merge commit between the oldest
 	// sha and HEAD, uncommitted changes to tracked files (DirtyWorktree).
 	// Every other blocker is GitFailed. Reads only.
-	SquashCheck(ctx context.Context, wt WorktreeID, shas []string) (SquashCheck, error)
+	SquashCheck(ctx context.Context, wt WorktreeID, shas []SHA) (SquashCheck, error)
 
 	// Squash folds shas into one commit with message, exactly as given
 	// apart from surrounding whitespace (a prepare-commit-msg hook can
@@ -51,10 +50,10 @@ type Operations interface {
 	// flow: Code Conflicted when files conflict, else Code Stopped with git's
 	// reason. A blank message, or fewer than two distinct shas, is Code
 	// Internal.
-	Squash(ctx context.Context, wt WorktreeID, shas []string, message string) (SquashResult, error)
+	Squash(ctx context.Context, wt WorktreeID, shas []SHA, message string) (SquashResult, error)
 
 	// Fixup is Squash keeping the oldest sha's message exactly.
-	Fixup(ctx context.Context, wt WorktreeID, shas []string) (SquashResult, error)
+	Fixup(ctx context.Context, wt WorktreeID, shas []SHA) (SquashResult, error)
 
 	// ContinueOperation runs --continue for wt's in-progress merge, rebase,
 	// cherry-pick, or revert (Summary.Operation) under the write lock, with
@@ -77,11 +76,11 @@ type Operations interface {
 	// PopStash applies the stash entry whose commit is sha and drops it on
 	// success; sha is resolved to its current stash@{n} at call time. A
 	// conflicting pop keeps the entry. Code Internal if no entry has sha.
-	PopStash(ctx context.Context, wt WorktreeID, sha string) error
+	PopStash(ctx context.Context, wt WorktreeID, sha SHA) error
 
 	// DropStash deletes the stash entry sha, resolved like PopStash. The UI
 	// confirms first.
-	DropStash(ctx context.Context, wt WorktreeID, sha string) error
+	DropStash(ctx context.Context, wt WorktreeID, sha SHA) error
 }
 
 // Operation is a merge, rebase, cherry-pick or revert in progress.
@@ -133,5 +132,5 @@ type SquashCheck struct {
 // SquashResult is Squash's and Fixup's result: the branch's commit before,
 // so the user can go back.
 type SquashResult struct {
-	PreviousHead string `json:"previousHead"`
+	PreviousHead SHA `json:"previousHead"`
 }

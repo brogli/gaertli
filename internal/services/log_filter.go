@@ -50,7 +50,9 @@ func logArgs(f core.LogFilter, query, format string, opts ...string) []string {
 		args = append(args, "--exclude=refs/stash", "--all") // same as the unfiltered load
 	}
 	args = append(args, "--format="+format, "--end-of-options")
-	args = append(args, f.Branches...)
+	for _, ref := range f.Branches {
+		args = append(args, string(ref))
+	}
 	if f.Path != "" {
 		args = append(args, "--", f.Path)
 	}
@@ -62,6 +64,11 @@ func (c *Core) SetLogFilter(ctx context.Context, id core.WorktreeID, filter core
 	wt, err := c.sessions.Get(id)
 	if err != nil {
 		return err
+	}
+	for _, ref := range filter.Branches {
+		if err := ref.Validate(); err != nil {
+			return err
+		}
 	}
 	if filter.Empty() {
 		wt.FilterClear()
@@ -95,7 +102,7 @@ func (c *Core) emitFilterProgress(wtID core.WorktreeID, gen, loaded int, done bo
 
 // resolveHash checks whether q looks like, and resolves to, an existing
 // commit.
-func resolveHash(ctx context.Context, r git.Runner, dir, q string) (sha string, ok bool) {
+func resolveHash(ctx context.Context, r git.Runner, dir, q string) (sha core.SHA, ok bool) {
 	if !hashPattern.MatchString(q) {
 		return "", false
 	}
@@ -106,7 +113,7 @@ func resolveHash(ctx context.Context, r git.Runner, dir, q string) (sha string, 
 	if err != nil {
 		return "", false
 	}
-	return strings.TrimSpace(string(result.Stdout)), true
+	return core.SHA(strings.TrimSpace(string(result.Stdout))), true
 }
 
 // SearchLog implements core.API.
@@ -126,21 +133,21 @@ func (c *Core) SearchLog(ctx context.Context, id core.WorktreeID, query string) 
 // matchingSHAs is the set of commits query finds: none for "", the one
 // commit a hash resolves to, else every commit in wt's active view whose
 // message contains query.
-func matchingSHAs(ctx context.Context, wt *session.Worktree, query string) (map[string]bool, error) {
+func matchingSHAs(ctx context.Context, wt *session.Worktree, query string) (map[core.SHA]bool, error) {
 	if query == "" {
 		return nil, nil
 	}
 	if sha, ok := resolveHash(ctx, wt.Runner, wt.Path, query); ok {
-		return map[string]bool{sha: true}, nil
+		return map[core.SHA]bool{sha: true}, nil
 	}
 	filter, _ := wt.ActiveFilter() // the zero LogFilter (the base log) if none active
 	result, err := wt.Runner.Run(ctx, git.Call{Dir: wt.Path, ReadOnly: true, Args: searchArgs(filter, query)})
 	if err != nil {
 		return nil, core.ErrorOf(err)
 	}
-	matched := map[string]bool{}
+	matched := map[core.SHA]bool{}
 	for sha := range strings.FieldsSeq(string(result.Stdout)) {
-		matched[sha] = true
+		matched[core.SHA(sha)] = true
 	}
 	return matched, nil
 }

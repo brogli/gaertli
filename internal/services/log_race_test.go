@@ -47,7 +47,7 @@ func TestLogStaysConsistentUnderConcurrentLoadsReloadsAndFilters(t *testing.T) {
 					rowsErr,
 				)
 				if i%3 == g%3 {
-					errs <- c.SetLogFilter(ctx, id, core.LogFilter{Branches: []string{"side"}})
+					errs <- c.SetLogFilter(ctx, id, core.LogFilter{Branches: []core.RefName{"refs/heads/side"}})
 				}
 			}
 		})

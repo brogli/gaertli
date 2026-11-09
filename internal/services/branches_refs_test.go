@@ -124,9 +124,9 @@ func TestRefsListsEveryRefShape(t *testing.T) {
 	// A newer git's "remote add" refuses a name nested under an existing
 	// remote's; a repo set up by an older git or by hand still has both.
 	gittest.Run(t, repo.Dir, "config", "remote.team/x.url", "https://example.invalid/x.git")
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/main", sha)
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/x/master", sha)
-	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/gone/topic", sha) // a remote no longer configured
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/main", string(sha))
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/team/x/master", string(sha))
+	gittest.Run(t, repo.Dir, "update-ref", "refs/remotes/gone/topic", string(sha)) // a remote no longer configured
 
 	c, wt := openWorktree(t, repo.Dir)
 	refs, err := c.Refs(t.Context(), wt)
@@ -242,7 +242,7 @@ func TestRefsMarksBranchesBeingRebasedOrBisectedElsewhere(t *testing.T) {
 	gittest.Run(t, repo.Dir, "worktree", "add", wDir, "D")
 
 	zDir := filepath.Join(t.TempDir(), "z")
-	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", zDir, seedSHA)
+	gittest.Run(t, repo.Dir, "worktree", "add", "--detach", zDir, string(seedSHA))
 	gittest.Commit(t, zDir, "conflict2.txt", "z-side\n", "z change")
 	gittest.Commit(t, wDir, "conflict2.txt", "d-side\n", "d change")
 	gitStops(t, zDir, "rebase", "D")

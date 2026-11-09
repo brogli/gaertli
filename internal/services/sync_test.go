@@ -49,14 +49,14 @@ func stashPush(t *testing.T, dir, msg string) string {
 
 // remoteAppendCommit pushes a commit to remoteDir's default branch from a
 // throwaway clone and returns its SHA.
-func remoteAppendCommit(t *testing.T, remoteDir, file, content, msg string) string {
+func remoteAppendCommit(t *testing.T, remoteDir, file, content, msg string) core.SHA {
 	t.Helper()
 	return remoteAppendCommitOnBranch(t, remoteDir, "", file, content, msg)
 }
 
 // remoteAppendCommitOnBranch is remoteAppendCommit on branch ("" for the
 // remote's default branch).
-func remoteAppendCommitOnBranch(t *testing.T, remoteDir, branch, file, content, msg string) string {
+func remoteAppendCommitOnBranch(t *testing.T, remoteDir, branch, file, content, msg string) core.SHA {
 	t.Helper()
 	parent := t.TempDir()
 	clone := filepath.Join(parent, "clone")
@@ -309,7 +309,7 @@ func TestPullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.WaitingStash != stashSHA {
+	if summary.WaitingStash != core.SHA(stashSHA) {
 		t.Errorf("Summary.WaitingStash = %q, want %q", summary.WaitingStash, stashSHA)
 	}
 
@@ -320,7 +320,7 @@ func TestPullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) {
 	}
 	gittest.CommitAll(t, repo.Dir, "resolve conflict")
 
-	if err := c.PopStash(t.Context(), wt, stashSHA); err != nil {
+	if err := c.PopStash(t.Context(), wt, core.SHA(stashSHA)); err != nil {
 		t.Fatal(err)
 	}
 	if content := readFile(t, repo.Dir, "other.txt"); content != "unrelated local change\n" {
@@ -349,7 +349,7 @@ func TestPopStashOnAConflictKeepsTheEntryAndLeavesConflictMarkers(t *testing.T) 
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.PopStash(t.Context(), wt, stashSHA)
+	err := c.PopStash(t.Context(), wt, core.SHA(stashSHA))
 
 	coretest.AssertCode(t, err, core.GitFailed)
 	if list := gittest.Out(t, repo.Dir, "stash", "list"); list == "" {
@@ -374,7 +374,7 @@ func TestDropStashDropsOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.DropStash(t.Context(), wt, markerSHA); err != nil {
+	if err := c.DropStash(t.Context(), wt, core.SHA(markerSHA)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -399,7 +399,7 @@ func TestPopStashRestoresOnlyTheMarkerEntryWhenAUserStashIsOnTop(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	if err := c.PopStash(t.Context(), wt, markerSHA); err != nil {
+	if err := c.PopStash(t.Context(), wt, core.SHA(markerSHA)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -422,7 +422,7 @@ func TestPopStashWithAnUnknownSHAReturnsAClearError(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 
-	err := c.PopStash(t.Context(), wt, strings.Repeat("a", 40))
+	err := c.PopStash(t.Context(), wt, core.SHA(strings.Repeat("a", 40)))
 
 	coretest.AssertCode(t, err, core.Internal)
 }
@@ -493,7 +493,7 @@ func TestPullMergeWithPullFFFalseMakesAMergeCommitWhenBehind(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	waitForJobDone(t, c, wt, jobID(t)(c.Pull(t.Context(), wt, core.PullMerge)))
 
-	if parents := headParents(t, repo.Dir); len(parents) != 2 || parents[1] != upstreamTip {
+	if parents := headParents(t, repo.Dir); len(parents) != 2 || core.SHA(parents[1]) != upstreamTip {
 		t.Errorf("HEAD parents = %v, want a merge commit with %s second", parents, upstreamTip)
 	}
 }
@@ -564,10 +564,10 @@ func TestFetchAllUpdatesEveryRemote(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	waitForJobState(t, c, wt, jobID(t)(c.Fetch(t.Context(), wt, "")), core.JobDone)
 
-	if got, _ := refSHA(t, repo.Dir, "refs/remotes/a/master"); got != aTip {
+	if got, _ := refSHA(t, repo.Dir, "refs/remotes/a/master"); core.SHA(got) != aTip {
 		t.Errorf("refs/remotes/a/master = %q, want %q", got, aTip)
 	}
-	if got, _ := refSHA(t, repo.Dir, "refs/remotes/b/master"); got != bTip {
+	if got, _ := refSHA(t, repo.Dir, "refs/remotes/b/master"); core.SHA(got) != bTip {
 		t.Errorf("refs/remotes/b/master = %q, want %q", got, bTip)
 	}
 }
@@ -679,7 +679,7 @@ func TestPullRebaseLinearisesNonConflictingDivergence(t *testing.T) {
 	if len(parents) != 1 {
 		t.Fatalf("HEAD parents = %v, want 1 (linear history, no merge commit)", parents)
 	}
-	if parents[0] != upstreamTip {
+	if core.SHA(parents[0]) != upstreamTip {
 		t.Errorf("HEAD's parent = %q, want the rebased-onto upstream tip %q", parents[0], upstreamTip)
 	}
 	for _, f := range []string{"local-only.txt", "upstream-only.txt"} {
@@ -709,7 +709,7 @@ func TestPullRebaseLeavesRebaseDirOnConflict(t *testing.T) {
 // remoteAmendTip amends remoteDir's default-branch tip with file set to
 // content, through a throwaway clone, and force-pushes it. Returns the new
 // tip's SHA.
-func remoteAmendTip(t *testing.T, remoteDir, file, content string) string {
+func remoteAmendTip(t *testing.T, remoteDir, file, content string) core.SHA {
 	t.Helper()
 	clone := filepath.Join(t.TempDir(), "clone")
 	gittest.Run(t, filepath.Dir(clone), "clone", remoteDir, clone)
@@ -731,7 +731,7 @@ func TestPullRebaseAfterAnUpstreamRewriteReplaysOnlyTheLocalCommit(t *testing.T)
 	c, wt := openWorktree(t, repo.Dir)
 	waitForJobDone(t, c, wt, jobID(t)(c.Pull(t.Context(), wt, core.PullRebase)))
 
-	if parents := headParents(t, repo.Dir); len(parents) != 1 || parents[0] != rewrittenTip {
+	if parents := headParents(t, repo.Dir); len(parents) != 1 || core.SHA(parents[0]) != rewrittenTip {
 		t.Errorf("HEAD parents = %v, want the rewritten upstream tip %s", parents, rewrittenTip)
 	}
 	if subject := gittest.Out(t, repo.Dir, "log", "-1", "--format=%s", "HEAD"); subject != "local commit" {
@@ -749,7 +749,7 @@ func TestPushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
 	rec := recordCommands(t, c, wt)
 	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")), core.JobDone)
 
-	if got := gittest.Out(t, origin, "rev-parse", "master"); got != localTip {
+	if got := gittest.Out(t, origin, "rev-parse", "master"); core.SHA(got) != localTip {
 		t.Errorf("origin's master = %q, want %q", got, localTip)
 	}
 	if cmd := lastCommand(t, rec, "push"); strings.Contains(cmd.Command, "--set-upstream") {
@@ -775,7 +775,7 @@ func TestPushSetUpstreamPushesTheNamedBranchEvenIfHEADMovedAway(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "origin", "feature")), core.JobDone)
 
-	if got := gittest.Out(t, origin, "rev-parse", "feature"); got != featureTip {
+	if got := gittest.Out(t, origin, "rev-parse", "feature"); core.SHA(got) != featureTip {
 		t.Errorf("origin's feature = %q, want %q", got, featureTip)
 	}
 	if _, ok := refSHA(t, origin, "refs/heads/other"); ok {
@@ -953,7 +953,7 @@ func TestPushDeclinedByAServerHookNamesTheReason(t *testing.T) {
 	if !strings.Contains(job.Error.GitStderr, "refusing") {
 		t.Errorf("GitStderr = %q, want the reason the hook gave", job.Error.GitStderr)
 	}
-	if got := gittest.Out(t, origin, "rev-parse", "master"); got == gittest.HeadSHA(t, repo.Dir) {
+	if got := gittest.Out(t, origin, "rev-parse", "master"); core.SHA(got) == gittest.HeadSHA(t, repo.Dir) {
 		t.Error("origin's master took the declined commit")
 	}
 }
@@ -1007,7 +1007,7 @@ func TestForcePushSucceedsAfterProperlyIncorporatingUpstream(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	waitForJobState(t, c, wt, jobID(t)(c.ForcePush(t.Context(), wt)), core.JobDone)
 
-	if got := gittest.Out(t, origin, "rev-parse", "master"); got != rewrittenTip {
+	if got := gittest.Out(t, origin, "rev-parse", "master"); core.SHA(got) != rewrittenTip {
 		t.Errorf("origin's master = %q, want the rewritten local tip %q", got, rewrittenTip)
 	}
 }
@@ -1105,10 +1105,10 @@ func Test02_03_05_UpdateBranchFastForwardsABranchNotCheckedOutAnywhere(t *testin
 		t.Errorf("job Kind, Branch = %q, %q, want update-branch, B", job.Kind, job.Branch)
 	}
 	result := updateBranchResult(t, job)
-	if result.Outcome != "updated" || result.Commits <= 0 || result.To != newTip || result.From != beforeSHA {
+	if result.Outcome != "updated" || result.Commits <= 0 || result.To != newTip || result.From != core.SHA(beforeSHA) {
 		t.Errorf("Result = %+v, want Outcome updated, Commits > 0, From %q, To %q", result, beforeSHA, newTip)
 	}
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != newTip {
+	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); core.SHA(got) != newTip {
 		t.Errorf("refs/heads/B = %q, want %q", got, newTip)
 	}
 	if got := gittest.HeadSHA(t, repo.Dir); got != mainBefore {
@@ -1150,7 +1150,7 @@ func TestUpdateBranchFastForwardsABranchTrackingALocalBranch(t *testing.T) {
 
 	c, wt := openWorktree(t, repo.Dir)
 	waitForJobDone(t, c, wt, jobID(t)(c.UpdateBranch(t.Context(), wt, "B")))
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != masterTip {
+	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); core.SHA(got) != masterTip {
 		t.Errorf("refs/heads/B = %q, want master's tip %q", got, masterTip)
 	}
 }
@@ -1170,7 +1170,7 @@ func TestUpdateBranchDivergedFromUpstreamFailsNotFastForward(t *testing.T) {
 	if job.Error == nil || job.Error.Code != core.NotFastForward {
 		t.Fatalf("job.Error = %+v, want Code %s", job.Error, core.NotFastForward)
 	}
-	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); got != localTip {
+	if got, _ := refSHA(t, repo.Dir, "refs/heads/B"); core.SHA(got) != localTip {
 		t.Errorf("refs/heads/B = %q, want unchanged %q", got, localTip)
 	}
 }

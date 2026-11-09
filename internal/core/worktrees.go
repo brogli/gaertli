@@ -61,7 +61,7 @@ type Sessions interface {
 type Worktree struct {
 	Path    string `json:"path"`
 	Branch  string `json:"branch,omitempty"` // "" when detached
-	SHA     string `json:"sha"`
+	SHA     SHA    `json:"sha"`
 	Main    bool   `json:"main"` // git lists the main worktree first
 	Locked  bool   `json:"locked"`
 	Missing bool   `json:"missing"` // git's "prunable"; Dirty is always false then, the directory is gone
@@ -81,12 +81,11 @@ type Summary struct {
 	Branch       string    `json:"branch"` // "" when Detached
 	Detached     bool      `json:"detached"`
 	Operation    Operation `json:"operation"`     // "" if none
-	SHA          string    `json:"sha,omitempty"` // HEAD's commit; "" for an unborn HEAD
+	SHA          SHA       `json:"sha,omitempty"` // HEAD's commit, "" for an unborn HEAD
 	EditorName   string    `json:"editorName"`    // the effective editor profile's Name
 	MessageDraft string    `json:"messageDraft"`  // "" if none
 
 	// WaitingStash is the commit of the newest stash entry a pull, merge or rebase with stash made
-	// that is still in the stash list, "" if none. A commit, not a stash@{n} index, which shifts
-	// whenever anything else stashes.
-	WaitingStash string `json:"waitingStash"`
+	// that is still in the stash list, "" if none.
+	WaitingStash SHA `json:"waitingStash"`
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/brogli/gaertli/internal/core"
@@ -161,20 +160,16 @@ func rebasingBranch(gitDir string) (branch string, ok bool) {
 	return "", false
 }
 
-// gitObjectID matches a full SHA-1 or SHA-256 object id: BISECT_START holds
-// one when a bisect started on a detached HEAD, the branch's short name
-// otherwise.
-var gitObjectID = regexp.MustCompile(`^[0-9a-f]{40}$|^[0-9a-f]{64}$`)
-
 // bisectingBranch reads gitDir's BISECT_START: the branch it names, "" if
-// no bisect is running or it started on a detached HEAD.
+// no bisect is running or it started on a detached HEAD, when it holds a
+// commit instead.
 func bisectingBranch(gitDir string) (branch string, ok bool) {
 	content, err := os.ReadFile(filepath.Join(gitDir, "BISECT_START"))
 	if err != nil {
 		return "", false
 	}
 	name := strings.TrimSpace(string(content))
-	if name == "" || gitObjectID.MatchString(name) {
+	if name == "" || core.SHA(name).Validate() == nil {
 		return "", false
 	}
 	return name, true

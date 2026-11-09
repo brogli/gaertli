@@ -41,7 +41,7 @@ func (f *Forwarder) Checkout(ctx context.Context, wt core.WorktreeID, branch str
 	return c.Checkout(ctx, coreID, branch)
 }
 
-func (f *Forwarder) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha string) error {
+func (f *Forwarder) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func (f *Forwarder) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha 
 	return c.CheckoutCommit(ctx, coreID, sha)
 }
 
-func (f *Forwarder) CherryPick(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (f *Forwarder) CherryPick(ctx context.Context, wt core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (f *Forwarder) Commit(ctx context.Context, wt core.WorktreeID, message stri
 	return c.Commit(ctx, coreID, message, amend)
 }
 
-func (f *Forwarder) CommitDetails(ctx context.Context, wt core.WorktreeID, sha string) (core.CommitDetails, error) {
+func (f *Forwarder) CommitDetails(ctx context.Context, wt core.WorktreeID, sha core.SHA) (core.CommitDetails, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.CommitDetails
@@ -82,7 +82,7 @@ func (f *Forwarder) CommitDetails(ctx context.Context, wt core.WorktreeID, sha s
 	return c.CommitDetails(ctx, coreID, sha)
 }
 
-func (f *Forwarder) CompareCommits(ctx context.Context, wt core.WorktreeID, a string, b string) ([]core.ChangedFile, error) {
+func (f *Forwarder) CompareCommits(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA) ([]core.ChangedFile, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero []core.ChangedFile
@@ -91,7 +91,7 @@ func (f *Forwarder) CompareCommits(ctx context.Context, wt core.WorktreeID, a st
 	return c.CompareCommits(ctx, coreID, a, b)
 }
 
-func (f *Forwarder) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha string) ([]core.ChangedFile, error) {
+func (f *Forwarder) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha core.SHA) ([]core.ChangedFile, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero []core.ChangedFile
@@ -133,7 +133,7 @@ func (f *Forwarder) DeleteBranch(ctx context.Context, wt core.WorktreeID, name s
 	return c.DeleteBranch(ctx, coreID, name, force)
 }
 
-func (f *Forwarder) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (f *Forwarder) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.DiffFile
@@ -142,7 +142,7 @@ func (f *Forwarder) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, 
 	return c.DiffAgainstWorking(ctx, coreID, sha, path, oldPath, opts)
 }
 
-func (f *Forwarder) DiffFile(ctx context.Context, wt core.WorktreeID, sha string, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (f *Forwarder) DiffFile(ctx context.Context, wt core.WorktreeID, sha core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.DiffFile
@@ -151,7 +151,7 @@ func (f *Forwarder) DiffFile(ctx context.Context, wt core.WorktreeID, sha string
 	return c.DiffFile(ctx, coreID, sha, path, oldPath, opts)
 }
 
-func (f *Forwarder) DiffRange(ctx context.Context, wt core.WorktreeID, a string, b string, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+func (f *Forwarder) DiffRange(ctx context.Context, wt core.WorktreeID, a core.SHA, b core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.DiffFile
@@ -185,7 +185,7 @@ func (f *Forwarder) DiscardLines(ctx context.Context, wt core.WorktreeID, path s
 	return c.DiscardLines(ctx, coreID, path, sel)
 }
 
-func (f *Forwarder) DropStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+func (f *Forwarder) DropStash(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -202,7 +202,7 @@ func (f *Forwarder) Fetch(ctx context.Context, wt core.WorktreeID, remote string
 	return c.Fetch(ctx, coreID, remote)
 }
 
-func (f *Forwarder) Fixup(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashResult, error) {
+func (f *Forwarder) Fixup(ctx context.Context, wt core.WorktreeID, shas []core.SHA) (core.SquashResult, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.SquashResult
@@ -246,7 +246,7 @@ func (f *Forwarder) LoadLog(ctx context.Context, wt core.WorktreeID) error {
 	return c.LoadLog(ctx, coreID)
 }
 
-func (f *Forwarder) LogIndexOf(ctx context.Context, wt core.WorktreeID, sha string) (core.LogIndexResult, error) {
+func (f *Forwarder) LogIndexOf(ctx context.Context, wt core.WorktreeID, sha core.SHA) (core.LogIndexResult, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.LogIndexResult
@@ -273,7 +273,7 @@ func (f *Forwarder) MainWorktree(ctx context.Context, gitDir core.RepoPath) (cor
 	return c.MainWorktree(ctx, gitDir)
 }
 
-func (f *Forwarder) Merge(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+func (f *Forwarder) Merge(ctx context.Context, wt core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.IntegrateResult
@@ -324,7 +324,7 @@ func (f *Forwarder) OpenWorktree(ctx context.Context, path core.RepoPath) (core.
 	return c.OpenWorktree(ctx, path)
 }
 
-func (f *Forwarder) PopStash(ctx context.Context, wt core.WorktreeID, sha string) error {
+func (f *Forwarder) PopStash(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -376,7 +376,7 @@ func (f *Forwarder) PushTarget(ctx context.Context, wt core.WorktreeID) (core.Pu
 	return c.PushTarget(ctx, coreID)
 }
 
-func (f *Forwarder) Rebase(ctx context.Context, wt core.WorktreeID, ref string, stash bool) (core.IntegrateResult, error) {
+func (f *Forwarder) Rebase(ctx context.Context, wt core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.IntegrateResult
@@ -434,7 +434,7 @@ func (f *Forwarder) ReopenConflict(ctx context.Context, wt core.WorktreeID, path
 	return c.ReopenConflict(ctx, coreID, path)
 }
 
-func (f *Forwarder) Reset(ctx context.Context, wt core.WorktreeID, sha string, mode core.ResetMode) (core.ResetResult, error) {
+func (f *Forwarder) Reset(ctx context.Context, wt core.WorktreeID, sha core.SHA, mode core.ResetMode) (core.ResetResult, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.ResetResult
@@ -451,7 +451,7 @@ func (f *Forwarder) ResolveConflict(ctx context.Context, wt core.WorktreeID, pat
 	return c.ResolveConflict(ctx, coreID, path, choice)
 }
 
-func (f *Forwarder) Revert(ctx context.Context, wt core.WorktreeID, shas []string, opts core.PickOptions) error {
+func (f *Forwarder) Revert(ctx context.Context, wt core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -521,7 +521,7 @@ func (f *Forwarder) SkipOperation(ctx context.Context, wt core.WorktreeID) error
 	return c.SkipOperation(ctx, coreID)
 }
 
-func (f *Forwarder) Squash(ctx context.Context, wt core.WorktreeID, shas []string, message string) (core.SquashResult, error) {
+func (f *Forwarder) Squash(ctx context.Context, wt core.WorktreeID, shas []core.SHA, message string) (core.SquashResult, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.SquashResult
@@ -530,7 +530,7 @@ func (f *Forwarder) Squash(ctx context.Context, wt core.WorktreeID, shas []strin
 	return c.Squash(ctx, coreID, shas, message)
 }
 
-func (f *Forwarder) SquashCheck(ctx context.Context, wt core.WorktreeID, shas []string) (core.SquashCheck, error) {
+func (f *Forwarder) SquashCheck(ctx context.Context, wt core.WorktreeID, shas []core.SHA) (core.SquashCheck, error) {
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.SquashCheck

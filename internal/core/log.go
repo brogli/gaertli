@@ -21,7 +21,7 @@ type Log interface {
 
 	// LogIndexOf finds sha's row in the loaded log, without a git call.
 	// Found is false if sha is not loaded (yet).
-	LogIndexOf(ctx context.Context, wt WorktreeID, sha string) (LogIndexResult, error)
+	LogIndexOf(ctx context.Context, wt WorktreeID, sha SHA) (LogIndexResult, error)
 
 	// SetLogFilter starts wt's own filtered log view, or clears it for an
 	// empty filter. The view belongs to the worktree, shared by every
@@ -38,16 +38,16 @@ type Log interface {
 
 	// CommitDetails returns one commit's full message, committer, parents,
 	// and changed files vs. its first parent.
-	CommitDetails(ctx context.Context, wt WorktreeID, sha string) (CommitDetails, error)
+	CommitDetails(ctx context.Context, wt WorktreeID, sha SHA) (CommitDetails, error)
 
 	// CompareCommits lists the files that differ between a and b: a direct
 	// two-revision diff, never a merge-base diff, so swapping a and b
 	// mirrors every status.
-	CompareCommits(ctx context.Context, wt WorktreeID, a, b string) ([]ChangedFile, error)
+	CompareCommits(ctx context.Context, wt WorktreeID, a, b SHA) ([]ChangedFile, error)
 
 	// CompareWithWorking lists the files that differ between sha and wt's
 	// working tree (git diff <sha>).
-	CompareWithWorking(ctx context.Context, wt WorktreeID, sha string) ([]ChangedFile, error)
+	CompareWithWorking(ctx context.Context, wt WorktreeID, sha SHA) ([]ChangedFile, error)
 
 	// DiffFile returns path at sha's first parent (at oldPath for a rename)
 	// and at sha, and git's hunks between them; a root commit has no old
@@ -57,15 +57,15 @@ type Log interface {
 	// content or hunks; opts.Force bypasses the size cap only.
 	// opts.IgnoreWhitespace takes the hunks from git diff -w; the contents
 	// stay exact.
-	DiffFile(ctx context.Context, wt WorktreeID, sha, path, oldPath string, opts DiffOptions) (DiffFile, error)
+	DiffFile(ctx context.Context, wt WorktreeID, sha SHA, path, oldPath string, opts DiffOptions) (DiffFile, error)
 
 	// DiffRange is DiffFile for two arbitrary revisions a and b.
-	DiffRange(ctx context.Context, wt WorktreeID, a, b, path, oldPath string, opts DiffOptions) (DiffFile, error)
+	DiffRange(ctx context.Context, wt WorktreeID, a, b SHA, path, oldPath string, opts DiffOptions) (DiffFile, error)
 
 	// DiffAgainstWorking returns path at sha (at oldPath for a rename)
 	// against the working-tree file, bypassing the index (git diff <sha>).
 	// Same rules as DiffFile.
-	DiffAgainstWorking(ctx context.Context, wt WorktreeID, sha, path, oldPath string, opts DiffOptions) (DiffFile, error)
+	DiffAgainstWorking(ctx context.Context, wt WorktreeID, sha SHA, path, oldPath string, opts DiffOptions) (DiffFile, error)
 }
 
 // LogRowsResult is a window of the commit log loaded so far.
@@ -79,7 +79,7 @@ type LogRowsResult struct {
 
 // LogCommit is one commit-log row.
 type LogCommit struct {
-	SHA          string     `json:"sha"`
+	SHA          SHA        `json:"sha"`
 	ShortSHA     string     `json:"shortSha"`
 	Author       string     `json:"author"`
 	AuthorAt     int64      `json:"authorAt"` // unix seconds
@@ -134,8 +134,8 @@ const (
 // CommitDetails is one commit's full message, committer, parents, and
 // changed files vs. its first parent.
 type CommitDetails struct {
-	SHA            string        `json:"sha"`
-	Parents        []string      `json:"parents"`
+	SHA            SHA           `json:"sha"`
+	Parents        []SHA         `json:"parents"`
 	Author         string        `json:"author"`
 	AuthorEmail    string        `json:"authorEmail"`
 	AuthorAt       int64         `json:"authorAt"`
@@ -149,9 +149,9 @@ type CommitDetails struct {
 // LogFilter is the log's combined filter: every non-empty field narrows the
 // result (AND).
 type LogFilter struct {
-	Author   string   `json:"author,omitempty"`   // author name or email
-	Branches []string `json:"branches,omitempty"` // full ref names of branches or tags (refs/heads/x, refs/tags/x): a short one can name either; empty = every branch, like the unfiltered log
-	Path     string   `json:"path,omitempty"`     // file or folder path
+	Author   string    `json:"author,omitempty"`   // author name or email
+	Branches []RefName `json:"branches,omitempty"` // branches or tags; empty = every branch, like the unfiltered log
+	Path     string    `json:"path,omitempty"`     // file or folder path
 }
 
 // Empty reports whether f narrows nothing; SetLogFilter with an empty
