@@ -1,9 +1,14 @@
 // Package services implements core.API in-process: it validates input, runs
-// git, and returns DTOs. One file per feature area.
+// git, and returns DTOs.
+//
+// One file group per bounded context: its methods and helpers live in
+// <context>.go and <context>_<topic>.go; helpers several contexts share live
+// in files without a context stem.
 package services
 
 import (
 	"context"
+	"os"
 	"sync/atomic"
 
 	"github.com/brogli/gaertli/internal/buildinfo"
@@ -40,3 +45,21 @@ func (c *Core) Version(ctx context.Context) (core.Version, error) {
 	}
 	return v, nil
 }
+
+// runLocked runs git with args in id's worktree under its write lock.
+func (c *Core) runLocked(ctx context.Context, id core.WorktreeID, args ...string) (git.Result, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return git.Result{}, err
+	}
+	wt.Lock()
+	defer wt.Unlock()
+	return wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+var _ core.API = (*Core)(nil)

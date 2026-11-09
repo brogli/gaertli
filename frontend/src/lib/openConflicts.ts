@@ -15,7 +15,7 @@ export async function openConflicts(wt: string): Promise<void> {
 // diff window and counts as handled; any other error is left to the caller.
 export function openOnConflicts(wt: string): (error: CoreError) => boolean {
   return (error) => {
-    if (error.code !== Code.Conflicts) return false
+    if (error.code !== Code.Conflicted) return false
     void openConflicts(wt)
     return true
   }

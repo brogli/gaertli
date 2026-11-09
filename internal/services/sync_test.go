@@ -290,8 +290,8 @@ func TestPullWithStashLeavesTheStashInPlaceOnAConflict(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	job := waitForJobState(t, c, wt, jobID(t)(c.PullWithStash(t.Context(), wt, core.PullMerge)), core.JobFailed)
 
-	if job.Error == nil || job.Error.Code != core.Conflicts {
-		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicts)
+	if job.Error == nil || job.Error.Code != core.Conflicted {
+		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicted)
 	}
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Error("MERGE_HEAD missing, want it left in place for the conflict flow")
@@ -627,8 +627,8 @@ func TestPullMergeLeavesMergeHeadOnConflict(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	job := waitForJobState(t, c, wt, jobID(t)(c.Pull(t.Context(), wt, core.PullMerge)), core.JobFailed)
 
-	if job.Error == nil || job.Error.Code != core.Conflicts {
-		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicts)
+	if job.Error == nil || job.Error.Code != core.Conflicted {
+		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicted)
 	}
 	if !fileExists(filepath.Join(repo.Dir, ".git", "MERGE_HEAD")) {
 		t.Error("MERGE_HEAD missing, want it left in place for the conflict flow")
@@ -698,8 +698,8 @@ func TestPullRebaseLeavesRebaseDirOnConflict(t *testing.T) {
 	c, wt := openWorktree(t, repo.Dir)
 	job := waitForJobState(t, c, wt, jobID(t)(c.Pull(t.Context(), wt, core.PullRebase)), core.JobFailed)
 
-	if job.Error == nil || job.Error.Code != core.Conflicts {
-		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicts)
+	if job.Error == nil || job.Error.Code != core.Conflicted {
+		t.Errorf("job.Error = %+v, want Code %s", job.Error, core.Conflicted)
 	}
 	if !fileExists(filepath.Join(repo.Dir, ".git", "rebase-merge")) {
 		t.Error("rebase-merge missing, want it left in place for the conflict flow")

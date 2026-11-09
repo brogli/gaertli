@@ -358,7 +358,7 @@ func TestRevertRefusesWithADirtyFileInTheWay(t *testing.T) {
 	}
 }
 
-func TestCherryPickReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T) {
+func TestCherryPickReportsCodeConflictedOnARealStopLeftInPlace(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	featureSHA := realConflictFixture(t, repo.Dir, "cherry-pick")
@@ -367,13 +367,13 @@ func TestCherryPickReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T) {
 
 	err := c.CherryPick(t.Context(), wt, []string{featureSHA}, core.PickOptions{})
 
-	coretest.AssertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicted)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "CHERRY_PICK_HEAD")) {
 		t.Error("CHERRY_PICK_HEAD missing, want it left in place for the conflict flow")
 	}
 }
 
-func TestRevertReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T) {
+func TestRevertReportsCodeConflictedOnARealStopLeftInPlace(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
 	c1SHA := realConflictFixture(t, repo.Dir, "revert")
@@ -382,7 +382,7 @@ func TestRevertReportsCodeConflictsOnARealStopLeftInPlace(t *testing.T) {
 
 	err := c.Revert(t.Context(), wt, []string{c1SHA}, core.PickOptions{})
 
-	coretest.AssertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicted)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "REVERT_HEAD")) {
 		t.Error("REVERT_HEAD missing, want it left in place for the conflict flow")
 	}
@@ -486,7 +486,7 @@ func TestCherryPickWithNoCommitOnARealConflictLeavesNoOperationState(t *testing.
 }
 
 // Unlike a no-commit cherry-pick, a no-commit revert stopped on a conflict
-// leaves REVERT_HEAD, so the error is Conflicts.
+// leaves REVERT_HEAD, so the error is Conflicted.
 func TestRevertWithNoCommitOnARealConflictStillReportsConflicts(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -496,7 +496,7 @@ func TestRevertWithNoCommitOnARealConflictStillReportsConflicts(t *testing.T) {
 
 	err := c.Revert(t.Context(), wt, []string{revertSHA}, core.PickOptions{NoCommit: true})
 
-	coretest.AssertCode(t, err, core.Conflicts)
+	coretest.AssertCode(t, err, core.Conflicted)
 	if !fileExists(filepath.Join(repo.Dir, ".git", "REVERT_HEAD")) {
 		t.Error("REVERT_HEAD missing, want it left in place for the conflict flow")
 	}

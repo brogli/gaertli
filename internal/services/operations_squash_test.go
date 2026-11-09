@@ -76,7 +76,7 @@ func TestAnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
 	timedOut := core.Errorf(core.Cancelled, "context deadline exceeded")
 
 	coretest.AssertCode(t, asStop(timedOut, false), core.Stopped)
-	coretest.AssertCode(t, asStop(core.Errorf(core.GitFailed, "could not apply"), true), core.Conflicts)
+	coretest.AssertCode(t, asStop(core.Errorf(core.GitFailed, "could not apply"), true), core.Conflicted)
 }
 
 func TestSquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldestsAuthor(t *testing.T) {
@@ -224,14 +224,14 @@ func TestAConflictStopsAndContinueEndsWithTheExactMessage(t *testing.T) {
 
 			err := tc.fold(c, wt, []string{b, d})
 
-			coretest.AssertCode(t, err, core.Conflicts)
+			coretest.AssertCode(t, err, core.Conflicted)
 			if operation(filepath.Join(repo.Dir, ".git")) != "rebase" {
 				t.Fatal("no rebase in progress after the conflict")
 			}
 			writeFile(t, repo.Dir, "f.txt", "d\n")
 			gittest.Run(t, repo.Dir, "add", "f.txt")
 			err = c.ContinueOperation(t.Context(), wt) // C now conflicts with the folded D
-			coretest.AssertCode(t, err, core.Conflicts)
+			coretest.AssertCode(t, err, core.Conflicted)
 			writeFile(t, repo.Dir, "f.txt", "c\n")
 			gittest.Run(t, repo.Dir, "add", "f.txt")
 			if err := c.ContinueOperation(t.Context(), wt); err != nil {

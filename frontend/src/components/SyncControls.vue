@@ -161,7 +161,7 @@ useShortcut(
 )
 
 function onPullEnded(job: JobInfo): void {
-  const conflicted = job.error?.code === Code.Conflicts
+  const conflicted = job.error?.code === Code.Conflicted
   if (startedPulls.delete(job.id)) {
     if (conflicted) void run(() => openConflicts(props.wt))
   } else if (startCallsOut > 0) {

@@ -1,5 +1,7 @@
 # ADR-6: Write queues by what they lock
 
+**Status.** Approved.
+
 **Context.** Git protects the index and refs with lock files: two writes to one index at once make
 one fail. One global queue would let a slow fetch block a commit (QA-RESP-01).
 

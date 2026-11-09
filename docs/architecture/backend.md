@@ -6,6 +6,9 @@ The component diagram is in `architecture.md`.
 
 - Dependencies point down: only the shell knows windows and Wails; below it everything is plain Go,
   so the WSL core builds without cgo.
+- The core API is one interface per bounded context, composed into what a window may call and what
+  only the shell calls; a context owns its calls, its types and its session state, and reads the
+  others' only through their types.
 - The shell reaches repos only through the core API. It never runs git for a repo itself.
 - Settings belong to the shell, also for WSL repos; each core gets the part it needs, such as the
   editor profile, when it connects. Opening a window is a shell action, since a core has no windows.

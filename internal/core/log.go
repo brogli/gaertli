@@ -1,5 +1,73 @@
 package core
 
+import "context"
+
+// Log is the repo's commits and what they changed: the streamed log with its
+// graph and filters, a commit's details, comparisons, and diffs of committed
+// files.
+type Log interface {
+	// LoadLog starts loading the repo's commit log and graph unless already
+	// loading or loaded (idempotent per repo). Returns once the load has
+	// started; rows are read via LogRows and announced by "log:progress".
+	LoadLog(ctx context.Context, wt WorktreeID) error
+
+	// LogRows returns rows [from, to) of what has loaded so far, clamped to
+	// [0, loaded). Error (and Done) is set if the load failed.
+	LogRows(ctx context.Context, wt WorktreeID, from, to int) (LogRowsResult, error)
+
+	// ReloadLog restarts the log stream if a ref tip moved since the log
+	// last finished. No-op before the first load finishes or while one runs.
+	ReloadLog(ctx context.Context, wt WorktreeID) error
+
+	// LogIndexOf finds sha's row in the loaded log, without a git call.
+	// Found is false if sha is not loaded (yet).
+	LogIndexOf(ctx context.Context, wt WorktreeID, sha string) (LogIndexResult, error)
+
+	// SetLogFilter starts wt's own filtered log view, or clears it for an
+	// empty filter. The view belongs to the worktree, shared by every
+	// window selecting it, apart from the repo's shared log; a new filter
+	// kills the previous one's stream. Rows arrive like LoadLog's.
+	SetLogFilter(ctx context.Context, wt WorktreeID, filter LogFilter) error
+
+	// SearchLog finds query in wt's current view (its filtered view if one
+	// is set, else the base log): a hash resolves to that commit's row
+	// alone, if the view has it; otherwise every row whose message matches,
+	// case-insensitively. An empty query matches nothing. Read-only: no
+	// queue, no stream.
+	SearchLog(ctx context.Context, wt WorktreeID, query string) (LogSearchResult, error)
+
+	// CommitDetails returns one commit's full message, committer, parents,
+	// and changed files vs. its first parent.
+	CommitDetails(ctx context.Context, wt WorktreeID, sha string) (CommitDetails, error)
+
+	// CompareCommits lists the files that differ between a and b: a direct
+	// two-revision diff, never a merge-base diff, so swapping a and b
+	// mirrors every status.
+	CompareCommits(ctx context.Context, wt WorktreeID, a, b string) ([]ChangedFile, error)
+
+	// CompareWithWorking lists the files that differ between sha and wt's
+	// working tree (git diff <sha>).
+	CompareWithWorking(ctx context.Context, wt WorktreeID, sha string) ([]ChangedFile, error)
+
+	// DiffFile returns path at sha's first parent (at oldPath for a rename)
+	// and at sha, and git's hunks between them; a root commit has no old
+	// side. Both sides are in the form git diffs them: the clean form,
+	// after clean filters and line-ending conversion, for a working-tree
+	// side too. Binary files and files over the size cap come without
+	// content or hunks; opts.Force bypasses the size cap only.
+	// opts.IgnoreWhitespace takes the hunks from git diff -w; the contents
+	// stay exact.
+	DiffFile(ctx context.Context, wt WorktreeID, sha, path, oldPath string, opts DiffOptions) (DiffFile, error)
+
+	// DiffRange is DiffFile for two arbitrary revisions a and b.
+	DiffRange(ctx context.Context, wt WorktreeID, a, b, path, oldPath string, opts DiffOptions) (DiffFile, error)
+
+	// DiffAgainstWorking returns path at sha (at oldPath for a rename)
+	// against the working-tree file, bypassing the index (git diff <sha>).
+	// Same rules as DiffFile.
+	DiffAgainstWorking(ctx context.Context, wt WorktreeID, sha, path, oldPath string, opts DiffOptions) (DiffFile, error)
+}
+
 // LogRowsResult is a window of the commit log loaded so far.
 type LogRowsResult struct {
 	Rows       []LogCommit `json:"rows"`
@@ -78,17 +146,6 @@ type CommitDetails struct {
 	Files          []ChangedFile `json:"files"`
 }
 
-// ChangedFile is one file touched by a commit, or one entry in a worktree's
-// current changes.
-type ChangedFile struct {
-	Path    string `json:"path"`
-	OldPath string `json:"oldPath,omitempty"` // rename/copy source
-	// Status is "A" | "M" | "D" | "R" | "C" | "T" | "U" for a commit's own
-	// file; "?" for an untracked entry, or a two-letter unmerged code (e.g.
-	// "UU", "AU", "DD") for a conflicted entry.
-	Status string `json:"status"`
-}
-
 // LogFilter is the log's combined filter: every non-empty field narrows the
 // result (AND).
 type LogFilter struct {
@@ -117,6 +174,12 @@ type LogSearchResult struct {
 	Indices    []int `json:"indices,omitempty"`
 	Generation int   `json:"generation"`
 	Filtered   bool  `json:"filtered"`
+}
+
+// LogIndexResult is LogIndexOf's result.
+type LogIndexResult struct {
+	Index int  `json:"index"`
+	Found bool `json:"found"`
 }
 
 // LogProgress is "log:progress"'s payload. Filtered tells the repo-wide

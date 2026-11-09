@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"strings"
@@ -51,17 +52,6 @@ func (c *Core) UnstageAll(ctx context.Context, id core.WorktreeID) error {
 	return err
 }
 
-// runLocked runs git with args in id's worktree under its write lock.
-func (c *Core) runLocked(ctx context.Context, id core.WorktreeID, args ...string) (git.Result, error) {
-	wt, err := c.sessions.Get(id)
-	if err != nil {
-		return git.Result{}, err
-	}
-	wt.Lock()
-	defer wt.Unlock()
-	return wt.Runner.Run(ctx, git.Call{Dir: wt.Path, Args: args})
-}
-
 // Commit implements core.API.
 func (c *Core) Commit(ctx context.Context, id core.WorktreeID, message string, amend bool) error {
 	wt, err := c.sessions.Get(id)
@@ -98,7 +88,7 @@ func (c *Core) SetMessageDraft(ctx context.Context, id core.WorktreeID, message 
 // "MM" file lands in both groups.
 func parseStatus(data []byte) core.ChangedFiles {
 	var out core.ChangedFiles
-	records := splitRecords(data)
+	records := nulRecords(data)
 	for i := 0; i < len(records); i++ {
 		rec := records[i]
 		switch {
@@ -119,16 +109,6 @@ func parseStatus(data []byte) core.ChangedFiles {
 		}
 	}
 	return out
-}
-
-// splitRecords splits porcelain v2 -z output on NUL, dropping the trailing
-// empty element after the last record's terminator.
-func splitRecords(data []byte) []string {
-	s := strings.TrimSuffix(string(data), "\x00")
-	if s == "" {
-		return nil
-	}
-	return strings.Split(s, "\x00")
 }
 
 // appendChange places a "1" (ordinary) or "2" (rename/copy) record by its
@@ -162,4 +142,22 @@ func (c *Core) DiffWorking(ctx context.Context, id core.WorktreeID, path, oldPat
 		}
 	}
 	return c.diff(ctx, id, d, opts)
+}
+
+// UncommittedCount implements core.API. --no-renames and
+// --untracked-files=no together guarantee every record is exactly one
+// NUL-terminated field, so the count is the field count.
+func (c *Core) UncommittedCount(ctx context.Context, id core.WorktreeID) (int, error) {
+	wt, err := c.sessions.Get(id)
+	if err != nil {
+		return 0, err
+	}
+	result, err := wt.Runner.Run(ctx, git.Call{
+		Dir: wt.Path, ReadOnly: true,
+		Args: []string{"status", "--porcelain=v2", "-z", "--untracked-files=no", "--no-renames"},
+	})
+	if err != nil {
+		return 0, err
+	}
+	return bytes.Count(result.Stdout, []byte{0}), nil
 }

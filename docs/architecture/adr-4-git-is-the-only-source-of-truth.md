@@ -1,5 +1,7 @@
 # ADR-4: Git is the only source of truth
 
+**Status.** Approved.
+
 **Context.** Gärtli runs beside a terminal and an editor that change the repo at any time. Repo
 state the app keeps can go stale, and a stale view in a git tool leads to wrong actions (G4).
 

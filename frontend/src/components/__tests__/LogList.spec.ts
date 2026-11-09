@@ -30,6 +30,7 @@ import LogList from '../LogList.vue'
 import { useLogStore } from '@/stores/log'
 import { useCompareStore } from '@/stores/compare'
 import {
+  Code,
   EdgeKind,
   RefKind,
   type LogCommit,
@@ -410,7 +411,7 @@ describe('LogList', () => {
   })
 
   it('a cherry-pick that stops on conflicts opens the diff window and shows no error', async () => {
-    Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
+    Facade.CherryPick.mockRejectedValueOnce(wailsError('conflicts', Code.Conflicted))
     const { wrapper, body, rowEls } = await mountWithRows(['sha-a'])
 
     await rowEls[0]!.trigger('click')

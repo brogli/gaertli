@@ -35,6 +35,7 @@ import { useRepoStore } from '@/stores/repo'
 import { useLogStore } from '@/stores/log'
 import {
   BranchInUse,
+  Code,
   Operation,
   type Refs,
   type Summary,
@@ -407,7 +408,7 @@ describe('BranchPicker', () => {
   )
 
   it('a merge that stops on conflicts opens the diff window on the first conflicted file, with no notice', async () => {
-    Facade.Merge.mockRejectedValueOnce(wailsError('conflicts', 'CONFLICTS'))
+    Facade.Merge.mockRejectedValueOnce(wailsError('conflicts', Code.Conflicted))
     const notice = await mountNotices()
     const { body } = await openPicker()
 

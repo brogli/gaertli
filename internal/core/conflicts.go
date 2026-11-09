@@ -1,5 +1,50 @@
 package core
 
+import "context"
+
+// Conflicts resolves the files a stopped operation left conflicted, and keeps
+// the merge drafts.
+type Conflicts interface {
+	// Conflict reads path's conflict for the merge editor or the choice panel:
+	// its kind, the operation and sides' labels, and for Kind text the three
+	// sides, the working file as the result, its regions, its line ending and a
+	// fingerprint. All text has LF line breaks. A path with no unmerged entry is
+	// GitFailed (key notConflicted); a text conflict whose working file is gone
+	// is FileNotFound.
+	Conflict(ctx context.Context, wt WorktreeID, path string) (ConflictFile, error)
+
+	// SaveConflict writes text (LF line breaks) to path's working file in its
+	// line-ending convention and, if markResolved, stages it (git add). The
+	// file must still match fingerprint (GitFailed, key fileChangedSinceOpened,
+	// nothing written); markResolved with a conflict marker line left is
+	// GitFailed (key conflictMarkersLeft), nothing written. Returns the new
+	// fingerprint.
+	SaveConflict(ctx context.Context, wt WorktreeID, path, text, fingerprint string, markResolved bool) (string, error)
+
+	// ResolveConflict resolves path to one side or deletes it: current
+	// (checkout --ours + add), incoming (checkout --theirs + add), or delete
+	// (git rm). Current is always the side checked out (stage 2), also in a
+	// rebase. Git's refusals (a side without a version) are GitFailed.
+	ResolveConflict(ctx context.Context, wt WorktreeID, path string, choice ConflictChoice) error
+
+	// ReopenConflict turns path, resolved while the operation is still
+	// stopped, back into a conflict: its stages from git's resolve-undo record,
+	// and for a file with both sides the working file as git merged it (its
+	// markers). No operation in progress is GitFailed (key noOperation); no
+	// record is GitFailed (key notReopenable).
+	ReopenConflict(ctx context.Context, wt WorktreeID, path string) error
+
+	// MergeDraft returns the unsaved merge result kept for path, nil if none.
+	// Drafts are kept per worktree session, in memory only. A draft of a path
+	// that is no longer conflicted, or was made for an earlier conflict in
+	// path, is dropped, and nil returned.
+	MergeDraft(ctx context.Context, wt WorktreeID, path string) (*MergeDraft, error)
+
+	// SetMergeDraft keeps draft as path's unsaved merge result; nil clears it.
+	// A draft whose ConflictID is not that of path's conflict now is not kept.
+	SetMergeDraft(ctx context.Context, wt WorktreeID, path string, draft *MergeDraft) error
+}
+
 // ConflictFile is one conflicted file as the merge editor or the choice
 // panel needs it.
 type ConflictFile struct {

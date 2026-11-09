@@ -171,7 +171,7 @@ func readHeadStatus(ctx context.Context, wt *session.Worktree) (headStatus, erro
 		return headStatus{}, err
 	}
 	var st headStatus
-	for _, rec := range splitRecords(result.Stdout) {
+	for _, rec := range nulRecords(result.Stdout) {
 		switch {
 		case strings.HasPrefix(rec, "# branch.oid "):
 			st.head = strings.TrimPrefix(rec, "# branch.oid ")

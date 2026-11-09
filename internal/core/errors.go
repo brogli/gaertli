@@ -22,9 +22,9 @@ const (
 	NotFastForward Code = "NOT_FAST_FORWARD"
 	// DirtyWorktree: local changes are in the way.
 	DirtyWorktree Code = "DIRTY_WORKTREE"
-	// Conflicts: an operation stopped on conflicts, or cannot continue
+	// Conflicted: an operation stopped on conflicts, or cannot continue
 	// until they are resolved.
-	Conflicts Code = "CONFLICTS"
+	Conflicted Code = "CONFLICTS"
 	// Stopped: an operation stopped mid-way for another reason than
 	// conflicts (a hook, signing, a file in the way); it is left in
 	// progress for continue or abort.
