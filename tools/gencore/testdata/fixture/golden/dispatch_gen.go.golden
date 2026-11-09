@@ -20,5 +20,8 @@ func handlers(api fixture.API) handler.Map {
 		"Local": handler.New(func(ctx context.Context) (fixture.Page, error) {
 			return api.Local(ctx)
 		}),
+		"Validated": handler.New(func(ctx context.Context, p validatedParams) error {
+			return api.Validated(ctx, p.Wt, p.Sha, p.Shas)
+		}),
 	}
 }

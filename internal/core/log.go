@@ -160,6 +160,16 @@ func (f LogFilter) Empty() bool {
 	return f.Author == "" && len(f.Branches) == 0 && f.Path == ""
 }
 
+// Validate checks every ref Branches names.
+func (f LogFilter) Validate() error {
+	for _, ref := range f.Branches {
+		if err := ref.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Flat reports whether f's result has no graph: an author search walks
 // history out of topological order.
 func (f LogFilter) Flat() bool {

@@ -35,3 +35,13 @@ func (c *Client) Local(ctx context.Context) (fixture.Page, error) {
 	err := c.call(ctx, "Local", nil, &result)
 	return result, err
 }
+
+type validatedParams struct {
+	Wt   core.WorktreeID `json:"wt"`
+	Sha  core.SHA        `json:"sha"`
+	Shas []core.SHA      `json:"shas"`
+}
+
+func (c *Client) Validated(ctx context.Context, wt core.WorktreeID, sha core.SHA, shas []core.SHA) error {
+	return c.call(ctx, "Validated", validatedParams{Wt: wt, Sha: sha, Shas: shas}, nil)
+}

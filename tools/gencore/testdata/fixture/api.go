@@ -19,4 +19,5 @@ type API interface {
 	Local(ctx context.Context) (Page, error)
 	ByWorktree(ctx context.Context, wt core.WorktreeID, q Q) (Page, error)
 	ByPath(ctx context.Context, path core.RepoPath) error
+	Validated(ctx context.Context, wt core.WorktreeID, sha core.SHA, shas []core.SHA) error
 }

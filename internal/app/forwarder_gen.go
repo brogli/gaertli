@@ -42,6 +42,9 @@ func (f *Forwarder) Checkout(ctx context.Context, wt core.WorktreeID, branch str
 }
 
 func (f *Forwarder) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
+	if err := validateEach(sha); err != nil {
+		return err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -50,6 +53,9 @@ func (f *Forwarder) CheckoutCommit(ctx context.Context, wt core.WorktreeID, sha 
 }
 
 func (f *Forwarder) CherryPick(ctx context.Context, wt core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
+	if err := validateEach(shas...); err != nil {
+		return err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -74,6 +80,10 @@ func (f *Forwarder) Commit(ctx context.Context, wt core.WorktreeID, message stri
 }
 
 func (f *Forwarder) CommitDetails(ctx context.Context, wt core.WorktreeID, sha core.SHA) (core.CommitDetails, error) {
+	if err := validateEach(sha); err != nil {
+		var zero core.CommitDetails
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.CommitDetails
@@ -83,6 +93,14 @@ func (f *Forwarder) CommitDetails(ctx context.Context, wt core.WorktreeID, sha c
 }
 
 func (f *Forwarder) CompareCommits(ctx context.Context, wt core.WorktreeID, from core.SHA, to core.SHA) ([]core.ChangedFile, error) {
+	if err := validateEach(from); err != nil {
+		var zero []core.ChangedFile
+		return zero, err
+	}
+	if err := validateEach(to); err != nil {
+		var zero []core.ChangedFile
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero []core.ChangedFile
@@ -92,6 +110,10 @@ func (f *Forwarder) CompareCommits(ctx context.Context, wt core.WorktreeID, from
 }
 
 func (f *Forwarder) CompareWithWorking(ctx context.Context, wt core.WorktreeID, sha core.SHA) ([]core.ChangedFile, error) {
+	if err := validateEach(sha); err != nil {
+		var zero []core.ChangedFile
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero []core.ChangedFile
@@ -134,6 +156,10 @@ func (f *Forwarder) DeleteBranch(ctx context.Context, wt core.WorktreeID, name s
 }
 
 func (f *Forwarder) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, sha core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+	if err := validateEach(sha); err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.DiffFile
@@ -143,6 +169,10 @@ func (f *Forwarder) DiffAgainstWorking(ctx context.Context, wt core.WorktreeID, 
 }
 
 func (f *Forwarder) DiffFile(ctx context.Context, wt core.WorktreeID, sha core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+	if err := validateEach(sha); err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.DiffFile
@@ -152,6 +182,14 @@ func (f *Forwarder) DiffFile(ctx context.Context, wt core.WorktreeID, sha core.S
 }
 
 func (f *Forwarder) DiffRange(ctx context.Context, wt core.WorktreeID, from core.SHA, to core.SHA, path string, oldPath string, opts core.DiffOptions) (core.DiffFile, error) {
+	if err := validateEach(from); err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
+	if err := validateEach(to); err != nil {
+		var zero core.DiffFile
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.DiffFile
@@ -186,6 +224,9 @@ func (f *Forwarder) DiscardLines(ctx context.Context, wt core.WorktreeID, path s
 }
 
 func (f *Forwarder) DropStash(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
+	if err := validateEach(sha); err != nil {
+		return err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -203,6 +244,10 @@ func (f *Forwarder) Fetch(ctx context.Context, wt core.WorktreeID, remote string
 }
 
 func (f *Forwarder) Fixup(ctx context.Context, wt core.WorktreeID, shas []core.SHA) (core.SquashResult, error) {
+	if err := validateEach(shas...); err != nil {
+		var zero core.SquashResult
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.SquashResult
@@ -247,6 +292,10 @@ func (f *Forwarder) LoadLog(ctx context.Context, wt core.WorktreeID) error {
 }
 
 func (f *Forwarder) LogIndexOf(ctx context.Context, wt core.WorktreeID, sha core.SHA) (core.LogIndexResult, error) {
+	if err := validateEach(sha); err != nil {
+		var zero core.LogIndexResult
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.LogIndexResult
@@ -274,6 +323,10 @@ func (f *Forwarder) MainWorktree(ctx context.Context, gitDir core.RepoPath) (cor
 }
 
 func (f *Forwarder) Merge(ctx context.Context, wt core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
+	if err := validateEach(ref); err != nil {
+		var zero core.IntegrateResult
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.IntegrateResult
@@ -325,6 +378,9 @@ func (f *Forwarder) OpenWorktree(ctx context.Context, path core.RepoPath) (core.
 }
 
 func (f *Forwarder) PopStash(ctx context.Context, wt core.WorktreeID, sha core.SHA) error {
+	if err := validateEach(sha); err != nil {
+		return err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -377,6 +433,10 @@ func (f *Forwarder) PushTarget(ctx context.Context, wt core.WorktreeID) (core.Pu
 }
 
 func (f *Forwarder) Rebase(ctx context.Context, wt core.WorktreeID, ref core.RefName, stash bool) (core.IntegrateResult, error) {
+	if err := validateEach(ref); err != nil {
+		var zero core.IntegrateResult
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.IntegrateResult
@@ -435,6 +495,10 @@ func (f *Forwarder) ReopenConflict(ctx context.Context, wt core.WorktreeID, path
 }
 
 func (f *Forwarder) Reset(ctx context.Context, wt core.WorktreeID, sha core.SHA, mode core.ResetMode) (core.ResetResult, error) {
+	if err := validateEach(sha); err != nil {
+		var zero core.ResetResult
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.ResetResult
@@ -452,6 +516,9 @@ func (f *Forwarder) ResolveConflict(ctx context.Context, wt core.WorktreeID, pat
 }
 
 func (f *Forwarder) Revert(ctx context.Context, wt core.WorktreeID, shas []core.SHA, opts core.PickOptions) error {
+	if err := validateEach(shas...); err != nil {
+		return err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -490,6 +557,9 @@ func (f *Forwarder) SetFocused(ctx context.Context, wt core.WorktreeID, focused 
 }
 
 func (f *Forwarder) SetLogFilter(ctx context.Context, wt core.WorktreeID, filter core.LogFilter) error {
+	if err := validateEach(filter); err != nil {
+		return err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		return err
@@ -522,6 +592,10 @@ func (f *Forwarder) SkipOperation(ctx context.Context, wt core.WorktreeID) error
 }
 
 func (f *Forwarder) Squash(ctx context.Context, wt core.WorktreeID, shas []core.SHA, message string) (core.SquashResult, error) {
+	if err := validateEach(shas...); err != nil {
+		var zero core.SquashResult
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.SquashResult
@@ -531,6 +605,10 @@ func (f *Forwarder) Squash(ctx context.Context, wt core.WorktreeID, shas []core.
 }
 
 func (f *Forwarder) SquashCheck(ctx context.Context, wt core.WorktreeID, shas []core.SHA) (core.SquashCheck, error) {
+	if err := validateEach(shas...); err != nil {
+		var zero core.SquashCheck
+		return zero, err
+	}
 	c, coreID, err := f.router.CoreOf(ctx, wt)
 	if err != nil {
 		var zero core.SquashCheck

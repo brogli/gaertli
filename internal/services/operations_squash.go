@@ -109,14 +109,8 @@ func (c *Core) fold(ctx context.Context, id core.WorktreeID, shas []core.SHA, me
 }
 
 // inspectSelection reads shas' chain and the worktree's state, and names
-// the first blocker. The shas go into the rebase todo, where git would not
-// refuse a malformed one, so they are validated first.
+// the first blocker.
 func inspectSelection(ctx context.Context, wt *session.Worktree, shas []core.SHA) (selection, error) {
-	for _, sha := range shas {
-		if err := sha.Validate(); err != nil {
-			return selection{}, err
-		}
-	}
 	selected := map[string]bool{}
 	for _, sha := range shas {
 		selected[string(sha)] = true

@@ -103,22 +103,6 @@ func TestMergeFastForwards(t *testing.T) {
 	}
 }
 
-func TestMergeAndRebaseRefuseABareName(t *testing.T) {
-	t.Parallel()
-	repo := divergedFixture(t)
-	before := gittest.HeadSHA(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
-
-	_, mergeErr := c.Merge(t.Context(), wt, "side", false)
-	_, rebaseErr := c.Rebase(t.Context(), wt, "side", false)
-
-	coretest.AssertCode(t, mergeErr, core.Internal)
-	coretest.AssertCode(t, rebaseErr, core.Internal)
-	if got := gittest.HeadSHA(t, repo.Dir); got != before {
-		t.Errorf("HEAD = %s, want unchanged %s", got, before)
-	}
-}
-
 func TestMergeMakesAMergeCommitRunsHooksAndIgnoresHostileConfig(t *testing.T) {
 	t.Parallel()
 	repo := divergedFixture(t)

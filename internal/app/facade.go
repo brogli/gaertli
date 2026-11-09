@@ -23,6 +23,18 @@ type Forwarder struct{ router Router }
 // NewForwarder binds a Forwarder to r.
 func NewForwarder(r Router) *Forwarder { return &Forwarder{router: r} }
 
+// validateEach returns the first error of vs' Validate. The Forwarder checks
+// every value with a rule (a SHA, a full ref name) here, so no core is
+// reached with a malformed one.
+func validateEach[V interface{ Validate() error }](vs ...V) error {
+	for _, v := range vs {
+		if err := v.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Facade is the Wails service windows call: the Forwarder's WindowAPI
 // methods only, since Wails binds every method of a bound type.
 type Facade struct{ core.WindowAPI }

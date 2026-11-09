@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/brogli/gaertli/internal/core"
-	"github.com/brogli/gaertli/internal/core/coretest"
 	"github.com/brogli/gaertli/internal/git/gittest"
 	"github.com/brogli/gaertli/internal/testwait"
 )
@@ -350,14 +349,4 @@ func TestFirstFilteredRowObservableWellUnderFullStreamDuration(t *testing.T) {
 	}
 
 	waitForLogRows(t, c, id) // drain the background stream so it doesn't leak noise into later tests
-}
-
-func TestSetLogFilterRefusesABranchThatIsNoFullRefName(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	c, id := openWorktree(t, repo.Dir)
-
-	err := c.SetLogFilter(t.Context(), id, core.LogFilter{Branches: []core.RefName{"main"}})
-
-	coretest.AssertCode(t, err, core.Internal)
 }

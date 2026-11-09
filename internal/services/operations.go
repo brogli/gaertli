@@ -39,9 +39,6 @@ func (c *Core) integrate(ctx context.Context, id core.WorktreeID, ref core.RefNa
 	if err != nil {
 		return core.IntegrateResult{}, err
 	}
-	if err := ref.Validate(); err != nil {
-		return core.IntegrateResult{}, err
-	}
 	wt.Lock()
 	defer wt.Unlock()
 
