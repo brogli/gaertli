@@ -35,7 +35,7 @@ func (c *Core) Summary(ctx context.Context, id core.WorktreeID) (core.Summary, e
 		return core.Summary{}, err
 	}
 	return core.Summary{
-		Branch: branch, Detached: detached, Operation: core.OperationKind(operation(wt.GitDir)), SHA: sha,
+		Branch: branch, Detached: detached, Operation: operation(wt.GitDir), SHA: sha,
 		EditorName: c.currentProfile().Name, MessageDraft: wt.MessageDraft(), WaitingStash: stash,
 	}, nil
 }
