@@ -1,7 +1,7 @@
 // Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-ED-02, FR-LOG-21, QA-REL-03
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChangeScope } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
 vi.mock(
@@ -16,10 +16,10 @@ vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 import { Events, Window, emit } from '@/testing/runtime'
 
 import { confirmRequire } from '@/testing/confirm'
-import { useMergeDrafts } from '@/composables/useMergeDrafts'
+import { useConflictsStore } from '@/stores/conflicts'
 import DiffWindowView from '../DiffWindowView.vue'
 import DiffView from '@/components/DiffView.vue'
-import ConflictView from '@/components/ConflictView.vue'
+import ConflictedFileView from '@/components/ConflictedFileView.vue'
 import { DiffKind, type DiffTarget } from '@/lib/diffTarget'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
@@ -41,13 +41,13 @@ function diffOf(path: string) {
   })
 }
 
-// mountWindow mounts the window with DiffView and ConflictView stubbed, for
+// mountWindow mounts the window with DiffView and ConflictedFileView stubbed, for
 // tests that look at the file list and the props the views get.
 async function mountWindow(target: DiffTarget, wt = '/repo'): Promise<VueWrapper> {
-  return mountWindowWith(target, wt, { DiffView: true, ConflictView: true })
+  return mountWindowWith(target, wt, { DiffView: true, ConflictedFileView: true })
 }
 
-// mountRealWindow mounts the window with the real DiffView and ConflictView.
+// mountRealWindow mounts the window with the real DiffView and ConflictedFileView.
 async function mountRealWindow(target: DiffTarget): Promise<VueWrapper> {
   return mountWindowWith(target, '/repo', {})
 }
@@ -67,7 +67,7 @@ const diffProps = (wrapper: VueWrapper) => wrapper.getComponent(DiffView).props(
 // stepFile has the shown stubbed view ask for its neighbouring file.
 async function stepFile(wrapper: VueWrapper, step: 1 | -1): Promise<void> {
   const view = wrapper.findComponent(DiffView)
-  ;(view.exists() ? view : wrapper.getComponent(ConflictView)).vm.$emit('step-file', step)
+  ;(view.exists() ? view : wrapper.getComponent(ConflictedFileView)).vm.$emit('step-file', step)
   await flushPromises()
 }
 
@@ -97,9 +97,10 @@ const rows = (wrapper: VueWrapper) => wrapper.findAll('.files li')
 const selectedRow = (wrapper: VueWrapper) => wrapper.get('.files li.selected .path').text()
 
 describe('DiffWindowView', () => {
+  afterEach(() => useConflictsStore().$dispose())
+
   beforeEach(() => {
     localStorage.clear()
-    useMergeDrafts().keepOnly('/repo', [])
     setActivePinia(createPinia())
     resetMainWindowApp()
     Facade.CommitDetails.mockResolvedValue({ sha: 'abc', files })
@@ -181,7 +182,10 @@ describe('DiffWindowView', () => {
 
     expect(selectedRow(wrapper)).toBe('both.txt')
     expect(wrapper.findComponent(DiffView).exists()).toBe(false)
-    expect(wrapper.getComponent(ConflictView).props()).toEqual({ wt: '/repo', path: 'both.txt' })
+    expect(wrapper.getComponent(ConflictedFileView).props()).toEqual({
+      wt: '/repo',
+      path: 'both.txt',
+    })
   })
 
   it("in the working tree's window, next file goes on from the staged group to the unstaged one, then to the conflicted files", async () => {
@@ -192,7 +196,7 @@ describe('DiffWindowView', () => {
 
     await stepFile(wrapper, 1)
     await stepFile(wrapper, 1)
-    expect(wrapper.getComponent(ConflictView).props('path')).toBe('both.txt')
+    expect(wrapper.getComponent(ConflictedFileView).props('path')).toBe('both.txt')
   })
 
   it("the conflict view's next and previous file step through the conflicted files", async () => {
@@ -200,10 +204,10 @@ describe('DiffWindowView', () => {
     const wrapper = await mountWindow(oneOfTwo)
 
     await stepFile(wrapper, 1)
-    expect(wrapper.getComponent(ConflictView).props('path')).toBe('two.txt')
+    expect(wrapper.getComponent(ConflictedFileView).props('path')).toBe('two.txt')
 
     await stepFile(wrapper, -1)
-    expect(wrapper.getComponent(ConflictView).props('path')).toBe('one.txt')
+    expect(wrapper.getComponent(ConflictedFileView).props('path')).toBe('one.txt')
   })
 
   describe('a conflicted target', () => {
@@ -219,14 +223,14 @@ describe('DiffWindowView', () => {
 
     it('shows its conflict, then gives way to the next conflicted file once it leaves the list', async () => {
       const wrapper = await mountWindow(oneOfTwo)
-      expect(wrapper.getComponent(ConflictView).props('path')).toBe('one.txt')
+      expect(wrapper.getComponent(ConflictedFileView).props('path')).toBe('one.txt')
       await indexChanges(
         changedFilesFixture({
           staged: [{ path: 'one.txt', status: 'M' }],
           conflicted: [{ path: 'two.txt', status: 'UU' }],
         }),
       )
-      expect(wrapper.getComponent(ConflictView).props('path')).toBe('two.txt')
+      expect(wrapper.getComponent(ConflictedFileView).props('path')).toBe('two.txt')
       expect(selectedRow(wrapper)).toBe('two.txt')
     })
 
@@ -238,13 +242,13 @@ describe('DiffWindowView', () => {
           conflicted: [{ path: 'one.txt', status: 'UU' }],
         }),
       )
-      expect(wrapper.getComponent(ConflictView).props('path')).toBe('one.txt')
+      expect(wrapper.getComponent(ConflictedFileView).props('path')).toBe('one.txt')
     })
 
     it('shows a hint once no conflicted file is left', async () => {
       const wrapper = await mountWindow(oneOfTwo)
       await indexChanges(changedFilesFixture({ staged: [{ path: 'two.txt', status: 'M' }] }))
-      expect(wrapper.findComponent(ConflictView).exists()).toBe(false)
+      expect(wrapper.findComponent(ConflictedFileView).exists()).toBe(false)
       expect(wrapper.text()).toContain('No conflicts left.')
     })
   })
@@ -347,7 +351,7 @@ describe('DiffWindowView', () => {
   it('a draft of a file that is no longer conflicted is dropped', async () => {
     Facade.Status.mockResolvedValue(twoConflicted())
     await mountWindow(oneOfTwo)
-    const drafts = useMergeDrafts()
+    const drafts = useConflictsStore()
     drafts.set('/repo', 'one.txt', '', () => ({ text: 'x', fingerprint: 'fp', changes: [] }))
     drafts.set('/repo', 'two.txt', '', () => ({ text: 'y', fingerprint: 'fp', changes: [] }))
 
@@ -379,7 +383,7 @@ describe('DiffWindowView', () => {
   it('Escape with a merge draft closes the window without asking', async () => {
     confirmRequire.mockReset()
     await mountWindow(commitA)
-    useMergeDrafts().set('/repo', 'a.txt', '', () => ({
+    useConflictsStore().set('/repo', 'a.txt', '', () => ({
       text: 'x',
       fingerprint: 'fp',
       changes: [],
