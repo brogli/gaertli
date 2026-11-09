@@ -1,6 +1,7 @@
 // Command gencore reads the core.API interface and writes the shell's
 // forwarder, the JSON-RPC client and the JSON-RPC dispatcher. A method is
-// written once, in the interface.
+// written once, in the interface. The forwarder checks every parameter whose
+// type has a Validate() error method before routing the call.
 package main
 
 import (
@@ -45,8 +46,9 @@ var routes = map[string]route{
 const coreArg = "coreID"
 
 type param struct {
-	name string
-	typ  types.Type
+	name      string
+	typ       types.Type
+	validated bool // the value, or each element of the slice, has Validate() error
 }
 
 type method struct {
@@ -129,7 +131,7 @@ func readMethod(fn *types.Func) (method, error) {
 		if bad := nonJSON(p.Type()); bad != nil {
 			return fail("parameter %s: %s is not JSON-serialisable", p.Name(), bad)
 		}
-		m.params = append(m.params, param{p.Name(), p.Type()})
+		m.params = append(m.params, param{p.Name(), p.Type(), validated(p.Type())})
 	}
 	if len(m.params) > 0 {
 		m.router = routes[types.TypeString(m.params[0].typ, nil)]
@@ -191,6 +193,21 @@ func nonJSON(t types.Type) types.Type {
 	return walk(t)
 }
 
+// validated reports whether t, or t's element if t is a slice, has a
+// Validate() error method.
+func validated(t types.Type) bool {
+	if s, ok := t.Underlying().(*types.Slice); ok {
+		t = s.Elem()
+	}
+	sel := types.NewMethodSet(t).Lookup(nil, "Validate")
+	if sel == nil {
+		return false
+	}
+	sig := sel.Obj().(*types.Func).Signature()
+	return sig.Params().Len() == 0 && sig.Results().Len() == 1 &&
+		types.Identical(sig.Results().At(0).Type(), types.Universe.Lookup("error").Type())
+}
+
 // file collects generated code and the imports its type names need.
 type file struct {
 	pkg     string
@@ -250,11 +267,34 @@ func (f *file) results(m method) string {
 	return "(" + f.typ(m.result) + ", error)"
 }
 
+// returnErr returns err from a method with m's results.
+func (f *file) returnErr(m method) {
+	if m.result == nil {
+		f.printf("\t\treturn err\n")
+	} else {
+		f.printf("\t\tvar zero %s\n\t\treturn zero, err\n", f.typ(m.result))
+	}
+}
+
+// emitForwarder writes the Forwarder: each method checks its validated
+// parameters, then forwards the call to the core the Router names.
 func emitForwarder(pkg *types.Package, methods []method) *file {
 	f := newFile("app", pkg, "context")
 	for _, m := range methods {
 		params, args := f.signature(m)
 		f.printf("func (f *Forwarder) %s(%s) %s {\n", m.name, params, f.results(m))
+		for _, p := range m.params {
+			if !p.validated {
+				continue
+			}
+			spread := ""
+			if _, ok := p.typ.Underlying().(*types.Slice); ok {
+				spread = "..."
+			}
+			f.printf("\tif err := validateEach(%s%s); err != nil {\n", p.name, spread)
+			f.returnErr(m)
+			f.printf("\t}\n")
+		}
 		if m.router.method == "" {
 			f.printf("\treturn f.router.Local().%s(%s)\n", m.name, strings.Join(args, ", "))
 		} else {
@@ -265,11 +305,7 @@ func emitForwarder(pkg *types.Package, methods []method) *file {
 				args[1] = coreArg
 			}
 			f.printf("\t%s, err := f.router.%s(%s)\n\tif err != nil {\n", routed, m.router.method, routeArgs)
-			if m.result == nil {
-				f.printf("\t\treturn err\n")
-			} else {
-				f.printf("\t\tvar zero %s\n\t\treturn zero, err\n", f.typ(m.result))
-			}
+			f.returnErr(m)
 			f.printf("\t}\n\treturn c.%s(%s)\n", m.name, strings.Join(args, ", "))
 		}
 		f.printf("}\n\n")

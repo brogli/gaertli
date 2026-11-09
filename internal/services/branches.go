@@ -79,9 +79,6 @@ func (c *Core) Reset(ctx context.Context, id core.WorktreeID, sha core.SHA, mode
 	if err != nil {
 		return core.ResetResult{}, err
 	}
-	if err := sha.Validate(); err != nil {
-		return core.ResetResult{}, err
-	}
 	flag, err := resetFlag(mode)
 	if err != nil {
 		return core.ResetResult{}, err

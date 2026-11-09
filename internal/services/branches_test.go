@@ -600,21 +600,6 @@ func TestBranchActionsFailCleanlyOnAnEmptyRepo(t *testing.T) {
 	}
 }
 
-func TestResetRefusesARevisionThatIsNoCommitHash(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	resetFixture(t, repo.Dir)
-	before := gittest.HeadSHA(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
-
-	_, err := c.Reset(t.Context(), wt, "master~2", core.ResetHard)
-
-	coretest.AssertCode(t, err, core.Internal)
-	if got := gittest.HeadSHA(t, repo.Dir); got != before {
-		t.Errorf("HEAD = %s, want unchanged %s", got, before)
-	}
-}
-
 func TestResetSoftMovesBranchLeavesIndexAndWorkingTreeUntouched(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

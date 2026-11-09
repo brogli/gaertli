@@ -1,4 +1,4 @@
-// Requirements: QA-PORT-02
+// Requirements: QA-PORT-02, QA-MNT-07, QA-SEC-03
 
 package app_test
 
@@ -9,6 +9,7 @@ import (
 
 	"github.com/brogli/gaertli/internal/app"
 	"github.com/brogli/gaertli/internal/core"
+	"github.com/brogli/gaertli/internal/core/coretest"
 )
 
 // stubCore answers Version and records Summary's id. The embedded
@@ -93,5 +94,42 @@ func TestFacadeMethodSetIsExactlyWindowAPI(t *testing.T) {
 		if _, ok := facade.MethodByName(name); ok {
 			t.Errorf("Facade has %s, a core.API method outside core.WindowAPI", name)
 		}
+	}
+}
+
+func TestForwarderRefusesAMalformedValueBeforeReachingACore(t *testing.T) {
+	const sha core.SHA = "0123456789abcdef0123456789abcdef01234567"
+	calls := map[string]func(f *app.Forwarder) error{
+		"short sha": func(f *app.Forwarder) error {
+			_, err := f.CommitDetails(t.Context(), "wt", "0123456")
+			return err
+		},
+		"revision expression": func(f *app.Forwarder) error {
+			_, err := f.Reset(t.Context(), "wt", "master~2", core.ResetHard)
+			return err
+		},
+		"option as one of several shas": func(f *app.Forwarder) error {
+			return f.CherryPick(t.Context(), "wt", []core.SHA{sha, "--quit"}, core.PickOptions{})
+		},
+		"revision expression among squashed shas": func(f *app.Forwarder) error {
+			_, err := f.Squash(t.Context(), "wt", []core.SHA{"HEAD~1", sha}, "folded")
+			return err
+		},
+		"short ref": func(f *app.Forwarder) error {
+			_, err := f.Merge(t.Context(), "wt", "main", false)
+			return err
+		},
+		"short ref in a log filter": func(f *app.Forwarder) error {
+			return f.SetLogFilter(t.Context(), "wt", core.LogFilter{Branches: []core.RefName{"main"}})
+		},
+	}
+	for name, call := range calls {
+		t.Run(name, func(t *testing.T) {
+			r := &stubRouter{}
+			coretest.AssertCode(t, call(app.NewForwarder(r)), core.Internal)
+			if r.other != 0 {
+				t.Errorf("a core was looked up %d times", r.other)
+			}
+		})
 	}
 }

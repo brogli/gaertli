@@ -105,24 +105,6 @@ func TestSquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldes
 	}
 }
 
-func TestSquashAndFixupRefuseARevisionThatIsNoCommitHash(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	l := lineFixture(t, repo.Dir)
-	c, wt := openWorktree(t, repo.Dir)
-
-	_, squashErr := c.Squash(t.Context(), wt, []core.SHA{"HEAD~1", l.E}, "folded")
-	_, fixupErr := c.Fixup(t.Context(), wt, []core.SHA{"HEAD~1", l.E})
-	_, checkErr := c.SquashCheck(t.Context(), wt, []core.SHA{"HEAD~1", l.E})
-
-	coretest.AssertCode(t, squashErr, core.Internal)
-	coretest.AssertCode(t, checkErr, core.Internal)
-	coretest.AssertCode(t, fixupErr, core.Internal)
-	if got := gittest.HeadSHA(t, repo.Dir); got != l.E {
-		t.Errorf("HEAD = %s, want unchanged %s", got, l.E)
-	}
-}
-
 func TestFixupKeepsTheOldestMessageWhateverOrderTheShasCome(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

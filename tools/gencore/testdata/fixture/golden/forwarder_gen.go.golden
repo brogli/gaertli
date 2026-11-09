@@ -29,3 +29,17 @@ func (f *Forwarder) ByWorktree(ctx context.Context, wt core.WorktreeID, q fixtur
 func (f *Forwarder) Local(ctx context.Context) (fixture.Page, error) {
 	return f.router.Local().Local(ctx)
 }
+
+func (f *Forwarder) Validated(ctx context.Context, wt core.WorktreeID, sha core.SHA, shas []core.SHA) error {
+	if err := validateEach(sha); err != nil {
+		return err
+	}
+	if err := validateEach(shas...); err != nil {
+		return err
+	}
+	c, coreID, err := f.router.CoreOf(ctx, wt)
+	if err != nil {
+		return err
+	}
+	return c.Validated(ctx, coreID, sha, shas)
+}

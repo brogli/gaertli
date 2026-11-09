@@ -21,7 +21,10 @@ The component diagram is in `architecture.md`.
 
 - **Calls** (UI → Go) go through generated bindings and return a result or the core error. Large
   data (log rows, file contents) always moves by call. A window can reach only the window part of
-  the API; what the shell does for itself (opening sessions, configuring a core) is not bound.
+  the API; what the shell does for itself (opening sessions, configuring a core) is not bound. A
+  value with a rule (a SHA, a full ref name, a filter naming refs) is checked once, where the call
+  enters the shell, so no core sees a malformed one and git is never handed a revision expression or
+  an option in its place.
 - **Events** (Go → UI) carry small payloads and tell the UI to reload or update:
 
 | Event              | Meaning                                                                 |
