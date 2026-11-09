@@ -13,7 +13,9 @@ import (
 
 func main() {
 	outFile := os.Args[1]
-	_ = os.WriteFile(outFile, []byte(strings.Join(os.Args[2:], "\n")), 0o644)
+	// Rename, so a reader never sees the file created but still empty.
+	_ = os.WriteFile(outFile+".tmp", []byte(strings.Join(os.Args[2:], "\n")), 0o644)
+	_ = os.Rename(outFile+".tmp", outFile)
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
 		if _, err := os.Stat(outFile + ".hold"); err != nil {
 			break
