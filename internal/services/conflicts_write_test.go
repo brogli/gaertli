@@ -207,3 +207,19 @@ func TestConflictFindsTheMarkersOfAMixedLineEndingFile(t *testing.T) {
 	_, err := c.SaveConflict(t.Context(), wt, "a.txt", "one\r\n>>>>>>> side\r\n", got.Fingerprint, true)
 	requireGitFailedKey(t, err, "conflictMarkersLeft")
 }
+
+func TestHasMarkerLineFindsAnOpeningOrClosingMarkerOnly(t *testing.T) {
+	t.Parallel()
+	for text, want := range map[string]bool{
+		"a\n<<<<<<< HEAD\nb\n": true,
+		"a\n>>>>>>> side\n":    true,
+		"a\n=======\nb\n":      false,
+		"<<<<<<<< not one\n":   false,
+		"a\n>>>>>>>\r\n":       true,
+		"no marker, no break":  false,
+	} {
+		if got := hasMarkerLine(text, 7); got != want {
+			t.Errorf("hasMarkerLine(%q) = %v, want %v", text, got, want)
+		}
+	}
+}
