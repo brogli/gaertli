@@ -3,24 +3,17 @@ package services
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/brogli/gaertli/internal/core"
 )
 
-// stateFiles are what a stopped operation leaves in its worktree's git dir.
-// The rebase directories, not REBASE_HEAD, mark a rebase stop: REBASE_HEAD is
-// absent at a break or exec stop and lingers after a finished rebase.
-var stateFiles = []struct {
-	name string
-	kind core.OperationKind
-}{
-	{"MERGE_HEAD", core.MergeOperation},
-	{"CHERRY_PICK_HEAD", core.CherryPickOperation},
-	{"REVERT_HEAD", core.RevertOperation},
-	{"rebase-merge", core.RebaseOperation},
-	{"rebase-apply", core.RebaseOperation},
-}
+// rebaseDirs are the directories a stopped rebase leaves in its worktree's
+// git dir, rebase-merge first. They, not REBASE_HEAD, mark a rebase stop:
+// REBASE_HEAD is absent at a break or exec stop and lingers after a finished
+// rebase.
+var rebaseDirs = []string{"rebase-merge", "rebase-apply"}
 
 // operation names the operation in progress in the worktree whose own git
 // dir is gitDir, "" for none. File checks only, no subprocess. A merge or
@@ -34,13 +27,13 @@ func operation(gitDir string) core.OperationKind {
 	switch {
 	case has("MERGE_HEAD") && !rebaseStoppedOnMerge(gitDir):
 		return core.MergeOperation
-	case has("CHERRY_PICK_HEAD") && (!has("rebase-merge") || stateSHA(gitDir, "CHERRY_PICK_HEAD") != stateSHA(gitDir, "REBASE_HEAD")):
+	case has("CHERRY_PICK_HEAD") && !rebaseStoppedOnPick(gitDir):
 		return core.CherryPickOperation
 	case has("REVERT_HEAD"):
 		return core.RevertOperation
 	case has("sequencer"):
 		return sequenceKind(gitDir)
-	case has("rebase-merge") || has("rebase-apply"):
+	case slices.ContainsFunc(rebaseDirs, has):
 		return core.RebaseOperation
 	}
 	return ""
@@ -53,6 +46,13 @@ func rebaseStoppedOnMerge(gitDir string) bool {
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	command, _, _ := strings.Cut(lines[len(lines)-1], " ")
 	return command == "merge" || command == "m"
+}
+
+// rebaseStoppedOnPick reports whether CHERRY_PICK_HEAD in gitDir is the pick
+// an interactive rebase stopped on.
+func rebaseStoppedOnPick(gitDir string) bool {
+	return fileExists(filepath.Join(gitDir, "rebase-merge")) &&
+		stateSHA(gitDir, "CHERRY_PICK_HEAD") == stateSHA(gitDir, "REBASE_HEAD")
 }
 
 // sequenceKind is the kind of the cherry-pick or revert sequence stopped in
@@ -68,10 +68,15 @@ func sequenceKind(gitDir string) core.OperationKind {
 // stateFile is the file kind's stop leaves in a git dir, rebase-merge for a
 // rebase.
 func stateFile(kind core.OperationKind) string {
-	for _, f := range stateFiles {
-		if f.kind == kind {
-			return f.name
-		}
+	switch kind {
+	case core.MergeOperation:
+		return "MERGE_HEAD"
+	case core.CherryPickOperation:
+		return "CHERRY_PICK_HEAD"
+	case core.RevertOperation:
+		return "REVERT_HEAD"
+	case core.RebaseOperation:
+		return "rebase-merge"
 	}
 	return ""
 }
@@ -80,11 +85,8 @@ func stateFile(kind core.OperationKind) string {
 // directory gitDir holds, rebase-merge first.
 func rebaseStateFiles(gitDir, name string) []string {
 	var contents []string
-	for _, f := range stateFiles {
-		if f.kind != core.RebaseOperation {
-			continue
-		}
-		if data, err := os.ReadFile(filepath.Join(gitDir, f.name, name)); err == nil {
+	for _, dir := range rebaseDirs {
+		if data, err := os.ReadFile(filepath.Join(gitDir, dir, name)); err == nil {
 			contents = append(contents, strings.TrimSpace(string(data)))
 		}
 	}
