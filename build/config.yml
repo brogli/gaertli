@@ -10,7 +10,7 @@ info:
   copyright: 'Copyright (c) 2026, brogli'
   comments: ''
   # The release version (semantic versioning), raised by hand before each release.
-  version: '0.1.0'
+  version: '0.1.1'
 
 dev_mode:
   root_path: .
