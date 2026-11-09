@@ -9,7 +9,7 @@ vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ App
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import GitWarningDialog from '../GitWarningDialog.vue'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import { mountInBody } from '@/testing/mountInBody'
 import { footerButtons } from '@/testing/dialog'
@@ -62,7 +62,7 @@ describe('GitWarningDialog', () => {
     expect(body.find('.p-dialog').exists()).toBe(false)
 
     AppService.TakeGitWarnings.mockResolvedValue([distroWarning])
-    useRepoStore().summary = summaryFixture()
+    useWorktreesStore().summary = summaryFixture()
     await flushPromises()
 
     expect(body.get('.p-dialog').text()).toContain('The git in WSL distro Ubuntu')

@@ -11,8 +11,8 @@ import {
   type BranchInUse,
   type IntegrateResult,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
-import { useRefsStore } from '@/stores/refs'
-import { useRepoStore } from '@/stores/repo'
+import { useBranchesStore } from '@/stores/branches'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useLogStore } from '@/stores/log'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
@@ -41,8 +41,8 @@ const emit = defineEmits<{
   'checkout-elsewhere': [branch: string, path: string, inUse?: BranchInUse]
   'show-log': []
 }>()
-const refs = useRefsStore()
-const repo = useRepoStore()
+const refs = useBranchesStore()
+const repo = useWorktreesStore()
 const log = useLogStore()
 const { error, run, runAndClose } = useCoreCall()
 const { confirmAction } = useConfirmAction()

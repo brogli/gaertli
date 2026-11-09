@@ -4,14 +4,14 @@ import Dialog from 'openvue/dialog'
 import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
 import { AppService, type GitWarning } from '../../bindings/github.com/brogli/gaertli/internal/app'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { DIALOG } from '@/lib/layout'
 
 // GitWarningDialog warns about outdated gits. The shell hands each git's
 // warning to the first window that asks: on load, and once the window's
 // repo has loaded, since a WSL distro's git is checked on its first use.
 const { t } = useI18n()
-const repo = useRepoStore()
+const repo = useWorktreesStore()
 const warnings = ref<GitWarning[]>([])
 const downloads = 'https://git-scm.com/downloads'
 

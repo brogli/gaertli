@@ -6,7 +6,7 @@ import Message from 'openvue/message'
 import Button from 'openvue/button'
 import { useI18n } from '@/i18n'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useSettingsStore } from '@/stores/settings'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { Code, type SquashCheck } from '../../bindings/github.com/brogli/gaertli/internal/core'
@@ -24,7 +24,7 @@ import FormField from './FormField.vue'
 const props = defineProps<{ wt: string; shas: string[]; check: SquashCheck; fixup: boolean }>()
 const emit = defineEmits<{ close: []; done: [] }>()
 const { t } = useI18n()
-const repo = useRepoStore()
+const repo = useWorktreesStore()
 const settings = useSettingsStore()
 const notices = useNotices()
 const { error, run } = useCoreCall()

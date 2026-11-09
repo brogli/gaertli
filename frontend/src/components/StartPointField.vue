@@ -4,14 +4,14 @@ import InputText from 'openvue/inputtext'
 import Select from 'openvue/select'
 import { useI18n } from '@/i18n'
 import { refGroups } from '@/lib/refOptions'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import FormField from './FormField.vue'
 import type { StartPoint } from './startPoint'
 
 // StartPointField is a new branch's start point: a fixed commit shown by its
 // label, or a branch or tag the user picks from the window's refs.
 const start = defineModel<StartPoint>({ required: true })
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const { t } = useI18n()
 
 const options = computed(() => refGroups(refs.refs, t))

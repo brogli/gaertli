@@ -6,7 +6,7 @@ import AutoComplete from 'openvue/autocomplete'
 import MultiSelect from 'openvue/multiselect'
 import ClearableInput from './ClearableInput.vue'
 import { useLogStore } from '@/stores/log'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { refGroups } from '@/lib/refOptions'
 import type { LogFilter } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
@@ -17,7 +17,7 @@ import type { LogFilter } from '../../bindings/github.com/brogli/gaertli/interna
 // once when cleared. The branch field shows the log store's own filter, which the branch picker's
 // Show history also sets.
 const log = useLogStore()
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const { t } = useI18n()
 
 const author = ref(log.filter.author ?? '')

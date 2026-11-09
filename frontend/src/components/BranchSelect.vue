@@ -2,12 +2,12 @@
 import { computed } from 'vue'
 import Select from 'openvue/select'
 import { useI18n } from '@/i18n'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 
 // BranchSelect picks a local branch by name from a searchable list.
 defineProps<{ inputId: string }>()
 const branch = defineModel<string>({ required: true })
-const refs = useRefsStore()
+const refs = useBranchesStore()
 const { t } = useI18n()
 
 const options = computed(() => (refs.refs?.branches ?? []).map((b) => b.name))

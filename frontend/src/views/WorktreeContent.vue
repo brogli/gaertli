@@ -9,8 +9,8 @@ import Tab from 'openvue/tab'
 import TabPanels from 'openvue/tabpanels'
 import TabPanel from 'openvue/tabpanel'
 import Button from 'openvue/button'
-import { useRepoStore } from '@/stores/repo'
-import { useRefsStore } from '@/stores/refs'
+import { useWorktreesStore } from '@/stores/worktrees'
+import { useBranchesStore } from '@/stores/branches'
 import { useLogStore } from '@/stores/log'
 import { useCompareStore } from '@/stores/compare'
 import { useChangesStore } from '@/stores/changes'
@@ -50,8 +50,8 @@ const withShortcut = useWithShortcut()
 // The id every core call and child takes: path for a local worktree, its
 // UNC form for a WSL one. path stays what the window shows.
 const wt = repoPath(props.path, props.distro)
-const repo = useRepoStore()
-const refs = useRefsStore()
+const repo = useWorktreesStore()
+const refs = useBranchesStore()
 const log = useLogStore()
 const compare = useCompareStore()
 const changes = useChangesStore()
@@ -76,7 +76,7 @@ const checkoutElsewhere = ref<{ branch: string; path: string; inUse: BranchInUse
 const resetTarget = ref<{ sha: string; subject: string } | null>(null)
 
 onMounted(() => {
-  void run(() => repo.loadSummary(wt))
+  void run(() => repo.load(wt))
   void refs.load(wt)
   void changes.load(wt)
 })

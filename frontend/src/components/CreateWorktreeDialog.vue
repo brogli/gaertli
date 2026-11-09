@@ -10,7 +10,7 @@ import { AppService, Facade } from '../../bindings/github.com/brogli/gaertli/int
 import type { Worktree } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DIALOG } from '@/lib/layout'
 import { repoPath as toRepoPath } from '@/lib/path'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import BranchSelect from './BranchSelect.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import FormField from './FormField.vue'
@@ -27,7 +27,7 @@ const props = defineProps<{
   start?: WorktreeStart
 }>()
 const emit = defineEmits<{ created: []; close: [] }>()
-const refs = useRefsStore()
+const refs = useBranchesStore()
 // repo is repoPath as core calls take it.
 const repo = toRepoPath(props.repoPath, props.distro)
 

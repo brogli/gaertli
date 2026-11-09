@@ -10,11 +10,11 @@ vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
 import { usePush } from '../usePush'
 import { useCoreCall } from '../useCoreCall'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import { branchFixture } from '@/testing/fixtures/branch'
 
 function setBranch(overrides: Parameters<typeof branchFixture>[0] = {}): void {
-  useRefsStore().refs = { branches: [branchFixture(overrides)], remotes: [], tags: [] }
+  useBranchesStore().refs = { branches: [branchFixture(overrides)], remotes: [], tags: [] }
 }
 
 describe('usePush', () => {

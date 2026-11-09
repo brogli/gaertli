@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Button from 'openvue/button'
 import Message from 'openvue/message'
 import { useI18n } from '@/i18n'
-import { useRepoStore } from '@/stores/repo'
+import { useWorktreesStore } from '@/stores/worktrees'
 import { useChangesStore } from '@/stores/changes'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useCoreCall } from '@/composables/useCoreCall'
@@ -19,7 +19,7 @@ import ErrorBanner from './ErrorBanner.vue'
 // supported), and Abort. The repo watcher keeps the stores it reads
 // current, so it refreshes nothing itself.
 const props = defineProps<{ wt: string }>()
-const repo = useRepoStore()
+const repo = useWorktreesStore()
 const changes = useChangesStore()
 const { error, run } = useCoreCall()
 const { confirmAction } = useConfirmAction()

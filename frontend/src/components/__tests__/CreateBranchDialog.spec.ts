@@ -15,11 +15,11 @@ import { mountInBody } from '@/testing/mountInBody'
 import { field } from '@/testing/dialog'
 import { branchFixture } from '@/testing/fixtures/branch'
 import { refsOfEveryKind } from '@/testing/fixtures/refs'
-import { useRefsStore } from '@/stores/refs'
+import { useBranchesStore } from '@/stores/branches'
 import type { StartPoint } from '../startPoint'
 
 function mountDialog(start: StartPoint) {
-  useRefsStore().refs = refsOfEveryKind([
+  useBranchesStore().refs = refsOfEveryKind([
     branchFixture(),
     branchFixture({ name: 'feat', current: false }),
   ])
