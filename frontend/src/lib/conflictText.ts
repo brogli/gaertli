@@ -13,33 +13,33 @@ function linesIn(content: string | undefined, range: LineRange): string[] {
   return content.split('\n').slice(range.start - 1, range.start - 1 + range.lines)
 }
 
-function regionLines(file: ConflictFile, region: number, side: Side): string[] {
-  const range = file.changes?.[region]?.[side]
+function changeLines(file: ConflictFile, change: number, side: Side): string[] {
+  const range = file.changes?.[change]?.[side]
   return range ? linesIn(file[side].content, range) : []
 }
 
-// resultFromBase is the working file with each region's lines (a conflict's
+// resultFromBase is the working file with each change's lines (a conflict's
 // marker block, or what git applied of a change) replaced by the base
-// version's lines (none without a base), and the line ranges the regions then
+// version's lines (none without a base), and the line ranges the changes then
 // take.
-export function resultFromBase(file: ConflictFile): { text: string; regions: LineRange[] } {
+export function resultFromBase(file: ConflictFile): { text: string; changes: LineRange[] } {
   const lines = (file.result ?? '').split('\n')
   const out: string[] = []
-  const regions: LineRange[] = []
+  const changes: LineRange[] = []
   let next = 0
-  file.changes?.forEach((region, i) => {
-    const before = region.result.lines > 0 ? region.result.start - 1 : region.result.start
+  file.changes?.forEach((change, i) => {
+    const before = change.result.lines > 0 ? change.result.start - 1 : change.result.start
     out.push(...lines.slice(next, before))
-    const base = regionLines(file, i, 'base')
-    regions.push({ start: base.length > 0 ? out.length + 1 : out.length, lines: base.length })
+    const base = changeLines(file, i, 'base')
+    changes.push({ start: base.length > 0 ? out.length + 1 : out.length, lines: base.length })
     out.push(...base)
-    next = before + region.result.lines
+    next = before + change.result.lines
   })
   out.push(...lines.slice(next))
-  return { text: out.join('\n'), regions }
+  return { text: out.join('\n'), changes }
 }
 
-// takeSides are the sides whose lines a take puts into a region, in order.
+// takeSides are the sides whose lines a take puts into a change, in order.
 const takeSides: Record<Take, Side[]> = {
   current: ['current'],
   incoming: ['incoming'],
@@ -47,7 +47,7 @@ const takeSides: Record<Take, Side[]> = {
   incomingFirst: ['incoming', 'current'],
 }
 
-// takenLines are the lines a take puts into a region.
-export function takenLines(file: ConflictFile, region: number, take: Take): string[] {
-  return takeSides[take].flatMap((side) => regionLines(file, region, side))
+// takenLines are the lines a take puts into a change.
+export function takenLines(file: ConflictFile, change: number, take: Take): string[] {
+  return takeSides[take].flatMap((side) => changeLines(file, change, side))
 }

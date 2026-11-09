@@ -9,20 +9,20 @@ describe('conflictText', () => {
 
     expect(resultFromBase(file)).toEqual({
       text: 'a\no1\nb\no2\nz',
-      regions: [
+      changes: [
         { start: 2, lines: 1 },
         { start: 4, lines: 1 },
       ],
     })
   })
 
-  it('a conflict without a base leaves its regions empty', () => {
+  it('a conflict without a base leaves its changes empty', () => {
     const file = conflictFileFixture({ base: { present: false } })
-    const regions = file.changes!.map((region) => ({ ...region, base: { start: 0, lines: 0 } }))
+    const changes = file.changes!.map((change) => ({ ...change, base: { start: 0, lines: 0 } }))
 
-    expect(resultFromBase({ ...file, changes: regions })).toEqual({
+    expect(resultFromBase({ ...file, changes })).toEqual({
       text: 'a\nb\nz',
-      regions: [
+      changes: [
         { start: 1, lines: 0 },
         { start: 2, lines: 0 },
       ],
@@ -45,7 +45,7 @@ describe('conflictText', () => {
 
     expect(resultFromBase(state)).toEqual({
       text: 'x\nold\ny',
-      regions: [{ start: 2, lines: 1 }],
+      changes: [{ start: 2, lines: 1 }],
     })
     expect(resultFromBase({ ...file, changes: file.changes!.slice(0, 1) }).text).toBe(
       'a\no1\nb\n<<<<<<< HEAD\nc2\n=======\ni2\n>>>>>>> side\nc\ni3\nz\nnew',

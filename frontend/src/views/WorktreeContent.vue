@@ -33,7 +33,7 @@ import RepoPicker from '@/components/RepoPicker.vue'
 import WorktreePicker from '@/components/WorktreePicker.vue'
 import CreateBranchDialog from '@/components/CreateBranchDialog.vue'
 import DetachWarningDialog from '@/components/DetachWarningDialog.vue'
-import BranchInWorktreeDialog from '@/components/BranchInWorktreeDialog.vue'
+import BranchInUseDialog from '@/components/BranchInUseDialog.vue'
 import ResetDialog from '@/components/ResetDialog.vue'
 import CreateWorktreeDialog from '@/components/CreateWorktreeDialog.vue'
 import SyncControls from '@/components/SyncControls.vue'
@@ -88,7 +88,7 @@ useRepoChanged([ChangeScope.IndexChanged], () => void changes.load(wt))
 // A restarted WSL core knows nothing of this window: it gets the commit
 // message being typed, then the window reloads from scratch.
 useWindowEvent('core:reconnected', () => {
-  void Facade.SetMessageDraft(wt, changes.message).finally(() => window.location.reload())
+  void Facade.SetMessageDraft(wt, changes.messageDraft).finally(() => window.location.reload())
 })
 
 // Manual refresh: if anything differs, repo:changed arrives the normal way.
@@ -317,7 +317,7 @@ const sideView = computed<'details' | 'changes'>(() =>
       :sha="checkoutCommitSha"
       @close="checkoutCommitSha = null"
     />
-    <BranchInWorktreeDialog
+    <BranchInUseDialog
       v-if="checkoutElsewhere"
       :branch="checkoutElsewhere.branch"
       :path="checkoutElsewhere.path"

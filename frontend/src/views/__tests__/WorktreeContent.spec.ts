@@ -23,7 +23,7 @@ import LogView from '@/components/LogView.vue'
 import CreateWorktreeDialog from '@/components/CreateWorktreeDialog.vue'
 import BranchPicker from '@/components/BranchPicker.vue'
 import DetachWarningDialog from '@/components/DetachWarningDialog.vue'
-import BranchInWorktreeDialog from '@/components/BranchInWorktreeDialog.vue'
+import BranchInUseDialog from '@/components/BranchInUseDialog.vue'
 import DiffView from '@/components/DiffView.vue'
 import { useLogStore } from '@/stores/log'
 import { useChangesStore } from '@/stores/changes'
@@ -269,7 +269,7 @@ describe('WorktreeContent', () => {
     wrapper.findComponent(BranchPicker).vm.$emit('checkout-elsewhere', 'side', '/repo-side')
     await flushPromises()
 
-    const dialog = wrapper.findComponent(BranchInWorktreeDialog)
+    const dialog = wrapper.findComponent(BranchInUseDialog)
     expect(dialog.exists()).toBe(true)
     expect(dialog.props()).toMatchObject({ branch: 'side', path: '/repo-side' })
     expect(body.get('.p-dialog').text()).toContain('side')
@@ -365,7 +365,7 @@ describe('WorktreeContent', () => {
     let draftSaved!: () => void
     await mountView({ path: '/repo' })
     Facade.SetMessageDraft.mockReturnValue(new Promise<void>((r) => (draftSaved = r)))
-    useChangesStore().message = 'half-typed'
+    useChangesStore().messageDraft = 'half-typed'
 
     emit('core:reconnected')
     await flushPromises()

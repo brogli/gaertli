@@ -84,7 +84,7 @@ const fileChanged = ref<CoreError | null>(null)
 // shownError is the last core call's failure, else the draft's failed write.
 const shownError = computed(() => error.value ?? conflicts.writeError(props.wt, props.file.path))
 
-const regions = computed(() => props.file.changes ?? [])
+const changes = computed(() => props.file.changes ?? [])
 const markerSize = computed(() => props.file.markerSize ?? DEFAULT_MARKER_SIZE)
 
 const hosts: Partial<Record<Pane, HTMLElement>> = {}
@@ -170,8 +170,8 @@ const saveTitle = computed(
 const openOneSided = computed(() => {
   const state = resultState.value
   if (!state) return []
-  return regions.value.flatMap((region, i) =>
-    region.kind !== MergeChangeKind.ConflictChange &&
+  return changes.value.flatMap((change, i) =>
+    change.kind !== MergeChangeKind.ConflictChange &&
     i < regionCount(state) &&
     isUnresolved(state, i)
       ? [i]
@@ -240,8 +240,8 @@ let anchors: Anchor[] = []
 
 function updateAnchors(state: EditorState): void {
   const resultRanges = resultRegions(state).map(({ range }) => range)
-  const aligned = regions.value.map((region, i) => ({
-    ...region,
+  const aligned = changes.value.map((change, i) => ({
+    ...change,
     ...(resultRanges[i] && { result: resultRanges[i] }),
   }))
   const lineCounts = Object.fromEntries(
@@ -291,10 +291,10 @@ function createViews(shared: Extension[]): void {
           ...paneExtensions,
           EditorState.readOnly.of(true),
           sideRegionsExtension(
-            regions.value.map((region) => region[pane]),
+            changes.value.map((change) => change[pane]),
             (pane === 'current' ? file.currentChanges : file.incomingChanges) ?? [],
             t('mergeEditor.emptyChange'),
-            regions.value.map((region) => regionTint(region, pane)),
+            changes.value.map((change) => regionTint(change, pane)),
           ),
           EditorView.updateListener.of(selectClickedRegion),
         ],
@@ -311,10 +311,10 @@ function createViews(shared: Extension[]): void {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         regionsExtension(
-          draft?.changes ?? initial.regions.map((range) => ({ range, resolved: false })),
+          draft?.changes ?? initial.changes.map((range) => ({ range, resolved: false })),
           markerSize.value,
           t('mergeEditor.emptyChange'),
-          regions.value.map((region) => regionTint(region, 'result')),
+          changes.value.map((change) => regionTint(change, 'result')),
         ),
         EditorView.updateListener.of(onResultUpdate),
       ],
@@ -391,7 +391,7 @@ function applyNonConflicting(): void {
   const result = views.result
   if (!result) return
   const takes = openOneSided.value.map((region) => {
-    const incoming = regions.value[region]?.kind === MergeChangeKind.IncomingOnlyChange
+    const incoming = changes.value[region]?.kind === MergeChangeKind.IncomingOnlyChange
     return { region, lines: takenLines(props.file, region, incoming ? 'incoming' : 'current') }
   })
   result.dispatch(takeRegions(result.state, takes))

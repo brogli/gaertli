@@ -10,7 +10,7 @@ import type { ChangedFiles } from '../../bindings/github.com/brogli/gaertli/inte
 export const useChangesStore = defineStore('changes', () => {
   const files = ref<ChangedFiles | null>(null)
   const loading = ref(false)
-  const message = ref('')
+  const messageDraft = ref('')
 
   async function load(wt: string): Promise<void> {
     loading.value = true
@@ -21,5 +21,5 @@ export const useChangesStore = defineStore('changes', () => {
     }
   }
 
-  return { files, loading, message, load }
+  return { files, loading, messageDraft, load }
 })

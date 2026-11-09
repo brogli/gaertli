@@ -6,7 +6,7 @@ const { AppService } = vi.hoisted(() => ({ AppService: { SelectWorktree: vi.fn()
 
 vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ AppService }))
 
-import BranchInWorktreeDialog from '../BranchInWorktreeDialog.vue'
+import BranchInUseDialog from '../BranchInUseDialog.vue'
 import { BranchInUse } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
@@ -15,12 +15,12 @@ import { footerButtons } from '@/testing/dialog'
 // mountDialog mounts the dialog for the branch side, checked out in
 // /home/u/r-side.
 function mountDialog(props: { inUse?: BranchInUse | undefined; distro?: string } = {}) {
-  return mountInBody(BranchInWorktreeDialog, {
+  return mountInBody(BranchInUseDialog, {
     props: { branch: 'side', path: '/home/u/r-side', ...props },
   })
 }
 
-describe('BranchInWorktreeDialog', () => {
+describe('BranchInUseDialog', () => {
   beforeEach(() => {
     AppService.SelectWorktree.mockReset().mockResolvedValue(undefined)
   })
