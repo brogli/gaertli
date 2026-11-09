@@ -229,8 +229,7 @@ type Integrate = 'merge' | 'rebase'
 
 // integrate merges row's ref into the current branch or rebases the current
 // branch onto it. A stop on conflicts opens the diff window and waits in the
-// conflict banner; local
-// changes in the way offer to stash them and run again.
+// operation banner; local changes in the way offer to stash them and run again.
 async function integrate(verb: Integrate, row: RefRow, stash = false): Promise<void> {
   const head = headName.value
   const call = verb === 'merge' ? Facade.Merge : Facade.Rebase

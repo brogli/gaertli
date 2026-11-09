@@ -29,8 +29,9 @@ their scroll position and the typed message.
 └───────────────────────────┴──────────────────────┴───────────────────────┘
 ```
 
-States (a conflict in progress, a pull's waiting stash) show as banners below the toolbar; results
-show as notices. The pickers start no core until a repo is chosen, so no WSL core starts uninvited.
+An operation in progress and a waiting stash show as banners (the operation banner, the waiting
+stash banner) below the toolbar; results show as notices. The pickers start no core until a repo is
+chosen, so no WSL core starts uninvited.
 
 ## Diff window
 
@@ -49,9 +50,9 @@ Three editors: the current and incoming sides read-only around the editable resu
 
 - The core computes one list of changes: the conflicts and the changes only one side made. A change
   both sides made alike is not listed.
-- The result starts with every region at the base version, so nothing enters it until the user takes
-  it. Each region tracks its range through edits and carries an explicit state, unresolved or
+- The result starts with every change at the base version, so nothing enters it until the user takes
+  it. Each change tracks its range through edits and carries an explicit state, unresolved or
   resolved; saving waits until all are resolved.
-- The panes stay aligned by region boundaries.
-- Unsaved results live in the worktree session in the core, in memory only (ADR-4): they outlive the
+- The panes stay aligned by change boundaries.
+- Merge drafts live in the worktree session in the core, in memory only (ADR-4): they outlive the
   diff window and die with the app.

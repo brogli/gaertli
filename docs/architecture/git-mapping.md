@@ -22,7 +22,7 @@ rules add everywhere.
 | Stage lines               | `apply --cached --recount` of a partial patch built from a fresh full-context diff (ADR-7)                                                                                                                                                                                                                                                 |
 | Discard                   | `restore --worktree`, `clean -f` for untracked files, `apply --reverse` for lines                                                                                                                                                                                                                                                          |
 | Commit, amend             | `commit [--amend] -F -`, the message on stdin; hooks run                                                                                                                                                                                                                                                                                   |
-| Create branch             | `branch`, or `switch -c` to check it out; `--no-track` from a remote-tracking ref, so its first push sets an upstream of its own name                                                                                                                                                                                                      |
+| Create branch             | `branch`, or `switch -c` to check it out; `--no-track` from a remote branch, so its first push sets an upstream of its own name                                                                                                                                                                                                            |
 | Checkout                  | `switch`; `switch --track` for a remote branch; `switch --detach` for a commit                                                                                                                                                                                                                                                             |
 | Reset                     | `reset --soft/--mixed/--hard/--keep`                                                                                                                                                                                                                                                                                                       |
 | Rename, delete branch     | `branch -m`, `branch -d/-D`. Delete is refused before any git call for a branch another worktree has checked out, rebases or bisects. Rename is refused only for rebase or bisect; a branch checked out elsewhere is renamed there too, as git does                                                                                        |
@@ -70,7 +70,7 @@ A conflicted file is read from what git left, never merged a second time.
    in each side comes from git: the result with every block filled from one side is diffed against
    that side (`diff --no-index -U0`), and each side against the base the same way. With the blocks
    filled from one side, what still differs is a change only the other side made, which git applied.
-   A change both sides made alike is listed nowhere. Starting every region from the base means
+   A change both sides made alike is listed nowhere. Starting every change from the base means
    taking the current side everywhere gives the current side's file, and taking every one-side
    change plus the current side in conflicts gives `merge -X ours`.
 4. Text reaches the UI with LF line breaks. Saving writes the file's own line endings back, refuses
@@ -145,10 +145,10 @@ into place. Events are debounced and reported as one scope:
 | `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `rebase-merge`, `rebase-apply`, `sequencer` | `state`     |
 | `worktrees/`                                                                                 | `worktrees` |
 
-Working files are not watched. Status runs on window focus, after every own action, and on a timer
-while focused: every second, doubling while status is slower than the interval, up to 10 s. A poll
-compares the status output plus size and modification time of every listed file, since a further
-edit to a listed file leaves the status output unchanged; a difference is scope `index`.
+Working-tree files are not watched. Status runs on window focus, after every own action, and on a
+timer while focused: every second, doubling while status is slower than the interval, up to 10 s. A
+poll compares the status output plus size and modification time of every listed file, since a
+further edit to a listed file leaves the status output unchanged; a difference is scope `index`.
 
 The app's own writes trigger the watcher too; debounce plus reload-after-write makes that harmless.
 
