@@ -6,7 +6,7 @@ import { conflictSideNames } from '@/lib/conflictSides'
 import { SECONDARY_BUTTON } from '@/lib/layout'
 import { useRepoChanged } from '@/lib/windowEvents'
 import { useConfirmAction } from '@/composables/useConfirmAction'
-import { useMergeDrafts } from '@/composables/useMergeDrafts'
+import { useConflictsStore } from '@/stores/conflicts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
@@ -21,7 +21,7 @@ import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 import MergeEditor from './MergeEditor.vue'
 
-// ConflictView is the diff window's right pane for a conflicted file: the
+// ConflictedFileView is the diff window's right pane for a conflicted file: the
 // file's conflict, read again whenever the index changes. A text file opens
 // in the merge editor; any other kind gets a panel to pick a side or to
 // resolve it elsewhere.
@@ -31,7 +31,7 @@ const { error, run } = useCoreCall()
 const { openEditor } = useOpenInEditor(() => props.wt, run)
 const { confirmAction } = useConfirmAction()
 const { t } = useI18n()
-const drafts = useMergeDrafts()
+const conflicts = useConflictsStore()
 
 const conflict = ref<ConflictFile | null>(null)
 
@@ -52,20 +52,21 @@ async function load(): Promise<void> {
   const next = (await run(() => Facade.Conflict(props.wt, props.path), ignoreError)) ?? null
   if (started !== version) return
   const conflictId = next?.conflictId ?? ''
-  if (next) await run(() => drafts.load(props.wt, props.path, conflictId), ignoreError)
+  if (next) await run(() => conflicts.load(props.wt, props.path, conflictId), ignoreError)
   if (started !== version) return
   const shown = conflict.value
   const samePath = next?.path === shown?.path
   const changed = samePath && next?.fingerprint !== shown?.fingerprint
   const newConflict = samePath && conflictId !== (shown?.conflictId ?? '')
-  if (newConflict || (changed && !drafts.has(props.wt, props.path, conflictId))) generation.value++
+  if (newConflict || (changed && !conflicts.has(props.wt, props.path, conflictId)))
+    generation.value++
   conflict.value = next
 }
 
 // reload drops the merge editor's unsaved edits for the file as it is on
 // disk.
 async function reload(): Promise<void> {
-  await drafts.discard(props.wt, props.path)
+  await conflicts.discard(props.wt, props.path)
   await load()
   generation.value++
 }

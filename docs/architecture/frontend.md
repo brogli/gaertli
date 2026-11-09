@@ -5,8 +5,10 @@
 - Each window is its own WebView with its own stores, so window state is isolated.
 - The generated bindings are the only way to reach Go.
 - One store per area (`worktrees`, `log`, `branches`, `diff`, `compare`, `changes`, `sync`,
-  `settings`). Stores hold view state only: after a write they reload from Go, never update
-  optimistically (QA-COMP-01), and events tell them when to reload.
+  `conflicts`, `settings`). Stores hold view state only: after a write they reload from Go, never
+  update optimistically (QA-COMP-01), and events tell them when to reload. The exception is
+  `conflicts`, which keeps the page's copy of the merge drafts and writes it to Go in the
+  background.
 - Cross-cutting paths exist once: one for confirming risky actions (QA-SAFE-01), one for core errors
   (FR-UX-01), one guard for window shortcuts.
 - Selection is the log store's one ordered list; a comparison is derived from it, not stored.

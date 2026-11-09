@@ -9,7 +9,7 @@ import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
 import { codeEditorExtensions, PANE_LAYOUT } from '@/lib/codeEditor'
-import { useMergeDrafts } from '@/composables/useMergeDrafts'
+import { useConflictsStore } from '@/stores/conflicts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { conflictColours } from '@/lib/conflictColours'
 import { DEFAULT_MARKER_SIZE } from '@/lib/conflictMarkers'
@@ -66,23 +66,23 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { error, run } = useCoreCall()
-const drafts = useMergeDrafts()
+const conflicts = useConflictsStore()
 
 // conflictId is the conflict the editor shows; a later one in the path
 // mounts another editor.
 const conflictId = props.file.conflictId ?? ''
 // The result may start as unsaved edits left by an earlier view of the file.
-const draft = drafts.get(props.wt, props.file.path, conflictId)
+const draft = conflicts.get(props.wt, props.file.path, conflictId)
 const initial = resultFromBase(props.file)
 // fingerprint is the working file's state the result is based on: the one
 // the file was opened with, then each save's.
 const fingerprint = ref(draft?.fingerprint ?? props.file.fingerprint ?? '')
 // diskFingerprint is the working file's latest known state.
 const diskFingerprint = computed(() => props.file.fingerprint ?? '')
-const dirty = computed(() => drafts.has(props.wt, props.file.path, conflictId))
+const dirty = computed(() => conflicts.has(props.wt, props.file.path, conflictId))
 const fileChanged = ref<CoreError | null>(null)
 // shownError is the last core call's failure, else the draft's failed write.
-const shownError = computed(() => error.value ?? drafts.writeError(props.wt, props.file.path))
+const shownError = computed(() => error.value ?? conflicts.writeError(props.wt, props.file.path))
 
 const regions = computed(() => props.file.changes ?? [])
 const markerSize = computed(() => props.file.markerSize ?? DEFAULT_MARKER_SIZE)
@@ -212,7 +212,7 @@ const CONFLICT_KEYS = Prec.highest(
 // storeDraft keeps the result as the file's draft, read from result as it
 // is when the draft is written.
 function storeDraft(result: EditorView): void {
-  drafts.set(props.wt, props.file.path, conflictId, () => ({
+  conflicts.set(props.wt, props.file.path, conflictId, () => ({
     text: result.state.doc.toString(),
     fingerprint: fingerprint.value,
     changes: resultRegions(result.state),
@@ -372,7 +372,7 @@ async function save(): Promise<void> {
 function keepEditsSince(saved: string): void {
   const result = views.result
   if (!result || result.state.doc.toString() === saved) {
-    void drafts.discard(props.wt, props.file.path)
+    void conflicts.discard(props.wt, props.file.path)
     return
   }
   storeDraft(result)
@@ -421,7 +421,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   unmounted = true
   untieScroll?.()
-  drafts.flush(props.wt, props.file.path)
+  conflicts.flush(props.wt, props.file.path)
   Object.values(views).forEach((view) => view.destroy())
 })
 </script>

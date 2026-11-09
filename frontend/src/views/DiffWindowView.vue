@@ -14,7 +14,7 @@ import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '@/lib/d
 import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
 import { useChangesStore } from '@/stores/changes'
 import { useDiffStore } from '@/stores/diff'
-import { useMergeDrafts } from '@/composables/useMergeDrafts'
+import { useConflictsStore } from '@/stores/conflicts'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { useFileTreeChoice } from '@/composables/useFileTreeChoice'
@@ -23,7 +23,7 @@ import ChangedFileList from '@/components/ChangedFileList.vue'
 import ChangedFileTree from '@/components/ChangedFileTree.vue'
 import FileTreeControls from '@/components/FileTreeControls.vue'
 import DiffView from '@/components/DiffView.vue'
-import ConflictView from '@/components/ConflictView.vue'
+import ConflictedFileView from '@/components/ConflictedFileView.vue'
 
 // DiffWindowView is the diff window's root view: the files of its target
 // on the left, one file's diff on the right. The window is its own JS
@@ -41,7 +41,7 @@ const { openEditor } = useOpenInEditor(wt, run)
 const asTree = useFileTreeChoice()
 const folded = ref(false)
 const { t } = useI18n()
-const { keepOnly } = useMergeDrafts()
+const { keepOnly } = useConflictsStore()
 
 const isWorking = computed(() => target.value.kind === DiffKind.WorkingDiff)
 
@@ -229,7 +229,7 @@ useEventListener(
     </SplitterPanel>
     <SplitterPanel :size="75" :min-size="30">
       <template v-if="target.conflicted">
-        <ConflictView v-if="current" :wt="wt" :path="target.path" @step-file="stepFile" />
+        <ConflictedFileView v-if="current" :wt="wt" :path="target.path" @step-file="stepFile" />
         <p v-else-if="changes.files" class="p-2.5">{{ t('diffWindow.noConflictsLeft') }}</p>
       </template>
       <DiffView

@@ -2,7 +2,7 @@
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { undo } from '@codemirror/commands'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountInBody } from '@/testing/mountInBody'
 import { wailsError } from '@/testing/errors'
 
@@ -22,9 +22,9 @@ vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Fac
 vi.mock('openvue/useconfirm', () => import('@/testing/confirm'))
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
-import ConflictView from '../ConflictView.vue'
+import ConflictedFileView from '../ConflictedFileView.vue'
 import { confirmOptions, confirmRequire } from '@/testing/confirm'
-import { useMergeDrafts } from '@/composables/useMergeDrafts'
+import { useConflictsStore } from '@/stores/conflicts'
 import { emit } from '@/testing/runtime'
 import { findButton } from '@/testing/findButton'
 import { editorViews } from '@/testing/editorView'
@@ -40,18 +40,21 @@ import {
 
 async function mountView(file: Partial<ConflictFile> = {}) {
   Facade.Conflict.mockResolvedValue(conflictFileFixture(file))
-  const { wrapper } = await mountInBody(ConflictView, { props: { wt: '/repo', path: 'a.txt' } })
+  const { wrapper } = await mountInBody(ConflictedFileView, {
+    props: { wt: '/repo', path: 'a.txt' },
+  })
   return wrapper
 }
 
 const resultView = (wrapper: VueWrapper) => editorViews(wrapper)[1]!
 
-describe('ConflictView', () => {
+describe('ConflictedFileView', () => {
+  afterEach(() => useConflictsStore().$dispose())
+
   beforeEach(() => {
     setActivePinia(createPinia())
     for (const fn of Object.values(Facade)) fn.mockReset().mockResolvedValue(undefined)
     confirmRequire.mockReset()
-    useMergeDrafts().keepOnly('/repo', [])
     document.body.innerHTML = ''
   })
 
@@ -316,7 +319,7 @@ describe('ConflictView', () => {
       await findButton(wrapper, 'Reload')!.trigger('click')
       await flushPromises()
       expect(resultView(wrapper).state.doc.toString()).toBe('on disk again')
-      expect(useMergeDrafts().get('/repo', 'a.txt', '')).toBeUndefined()
+      expect(useConflictsStore().get('/repo', 'a.txt', '')).toBeUndefined()
       expect(Facade.SetMergeDraft).toHaveBeenLastCalledWith('/repo', 'a.txt', null)
     })
 
@@ -334,7 +337,7 @@ describe('ConflictView', () => {
 
         expect(resultView(wrapper).state.doc.toString()).not.toMatch(/^typed /)
         expect(wrapper.text()).not.toContain('changed on disk')
-        expect(useMergeDrafts().get('/repo', 'a.txt', 'c2')).toBeUndefined()
+        expect(useConflictsStore().get('/repo', 'a.txt', 'c2')).toBeUndefined()
       },
     )
 
@@ -373,7 +376,7 @@ describe('ConflictView', () => {
       const [, , stored] = Facade.SetMergeDraft.mock.lastCall!
       expect(stored.text).toBe(text)
 
-      useMergeDrafts().keepOnly('/repo', [])
+      useConflictsStore().keepOnly('/repo', [])
       Facade.MergeDraft.mockResolvedValue(stored)
       const reopened = await mountView()
 

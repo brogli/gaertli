@@ -1,5 +1,6 @@
 // Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { Facade } = vi.hoisted(() => ({
   Facade: { SaveConflict: vi.fn(), SetMergeDraft: vi.fn(), MergeDraft: vi.fn() },
@@ -15,7 +16,7 @@ import { editorViews } from '@/testing/editorView'
 import MergeEditor from '../MergeEditor.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { findButton } from '@/testing/findButton'
-import { useMergeDrafts } from '@/composables/useMergeDrafts'
+import { useConflictsStore } from '@/stores/conflicts'
 import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
 import { resolveBothConflicts } from '@/testing/resolveConflicts'
 import {
@@ -23,7 +24,8 @@ import {
   type ConflictFile,
 } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
-beforeEach(() => useMergeDrafts().keepOnly('/repo', []))
+beforeEach(() => setActivePinia(createPinia()))
+afterEach(() => useConflictsStore().$dispose())
 
 async function mountEditor(file: ConflictFile = conflictFileFixture()) {
   const { wrapper } = await mountInBody(MergeEditor, { props: { wt: '/repo', file } })
@@ -301,7 +303,7 @@ describe('MergeEditor actions and navigation', () => {
 
   it('clicking a side conflict the restored result lacks leaves the selection alone and logs no error', async () => {
     const file = threeRegionFile()
-    useMergeDrafts().set('/repo', 'a.txt', '', () => ({
+    useConflictsStore().set('/repo', 'a.txt', '', () => ({
       text: 'a\no1\nb\no2\nc\no3\nz',
       fingerprint: 'fp',
       changes: [{ range: { start: 2, lines: 1 }, resolved: false }],
@@ -458,7 +460,7 @@ describe('MergeEditor saving while typing', () => {
     finish('fpSaved')
     await flushPromises()
 
-    const draft = useMergeDrafts().get('/repo', 'a.txt', '')
+    const draft = useConflictsStore().get('/repo', 'a.txt', '')
     expect(draft?.text).toMatch(/^two one a\n/)
     expect(draft?.fingerprint).toBe('fpSaved')
     expect(wrapper.emitted('saved')).toEqual([['fpSaved']])
@@ -511,7 +513,7 @@ describe('MergeEditor merge drafts', () => {
     const wrapper = await mountEditor(file)
 
     expect(editorTexts(wrapper)[RESULT]).toBe('a\no1\nb\no2\nz')
-    expect(useMergeDrafts().get('/repo', 'a.txt', '')).toBeUndefined()
+    expect(useConflictsStore().get('/repo', 'a.txt', '')).toBeUndefined()
   })
 
   it('closing the editor writes nothing the core already has', async () => {
