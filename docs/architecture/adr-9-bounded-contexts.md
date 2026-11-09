@@ -1,5 +1,7 @@
 # ADR-9: The core is split into bounded contexts
 
+**Status.** Approved.
+
 **Context.** The core API had grown to one interface spanning several areas, with one namespace and
 no stated owner of a type or a rule (QA-USE-03, QA-MNT-05).
 
