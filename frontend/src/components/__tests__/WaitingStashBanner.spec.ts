@@ -12,7 +12,7 @@ import { confirmOptions, confirmRequire } from '@/testing/confirm'
 
 vi.mock('@wailsio/runtime', () => import('@/testing/runtime'))
 
-import StashBanner from '../StashBanner.vue'
+import WaitingStashBanner from '../WaitingStashBanner.vue'
 import { useWorktreesStore } from '@/stores/worktrees'
 import { useChangesStore } from '@/stores/changes'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
@@ -20,15 +20,15 @@ import { findButton } from '@/testing/findButton'
 import { summaryFixture } from '@/testing/fixtures/summary'
 import type { ChangedFile } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 
-// mountWithStash mounts StashBanner with waitingStash set and conflicted
+// mountWithStash mounts WaitingStashBanner with waitingStash set and conflicted
 // files remaining.
 function mountWithStash(waitingStash: string, conflicted: ChangedFile[] = []) {
   useWorktreesStore().summary = summaryFixture({ waitingStash })
   useChangesStore().files = changedFilesFixture({ conflicted })
-  return mount(StashBanner, { props: { wt: '/repo' } })
+  return mount(WaitingStashBanner, { props: { wt: '/repo' } })
 }
 
-describe('StashBanner', () => {
+describe('WaitingStashBanner', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     Facade.PopStash.mockReset().mockResolvedValue(undefined)
@@ -53,7 +53,7 @@ describe('StashBanner', () => {
   ])('with $state the banner shows: $shown', ({ stash, conflicted, shown }) => {
     const wrapper = mountWithStash(stash, conflicted)
 
-    expect(wrapper.find('[data-test="stash-banner"]').exists()).toBe(shown)
+    expect(wrapper.find('[data-test="waiting-stash-banner"]').exists()).toBe(shown)
     expect(wrapper.text().includes('Local changes from before a pull, merge or rebase')).toBe(shown)
   })
 

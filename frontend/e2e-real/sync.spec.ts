@@ -11,7 +11,7 @@ import {
   clickConfirm,
   commitFiles,
   confirmDialog,
-  conflictBanner,
+  operationBanner,
   fileRow,
   fileText,
   jobsMenuButton,
@@ -256,27 +256,27 @@ test("a stash-and-pull that stops on conflicts keeps the stash; Restore brings b
 
   await pull(app)
   await notice(app).getByRole('button', { name: 'Stash and pull' }).click()
-  const banner = conflictBanner(app)
+  const banner = operationBanner(app)
   await expect(banner).toBeVisible()
-  const stashBanner = app.locator('[data-test=stash-banner]')
-  await expect(stashBanner).toBeHidden()
+  const waitingStashBanner = app.locator('[data-test=waiting-stash-banner]')
+  await expect(waitingStashBanner).toBeHidden()
 
   fs.writeFileSync(file('conflict.txt'), 'merged\n')
   await fileRow(app, 'Conflicted', 'conflict.txt').locator('[data-test=action]').click()
   await banner.getByRole('button', { name: 'Continue' }).click()
   await expect(banner).toBeHidden()
-  await expect(stashBanner).toBeVisible()
+  await expect(waitingStashBanner).toBeVisible()
   expect(parents(git, repos.work)).toBe(2)
 
   fs.writeFileSync(file('other.txt'), 'terminal stash\n')
   git(repos.work, 'add', 'other.txt')
   git(repos.work, 'stash', 'push', '-q', '-m', 'terminal stash')
-  await stashBanner.getByRole('button', { name: 'Restore' }).click()
+  await waitingStashBanner.getByRole('button', { name: 'Restore' }).click()
 
   await expect
     .poll(() => fileText(file('hunks.txt')))
     .toBe(hunksText({ 3: 'line 3 REMOTE', 25: 'line 25 LOCAL' }))
-  await expect(stashBanner).toBeHidden()
+  await expect(waitingStashBanner).toBeHidden()
   expect(git(repos.work, 'stash', 'list', '--format=%s')).toBe('On main: terminal stash\n')
   expect(fs.existsSync(file('other.txt'))).toBe(false)
   expect(git(repos.work, 'status', '--porcelain')).toBe(' M hunks.txt\n')

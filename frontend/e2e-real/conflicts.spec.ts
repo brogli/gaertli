@@ -7,7 +7,7 @@ import { hunksText, type Git, type Repos } from './repos'
 import {
   clickConfirm,
   commitFiles,
-  conflictBanner,
+  operationBanner,
   fileGroup,
   fileRow,
   parents,
@@ -34,7 +34,7 @@ function openConflict(openDiff: OpenDiff, repo: string, file: string): Promise<P
 }
 
 async function abort(page: Page): Promise<void> {
-  await conflictBanner(page).getByRole('button', { name: 'Abort…' }).click()
+  await operationBanner(page).getByRole('button', { name: 'Abort…' }).click()
   await clickConfirm(page)
 }
 
@@ -61,7 +61,7 @@ test.describe('a merge of feature stopped on two conflicting files', () => {
   }) => {
     stopOnConflicts(git, repos.work, 'merge', 'feature')
 
-    const banner = conflictBanner(app)
+    const banner = operationBanner(app)
     const continueButton = banner.getByRole('button', { name: 'Continue' })
     await expect(banner).toContainText('merge stopped on conflicts')
     await expect(continueButton).toBeDisabled()
@@ -99,13 +99,13 @@ test("a modify/delete conflict offers a side in the diff window; taking the curr
   git(repos.work, 'checkout', '-q', 'main')
   commitFiles(git, repos.work, 'main: edit readme', { 'docs/readme.md': 'edited on main\n' })
   stopOnConflicts(git, repos.work, 'merge', 'deleter')
-  await expect(conflictBanner(app).getByRole('button', { name: 'Continue' })).toBeDisabled()
+  await expect(operationBanner(app).getByRole('button', { name: 'Continue' })).toBeDisabled()
 
   const diff = await openConflict(openDiff, repos.work, 'docs/readme.md')
   await diff.getByRole('button', { name: 'Keep the version of main' }).click()
 
   await expect.poll(() => stagedText(git, repos.work, 'docs/readme.md')).toBe('edited on main\n')
-  await expect(conflictBanner(app).getByRole('button', { name: 'Continue' })).toBeEnabled()
+  await expect(operationBanner(app).getByRole('button', { name: 'Continue' })).toBeEnabled()
 })
 
 test('a rebase stopped on conflicts is named in the banner and can be aborted', async ({
@@ -116,10 +116,10 @@ test('a rebase stopped on conflicts is named in the banner and can be aborted', 
   const head = rev(git, repos.work, 'HEAD')
   stopOnConflicts(git, repos.work, 'rebase', 'feature')
 
-  await expect(conflictBanner(app)).toContainText('rebase stopped on conflicts')
+  await expect(operationBanner(app)).toContainText('rebase stopped on conflicts')
   await abort(app)
 
-  await expect(conflictBanner(app)).toBeHidden()
+  await expect(operationBanner(app)).toBeHidden()
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
   expect(fs.existsSync(path.join(repos.work, '.git', 'rebase-merge'))).toBe(false)
 })
@@ -141,10 +141,10 @@ test('a pull that stops on conflicts shows the merge in the banner; Abort undoes
 
   await pull(app)
 
-  await expect(conflictBanner(app)).toContainText('merge stopped on conflicts')
+  await expect(operationBanner(app)).toContainText('merge stopped on conflicts')
   await abort(app)
 
-  await expect(conflictBanner(app)).toBeHidden()
+  await expect(operationBanner(app)).toBeHidden()
   expect(rev(git, repos.work, 'HEAD')).toBe(head)
 })
 

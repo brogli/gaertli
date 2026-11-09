@@ -13,7 +13,7 @@ import { errorNotice, useNotices, type AppNotice } from '@/lib/notice'
 import { shortSha } from '@/lib/format'
 
 // EXPLAINED_ELSEWHERE are the job failures another part of the UI already
-// shows: the rejection and blocked-pull notices below, ConflictBanner, and
+// shows: the rejection and blocked-pull notices below, OperationBanner, and
 // a cancel the user asked for.
 const EXPLAINED_ELSEWHERE: Code[] = [
   Code.PushRejected,

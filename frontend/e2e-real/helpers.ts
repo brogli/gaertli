@@ -91,8 +91,8 @@ export async function clickConfirm(page: Page): Promise<void> {
   await confirmDialog(page).getByRole('button', { name: 'Confirm' }).click()
 }
 
-export function conflictBanner(page: Page): Locator {
-  return page.locator('[data-test=conflict-banner]')
+export function operationBanner(page: Page): Locator {
+  return page.locator('[data-test=operation-banner]')
 }
 
 // notice is the app's current notice (NoticeArea.vue); last() rides out the
