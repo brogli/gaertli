@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { EditorState, Text } from '@codemirror/state'
 import { EditorView, type DecorationSet } from '@codemirror/view'
+import type { LineRange } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { history, undo } from '@codemirror/commands'
 import {
   hasStrayMarkers,
@@ -21,7 +22,6 @@ import {
   takeRegion,
   takeRegions,
   unresolvedCount,
-  type LineRange,
 } from '../conflictRegions'
 
 const text = ['a', 'o1', 'b', 'o2', 'z'].join('\n')

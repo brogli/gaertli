@@ -1,16 +1,14 @@
 // Line mapping and scroll tying between the merge editor's panes. An anchor is a set of
 // lines, one per pane, that sit at the same height; between anchors lines map linearly.
 import type { EditorView } from '@codemirror/view'
+import type { LineRange } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { PANES, type Pane } from './conflictPanes'
 import { tieScroll } from './tieScroll'
 
 // Lines are 1-based and may be fractional.
 export type Anchor = Partial<Record<Pane, number>>
 
-// A region's lines in a pane: Start is its first line; with Lines 0, the line
-// after which the region would be.
-export type PaneRegion = { start: number; lines: number }
-export type RegionRanges = Partial<Record<Pane, PaneRegion>>
+export type RegionRanges = Partial<Record<Pane, LineRange>>
 
 // regionAnchors builds the anchors of regions listed in file order: every
 // file's start, each region's first line and the line after its last, and

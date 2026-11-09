@@ -1,5 +1,7 @@
-import type { ConflictFile } from '../../bindings/github.com/brogli/gaertli/internal/core'
-import type { LineRange } from './conflictRegions'
+import type {
+  ConflictFile,
+  LineRange,
+} from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 export type Take = 'current' | 'incoming' | 'currentFirst' | 'incomingFirst'
 

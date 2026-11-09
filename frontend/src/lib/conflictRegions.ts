@@ -1,5 +1,6 @@
-// The merge editor's regions in its CodeMirror panes: the conflicts and the
-// changes only one side made. The result pane tracks each region's range
+// The merge editor's changes in its CodeMirror panes: the conflicts and the
+// changes only one side made. A region is the editor's span of document
+// offsets over one change; the core's types describe the change itself. The result pane tracks each region's range
 // through edits; a region is resolved once a take or "mark done" says so,
 // never by an edit alone. The read-only side panes mark their regions' lines
 // and the lines the side changed.
@@ -26,8 +27,11 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import {
+  type DraftChange,
+  type LineRange,
   MergeChangeKind,
   type MergeChange,
+  type SideChange,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DEFAULT_MARKER_SIZE, isMarkerLine } from './conflictMarkers'
 import type { Pane } from './conflictPanes'
@@ -35,17 +39,6 @@ import type { Pane } from './conflictPanes'
 export interface Region {
   from: number
   to: number
-}
-
-export interface LineRange {
-  start: number
-  lines: number
-}
-
-// SideChange is a run of a side's lines that differ from the base.
-export interface SideChange {
-  lines: LineRange
-  added: boolean
 }
 
 // regionFromLineRange converts a 1-based line range to offsets from the first
@@ -141,11 +134,6 @@ function regionLineDecorations(doc: Text, region: Region, look: RegionLook): Ran
 }
 
 // ---- result pane ----
-
-export interface ResultRegion {
-  range: LineRange
-  resolved: boolean
-}
 
 interface TrackedRegion extends Region {
   resolved: boolean
@@ -302,7 +290,7 @@ const undoResolved = invertedEffects.of((tr) =>
 // regionsExtension tracks the result's regions and styles their lines.
 // markerSize is the size of git's markers, for hasStrayMarkers.
 export function regionsExtension(
-  initial: ResultRegion[],
+  initial: DraftChange[],
   markerSize: number,
   placeholderLabel = 'Unresolved change',
   tints?: (RegionTint | undefined)[],
@@ -361,7 +349,7 @@ export function regionStart(state: EditorState, i: number): number {
 
 // resultRegions are the regions as line ranges, the inverse of
 // regionFromLineRange, with their resolved flags.
-export function resultRegions(state: EditorState): ResultRegion[] {
+export function resultRegions(state: EditorState): DraftChange[] {
   const { doc } = state
   return state.field(resultField).regions.map(({ from, to, resolved }) => {
     const first = doc.lineAt(from)
