@@ -104,7 +104,7 @@ shell.
   - [ADR-6: Write queues by what they lock](architecture/adr-6-write-queues-by-what-they-lock.md)
   - [ADR-7: Git computes the diff, CodeMirror draws it](architecture/adr-7-diff-ui-with-codemirror-6-merge.md)
   - [ADR-8: One process, one selection per window](architecture/adr-8-one-process-selection-per-window.md)
-  - [ADR-9: One package of bounded contexts](architecture/adr-9-one-package-of-bounded-contexts.md)
+  - [ADR-9: The core is split into bounded contexts](architecture/adr-9-bounded-contexts.md)
 - [backend.md](architecture/backend.md): shell and core responsibilities, calls, events, errors.
 - [frontend.md](architecture/frontend.md): window state, layout, diff view, merge editor.
 - [git-mapping.md](architecture/git-mapping.md): which git commands back which feature.
