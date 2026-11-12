@@ -42,8 +42,8 @@ importers:
         specifier: 1.2.0
         version: 1.2.0
       '@openvue/openicons':
-        specifier: 1.1.0
-        version: 1.1.0
+        specifier: 1.2.0
+        version: 1.2.0
       '@tanstack/vue-virtual':
         specifier: 3.13.52
         version: 3.13.52(vue@3.5.45(typescript@5.9.3))
@@ -723,8 +723,8 @@ packages:
     resolution: {integrity: sha512-2dVYu9TjPb2E/11wqVwprB58HS5rAaThhrAFkDCrUv+NlCrwIF3MwHh+Pc7oP1cTlxfH1UNTzAjPftxyBH8DUA==}
     engines: {node: '>=12.11.0'}
 
-  '@openvue/openicons@1.1.0':
-    resolution: {integrity: sha512-uPAhRslTkUrIQcFB8OWDXhEy03I9kjDnEqEN3vjl8+RFauRqYCItaE+5sZhgg/zYG5Y/Fgm99s31kID2xqhriQ==}
+  '@openvue/openicons@1.2.0':
+    resolution: {integrity: sha512-vmA+BfMbFrORc8mGTLH+xOYoxwuESSiB3WvJfG6Zmu0+ZfX+OpM0+DwjWF8ZY1dlwKYymrZrvTJ83xCO8T8t1g==}
 
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
@@ -3325,7 +3325,7 @@ snapshots:
     transitivePeerDependencies:
       - vue
 
-  '@openvue/openicons@1.1.0': {}
+  '@openvue/openicons@1.2.0': {}
 
   '@oxc-project/types@0.156.0': {}
 
