@@ -128,6 +128,46 @@ describe('WorktreeContent', () => {
     expect(refreshButton().attributes('title')).toBe('Refresh · F5')
   })
 
+  it('a reload right after a slow one shows as refreshing only once it too runs a second', async () => {
+    vi.useFakeTimers()
+    let endSlow!: (files: unknown) => void
+    Facade.Status.mockReturnValueOnce(new Promise((resolve) => (endSlow = resolve)))
+    const wrapper = await mountView()
+    const refreshButton = () => findButton(wrapper, 'Refresh')!
+    await vi.advanceTimersByTimeAsync(1500)
+    endSlow(changedFilesFixture())
+    await flushPromises()
+
+    let endNext!: (files: unknown) => void
+    Facade.Status.mockReturnValueOnce(new Promise((resolve) => (endNext = resolve)))
+    await vi.advanceTimersByTimeAsync(200)
+    void useChangesStore().load('/home/user/project')
+    await vi.advanceTimersByTimeAsync(999)
+    expect(refreshButton().attributes('title')).toBe('Refresh · F5')
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(refreshButton().attributes('title')).toBe('Refreshing…')
+    endNext(changedFilesFixture())
+  })
+
+  it('two Refresh calls show as refreshing until the last returns', async () => {
+    vi.useFakeTimers()
+    const ends: (() => void)[] = []
+    Facade.Refresh.mockImplementation(() => new Promise<void>((resolve) => ends.push(resolve)))
+    const wrapper = await mountView()
+    const refreshButton = () => findButton(wrapper, 'Refresh')!
+
+    await refreshButton().trigger('click')
+    await refreshButton().trigger('click')
+    ends[0]!()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(refreshButton().attributes('title')).toBe('Refreshing…')
+
+    ends[1]!()
+    await flushPromises()
+    expect(refreshButton().attributes('title')).toBe('Refresh · F5')
+  })
+
   it("a WSL worktree's calls carry its shell id, the UNC path, not the POSIX path it shows", async () => {
     const wrapper = await mountView({ path: '/home/u/r', distro: 'D' })
 

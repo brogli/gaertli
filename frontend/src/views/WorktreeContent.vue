@@ -9,7 +9,7 @@ import Tab from 'openvue/tab'
 import TabPanels from 'openvue/tabpanels'
 import TabPanel from 'openvue/tabpanel'
 import Button from 'openvue/button'
-import { refDebounced } from '@vueuse/core'
+import { useTimeoutFn } from '@vueuse/core'
 import { useWorktreesStore } from '@/stores/worktrees'
 import { useBranchesStore } from '@/stores/branches'
 import { useLogStore } from '@/stores/log'
@@ -93,23 +93,28 @@ useWindowEvent('core:reconnected', () => {
 })
 
 // Manual refresh: if anything differs, repo:changed arrives the normal way.
-const refreshCalled = ref(false)
+const refreshCalls = ref(0)
 async function refresh(): Promise<void> {
   if (slowRefresh.value) return
-  refreshCalled.value = true
+  refreshCalls.value++
   try {
     await run(() => Facade.Refresh(wt))
   } finally {
-    refreshCalled.value = false
+    refreshCalls.value--
   }
 }
 
-// A refresh still running after the status poll's base interval of a
+// A refresh running for longer than the status poll's base interval of a
 // second shows as refreshing, so a very large working tree does not look
 // stuck.
-const refreshRunning = computed(() => refreshCalled.value || changes.loading)
-const refreshRunningLong = refDebounced(refreshRunning, 1000)
-const slowRefresh = computed(() => refreshRunning.value && refreshRunningLong.value)
+const refreshRunning = computed(() => refreshCalls.value > 0 || changes.loading)
+const slowRefresh = ref(false)
+const slowRefreshTimer = useTimeoutFn(() => (slowRefresh.value = true), 1000, { immediate: false })
+watch(refreshRunning, (running) => {
+  slowRefresh.value = false
+  if (running) slowRefreshTimer.start()
+  else slowRefreshTimer.stop()
+})
 const refreshTitle = computed(() =>
   slowRefresh.value
     ? t('toolbar.refreshing')

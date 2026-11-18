@@ -67,10 +67,10 @@ const ROW_HEIGHT = 24
 // A row shows this many ref labels, then "+N" naming them all on hover.
 const MAX_LABELS = 2
 
-// shownRefs are the labels row shows: a worktree label by its folder name
+// shownRefs are row's labels as shown: a worktree label by its folder name
 // and a worktree icon, its path on hover.
 function shownRefs(row: LogCommit) {
-  return (row.refs ?? []).slice(0, MAX_LABELS).map((label) =>
+  return (row.refs ?? []).map((label) =>
     label.kind === RefKind.WorktreeRef
       ? {
           ...label,
@@ -356,7 +356,7 @@ const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
               >{{ row.subject }}</span
             >
             <span
-              v-for="label in shownRefs(row)"
+              v-for="label in shownRefs(row).slice(0, MAX_LABELS)"
               :key="label.name"
               class="ref-label min-w-[2em] max-w-[6em] flex-[0_1_auto] truncate rounded-sm bg-emphasis px-1.5 text-sm"
               :class="label.kind"
@@ -368,7 +368,11 @@ const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
             <span
               v-if="(row.refs?.length ?? 0) > MAX_LABELS"
               class="ref-more max-w-[6em] flex-none truncate rounded-sm bg-emphasis px-1.5 text-sm"
-              :title="row.refs!.map((r) => r.name).join(', ')"
+              :title="
+                shownRefs(row)
+                  .map((r) => r.text)
+                  .join(', ')
+              "
               >+{{ row.refs!.length - MAX_LABELS }}</span
             >
           </span>

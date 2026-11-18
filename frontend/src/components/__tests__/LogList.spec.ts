@@ -256,6 +256,17 @@ describe('LogList', () => {
     expect(labels[1]!.find('i.oi-folder').exists()).toBe(true)
   })
 
+  it('a worktree label behind "+N" is named by its folder in the title', async () => {
+    const refs = [
+      { name: 'main', kind: RefKind.BranchRef },
+      { name: 'origin/main', kind: RefKind.RemoteRef },
+      { name: '/repos/feature-x', kind: RefKind.WorktreeRef },
+    ]
+    const { wrapper } = await mountWithRows([commitRow({ refs })])
+
+    expect(wrapper.get('.ref-more').attributes('title')).toBe('main, origin/main, feature-x')
+  })
+
   it('a row shows its short hash', async () => {
     const { wrapper } = await mountWithRows([
       commitRow({ sha: 'abcdef0123456789', shortSha: 'abcdef0' }),

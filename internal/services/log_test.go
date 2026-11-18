@@ -593,7 +593,7 @@ func TestLogRowsPlaceHEADOnTheAskingWorktreesHead(t *testing.T) {
 }
 
 // Each window's rows mark the commit another worktree has checked out with
-// that worktree's path, right after where HEAD would go.
+// that worktree's path, after the commit's own refs.
 func TestLogRowsMarkOtherWorktreesCheckouts(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
@@ -613,19 +613,51 @@ func TestLogRowsMarkOtherWorktreesCheckouts(t *testing.T) {
 		subject string
 		want    []core.RefLabel
 	}{
-		{mainWt.ID, "a", []core.RefLabel{{Name: gitPath(t, linked), Kind: core.WorktreeRef}, {Name: "side", Kind: core.BranchRef}}},
-		{linkedWt.ID, "a2", []core.RefLabel{{Name: gitPath(t, repo.Dir), Kind: core.WorktreeRef}, {Name: "master", Kind: core.BranchRef}}},
+		{mainWt.ID, "a", []core.RefLabel{{Name: "side", Kind: core.BranchRef}, {Name: gitPath(t, linked), Kind: core.WorktreeRef}}},
+		{linkedWt.ID, "a2", []core.RefLabel{{Name: "master", Kind: core.BranchRef}, {Name: gitPath(t, repo.Dir), Kind: core.WorktreeRef}}},
 	} {
-		res, err := c.LogRows(t.Context(), tc.id, 0, 10)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, row := range res.Rows {
-			if row.Subject == tc.subject && !slices.Equal(row.Refs, tc.want) {
-				t.Errorf("worktree %s: refs on %q = %v, want %v", tc.id, tc.subject, row.Refs, tc.want)
-			}
+		if got := rowRefs(t, c, tc.id, tc.subject); !slices.Equal(got, tc.want) {
+			t.Errorf("worktree %s: refs on %q = %v, want %v", tc.id, tc.subject, got, tc.want)
 		}
 	}
+}
+
+// A worktree whose folder is gone marks no commit.
+func TestLogRowsMarkNoMissingWorktree(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "a")
+	gittest.Run(t, repo.Dir, "branch", "side")
+	gittest.Commit(t, repo.Dir, "a.txt", "a2", "a2")
+	linked := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "side")
+	if err := os.RemoveAll(linked); err != nil {
+		t.Fatal(err)
+	}
+
+	c, id := openWorktree(t, repo.Dir)
+	loadLog(t, c, id)
+
+	want := []core.RefLabel{{Name: "side", Kind: core.BranchRef}}
+	if got := rowRefs(t, c, id, "a"); !slices.Equal(got, want) {
+		t.Errorf("refs on %q = %v, want %v", "a", got, want)
+	}
+}
+
+// rowRefs is the refs id's log rows show on the commit with subject.
+func rowRefs(t *testing.T, c *Core, id core.WorktreeID, subject string) []core.RefLabel {
+	t.Helper()
+	res, err := c.LogRows(t.Context(), id, 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range res.Rows {
+		if row.Subject == subject {
+			return row.Refs
+		}
+	}
+	t.Fatalf("no row %q in %+v", subject, res.Rows)
+	return nil
 }
 
 // loadLog starts id's log load and returns the first 1000 rows once it

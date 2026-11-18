@@ -84,13 +84,18 @@ const pullMenuItems = computed<MenuItem[]>(() => [
   },
 ])
 
+// fetchRemotes maps the fetch jobs this window started to their remote, so
+// a retry fetches the same one; JobInfo does not name it.
+const fetchRemotes = new Map<string, string>()
+
 // onFetch fetches remote, or every remote for ''.
-function onFetch(remote = ''): void {
-  void run(() => Facade.Fetch(props.wt, remote))
+async function onFetch(remote = ''): Promise<void> {
+  const id = await run(() => Facade.Fetch(props.wt, remote))
+  if (id !== undefined) fetchRemotes.set(id, remote)
 }
 const fetchMenuTooltip = t('toolbar.fetchRemoteMenu')
 const fetchMenuItems = computed<MenuItem[]>(() =>
-  remoteNames.value.map((name) => ({ label: name, command: () => onFetch(name) })),
+  remoteNames.value.map((name) => ({ label: name, command: () => void onFetch(name) })),
 )
 // choosePullMode only saves the chosen mode as Settings' default pull mode;
 // it never pulls. settings:changed then updates every window's button.
@@ -139,7 +144,7 @@ function onStashPull(): void {
 
 // onRetryJob starts a fresh job the same way job's own kind started.
 const JOB_RETRIES: Partial<Record<JobKind, (job: JobInfo) => void>> = {
-  [JobKind.FetchJob]: () => onFetch(),
+  [JobKind.FetchJob]: (job) => void onFetch(fetchRemotes.get(job.id)),
   [JobKind.PullJob]: onPull,
   [JobKind.PushJob]: push,
   [JobKind.ForcePushJob]: onForcePush,
@@ -187,7 +192,7 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onPullEnded })
       :button-props="{ title: t('toolbar.fetch'), 'aria-label': t('toolbar.fetch') }"
       :menu-button-props="{ title: fetchMenuTooltip, 'aria-label': fetchMenuTooltip }"
       :model="fetchMenuItems"
-      @click="onFetch()"
+      @click="void onFetch()"
     >
       <template #icon><i :class="iconClass('fetch')" aria-hidden="true"></i></template>
     </SplitButton>
@@ -199,7 +204,7 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onPullEnded })
       :disabled="!hasRemote"
       :title="!hasRemote ? NO_REMOTE_TOOLTIP : t('toolbar.fetch')"
       :aria-label="t('toolbar.fetch')"
-      @click="onFetch()"
+      @click="void onFetch()"
     />
     <template v-if="disabledReason">
       <Button

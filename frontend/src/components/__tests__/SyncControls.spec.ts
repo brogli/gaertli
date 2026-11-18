@@ -149,6 +149,30 @@ describe('SyncControls', () => {
     expect(Facade.Fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('"Try again" on a locked fetch of one remote fetches that remote again', async () => {
+    setRefs({}, ['origin', 'upstream'])
+    Facade.Fetch.mockResolvedValue('job-7')
+    const { body } = await mountControls()
+    const notice = await mountNotices()
+    await body.get('.p-splitbutton-dropdown').trigger('click')
+    await flushPromises()
+    await clickMenuItem(body, 'upstream', 'tieredmenu')
+    await flushPromises()
+
+    useSyncStore().upsert(
+      jobFixture({
+        id: 'job-7',
+        kind: JobKind.FetchJob,
+        state: JobState.JobFailed,
+        error: { code: Code.Locked, message: 'locked' },
+      }),
+    )
+    await flushPromises()
+    await findButton(notice, 'Try again')!.trigger('click')
+
+    expect(Facade.Fetch).toHaveBeenLastCalledWith('/repo', 'upstream')
+  })
+
   it('a pull this window started that stops on conflicts opens the diff window; one it did not start opens nothing', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()
