@@ -9,6 +9,7 @@ import Tab from 'openvue/tab'
 import TabPanels from 'openvue/tabpanels'
 import TabPanel from 'openvue/tabpanel'
 import Button from 'openvue/button'
+import { refDebounced } from '@vueuse/core'
 import { useWorktreesStore } from '@/stores/worktrees'
 import { useBranchesStore } from '@/stores/branches'
 import { useLogStore } from '@/stores/log'
@@ -92,11 +93,28 @@ useWindowEvent('core:reconnected', () => {
 })
 
 // Manual refresh: if anything differs, repo:changed arrives the normal way.
-function refresh(): void {
-  void run(() => Facade.Refresh(wt))
+const refreshCalled = ref(false)
+async function refresh(): Promise<void> {
+  refreshCalled.value = true
+  await run(() => Facade.Refresh(wt))
+  refreshCalled.value = false
 }
 
-useShortcut('F5', refresh)
+// A refresh still running after the status poll's base interval of a
+// second shows as refreshing, so a very large working tree does not look
+// stuck.
+const refreshRunning = computed(() => refreshCalled.value || changes.loading)
+const refreshRunningLong = refDebounced(refreshRunning, 1000)
+const slowRefresh = computed(() => refreshRunning.value && refreshRunningLong.value)
+const refreshTitle = computed(() =>
+  slowRefresh.value
+    ? t('toolbar.refreshing')
+    : withShortcut('toolbar.refresh', 'shortcuts.refresh'),
+)
+
+useShortcut('F5', () => {
+  if (!slowRefresh.value) void refresh()
+})
 
 // The Open in editor button names the effective editor profile once the
 // summary loads.
@@ -208,7 +226,8 @@ const sideView = computed<'details' | 'changes'>(() =>
         v-bind="toolbarButton"
         :icon="iconClass('refresh')"
         :label="compact ? '' : t('toolbar.refresh')"
-        :title="withShortcut('toolbar.refresh', 'shortcuts.refresh')"
+        :loading="slowRefresh"
+        :title="refreshTitle"
         :aria-label="t('toolbar.refresh')"
         @click="refresh"
       />

@@ -1,7 +1,7 @@
 // Requirements: FR-BR-01, FR-BR-02, FR-BR-05, FR-BR-08, FR-BR-09, FR-CHG-01, FR-CMP-02, FR-DIFF-07, FR-ED-01, FR-ED-05, FR-ED-06, FR-LOG-11, FR-REPO-04, FR-REPO-07, FR-UX-01, FR-UX-05, FR-UX-09, FR-WT-02, QA-PORT-02, QA-REL-03
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountNotices } from '@/testing/mountNotices'
 import { editorNotFound, wailsError } from '@/testing/errors'
 import { mountInBody } from '@/testing/mountInBody'
@@ -50,6 +50,9 @@ describe('WorktreeContent', () => {
     resetMainWindowApp()
     Events.On.mockReset()
   })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it('Open in editor failing EDITOR_NOT_FOUND shows an error notice naming the command, no banner', async () => {
     Facade.OpenFolder.mockRejectedValueOnce(editorNotFound('myed'))
@@ -85,6 +88,44 @@ describe('WorktreeContent', () => {
 
     expect(Facade.Refresh).toHaveBeenCalledTimes(1)
     expect(Facade.Refresh).toHaveBeenCalledWith('/home/user/project')
+  })
+
+  it('a refresh still running after a second shows on the Refresh button and ends with it; F5 does nothing meanwhile', async () => {
+    vi.useFakeTimers()
+    let endStatus!: (files: unknown) => void
+    Facade.Status.mockReturnValueOnce(new Promise((resolve) => (endStatus = resolve)))
+    const wrapper = await mountView()
+    const refreshButton = () => findButton(wrapper, 'Refresh')!
+
+    await vi.advanceTimersByTimeAsync(999)
+    expect(refreshButton().attributes('title')).toBe('Refresh · F5')
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(refreshButton().attributes('title')).toBe('Refreshing…')
+    expect(refreshButton().element.disabled).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F5', cancelable: true }))
+    expect(Facade.Refresh).not.toHaveBeenCalled()
+
+    endStatus(changedFilesFixture())
+    await flushPromises()
+    expect(refreshButton().attributes('title')).toBe('Refresh · F5')
+    expect(refreshButton().element.disabled).toBe(false)
+  })
+
+  it('a Refresh call still running after a second shows as refreshing until it returns', async () => {
+    vi.useFakeTimers()
+    let endRefresh!: () => void
+    Facade.Refresh.mockReturnValueOnce(new Promise<void>((resolve) => (endRefresh = resolve)))
+    const wrapper = await mountView()
+    const refreshButton = () => findButton(wrapper, 'Refresh')!
+
+    await refreshButton().trigger('click')
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(refreshButton().attributes('title')).toBe('Refreshing…')
+
+    endRefresh()
+    await flushPromises()
+    expect(refreshButton().attributes('title')).toBe('Refresh · F5')
   })
 
   it("a WSL worktree's calls carry its shell id, the UNC path, not the POSIX path it shows", async () => {

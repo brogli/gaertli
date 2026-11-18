@@ -358,6 +358,7 @@
     "forcePushProtectedWarning": " \"{branch}\" is a protected branch.",
     "createBranchHere": "Create branch here",
     "refresh": "Refresh",
+    "refreshing": "Refreshing…",
     "openInEditor": "Open in {editor}",
     "editorFallback": "editor",
     "settings": "Settings"

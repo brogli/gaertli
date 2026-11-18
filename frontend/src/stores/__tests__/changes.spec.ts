@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-01
+// Requirements: FR-CHG-01, FR-REPO-04
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -26,6 +26,24 @@ describe('changes store', () => {
 
     expect(Facade.Status).toHaveBeenCalledWith('/repo')
     expect(changes.files).toEqual(result)
+    expect(changes.loading).toBe(false)
+  })
+
+  it('loading stays true until the last of overlapping loads ends', async () => {
+    let endFirst!: (files: unknown) => void
+    Facade.Status.mockReturnValueOnce(new Promise((resolve) => (endFirst = resolve)))
+    let endSecond!: (files: unknown) => void
+    Facade.Status.mockReturnValueOnce(new Promise((resolve) => (endSecond = resolve)))
+    const changes = useChangesStore()
+
+    const first = changes.load('/repo')
+    const second = changes.load('/repo')
+    endFirst(changedFilesFixture())
+    await first
+    expect(changes.loading).toBe(true)
+
+    endSecond(changedFilesFixture())
+    await second
     expect(changes.loading).toBe(false)
   })
 })
