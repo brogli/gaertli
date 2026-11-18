@@ -725,7 +725,7 @@ func TestPullRebaseAfterAnUpstreamRewriteReplaysOnlyTheLocalCommit(t *testing.T)
 	}
 }
 
-func TestPushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
+func TestPushPlainUpdatesTrackedUpstream(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Commit(t, repo.Dir, "local.txt", "x", "local commit")

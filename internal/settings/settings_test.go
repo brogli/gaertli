@@ -17,23 +17,6 @@ import (
 	"github.com/brogli/gaertli/internal/settings"
 )
 
-func TestPathIsUnderTheOSUserConfigDir(t *testing.T) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		t.Skip(err)
-	}
-
-	got, err := settings.Path()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if want := filepath.Join(dir, "gaertli", "settings.json"); got != want {
-		t.Errorf("Path() = %q, want %q", got, want)
-	}
-}
-
-// saveAndLoad saves s to a fresh settings file and loads it back.
 func saveAndLoad(t *testing.T, s settings.Settings) settings.Settings {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "settings.json")

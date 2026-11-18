@@ -44,7 +44,6 @@ type fakeWindow struct {
 	url          string
 	width        int
 	height       int
-	minWidth     int
 	focusCount   int
 	emitted      []emittedEvent
 	handlers     map[events.WindowEventType]func(*application.WindowEvent)
@@ -120,7 +119,7 @@ type fakeOpener struct {
 func (o *fakeOpener) NewWithOptions(opts application.WebviewWindowOptions) shellWindow {
 	w := &fakeWindow{
 		id: uint(len(o.windows)) + 1, title: opts.Title, url: opts.URL,
-		width: opts.Width, height: opts.Height, minWidth: opts.MinWidth,
+		width: opts.Width, height: opts.Height,
 	}
 	o.windows = append(o.windows, w)
 	return w
