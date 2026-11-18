@@ -100,8 +100,8 @@ function onResetClick(): void {
     <ErrorBanner v-if="error" :error="error" />
     <p>
       {{ t('dialogs.reset.resetTo', { branch: branchLabel }) }}
-      <span class="font-mono">{{ shortSha(sha) }}</span
-      >{{ ' ' }}<span :title="subject">{{ subject }}</span>
+      <span class="font-mono">{{ shortSha(sha) }}</span>{{ ' '
+      }}<span :title="subject">{{ subject }}</span>
     </p>
     <div class="flex flex-col gap-3">
       <label v-for="m in modes" :key="m.value" class="reset-mode flex items-baseline gap-2">
@@ -111,9 +111,7 @@ function onResetClick(): void {
           name="reset-mode"
           :input-id="`reset-mode-${m.value}`"
         />
-        <span
-          ><strong>{{ m.label }}</strong> {{ m.text }}</span
-        >
+        <span><strong>{{ m.label }}</strong> {{ m.text }}</span>
       </label>
     </div>
     <template #footer>
