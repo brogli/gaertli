@@ -17,7 +17,7 @@ require (
 	github.com/creachadair/jrpc2 v1.3.6
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/wailsapp/wails/v3 v3.1.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sys v0.50.0
 	golang.org/x/tools v0.52.0
 )
 
