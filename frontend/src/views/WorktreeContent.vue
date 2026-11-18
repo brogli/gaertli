@@ -95,9 +95,13 @@ useWindowEvent('core:reconnected', () => {
 // Manual refresh: if anything differs, repo:changed arrives the normal way.
 const refreshCalled = ref(false)
 async function refresh(): Promise<void> {
+  if (slowRefresh.value) return
   refreshCalled.value = true
-  await run(() => Facade.Refresh(wt))
-  refreshCalled.value = false
+  try {
+    await run(() => Facade.Refresh(wt))
+  } finally {
+    refreshCalled.value = false
+  }
 }
 
 // A refresh still running after the status poll's base interval of a
@@ -112,9 +116,7 @@ const refreshTitle = computed(() =>
     : withShortcut('toolbar.refresh', 'shortcuts.refresh'),
 )
 
-useShortcut('F5', () => {
-  if (!slowRefresh.value) void refresh()
-})
+useShortcut('F5', () => void refresh())
 
 // The Open in editor button names the effective editor profile once the
 // summary loads.

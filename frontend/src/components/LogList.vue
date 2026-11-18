@@ -28,7 +28,6 @@ import {
   RefKind,
   type LogCommit,
   type PickOptions,
-  type RefLabel,
   type SquashCheck,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
@@ -68,14 +67,19 @@ const ROW_HEIGHT = 24
 // A row shows this many ref labels, then "+N" naming them all on hover.
 const MAX_LABELS = 2
 
-// A worktree label names the worktree by its folder, its path on hover.
-function refText(label: RefLabel): string {
-  return label.kind === RefKind.WorktreeRef ? basename(label.name) : label.name
-}
-function refTitle(label: RefLabel): string {
-  return label.kind === RefKind.WorktreeRef
-    ? t('logView.checkedOutIn', { path: label.name })
-    : label.name
+// shownRefs are the labels row shows: a worktree label by its folder name
+// and a worktree icon, its path on hover.
+function shownRefs(row: LogCommit) {
+  return (row.refs ?? []).slice(0, MAX_LABELS).map((label) =>
+    label.kind === RefKind.WorktreeRef
+      ? {
+          ...label,
+          text: basename(label.name),
+          title: t('logView.checkedOutIn', { path: label.name }),
+          icon: iconClass('worktree'),
+        }
+      : { ...label, text: label.name, title: label.name, icon: '' },
+  )
 }
 
 const virtualizer = useVirtualizer(
@@ -352,18 +356,14 @@ const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
               >{{ row.subject }}</span
             >
             <span
-              v-for="label in row.refs?.slice(0, MAX_LABELS)"
+              v-for="label in shownRefs(row)"
               :key="label.name"
               class="ref-label min-w-[2em] max-w-[6em] flex-[0_1_auto] truncate rounded-sm bg-emphasis px-1.5 text-sm"
               :class="label.kind"
-              :title="refTitle(label)"
+              :title="label.title"
             >
-              <i
-                v-if="label.kind === RefKind.WorktreeRef"
-                :class="iconClass('worktree')"
-                aria-hidden="true"
-              ></i>
-              {{ refText(label) }}
+              <i v-if="label.icon" :class="label.icon" aria-hidden="true"></i>
+              {{ label.text }}
             </span>
             <span
               v-if="(row.refs?.length ?? 0) > MAX_LABELS"
