@@ -16,7 +16,7 @@ type Version struct{ Major, Minor, Patch int }
 
 // Latest is the newest git release (endoflife.date's newest cycle), the one
 // the app supports. Renovate bumps it.
-const Latest = "2.56.0" // renovate: datasource=endoflife-date depName=git
+const Latest = "2.56.1" // renovate: datasource=endoflife-date depName=git
 
 var latest = must(parseVersion(Latest))
 
