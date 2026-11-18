@@ -344,6 +344,7 @@
   },
   "toolbar": {
     "fetch": "Fetch",
+    "fetchRemoteMenu": "Fetch one remote",
     "noRemoteTooltip": "This repo has no remote",
     "noBranchTooltip": "No branch is checked out",
     "pull": "Pull",

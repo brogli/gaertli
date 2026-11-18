@@ -125,6 +125,30 @@ describe('SyncControls', () => {
     expect(Facade.Fetch).toHaveBeenCalledWith('/repo', '')
   })
 
+  it('with one remote, Fetch offers no choice of remote', async () => {
+    const { body } = await mountControls()
+
+    expect(body.find('.p-splitbutton').exists()).toBe(false)
+  })
+
+  it('with two remotes, clicking Fetch fetches all; its menu lists each remote and fetches only the chosen one', async () => {
+    setRefs({}, ['origin', 'upstream'])
+    const { body } = await mountControls()
+
+    await findButton(body, 'Fetch')!.trigger('click')
+    expect(Facade.Fetch).toHaveBeenLastCalledWith('/repo', '')
+
+    const dropdown = body.get('.p-splitbutton-dropdown')
+    expect(dropdown.attributes('title')).toBe('Fetch one remote')
+    await dropdown.trigger('click')
+    await flushPromises()
+    expect(menuLabels(body, 'tieredmenu')).toEqual(['origin', 'upstream'])
+    await clickMenuItem(body, 'upstream', 'tieredmenu')
+
+    expect(Facade.Fetch).toHaveBeenLastCalledWith('/repo', 'upstream')
+    expect(Facade.Fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('a pull this window started that stops on conflicts opens the diff window; one it did not start opens nothing', async () => {
     setRefs({ upstream: 'origin/main' })
     const { body } = await mountControls()

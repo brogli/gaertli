@@ -84,9 +84,14 @@ const pullMenuItems = computed<MenuItem[]>(() => [
   },
 ])
 
-function onFetch(): void {
-  void run(() => Facade.Fetch(props.wt, ''))
+// onFetch fetches remote, or every remote for ''.
+function onFetch(remote = ''): void {
+  void run(() => Facade.Fetch(props.wt, remote))
 }
+const fetchMenuTooltip = t('toolbar.fetchRemoteMenu')
+const fetchMenuItems = computed<MenuItem[]>(() =>
+  remoteNames.value.map((name) => ({ label: name, command: () => onFetch(name) })),
+)
 // choosePullMode only saves the chosen mode as Settings' default pull mode;
 // it never pulls. settings:changed then updates every window's button.
 function choosePullMode(mode: PullMode): void {
@@ -134,7 +139,7 @@ function onStashPull(): void {
 
 // onRetryJob starts a fresh job the same way job's own kind started.
 const JOB_RETRIES: Partial<Record<JobKind, (job: JobInfo) => void>> = {
-  [JobKind.FetchJob]: onFetch,
+  [JobKind.FetchJob]: () => onFetch(),
   [JobKind.PullJob]: onPull,
   [JobKind.PushJob]: push,
   [JobKind.ForcePushJob]: onForcePush,
@@ -175,14 +180,26 @@ useJobNotices({ onPull, onForcePush, onStashPull, onRetryJob, onPullEnded })
 <template>
   <div class="sync-controls flex items-center" :class="narrow ? 'gap-1' : 'gap-2'">
     <ErrorBanner v-if="error" :error="error" />
+    <SplitButton
+      v-if="remoteNames.length > 1"
+      v-bind="toolbarButton"
+      :label="compact ? '' : t('toolbar.fetch')"
+      :button-props="{ title: t('toolbar.fetch'), 'aria-label': t('toolbar.fetch') }"
+      :menu-button-props="{ title: fetchMenuTooltip, 'aria-label': fetchMenuTooltip }"
+      :model="fetchMenuItems"
+      @click="onFetch()"
+    >
+      <template #icon><i :class="iconClass('fetch')" aria-hidden="true"></i></template>
+    </SplitButton>
     <Button
+      v-else
       v-bind="toolbarButton"
       :icon="iconClass('fetch')"
       :label="compact ? '' : t('toolbar.fetch')"
       :disabled="!hasRemote"
       :title="!hasRemote ? NO_REMOTE_TOOLTIP : t('toolbar.fetch')"
       :aria-label="t('toolbar.fetch')"
-      @click="onFetch"
+      @click="onFetch()"
     />
     <template v-if="disabledReason">
       <Button
