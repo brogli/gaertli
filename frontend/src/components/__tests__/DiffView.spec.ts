@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CHG-10, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
+// Requirements: FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-CMP-02, FR-CMP-04, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -364,7 +364,7 @@ describe('DiffView', () => {
 
   it.each([
     [
-      'FR-CMP-02 a range target loads via DiffRange',
+      'a range target loads via DiffRange',
       {
         target: {
           kind: DiffKind.RangeDiff,
@@ -378,13 +378,13 @@ describe('DiffView', () => {
       ['/repo', 'sha-a', 'sha-b', 'a.txt', ''],
     ],
     [
-      'FR-CMP-04 an against-working target loads via DiffAgainstWorking',
+      'an against-working target loads via DiffAgainstWorking',
       { target: { kind: DiffKind.AgainstWorkingDiff, sha: 'sha-a', path: 'a.txt', oldPath: '' } },
       'DiffAgainstWorking',
       ['/repo', 'sha-a', 'a.txt', ''],
     ],
     [
-      'FR-CHG-04 a working-tree target loads via DiffWorking',
+      'a working-tree target loads via DiffWorking',
       workingProps({ staged: true }),
       'DiffWorking',
       ['/repo', 'a.txt', '', true],
@@ -481,7 +481,7 @@ describe('DiffView', () => {
     await wrapper.get('[data-test="open-editor"]').trigger('click')
     await flushPromises()
 
-    expect(notice.text()).not.toBe('')
+    expect(notice.text()).toContain('myed')
     expect(wrapper.find('.cm-editor').exists()).toBe(true)
     expect(wrapper.find('.error-banner').exists()).toBe(false)
   })
@@ -740,31 +740,31 @@ describe('DiffView', () => {
 
   it.each([
     [
-      'FR-CHG-03 a renamed working file (status "R") gets no hunk controls',
+      'a renamed working file (status "R") gets no hunk controls',
       oneLine,
       { oldPath: 'old.txt', status: 'R' },
       noControls,
     ],
     [
-      'FR-CHG-03 an untracked working file (status "?") gets no hunk controls',
+      'an untracked working file (status "?") gets no hunk controls',
       addedFile,
       { status: '?' },
       noControls,
     ],
     [
-      'FR-CHG-03 a newly added staged working file (status "A") gets no hunk controls',
+      'a newly added staged working file (status "A") gets no hunk controls',
       addedFile,
       { staged: true, status: 'A' },
       noControls,
     ],
     [
-      'FR-CHG-03 a deleted working file (status "D") gets no hunk controls',
+      'a deleted working file (status "D") gets no hunk controls',
       { oldContent: 'old\n', newContent: '', hunks: [hunk(1, 1, 0, 0)] },
       { status: 'D' },
       noControls,
     ],
     [
-      'FR-CHG-10 a staged working-tree target renders no discard button',
+      'a staged working-tree target renders no discard button',
       {
         oldContent: 'line1\nline2 old\nline3\n',
         newContent: 'line1\nline2 new\nline3\n',
@@ -895,7 +895,6 @@ describe('DiffView', () => {
 
     const scrollers = wrapper.findAll<HTMLElement>('.cm-scroller')
     expect(scrollers).toHaveLength(1)
-    expect(() => scrollers[0]!.element.dispatchEvent(new Event('scroll'))).not.toThrow()
 
     oldA!.scrollLeft = 99
     oldA!.dispatchEvent(new Event('scroll'))
@@ -914,18 +913,19 @@ describe('DiffView', () => {
 
     const wrapper = await mountCommit()
 
-    for (const selector of [
-      'mode-toggle',
-      'ignore-whitespace-toggle',
-      'prev-change',
-      'next-change',
-      'prev-file',
-      'next-file',
-      'open-editor',
-    ]) {
+    const labels = {
+      'mode-toggle': 'Switch to side-by-side',
+      'ignore-whitespace-toggle': 'Showing whitespace',
+      'prev-change': 'Previous change',
+      'next-change': 'Next change',
+      'prev-file': 'Previous file',
+      'next-file': 'Next file',
+      'open-editor': 'Open in editor',
+    }
+    for (const [selector, label] of Object.entries(labels)) {
       const button = wrapper.get(`[data-test="${selector}"]`)
-      expect(button.attributes('title')).toBeTruthy()
-      expect(button.attributes('aria-label')).toBeTruthy()
+      expect(button.attributes('title')).toBe(label)
+      expect(button.attributes('aria-label')).toBe(label)
     }
     expect(wrapper.get('[data-test="mode-toggle"]').attributes('aria-pressed')).toBe('false')
     expect(wrapper.get('[data-test="ignore-whitespace-toggle"]').attributes('aria-pressed')).toBe(

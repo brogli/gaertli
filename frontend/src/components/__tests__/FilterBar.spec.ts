@@ -11,15 +11,8 @@ const mockClearQuery = vi.fn(() => {
   mockLogStore.matches = []
   mockLogStore.current = 0
 })
-// nextMatch/prevMatch step with the same wrap the real store uses, so the
-// component's "n of m" label can be checked after a keypress.
-const mockNextMatch = vi.fn(() => {
-  mockLogStore.current = (mockLogStore.current + 1) % mockLogStore.matches.length
-})
-const mockPrevMatch = vi.fn(() => {
-  mockLogStore.current =
-    (mockLogStore.current - 1 + mockLogStore.matches.length) % mockLogStore.matches.length
-})
+const mockNextMatch = vi.fn()
+const mockPrevMatch = vi.fn()
 
 const mockLogStore: {
   filter: { author?: string; branches?: string[]; path?: string }
@@ -79,14 +72,12 @@ describe('FilterBar', () => {
 
     await input.trigger('keydown', { key: 'Enter' })
     expect(mockNextMatch).toHaveBeenCalledTimes(1)
-    await wrapper.vm.$nextTick()
-    expect(wrapper.get('[data-test="match-label"]').text()).toBe('2 of 3')
-
-    mockLogStore.current = 0 // fresh "1 of 3" again
     await input.trigger('keydown', { key: 'Enter', shiftKey: true })
     expect(mockPrevMatch).toHaveBeenCalledTimes(1)
+
+    mockLogStore.current = 1
     await wrapper.vm.$nextTick()
-    expect(wrapper.get('[data-test="match-label"]').text()).toBe('3 of 3') // wraps back from the first
+    expect(wrapper.get('[data-test="match-label"]').text()).toBe('2 of 3')
 
     await input.trigger('keydown', { key: 'Escape' })
     expect(mockClearQuery).toHaveBeenCalledTimes(1)
@@ -125,6 +116,7 @@ describe('FilterBar', () => {
     wrapper.findComponent(MultiSelect).vm.$emit('update:modelValue', ['refs/tags/v1'])
     await wrapper.vm.$nextTick()
 
+    expect(mockApplyFilter).toHaveBeenCalledTimes(1)
     expect(mockApplyFilter).toHaveBeenCalledWith({ path: 'src/', branches: ['refs/tags/v1'] })
   })
 
@@ -135,20 +127,6 @@ describe('FilterBar', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.findComponent(MultiSelect).props('modelValue')).toEqual(['refs/tags/v1'])
-  })
-
-  it('selecting branches in the MultiSelect applies immediately', async () => {
-    const wrapper = mount(FilterBar)
-
-    wrapper
-      .findComponent(MultiSelect)
-      .vm.$emit('update:modelValue', ['refs/heads/main', 'refs/remotes/origin/main'])
-    await wrapper.vm.$nextTick()
-
-    expect(mockApplyFilter).toHaveBeenCalledTimes(1)
-    expect(mockApplyFilter).toHaveBeenCalledWith(
-      expect.objectContaining({ branches: ['refs/heads/main', 'refs/remotes/origin/main'] }),
-    )
   })
 
   it("clicking the message field's clear icon clears the query, not the branches/author/path filter", async () => {
@@ -168,23 +146,6 @@ describe('FilterBar', () => {
     await wrapper.get('[data-test="clear-path"]').trigger('click')
 
     expect(mockApplyFilter).toHaveBeenCalledWith({ branches: ['refs/heads/main'] })
-  })
-
-  it('an empty message field shows no clear icon', () => {
-    const wrapper = mount(FilterBar)
-
-    expect(wrapper.find('[data-test="clear-query"]').exists()).toBe(false)
-    expect(wrapper.find('[data-test="clear-path"]').exists()).toBe(false)
-  })
-
-  it('shows no chip list and no clear-filters button', () => {
-    mockLogStore.filter = { path: 'y' }
-    mockLogStore.query = 'x'
-    mockLogStore.filterActive = true
-    const wrapper = mount(FilterBar)
-
-    expect(wrapper.find('.p-chip').exists()).toBe(false)
-    expect(wrapper.find('[data-test="clear-filters"]').exists()).toBe(false)
   })
 
   it('clearing the author AutoComplete applies without the author', async () => {

@@ -95,6 +95,14 @@ describe('CompareView', () => {
     expect(log.selection).toEqual([])
   })
 
+  it('clicking the close button exits the comparison', async () => {
+    const { wrapper, log } = await mountComparing()
+
+    await wrapper.get('[data-test="exit"]').trigger('click')
+
+    expect(log.selection).toEqual([])
+  })
+
   it('a double-click on a file opens it in the diff window', async () => {
     const { wrapper } = await mountComparing([
       { path: 'a.txt', status: 'M' },

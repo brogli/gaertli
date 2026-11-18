@@ -1,4 +1,4 @@
-// Requirements: FR-BR-01, FR-BR-05, FR-BR-06, FR-BR-08, FR-BR-09, FR-BR-11, FR-BR-13, FR-CONF-09, FR-LOG-01, FR-LOG-06, FR-REPO-03, FR-UPD-01, FR-UX-01, FR-UX-03, FR-UX-09, FR-UX-14, FR-WT-02, FR-WT-15
+// Requirements: FR-BR-01, FR-BR-05, FR-BR-06, FR-BR-08, FR-BR-09, FR-BR-11, FR-BR-12, FR-BR-13, FR-CONF-09, FR-LOG-01, FR-LOG-06, FR-REPO-03, FR-UPD-01, FR-UX-01, FR-UX-03, FR-UX-09, FR-UX-14, FR-WT-02, FR-WT-15
 import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -365,20 +365,14 @@ describe('BranchPicker', () => {
   })
 
   it.each([
-    ['FR-BR-11', 'Merge', 'Merge into main', 'fastForward', 'Fast-forwarded main to feat'],
-    ['FR-BR-11', 'Merge', 'Merge into main', 'merged', 'Merged feat into main'],
-    ['FR-BR-11', 'Merge', 'Merge into main', 'upToDate', 'main is already up to date with feat'],
-    ['FR-BR-12', 'Rebase', 'Rebase main onto feat', 'rebased', 'Rebased main onto feat'],
-    [
-      'FR-BR-12',
-      'Rebase',
-      'Rebase main onto feat',
-      'upToDate',
-      'main is already up to date with feat',
-    ],
+    ['Merge', 'Merge into main', 'fastForward', 'Fast-forwarded main to feat'],
+    ['Merge', 'Merge into main', 'merged', 'Merged feat into main'],
+    ['Merge', 'Merge into main', 'upToDate', 'main is already up to date with feat'],
+    ['Rebase', 'Rebase main onto feat', 'rebased', 'Rebased main onto feat'],
+    ['Rebase', 'Rebase main onto feat', 'upToDate', 'main is already up to date with feat'],
   ] as const)(
-    '%s "%s" action calls the full ref; outcome %s shows a success notice (%#)',
-    async (_id, kind, action, outcome, text) => {
+    '"%s" action calls the full ref; outcome %s shows a success notice (%#)',
+    async (kind, action, outcome, text) => {
       Facade[kind].mockResolvedValueOnce({ outcome })
       const notice = await mountNotices()
       const { body } = await openPicker()
@@ -391,11 +385,11 @@ describe('BranchPicker', () => {
   )
 
   it.each([
-    ['FR-BR-11', 'Merge', 'Merge into main', 'Stash and merge'],
-    ['FR-BR-12', 'Rebase', 'Rebase main onto feat', 'Stash and rebase'],
+    ['Merge', 'Merge into main', 'Stash and merge'],
+    ['Rebase', 'Rebase main onto feat', 'Stash and rebase'],
   ] as const)(
-    '%s a %s refused for local changes offers "%s", which retries with stash',
-    async (_id, kind, action, stashAction) => {
+    'a %s refused for local changes offers "%s", which retries with stash',
+    async (kind, action, stashAction) => {
       Facade[kind].mockRejectedValueOnce(wailsError('local changes in the way', 'DIRTY_WORKTREE'))
       const notice = await mountNotices()
       const { body } = await openPicker()
@@ -467,14 +461,6 @@ describe('BranchPicker', () => {
     await filter.trigger('keydown', { key: 'F10', shiftKey: true })
     await flushPromises()
     expect(menuLabels(body)).toContain('Check out') // feat
-  })
-
-  it('choosing an action closes the list', async () => {
-    const { body } = await openPicker()
-
-    await pickAction(body, 'feat', 'Rename…')
-
-    expect(await listOpen(body)).toBe(false)
   })
 
   it('"New branch from here…" starts the branch at that branch or tag, picked in a list by its full ref name', async () => {

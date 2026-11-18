@@ -1,5 +1,7 @@
 // Requirements: FR-UPD-01, FR-UPD-02, FR-UPD-05
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { test, expect } from './fixtures'
 import {
@@ -51,7 +53,10 @@ test('an update runs as a background job while the app stays usable', async ({
   git,
 }) => {
   pushFromClone(git, repos.other, 'B', { 'q1.txt': 'q1\n' }, 'remote q1')
-  git(repos.work, 'config', 'remote.origin.uploadpack', 'sleep 3; git-upload-pack')
+  // The remote side of the fetch blocks reading this fifo until the test writes to it.
+  const hold = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'update-hold-')), 'release')
+  execFileSync('mkfifo', [hold])
+  git(repos.work, 'config', 'remote.origin.uploadpack', `cat '${hold}' >/dev/null; git-upload-pack`)
   const app = await openApp(repos.work)
 
   await pickRefAction(app, 'B', 'Update from upstream')
@@ -61,6 +66,7 @@ test('an update runs as a background job while the app stays usable', async ({
   await expect(app.locator('.commit-details')).toContainText('add logo and func a')
   await expect(jobsMenuButton(app)).toHaveAttribute('title', '1 running job')
 
+  fs.writeFileSync(hold, '')
   await expect(jobsMenuButton(app)).toHaveAttribute('title', 'No running jobs')
   expect(rev(git, repos.work, 'B')).toBe(rev(git, repos.remote, 'B'))
 })

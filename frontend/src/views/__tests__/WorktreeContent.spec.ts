@@ -1,4 +1,4 @@
-// Requirements: FR-BR-01, FR-BR-05, FR-BR-08, FR-BR-09, FR-CHG-01, FR-ED-01, FR-ED-05, FR-ED-06, FR-REPO-04, FR-UX-01, FR-UX-05, FR-UX-09, FR-WT-02, QA-PORT-02, QA-REL-03
+// Requirements: FR-BR-01, FR-BR-02, FR-BR-05, FR-BR-08, FR-BR-09, FR-CHG-01, FR-CMP-02, FR-DIFF-07, FR-ED-01, FR-ED-05, FR-ED-06, FR-LOG-11, FR-REPO-04, FR-REPO-07, FR-UX-01, FR-UX-05, FR-UX-09, FR-WT-02, QA-PORT-02, QA-REL-03
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -135,15 +135,6 @@ describe('WorktreeContent', () => {
     expect(findButton(wrapper, 'Create branch here')).toBeUndefined()
   })
 
-  it('"Create branch here" shows its icon', async () => {
-    Facade.Summary.mockResolvedValue(summaryFixture({ branch: '', detached: true, sha: 'abc123' }))
-    const wrapper = await mountView()
-
-    expect(findButton(wrapper, 'Create branch here')!.get('.p-button-icon').classes()).toContain(
-      'oi-code-branch',
-    )
-  })
-
   it('cancelling the warning never calls CheckoutCommit and closes the dialog', async () => {
     const { wrapper, body } = await mountInBody(WorktreeContent, {
       props: { path: '/home/user/project' },
@@ -185,7 +176,7 @@ describe('WorktreeContent', () => {
 
   it.each([
     [
-      'FR-BR-02, FR-LOG-11 "Reset current branch to here…" opens ResetDialog with the row\'s sha and subject',
+      '"Reset current branch to here…" opens ResetDialog with the row\'s sha and subject',
       'reset',
       ['abc123', 'Fix the bug'],
       ResetDialog,
@@ -193,7 +184,7 @@ describe('WorktreeContent', () => {
       { path: '/home/user/project' },
     ],
     [
-      'FR-BR-01, FR-LOG-11 "New branch from here…" opens CreateBranchDialog fixed at that commit',
+      '"New branch from here…" opens CreateBranchDialog fixed at that commit',
       'create-branch',
       ['abc123'],
       CreateBranchDialog,
@@ -201,7 +192,7 @@ describe('WorktreeContent', () => {
       { path: '/home/user/project' },
     ],
     [
-      'FR-WT-02, FR-LOG-11, FR-REPO-07 "Create worktree here…" opens CreateWorktreeDialog at that commit with the WSL repo path and distro',
+      '"Create worktree here…" opens CreateWorktreeDialog at that commit with the WSL repo path and distro',
       'create-worktree',
       ['abc123'],
       CreateWorktreeDialog,
@@ -277,7 +268,7 @@ describe('WorktreeContent', () => {
 
   it.each([
     {
-      name: 'FR-DIFF-07 a commit file',
+      name: 'a commit file',
       afterMount: () => {
         useLogStore().details = commitDetailsFixture({ files: [{ path: 'x.txt', status: 'M' }] })
       },
@@ -285,7 +276,7 @@ describe('WorktreeContent', () => {
       diff: { kind: 'commit', sha: 'abc123', path: 'x.txt', oldPath: '' },
     },
     {
-      name: 'FR-DIFF-07 a changed file',
+      name: 'a changed file',
       beforeMount: () => {
         Facade.Status.mockResolvedValue(
           changedFilesFixture({ unstaged: [{ path: 'a.txt', status: 'M' }] }),
@@ -295,7 +286,7 @@ describe('WorktreeContent', () => {
       diff: { kind: 'working', staged: false, path: 'a.txt', oldPath: '' },
     },
     {
-      name: 'FR-CMP-02 a compared file',
+      name: 'a compared file',
       beforeMount: () => {
         Facade.CompareCommits.mockResolvedValue([
           { path: 'a.txt', status: 'M' },

@@ -155,6 +155,7 @@ describe('ChangesView', () => {
     await flushPromises()
 
     expect(notice.findAll('.p-toast-message')).toHaveLength(1)
+    expect(notice.text()).toContain('myed')
     expect(wrapper.find('.error-banner').exists()).toBe(false)
   })
 

@@ -1,4 +1,4 @@
-// Requirements: FR-CMP-01, FR-CMP-03, FR-CMP-04, FR-CMP-05, FR-CONF-09, FR-CP-01, FR-CP-04, FR-CP-05, FR-CP-06, FR-LOG-01, FR-LOG-02, FR-LOG-05, FR-LOG-09, FR-LOG-11, FR-LOG-13, FR-LOG-14, FR-LOG-17, FR-LOG-18, FR-RV-04, FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-10
+// Requirements: FR-BR-01, FR-BR-02, FR-BR-08, FR-CMP-01, FR-CMP-03, FR-CMP-04, FR-CMP-05, FR-CONF-09, FR-CP-01, FR-CP-04, FR-CP-05, FR-CP-06, FR-LOG-01, FR-LOG-02, FR-LOG-05, FR-LOG-09, FR-LOG-11, FR-LOG-13, FR-LOG-14, FR-LOG-17, FR-LOG-18, FR-RV-04, FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-10, FR-WT-02
 import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -92,11 +92,11 @@ describe('LogList', () => {
   })
 
   it.each([
-    ['FR-WT-02', 'Create worktree here…', 'create-worktree', ['abc123']],
-    ['FR-BR-01', 'New branch from here…', 'create-branch', ['abc123']],
-    ['FR-BR-08', 'Check out commit', 'checkout-commit', ['abc123']],
-    ['FR-BR-02', 'Reset current branch to here…', 'reset', ['abc123', 'Fix the bug']],
-  ])('%s clicking "%s" emits %s with the row\'s sha', async (_id, label, event, args) => {
+    ['Create worktree here…', 'create-worktree', ['abc123']],
+    ['New branch from here…', 'create-branch', ['abc123']],
+    ['Check out commit', 'checkout-commit', ['abc123']],
+    ['Reset current branch to here…', 'reset', ['abc123', 'Fix the bug']],
+  ])('clicking "%s" emits %s with the row\'s sha', async (label, event, args) => {
     const { wrapper, body, rowEls } = await mountWithRows([sampleRow])
     await openMenu(wrapper, rowEls[0]!)
 
@@ -183,8 +183,9 @@ describe('LogList', () => {
     ])
 
     const widths = wrapper.findAll('.graph-cell').map((svg) => svg.attributes('width'))
-    expect(widths).toHaveLength(3)
-    expect(new Set(widths).size).toBe(1)
+    const laneWidth = 14 // GraphCell's LANE_WIDTH
+    const widest = 3 // lanes 0-2 of row b
+    expect(widths).toEqual(Array(3).fill(String(widest * laneWidth)))
   })
 
   it('the hash column is as wide as the longest short hash among the rendered rows', async () => {

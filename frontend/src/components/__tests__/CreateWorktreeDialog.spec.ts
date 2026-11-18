@@ -227,12 +227,12 @@ describe('CreateWorktreeDialog', () => {
     expect(folderFields(body)).toEqual({ name: 'z', location: '/picked/z' })
   })
 
-  it('a new branch adds its own labelled fields; Browse sits beside Location', async () => {
+  it('a new branch adds its own labelled fields', async () => {
     const { body } = await mountDialog({ repoPath: '/repo' })
 
     await body.get('input[type="checkbox"]').setValue(true)
     expect(fieldLabels(body)).toEqual(['Branch name', 'Start point', 'Folder name', 'Location'])
-    expect(body.find('.p-inputgroup [data-test="browse-target"]').exists()).toBe(true)
+    expect(body.find('[data-test="browse-target"]').exists()).toBe(true)
   })
 
   it("Browse seeds PickFolder at the distro's UNC root for a WSL repo", async () => {

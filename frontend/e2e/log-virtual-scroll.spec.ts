@@ -1,5 +1,6 @@
 // Requirements: FR-LOG-01, FR-LOG-09
 import { test, expect, type Page } from '@playwright/test'
+import { LOG_ROWS_FIXTURE } from '../src/testing/fixtures/log-rows'
 import { openMockRepo } from './helpers'
 
 // happy-dom has no real layout or scrolling, so a component test cannot
@@ -7,25 +8,14 @@ import { openMockRepo } from './helpers'
 // the visible window loads up front, and scrolling pulls in further rows
 // (window.__e2eLogRowsCalls, set by src/testing/e2e-mock-bindings.ts).
 
-declare global {
-  interface Window {
-    __settleCheck?: number
-  }
-}
-
-// waitForLogRowsSettle waits until no new LogRows call has fired for a full
-// polling interval.
+// waitForLogRowsSettle waits until the whole log is streamed in: the list's
+// content is as tall as all the fixture's rows.
 async function waitForLogRowsSettle(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () => {
-      const current = window.__e2eLogRowsCalls.length
-      if (window.__settleCheck === current) return true
-      window.__settleCheck = current
-      return false
-    },
-    undefined,
-    { polling: 200, timeout: 5000 },
-  )
+  await page.waitForFunction((rowCount) => {
+    const list = document.querySelector<HTMLElement>('.log-list')!
+    const rowHeight = parseFloat(getComputedStyle(list).getPropertyValue('--row-height'))
+    return list.scrollHeight >= rowCount * rowHeight
+  }, LOG_ROWS_FIXTURE.length)
 }
 
 test('scrolling the log loads further rows beyond the first screenful', async ({ page }) => {

@@ -25,7 +25,7 @@ describe('BranchInUseDialog', () => {
     AppService.SelectWorktree.mockReset().mockResolvedValue(undefined)
   })
 
-  it('names the branch and the worktree, and shows the full path', async () => {
+  it('shows the full worktree path and offers to switch to it', async () => {
     const { body } = await mountDialog()
 
     expect(body.get('.p-dialog').text()).toContain('/home/u/r-side')

@@ -99,7 +99,7 @@ describe('useJobNotices', () => {
     onPullEnded.mockReset()
   })
 
-  it('a failed push job shows a notice with the reason and Pull/Force push, running the actions', async () => {
+  it('a non-fast-forward push job shows the reason, and Force push runs its action', async () => {
     const notice = await mountWithNotices()
     setUpstream()
 

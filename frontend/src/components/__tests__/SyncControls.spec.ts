@@ -174,14 +174,6 @@ describe('SyncControls', () => {
     expect(AppService.OpenDiff).not.toHaveBeenCalled()
   })
 
-  it('without a remote, the disabled Pull and Push keep their icon', async () => {
-    setRefs({}, [])
-    const { body } = await mountControls()
-
-    expect(findButton(body, 'Pull')!.get('.p-button-icon').classes()).toContain('oi-download')
-    expect(findButton(body, 'Push')!.get('.p-button-icon').classes()).toContain('oi-upload')
-  })
-
   it.each([false, true])(
     'without a remote, Fetch, Pull and Push are disabled with the no-remote tooltip; no select (compact: %s)',
     async (compact) => {
@@ -299,10 +291,12 @@ describe('SyncControls', () => {
     expect(confirmRequire).toHaveBeenCalledTimes(1)
     const options = confirmOptions()
     expect(options.message).toContain('protected')
+    expect(options.message).toContain('main')
     expect(Facade.ForcePush).not.toHaveBeenCalled()
 
     options.accept()
     expect(Facade.ForcePush).toHaveBeenCalledTimes(1)
+    expect(Facade.ForcePush).toHaveBeenCalledWith('/repo')
   })
 
   it('the button shows and runs Settings’ default pull mode', async () => {

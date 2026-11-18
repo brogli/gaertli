@@ -1,4 +1,4 @@
-// Requirements: FR-CMP-01, FR-CMP-04, FR-CP-06, FR-LOG-11, FR-LOG-17, FR-RV-04, FR-UX-05
+// Requirements: FR-BR-01, FR-BR-02, FR-BR-08, FR-CMP-01, FR-CMP-04, FR-CP-06, FR-LOG-11, FR-LOG-17, FR-RV-04, FR-UX-05, FR-WT-02
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildOneCommitMenuItems,
@@ -70,11 +70,11 @@ describe('buildOneCommitMenuItems', () => {
   })
 
   it.each([
-    ['FR-WT-02, FR-LOG-11', 'Create worktree here…', 'openCreateWorktree', ['abc123']],
-    ['FR-BR-01', 'New branch from here…', 'openCreateBranch', ['abc123']],
-    ['FR-BR-08', 'Check out commit', 'openCheckoutCommit', ['abc123']],
-    ['FR-BR-02', 'Reset current branch to here…', 'openReset', ['abc123', 'Fix the bug']],
-  ] as const)('%s "%s" calls %s with the row\'s sha', (_id, label, action, args) => {
+    ['Create worktree here…', 'openCreateWorktree', ['abc123']],
+    ['New branch from here…', 'openCreateBranch', ['abc123']],
+    ['Check out commit', 'openCheckoutCommit', ['abc123']],
+    ['Reset current branch to here…', 'openReset', ['abc123', 'Fix the bug']],
+  ] as const)('"%s" calls %s with the row\'s sha', (label, action, args) => {
     const a = oneCommitActions()
     const items = buildOneCommitMenuItems(row(), a, t)
 
@@ -214,5 +214,18 @@ describe('buildSquashMenuItems', () => {
     expect(items).toEqual([
       { label: 'Squash and fixup not possible: a rebase is in progress', disabled: true },
     ])
+  })
+
+  it('without a blocker: squash and fixup items run their own action', () => {
+    const actions = { squash: vi.fn(), fixup: vi.fn() }
+    const items = buildSquashMenuItems(2, null, actions, t)
+
+    findItem(items, 'Squash 2 commits…').command()
+    expect(actions.squash).toHaveBeenCalledTimes(1)
+    expect(actions.fixup).not.toHaveBeenCalled()
+
+    findItem(items, 'Fixup 2 commits…').command()
+    expect(actions.fixup).toHaveBeenCalledTimes(1)
+    expect(actions.squash).toHaveBeenCalledTimes(1)
   })
 })
