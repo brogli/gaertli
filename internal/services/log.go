@@ -65,17 +65,23 @@ func (c *Core) LogRows(ctx context.Context, id core.WorktreeID, from, to int) (c
 	}, nil
 }
 
-// headFor puts the HEAD label on path's own HEAD commit. The log is loaded
-// once per repo, so its decoration names the HEAD of whichever worktree
-// ran git log.
+// headFor puts the HEAD label on path's own HEAD commit and a WorktreeRef
+// label on each other worktree's, in front of the commit's refs. The log is
+// loaded once per repo, so its decoration names the HEAD of whichever
+// worktree ran git log.
 func headFor(rows []core.LogCommit, path string) []core.LogCommit {
 	out := make([]core.LogCommit, len(rows))
 	for i, row := range rows {
 		refs := slices.DeleteFunc(slices.Clone(row.Refs), func(r core.RefLabel) bool { return r.Kind == core.HeadRef })
-		if slices.Contains(row.CheckedOutIn, path) {
-			refs = slices.Insert(refs, 0, core.RefLabel{Name: "HEAD", Kind: core.HeadRef})
+		var checkouts []core.RefLabel
+		for _, wt := range row.CheckedOutIn {
+			if wt == path {
+				checkouts = slices.Insert(checkouts, 0, core.RefLabel{Name: "HEAD", Kind: core.HeadRef})
+			} else {
+				checkouts = append(checkouts, core.RefLabel{Name: wt, Kind: core.WorktreeRef})
+			}
 		}
-		row.Refs = refs
+		row.Refs = slices.Concat(checkouts, refs)
 		out[i] = row
 	}
 	return out

@@ -22,10 +22,14 @@ import { exactDate, timeAgo } from '@/lib/format'
 import { laneSpan } from '@/lib/graphLanes'
 import { openOnConflicts } from '@/lib/openConflicts'
 import { errorHeadline } from '@/lib/errorText'
-import type {
-  LogCommit,
-  PickOptions,
-  SquashCheck,
+import { iconClass } from '@/lib/icons'
+import { basename } from '@/lib/path'
+import {
+  RefKind,
+  type LogCommit,
+  type PickOptions,
+  type RefLabel,
+  type SquashCheck,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // LogList is a virtual-scrolled commit list: only the rows in view are
@@ -63,6 +67,16 @@ const ROW_HEIGHT = 24
 
 // A row shows this many ref labels, then "+N" naming them all on hover.
 const MAX_LABELS = 2
+
+// A worktree label names the worktree by its folder, its path on hover.
+function refText(label: RefLabel): string {
+  return label.kind === RefKind.WorktreeRef ? basename(label.name) : label.name
+}
+function refTitle(label: RefLabel): string {
+  return label.kind === RefKind.WorktreeRef
+    ? t('logView.checkedOutIn', { path: label.name })
+    : label.name
+}
 
 const virtualizer = useVirtualizer(
   computed(() => ({
@@ -342,9 +356,14 @@ const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
               :key="label.name"
               class="ref-label min-w-[2em] max-w-[6em] flex-[0_1_auto] truncate rounded-sm bg-emphasis px-1.5 text-sm"
               :class="label.kind"
-              :title="label.name"
+              :title="refTitle(label)"
             >
-              {{ label.name }}
+              <i
+                v-if="label.kind === RefKind.WorktreeRef"
+                :class="iconClass('worktree')"
+                aria-hidden="true"
+              ></i>
+              {{ refText(label) }}
             </span>
             <span
               v-if="(row.refs?.length ?? 0) > MAX_LABELS"

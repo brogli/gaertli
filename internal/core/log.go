@@ -90,7 +90,8 @@ type LogCommit struct {
 }
 
 // RefLabel is one decoration on a commit. Name is the short display form
-// ("main", "origin/main", "v1.0", "HEAD").
+// ("main", "origin/main", "v1.0", "HEAD"), or for a WorktreeRef the path of
+// the other worktree that has the commit checked out.
 type RefLabel struct {
 	Name string  `json:"name"`
 	Kind RefKind `json:"kind"`
@@ -105,6 +106,9 @@ const (
 	BranchRef RefKind = "branch"
 	RemoteRef RefKind = "remote"
 	TagRef    RefKind = "tag"
+	// WorktreeRef marks a commit checked out in a worktree other than the
+	// asking one.
+	WorktreeRef RefKind = "worktree"
 )
 
 // GraphRow is a commit's lane data, the JSON shape of graph.Row.

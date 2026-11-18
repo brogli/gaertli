@@ -310,6 +310,7 @@
     "untrackedHint": "New, untracked files are not part of this comparison."
   },
   "logView": {
+    "checkedOutIn": "Checked out in {path}",
     "menu": {
       "copyHash": "Copy hash",
       "copySubject": "Copy subject",

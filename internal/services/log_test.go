@@ -592,6 +592,42 @@ func TestLogRowsPlaceHEADOnTheAskingWorktreesHead(t *testing.T) {
 	}
 }
 
+// Each window's rows mark the commit another worktree has checked out with
+// that worktree's path, right after where HEAD would go.
+func TestLogRowsMarkOtherWorktreesCheckouts(t *testing.T) {
+	t.Parallel()
+	repo := gittest.New(t)
+	gittest.Commit(t, repo.Dir, "a.txt", "a", "a")
+	gittest.Run(t, repo.Dir, "branch", "side")
+	gittest.Commit(t, repo.Dir, "a.txt", "a2", "a2")
+	linked := filepath.Join(t.TempDir(), "linked")
+	gittest.Run(t, repo.Dir, "worktree", "add", linked, "side")
+
+	c := New(func(core.Event) {})
+	mainWt := openOn(t, c, repo.Dir)
+	linkedWt := openOn(t, c, linked)
+	loadLog(t, c, mainWt.ID)
+
+	for _, tc := range []struct {
+		id      core.WorktreeID
+		subject string
+		want    []core.RefLabel
+	}{
+		{mainWt.ID, "a", []core.RefLabel{{Name: gitPath(t, linked), Kind: core.WorktreeRef}, {Name: "side", Kind: core.BranchRef}}},
+		{linkedWt.ID, "a2", []core.RefLabel{{Name: gitPath(t, repo.Dir), Kind: core.WorktreeRef}, {Name: "master", Kind: core.BranchRef}}},
+	} {
+		res, err := c.LogRows(t.Context(), tc.id, 0, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range res.Rows {
+			if row.Subject == tc.subject && !slices.Equal(row.Refs, tc.want) {
+				t.Errorf("worktree %s: refs on %q = %v, want %v", tc.id, tc.subject, row.Refs, tc.want)
+			}
+		}
+	}
+}
+
 // loadLog starts id's log load and returns the first 1000 rows once it
 // finished without an error.
 func loadLog(t *testing.T, c *Core, id core.WorktreeID) []core.LogCommit {
