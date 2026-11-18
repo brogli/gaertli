@@ -9,6 +9,7 @@ func Info(j Job) core.JobInfo {
 		ID:       string(j.ID),
 		Kind:     j.Kind,
 		Branch:   j.Branch,
+		Remote:   j.Remote,
 		State:    j.State,
 		Progress: j.Percent,
 		Message:  j.Message,

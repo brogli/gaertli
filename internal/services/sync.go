@@ -49,7 +49,7 @@ func (c *Core) Fetch(ctx context.Context, id core.WorktreeID, remote string) (st
 	} else {
 		args = append(args, remote)
 	}
-	jobID := wt.Repo.Jobs().Start(ctx, core.FetchJob, func(ctx context.Context, progress jobs.Progress) (any, error) {
+	jobID := wt.Repo.Jobs().StartForRemote(ctx, core.FetchJob, remote, func(ctx context.Context, progress jobs.Progress) (any, error) {
 		_, err := runRemote(ctx, wt, args, progress)
 		return nil, err
 	})

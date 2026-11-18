@@ -107,6 +107,7 @@ type JobInfo struct {
 	ID       string              `json:"id"`
 	Kind     JobKind             `json:"kind"`
 	Branch   string              `json:"branch,omitempty"` // the branch an UpdateBranchJob acts on
+	Remote   string              `json:"remote,omitempty"` // the one remote a FetchJob fetches; "" for all
 	State    JobState            `json:"state"`
 	Progress int                 `json:"progress"` // 0-100, or -1 while indeterminate
 	Message  string              `json:"message"`

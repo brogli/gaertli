@@ -310,6 +310,7 @@
     "untrackedHint": "New, untracked files are not part of this comparison."
   },
   "logView": {
+    "checkedOutIn": "Checked out in {path}",
     "menu": {
       "copyHash": "Copy hash",
       "copySubject": "Copy subject",
@@ -344,6 +345,7 @@
   },
   "toolbar": {
     "fetch": "Fetch",
+    "fetchRemoteMenu": "Fetch one remote",
     "noRemoteTooltip": "This repo has no remote",
     "noBranchTooltip": "No branch is checked out",
     "pull": "Pull",
@@ -356,6 +358,7 @@
     "forcePushProtectedWarning": " \"{branch}\" is a protected branch.",
     "createBranchHere": "Create branch here",
     "refresh": "Refresh",
+    "refreshing": "Refreshing…",
     "openInEditor": "Open in {editor}",
     "editorFallback": "editor",
     "settings": "Settings"

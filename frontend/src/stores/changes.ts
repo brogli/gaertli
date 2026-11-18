@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import type { ChangedFiles } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
@@ -9,15 +9,16 @@ import type { ChangedFiles } from '../../bindings/github.com/brogli/gaertli/inte
 // typed in the commit box.
 export const useChangesStore = defineStore('changes', () => {
   const files = ref<ChangedFiles | null>(null)
-  const loading = ref(false)
+  const loadsInFlight = ref(0)
+  const loading = computed(() => loadsInFlight.value > 0)
   const messageDraft = ref('')
 
   async function load(wt: string): Promise<void> {
-    loading.value = true
+    loadsInFlight.value++
     try {
       files.value = await Facade.Status(wt)
     } finally {
-      loading.value = false
+      loadsInFlight.value--
     }
   }
 

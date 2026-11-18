@@ -9,6 +9,7 @@ import Tab from 'openvue/tab'
 import TabPanels from 'openvue/tabpanels'
 import TabPanel from 'openvue/tabpanel'
 import Button from 'openvue/button'
+import { useTimeoutFn } from '@vueuse/core'
 import { useWorktreesStore } from '@/stores/worktrees'
 import { useBranchesStore } from '@/stores/branches'
 import { useLogStore } from '@/stores/log'
@@ -92,11 +93,35 @@ useWindowEvent('core:reconnected', () => {
 })
 
 // Manual refresh: if anything differs, repo:changed arrives the normal way.
-function refresh(): void {
-  void run(() => Facade.Refresh(wt))
+const refreshCalls = ref(0)
+async function refresh(): Promise<void> {
+  if (slowRefresh.value) return
+  refreshCalls.value++
+  try {
+    await run(() => Facade.Refresh(wt))
+  } finally {
+    refreshCalls.value--
+  }
 }
 
-useShortcut('F5', refresh)
+// A refresh running for longer than the status poll's base interval of a
+// second shows as refreshing, so a very large working tree does not look
+// stuck.
+const refreshRunning = computed(() => refreshCalls.value > 0 || changes.loading)
+const slowRefresh = ref(false)
+const slowRefreshTimer = useTimeoutFn(() => (slowRefresh.value = true), 1000, { immediate: false })
+watch(refreshRunning, (running) => {
+  slowRefresh.value = false
+  if (running) slowRefreshTimer.start()
+  else slowRefreshTimer.stop()
+})
+const refreshTitle = computed(() =>
+  slowRefresh.value
+    ? t('toolbar.refreshing')
+    : withShortcut('toolbar.refresh', 'shortcuts.refresh'),
+)
+
+useShortcut('F5', () => void refresh())
 
 // The Open in editor button names the effective editor profile once the
 // summary loads.
@@ -208,7 +233,8 @@ const sideView = computed<'details' | 'changes'>(() =>
         v-bind="toolbarButton"
         :icon="iconClass('refresh')"
         :label="compact ? '' : t('toolbar.refresh')"
-        :title="withShortcut('toolbar.refresh', 'shortcuts.refresh')"
+        :loading="slowRefresh"
+        :title="refreshTitle"
         :aria-label="t('toolbar.refresh')"
         @click="refresh"
       />

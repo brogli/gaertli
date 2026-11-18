@@ -65,15 +65,20 @@ func (c *Core) LogRows(ctx context.Context, id core.WorktreeID, from, to int) (c
 	}, nil
 }
 
-// headFor puts the HEAD label on path's own HEAD commit. The log is loaded
-// once per repo, so its decoration names the HEAD of whichever worktree
-// ran git log.
+// headFor puts the HEAD label on path's own HEAD commit, before its refs,
+// and a WorktreeRef label for each other worktree's after them. The log is
+// loaded once per repo, so its decoration names the HEAD of whichever
+// worktree ran git log.
 func headFor(rows []core.LogCommit, path string) []core.LogCommit {
 	out := make([]core.LogCommit, len(rows))
 	for i, row := range rows {
 		refs := slices.DeleteFunc(slices.Clone(row.Refs), func(r core.RefLabel) bool { return r.Kind == core.HeadRef })
-		if slices.Contains(row.CheckedOutIn, path) {
-			refs = slices.Insert(refs, 0, core.RefLabel{Name: "HEAD", Kind: core.HeadRef})
+		for _, wt := range row.CheckedOutIn {
+			if wt == path {
+				refs = slices.Insert(refs, 0, core.RefLabel{Name: "HEAD", Kind: core.HeadRef})
+			} else {
+				refs = append(refs, core.RefLabel{Name: wt, Kind: core.WorktreeRef})
+			}
 		}
 		row.Refs = refs
 		out[i] = row
@@ -335,7 +340,7 @@ func worktreeCheckouts(ctx context.Context, r git.Runner, dir string, background
 	}
 	checkouts := map[core.SHA][]string{}
 	for _, wt := range worktrees {
-		if wt.Path != "" && wt.SHA != "" {
+		if wt.Path != "" && wt.SHA != "" && !wt.Missing {
 			checkouts[wt.SHA] = append(checkouts[wt.SHA], wt.Path)
 		}
 	}

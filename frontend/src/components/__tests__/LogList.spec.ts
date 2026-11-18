@@ -1,4 +1,4 @@
-// Requirements: FR-BR-01, FR-BR-02, FR-BR-08, FR-CMP-01, FR-CMP-03, FR-CMP-04, FR-CMP-05, FR-CONF-09, FR-CP-01, FR-CP-04, FR-CP-05, FR-CP-06, FR-LOG-01, FR-LOG-02, FR-LOG-05, FR-LOG-09, FR-LOG-11, FR-LOG-13, FR-LOG-14, FR-LOG-17, FR-LOG-18, FR-RV-04, FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-10, FR-WT-02
+// Requirements: FR-BR-01, FR-BR-02, FR-BR-08, FR-CMP-01, FR-CMP-03, FR-CMP-04, FR-CMP-05, FR-CONF-09, FR-CP-01, FR-CP-04, FR-CP-05, FR-CP-06, FR-LOG-01, FR-LOG-02, FR-LOG-05, FR-LOG-09, FR-LOG-10, FR-LOG-11, FR-LOG-13, FR-LOG-14, FR-LOG-17, FR-LOG-18, FR-RV-04, FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-10, FR-WT-02
 import { flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -241,6 +241,30 @@ describe('LogList', () => {
 
     expect(Facade.LogRows).toHaveBeenCalledTimes(1)
     expect(Facade.LogRows).toHaveBeenCalledWith('/repo', 0, 3)
+  })
+
+  it('a commit checked out in another worktree shows that worktree’s folder name, its path in the title', async () => {
+    const refs = [
+      { name: 'HEAD', kind: RefKind.HeadRef },
+      { name: '/repos/feature-x', kind: RefKind.WorktreeRef },
+    ]
+    const { wrapper } = await mountWithRows([commitRow({ refs })])
+
+    const labels = wrapper.findAll('.ref-label')
+    expect(labels.map((l) => l.text())).toEqual(['HEAD', 'feature-x'])
+    expect(labels[1]!.attributes('title')).toBe('Checked out in /repos/feature-x')
+    expect(labels[1]!.find('i.oi-folder').exists()).toBe(true)
+  })
+
+  it('a worktree label behind "+N" is named by its folder in the title', async () => {
+    const refs = [
+      { name: 'main', kind: RefKind.BranchRef },
+      { name: 'origin/main', kind: RefKind.RemoteRef },
+      { name: '/repos/feature-x', kind: RefKind.WorktreeRef },
+    ]
+    const { wrapper } = await mountWithRows([commitRow({ refs })])
+
+    expect(wrapper.get('.ref-more').attributes('title')).toBe('main, origin/main, feature-x')
   })
 
   it('a row shows its short hash', async () => {

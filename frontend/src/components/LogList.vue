@@ -22,10 +22,13 @@ import { exactDate, timeAgo } from '@/lib/format'
 import { laneSpan } from '@/lib/graphLanes'
 import { openOnConflicts } from '@/lib/openConflicts'
 import { errorHeadline } from '@/lib/errorText'
-import type {
-  LogCommit,
-  PickOptions,
-  SquashCheck,
+import { iconClass } from '@/lib/icons'
+import { basename } from '@/lib/path'
+import {
+  RefKind,
+  type LogCommit,
+  type PickOptions,
+  type SquashCheck,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 
 // LogList is a virtual-scrolled commit list: only the rows in view are
@@ -63,6 +66,21 @@ const ROW_HEIGHT = 24
 
 // A row shows this many ref labels, then "+N" naming them all on hover.
 const MAX_LABELS = 2
+
+// shownRefs are row's labels as shown: a worktree label by its folder name
+// and a worktree icon, its path on hover.
+function shownRefs(row: LogCommit) {
+  return (row.refs ?? []).map((label) =>
+    label.kind === RefKind.WorktreeRef
+      ? {
+          ...label,
+          text: basename(label.name),
+          title: t('logView.checkedOutIn', { path: label.name }),
+          icon: iconClass('worktree'),
+        }
+      : { ...label, text: label.name, title: label.name, icon: '' },
+  )
+}
 
 const virtualizer = useVirtualizer(
   computed(() => ({
@@ -338,18 +356,23 @@ const gitDefaults: PickOptions = { noCommit: false, recordOrigin: false }
               >{{ row.subject }}</span
             >
             <span
-              v-for="label in row.refs?.slice(0, MAX_LABELS)"
+              v-for="label in shownRefs(row).slice(0, MAX_LABELS)"
               :key="label.name"
               class="ref-label min-w-[2em] max-w-[6em] flex-[0_1_auto] truncate rounded-sm bg-emphasis px-1.5 text-sm"
               :class="label.kind"
-              :title="label.name"
+              :title="label.title"
             >
-              {{ label.name }}
+              <i v-if="label.icon" :class="label.icon" aria-hidden="true"></i>
+              {{ label.text }}
             </span>
             <span
               v-if="(row.refs?.length ?? 0) > MAX_LABELS"
               class="ref-more max-w-[6em] flex-none truncate rounded-sm bg-emphasis px-1.5 text-sm"
-              :title="row.refs!.map((r) => r.name).join(', ')"
+              :title="
+                shownRefs(row)
+                  .map((r) => r.text)
+                  .join(', ')
+              "
               >+{{ row.refs!.length - MAX_LABELS }}</span
             >
           </span>

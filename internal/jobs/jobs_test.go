@@ -1,4 +1,4 @@
-// Requirements: FR-SYNC-07, FR-UPD-01, QA-RESP-01
+// Requirements: FR-SYNC-01, FR-SYNC-07, FR-UPD-01, QA-RESP-01
 
 package jobs
 
@@ -331,6 +331,26 @@ func TestStartForBranchRunsOneJobPerBranchOfAKind(t *testing.T) {
 		if info := Info(j); info.Kind != "update-branch" || (info.Branch != "A" && info.Branch != "B") {
 			t.Errorf("Info = kind %q, branch %q, want update-branch on A or B", info.Kind, info.Branch)
 		}
+	}
+}
+
+func TestStartForRemoteNamesTheRemoteAndRunsOneJobOfAKind(t *testing.T) {
+	m := NewManager(func(Job) {})
+	release := make(chan struct{})
+	defer close(release)
+	fn := func(ctx context.Context, progress Progress) (any, error) {
+		<-release
+		return nil, nil
+	}
+
+	upstream := m.StartForRemote(t.Context(), "fetch", "upstream", fn)
+	all := m.StartForRemote(t.Context(), "fetch", "", fn)
+
+	if all != upstream {
+		t.Errorf("a second fetch returned %q, want the running job %q", all, upstream)
+	}
+	if info := Info(m.List()[0]); info.Remote != "upstream" {
+		t.Errorf("Info.Remote = %q, want upstream", info.Remote)
 	}
 }
 
