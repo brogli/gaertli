@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-01, FR-UX-09
+// Requirements: FR-LOG-01, FR-UX-09, FR-UX-27
 import { test, expect, type Locator } from '@playwright/test'
 import { dragLogBorder, openMockRepo, overflows, switchToChanges } from './helpers'
 

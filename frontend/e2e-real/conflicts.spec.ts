@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-01, FR-CONF-03, FR-CONF-04, FR-CONF-06, FR-CONF-07, FR-CONF-10
+// Requirements: FR-CONF-01, FR-CONF-03, FR-CONF-04, FR-CONF-06, FR-CONF-07, FR-CONF-10, FR-CONF-15
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'

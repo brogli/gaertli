@@ -1,4 +1,4 @@
-// Requirements: FR-BR-02, FR-BR-03, FR-BR-04, FR-UX-03
+// Requirements: FR-BR-02, FR-BR-03, FR-BR-04, FR-BR-16, FR-UX-03
 import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'

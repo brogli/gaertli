@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-09, FR-UX-08, FR-WT-02
+// Requirements: FR-LOG-09, FR-UX-26, FR-WT-02
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

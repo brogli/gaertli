@@ -1,4 +1,4 @@
-// Requirements: FR-CMP-01, FR-CMP-03, FR-CMP-04
+// Requirements: FR-CMP-01, FR-CMP-03, FR-CMP-04, FR-CMP-06
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

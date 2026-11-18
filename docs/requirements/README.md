@@ -1,6 +1,6 @@
 # Requirements — Gärtli
 
-What the app must do. How it is built is in `architecture.md`.
+What the app must do. How it is built is in [architecture](../architecture/README.md).
 
 Priorities: **MUST** = needed for v1. **SHOULD** = wanted, can slip. Every requirement has an ID;
 task plans and tests refer to these IDs.
@@ -41,20 +41,20 @@ offers a strong log view, commit comparison, worktree handling, and safe sync ac
 ## Requirements
 
 - Functional requirements (FR-*), one file per area:
-  - [repository.md](requirements/functional/repository.md): REPO
-  - [log.md](requirements/functional/log.md): LOG, CMP
-  - [diff.md](requirements/functional/diff.md): DIFF
-  - [branches.md](requirements/functional/branches.md): BR, UPD
-  - [worktrees.md](requirements/functional/worktrees.md): WT
-  - [changes.md](requirements/functional/changes.md): CHG, CONF
-  - [sync.md](requirements/functional/sync.md): SYNC
-  - [cherry-pick-revert.md](requirements/functional/cherry-pick-revert.md): CP, RV
-  - [editor.md](requirements/functional/editor.md): ED
-  - [ui.md](requirements/functional/ui.md): UX
-- [quality.md](requirements/quality.md): QA
-- [distribution.md](requirements/distribution.md): DIST, OSS
-- [glossary.md](requirements/glossary.md): the domain terms used by every document, the code and the
-  UI (QA-USE-03).
+  - [repository.md](functional/repository.md): REPO
+  - [log.md](functional/log.md): LOG, CMP
+  - [diff.md](functional/diff.md): DIFF
+  - [branches.md](functional/branches.md): BR, UPD
+  - [worktrees.md](functional/worktrees.md): WT
+  - [changes.md](functional/changes.md): CHG, CONF
+  - [sync.md](functional/sync.md): SYNC
+  - [cherry-pick-revert.md](functional/cherry-pick-revert.md): CP, RV
+  - [editor.md](functional/editor.md): ED
+  - [ui.md](functional/ui.md): UX
+- [quality.md](quality.md): QA
+- [distribution.md](distribution.md): DIST, OSS
+- [glossary.md](glossary.md): the domain terms used by every document, the code and the UI
+  (QA-USE-03).
 
 ## Out of scope for v1
 

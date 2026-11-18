@@ -125,7 +125,7 @@ Whether the branch then needs a force push is `merge-base --is-ancestor <oldest>
    where it is reached. A lane gets a colour number when it opens and a new one where it reaches a
    commit a local branch points at, decided per commit from the commit's own ref decorations, so no
    extra git call is needed and the stream stays a stream. A colour number is not reused while its
-   lane stays open; the UI maps it onto its palette (FR-LOG-02).
+   lane stays open; the UI maps it onto its palette (FR-LOG-23).
 3. A path filter keeps the graph valid, since `--parents` rewrites parents across filtered-out
    commits. An author filter shows a flat list. A new filter kills the running filtered log.
 4. A `refs` change re-reads the ref tips and restarts the log only if they differ from the snapshot

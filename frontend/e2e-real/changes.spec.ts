@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-01, FR-CHG-02, FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-REPO-04
+// Requirements: FR-CHG-01, FR-CHG-02, FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-DIFF-13, FR-REPO-04
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'

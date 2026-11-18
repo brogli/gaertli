@@ -3,10 +3,10 @@
 Desktop git GUI: Go core + Wails v3 shell + Vue 3 (OpenVue). Developed spec-driven, test-driven,
 hands-off by Claude sessions.
 
-Read `docs/requirements.md` (what), `docs/architecture.md` (how it is built) and
-`docs/conventions.md` (how its code is written) first, each an index of its folder, then only the
-topic files a task needs. `docs/testing.md` is the testing strategy, `docs/ci.md` what the CI
-pipelines do, `docs/releasing.md` how builds and releases work.
+Read `docs/requirements/README.md` (what), `docs/architecture/README.md` (how it is built) and
+`docs/conventions/README.md` (how its code and docs are written) first, each an index of its folder,
+then only the topic files a task needs. `docs/testing.md` is the testing strategy, `docs/ci.md` what
+the CI pipelines do, `docs/releasing.md` how builds and releases work.
 
 ## Process
 
@@ -23,22 +23,10 @@ pipelines do, `docs/releasing.md` how builds and releases work.
 
 ## Docs
 
-- `docs/` holds requirements, architecture, conventions, the testing strategy, the CI pipelines and
-  the release process, kept current. Plans, research notes, task lists and logs stay out of the
-  repo.
-- `docs/requirements/` is the only source of truth for what the app does. Every behaviour a remark,
-  a plan or a review settles becomes a row before it is built. Rows read as requirements written by
-  people: what the user can do and gets, goal first, current state. UI rows may say how the UI is
-  arranged (a toolbar, a picker, a shortcut shown on its button), never library or component names,
-  pixel values, log levels, file names, dates or history.
-- Cross-cutting qualities are quality attributes in `docs/requirements/quality.md`.
-- `docs/architecture/` reads like a design doc written by people: decisions and their reasons,
-  structure, UI design, git command shapes. An ADR records only a decision that is costly to
-  reverse, conceptually and briefly. No implementation detail (file names below package level,
-  per-method notes, mechanical flags, exit codes) and no changelog. Those live in code, tests, doc
-  comments and git.
-- `docs/conventions/` states each implementation convention's intent, not its details: those live in
-  lint and tool configuration and in the code.
+- `docs/` holds one folder or file per topic, kept current; a folder's `README.md` is its index.
+  Plans, research notes, task lists and logs stay out of the repo.
+- How docs are written, requirement rows included, is in `docs/conventions/docs.md`. Read it before
+  editing anything under `docs/`.
 
 ## Code
 

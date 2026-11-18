@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-01, FR-LOG-02, FR-LOG-09, FR-LOG-10, FR-REPO-04, FR-UX-02, QA-PERF-08
+// Requirements: FR-LOG-01, FR-LOG-02, FR-LOG-09, FR-LOG-10, FR-LOG-22, FR-REPO-04, FR-UX-23, QA-PERF-08
 
 package services
 

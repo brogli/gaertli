@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-ED-02, FR-LOG-21, QA-REL-03
+// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-CONF-19, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-DIFF-13, FR-ED-02, FR-LOG-16, FR-LOG-31, QA-REL-03
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

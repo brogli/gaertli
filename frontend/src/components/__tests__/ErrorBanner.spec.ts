@@ -1,4 +1,4 @@
-// Requirements: DIST-01, FR-ED-06, FR-UX-01, FR-UX-11, FR-UX-16
+// Requirements: FR-ED-06, FR-UX-01, FR-UX-11, FR-UX-16
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import ErrorBanner from '../ErrorBanner.vue'

@@ -1,4 +1,4 @@
-// Requirements: FR-REPO-01, FR-REPO-07, FR-REPO-08, FR-UX-05, FR-UX-09, FR-WT-13, FR-WT-16
+// Requirements: FR-REPO-01, FR-REPO-07, FR-REPO-08, FR-REPO-10, FR-UX-05, FR-UX-09, FR-WT-13, FR-WT-16, FR-WT-20
 import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

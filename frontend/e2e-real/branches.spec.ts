@@ -1,4 +1,4 @@
-// Requirements: FR-BR-01, FR-BR-03, FR-BR-04, FR-BR-06, FR-BR-09
+// Requirements: FR-BR-01, FR-BR-03, FR-BR-04, FR-BR-06, FR-BR-09, FR-BR-17
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'

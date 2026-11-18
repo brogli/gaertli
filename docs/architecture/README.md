@@ -1,7 +1,7 @@
 # Architecture — Gärtli
 
-How Gärtli is built. What it does is in `requirements.md`, how its code is written in
-`conventions.md`.
+How Gärtli is built. What it does is in [requirements](../requirements/README.md), how its code is
+written in [conventions](../conventions/README.md).
 
 ## Principles
 
@@ -96,15 +96,15 @@ shell.
 ## Documents
 
 - Decisions:
-  - [ADR-1: Shell out to git](architecture/adr-1-shell-out-to-git.md)
-  - [ADR-2: Wails v3](architecture/adr-2-wails-v3.md)
-  - [ADR-3: One core interface, two placements](architecture/adr-3-core-placement.md)
-  - [ADR-4: Git is the only source of truth](architecture/adr-4-git-is-the-only-source-of-truth.md)
-  - [ADR-5: Log and graph are built in Go](architecture/adr-5-log-and-graph-in-go.md)
-  - [ADR-6: Write queues by what they lock](architecture/adr-6-write-queues-by-what-they-lock.md)
-  - [ADR-7: Git computes the diff, CodeMirror draws it](architecture/adr-7-diff-ui-with-codemirror-6-merge.md)
-  - [ADR-8: One process, one selection per window](architecture/adr-8-one-process-selection-per-window.md)
-  - [ADR-9: The core is split into bounded contexts](architecture/adr-9-bounded-contexts.md)
-- [backend.md](architecture/backend.md): shell and core responsibilities, calls, events, errors.
-- [frontend.md](architecture/frontend.md): window state, layout, diff view, merge editor.
-- [git-mapping.md](architecture/git-mapping.md): which git commands back which feature.
+  - [ADR-1: Shell out to git](adr-1-shell-out-to-git.md)
+  - [ADR-2: Wails v3](adr-2-wails-v3.md)
+  - [ADR-3: One core interface, two placements](adr-3-core-placement.md)
+  - [ADR-4: Git is the only source of truth](adr-4-git-is-the-only-source-of-truth.md)
+  - [ADR-5: Log and graph are built in Go](adr-5-log-and-graph-in-go.md)
+  - [ADR-6: Write queues by what they lock](adr-6-write-queues-by-what-they-lock.md)
+  - [ADR-7: Git computes the diff, CodeMirror draws it](adr-7-diff-ui-with-codemirror-6-merge.md)
+  - [ADR-8: One process, one selection per window](adr-8-one-process-selection-per-window.md)
+  - [ADR-9: The core is split into bounded contexts](adr-9-bounded-contexts.md)
+- [backend.md](backend.md): shell and core responsibilities, calls, events, errors.
+- [frontend.md](frontend.md): window state, layout, diff view, merge editor.
+- [git-mapping.md](git-mapping.md): which git commands back which feature.

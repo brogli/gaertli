@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-09, FR-SYNC-04, FR-SYNC-08, FR-SYNC-09, FR-SYNC-13, FR-UPD-05, FR-UX-01, FR-UX-12, FR-UX-15, FR-UX-16
+// Requirements: FR-CONF-09, FR-SYNC-04, FR-SYNC-08, FR-SYNC-09, FR-SYNC-13, FR-UPD-05, FR-UX-01, FR-UX-12, FR-UX-15, FR-UX-16, FR-UX-28
 import { flushPromises, mount, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

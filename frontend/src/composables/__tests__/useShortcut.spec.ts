@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-05, FR-UX-05
+// Requirements: FR-UX-25
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref, type VNodeChild } from 'vue'

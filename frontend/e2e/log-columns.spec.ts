@@ -1,4 +1,4 @@
-// Requirements: FR-CMP-05, FR-LOG-01, FR-LOG-02, FR-UX-09
+// Requirements: FR-CMP-05, FR-LOG-01, FR-LOG-02, FR-UX-27
 import { test, expect, type Page } from '@playwright/test'
 import { openMockRepo } from './helpers'
 

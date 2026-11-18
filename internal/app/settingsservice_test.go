@@ -1,4 +1,4 @@
-// Requirements: FR-ED-05, FR-ED-11, FR-UX-04, FR-UX-19
+// Requirements: FR-ED-05, FR-ED-11, FR-UX-04, FR-UX-19, FR-UX-23, FR-UX-24
 
 package app
 

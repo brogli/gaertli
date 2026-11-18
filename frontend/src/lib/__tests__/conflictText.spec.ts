@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05, FR-CONF-10
+// Requirements: FR-CONF-10, FR-CONF-13
 import { describe, expect, it } from 'vitest'
 import { changesFileFixture, conflictFileFixture } from '@/testing/fixtures/conflicts'
 import { resultFromBase, takenLines } from '../conflictText'

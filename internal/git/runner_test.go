@@ -1,4 +1,4 @@
-// Requirements: FR-UX-01, FR-UX-02, QA-COMP-01, QA-COMP-02, QA-REL-01, QA-SAFE-02, QA-SAFE-04, QA-SEC-03
+// Requirements: FR-UX-01, FR-UX-02, FR-UX-23, QA-COMP-01, QA-COMP-02, QA-REL-01, QA-SAFE-02, QA-SAFE-04, QA-SEC-03
 
 package git
 

@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05
+// Requirements: FR-CONF-06
 import { describe, expect, it } from 'vitest'
 import { isMarkerLine } from '../conflictMarkers'
 

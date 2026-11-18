@@ -1,4 +1,4 @@
-// Requirements: FR-REPO-07, FR-UX-04, FR-UX-19, FR-WT-13, FR-WT-16
+// Requirements: FR-REPO-07, FR-UX-04, FR-UX-19, FR-WT-13, FR-WT-20
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

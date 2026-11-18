@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-13, FR-ED-02, FR-LOG-16, FR-LOG-21, FR-UX-13
+// Requirements: FR-CHG-13, FR-ED-02, FR-LOG-16, FR-LOG-30, FR-LOG-31, FR-UX-13
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import ChangedFileTree from '../ChangedFileTree.vue'

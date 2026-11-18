@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05, FR-CONF-10
+// Requirements: FR-CONF-06, FR-CONF-10, FR-CONF-13, FR-CONF-14, FR-CONF-15, FR-CONF-16, FR-CONF-17, FR-CONF-18
 import { describe, expect, it } from 'vitest'
 import { EditorState, Text } from '@codemirror/state'
 import { EditorView, type DecorationSet } from '@codemirror/view'

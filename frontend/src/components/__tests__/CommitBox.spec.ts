@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-05, FR-CHG-06, FR-CHG-07, FR-CHG-08, FR-CHG-09, FR-UX-05
+// Requirements: FR-CHG-05, FR-CHG-06, FR-CHG-07, FR-CHG-08, FR-CHG-09, FR-UX-05, FR-UX-25
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

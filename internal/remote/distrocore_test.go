@@ -1,4 +1,4 @@
-// Requirements: FR-ED-11, FR-REPO-07, FR-UX-02, QA-PORT-02, QA-REL-03
+// Requirements: FR-ED-11, FR-REPO-07, FR-UX-02, QA-PORT-02, QA-PORT-05, QA-REL-03
 
 package remote_test
 

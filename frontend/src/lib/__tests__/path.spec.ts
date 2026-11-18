@@ -1,4 +1,4 @@
-// Requirements: FR-UX-09, FR-WT-13, FR-WT-18
+// Requirements: FR-WT-13, FR-WT-18
 import { describe, expect, it } from 'vitest'
 import { basename, joinPath, lastSegment, parentPath, repoPath, withLastSegment } from '../path'
 

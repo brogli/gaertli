@@ -1,4 +1,4 @@
-// Requirements: DIST-03, FR-DIFF-06, FR-ED-04, FR-ED-07, FR-ED-11, FR-ED-13, FR-REPO-07, FR-SYNC-06, FR-UX-01, FR-UX-02, FR-UX-04, FR-UX-06, FR-UX-17
+// Requirements: DIST-10, FR-DIFF-06, FR-ED-04, FR-ED-07, FR-ED-11, FR-ED-13, FR-REPO-07, FR-SYNC-06, FR-UX-01, FR-UX-02, FR-UX-04, FR-UX-06, FR-UX-17
 import { flushPromises, mount, type BaseWrapper, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
