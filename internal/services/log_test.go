@@ -668,7 +668,11 @@ func TestAppDrivenReadsAreBackgroundCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, e := range rec.snapshot() {
+	entries := rec.snapshot()
+	if len(entries) == 0 {
+		t.Fatal("no commands recorded")
+	}
+	for _, e := range entries {
 		if !e.Background {
 			t.Errorf("%q logged as a user command, want background", e.Command)
 		}

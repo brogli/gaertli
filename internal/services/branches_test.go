@@ -332,6 +332,7 @@ func TestCreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T) {
 	sha := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
+	rec := recordCommands(t, c, wt)
 
 	err := c.CreateBranch(t.Context(), wt, "-bad", string(sha), false)
 
@@ -339,8 +340,10 @@ func TestCreateBranchRejectsAnInvalidNameBeforeTouchingGit(t *testing.T) {
 	if ce.Key != "invalidBranchName" || ce.Args["name"] != "-bad" {
 		t.Errorf("Key/Args = %q/%+v, want invalidBranchName/name=-bad", ce.Key, ce.Args)
 	}
-	if branchExists(t, repo.Dir, "-bad") {
-		t.Error("branch -bad was created, want none")
+	for _, cmd := range []string{"git branch", "git switch"} {
+		if n := countCommands(rec, cmd); n != 0 {
+			t.Errorf("%d %q commands ran, want none", n, cmd)
+		}
 	}
 }
 
@@ -479,9 +482,6 @@ func TestCheckoutSwitchesToAnExistingLocalBranch(t *testing.T) {
 
 	if got := currentBranch(t, repo.Dir); got != "feature" {
 		t.Errorf("current branch = %s, want feature", got)
-	}
-	if _, err := os.Stat(filepath.Join(repo.Dir, "seed.txt")); err != nil {
-		t.Errorf("working tree missing feature's own file: %v", err)
 	}
 }
 

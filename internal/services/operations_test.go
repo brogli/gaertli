@@ -415,9 +415,8 @@ func TestSkipOperationCherryPickDropsTheConflictingCommitAndAppliesTheSurvivor(t
 	if _, statErr := os.Stat(filepath.Join(dir, "other.txt")); statErr != nil {
 		t.Errorf("other.txt missing after skip, want cleanSHA's own pick applied: %v", statErr)
 	}
-	content := readFile(t, dir, "conflict.txt")
-	if content == "feature\n" {
-		t.Error("conflict.txt carries the skipped commit's own change, want it absent")
+	if content := readFile(t, dir, "conflict.txt"); content != "master\n" {
+		t.Errorf("conflict.txt = %q, want master's own content without the skipped change", content)
 	}
 }
 

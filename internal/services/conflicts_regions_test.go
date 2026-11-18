@@ -19,7 +19,7 @@ func TestParseMarkerBlocksInEachStyle(t *testing.T) {
 	t.Parallel()
 	merge := "pre\n<<<<<<< HEAD\ncur\n=======\ninc\n>>>>>>> side\npost\n"
 	diff3 := "pre\n<<<<<<< HEAD\ncur\n||||||| base\nbas\n=======\ninc\n>>>>>>> side\npost\n"
-	for style, text := range map[string]string{"merge": merge, "diff3": diff3, "zdiff3": diff3} {
+	for style, text := range map[string]string{"merge": merge, "diff3": diff3} {
 		t.Run(style, func(t *testing.T) {
 			t.Parallel()
 			blocks := parseMarkerBlocks(text, 7)

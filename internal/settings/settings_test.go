@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,16 +18,18 @@ import (
 )
 
 func TestPathIsUnderTheOSUserConfigDir(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		t.Skip(err)
+	}
 
 	got, err := settings.Path()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := filepath.Join("gaertli", "settings.json")
-	if !strings.HasSuffix(got, want) {
-		t.Errorf("Path() = %q, want a suffix of %q", got, want)
+	if want := filepath.Join(dir, "gaertli", "settings.json"); got != want {
+		t.Errorf("Path() = %q, want %q", got, want)
 	}
 }
 
@@ -66,7 +67,7 @@ func TestSaveThenLoadRoundTripsEveryField(t *testing.T) {
 		RecentRepos:              []settings.RecentRepo{{Path: "/a", LastOpened: "2026-09-21T00:00:00Z"}},
 		OpenWorktrees:            []string{"/a", "/b"},
 		DiffWindowSize:           &settings.WindowSize{Width: 900, Height: 600},
-		EditorProfile:            core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}"},
+		EditorProfile:            core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}", FileCmd: "alpha {path}", FileAtLineCmd: "alpha {path}:{line}"},
 		ProtectedBranches:        []string{"main"},
 		DefaultPullMode:          core.PullRebase,
 		DiffMode:                 settings.SideBySideDiff,
@@ -144,14 +145,6 @@ func TestAnExistingFileKeepsTheProtectedBranchesItStores(t *testing.T) {
 	}
 }
 
-func TestThemeRoundTrips(t *testing.T) {
-	got := saveAndLoad(t, settings.Settings{Theme: settings.DarkTheme})
-
-	if got.Theme != settings.DarkTheme {
-		t.Errorf("Theme = %q, want %q", got.Theme, "dark")
-	}
-}
-
 func TestLoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
 	got := loadJSON(t, `{}`)
 
@@ -161,8 +154,10 @@ func TestLoadOnMissingThemeKeyDefaultsToFollowTheOS(t *testing.T) {
 }
 
 func TestLoadAcceptsTheFourDarkThemesAndFallsBackToSystemOnAnUnknownValue(t *testing.T) {
-	if got := loadJSON(t, `{"theme": "dracula"}`).Theme; got != settings.DraculaTheme {
-		t.Errorf("Theme = %q, want %q", got, settings.DraculaTheme)
+	for _, theme := range []settings.Theme{settings.GruvboxDarkTheme, settings.CatppuccinMochaTheme, settings.NordTheme, settings.DraculaTheme} {
+		if got := loadJSON(t, `{"theme": "`+string(theme)+`"}`).Theme; got != theme {
+			t.Errorf("Theme = %q, want %q", got, theme)
+		}
 	}
 	if got := loadJSON(t, `{"theme": "bogus"}`).Theme; got != settings.SystemTheme {
 		t.Errorf("Theme = %q, want %q (unknown falls back to System)", got, settings.SystemTheme)
@@ -320,16 +315,6 @@ func TestStoreUpdateSavesAndGetReflectsTheChange(t *testing.T) {
 	}
 	if onDisk := load(t, path); onDisk.DefaultPullMode != "rebase" {
 		t.Errorf("on-disk DefaultPullMode = %q, want %q", onDisk.DefaultPullMode, "rebase")
-	}
-}
-
-func TestEditorProfileRoundTrips(t *testing.T) {
-	want := settings.Settings{
-		EditorProfile: core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}", FileCmd: "alpha {path}", FileAtLineCmd: "alpha {path}:{line}"},
-	}
-
-	if got := saveAndLoad(t, want); got.EditorProfile != want.EditorProfile {
-		t.Errorf("EditorProfile = %+v, want %+v", got.EditorProfile, want.EditorProfile)
 	}
 }
 

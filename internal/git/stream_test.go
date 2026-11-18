@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/core/coretest"
@@ -17,13 +16,14 @@ import (
 
 func TestStreamCallsOnRecordAsRecordsArrive(t *testing.T) {
 	streamSlowly(t, "A\x00\nB\x00\nC\x00\n")
+	done := os.Getenv("FAKEGIT_STREAM_DONE_FILE")
 
-	start := time.Now()
 	var records []string
-	var firstAt time.Duration
+	var finishedAtFirstRecord bool
 	_, err := (Runner{Git: fakegit}).Stream(t.Context(), Call{Args: []string{"log"}}, func(record []byte) error {
 		if len(records) == 0 {
-			firstAt = time.Since(start)
+			_, err := os.Stat(done)
+			finishedAtFirstRecord = err == nil
 		}
 		records = append(records, string(record))
 		return nil
@@ -32,8 +32,8 @@ func TestStreamCallsOnRecordAsRecordsArrive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if firstAt > 150*time.Millisecond {
-		t.Errorf("first record arrived after %s, want well under the 150ms record delay (proves streaming, not buffer-then-split)", firstAt)
+	if finishedAtFirstRecord {
+		t.Error("git had written its last record when the first arrived, want records delivered while git still runs")
 	}
 	if want := []string{"A", "B", "C"}; !slices.Equal(records, want) {
 		t.Errorf("records = %q, want %q", records, want)
@@ -74,7 +74,7 @@ func TestStreamCapturesStderrAndExitCode(t *testing.T) {
 }
 
 // streamSlowly makes fakegit's log call print the NUL-terminated records
-// 150ms apart.
+// 150ms apart and creates FAKEGIT_STREAM_DONE_FILE after the last.
 func streamSlowly(t *testing.T, records string) {
 	t.Helper()
 	file := filepath.Join(t.TempDir(), "records")
@@ -83,4 +83,5 @@ func streamSlowly(t *testing.T, records string) {
 	}
 	t.Setenv("FAKEGIT_STREAM_FILE", file)
 	t.Setenv("FAKEGIT_STREAM_DELAY_MS", "150")
+	t.Setenv("FAKEGIT_STREAM_DONE_FILE", filepath.Join(t.TempDir(), "done"))
 }

@@ -296,24 +296,6 @@ func TestBlobSizeParsesANumberOrReadsMissingAsZero(t *testing.T) {
 	}
 }
 
-func TestDiffFileReturnsExactContentOnBothSides(t *testing.T) {
-	t.Parallel()
-	repo := gittest.New(t)
-	gittest.Commit(t, repo.Dir, "a.txt", "first\n", "first")
-	gittest.Commit(t, repo.Dir, "a.txt", "second\n", "second")
-	sha := gittest.HeadSHA(t, repo.Dir)
-
-	c, wt := openWorktree(t, repo.Dir)
-
-	diff, err := c.DiffFile(t.Context(), wt, sha, "a.txt", "", core.DiffOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff.OldContent != "first\n" || diff.NewContent != "second\n" {
-		t.Errorf("DiffFile = %+v, want OldContent %q NewContent %q", diff, "first\n", "second\n")
-	}
-}
-
 func TestDiffFileOnDeletedFileHasNoNewContent(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

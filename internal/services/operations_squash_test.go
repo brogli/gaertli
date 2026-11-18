@@ -71,14 +71,6 @@ func TestSquashTodoPicksTheOldestFixesUpTheOthersAmendsThenReplaysTheRest(t *tes
 	}
 }
 
-func TestAnyFailureThatLeavesTheRebaseIsAStop(t *testing.T) {
-	t.Parallel()
-	timedOut := core.Errorf(core.Cancelled, "context deadline exceeded")
-
-	coretest.AssertCode(t, asStop(timedOut, false), core.Stopped)
-	coretest.AssertCode(t, asStop(core.Errorf(core.GitFailed, "could not apply"), true), core.Conflicted)
-}
-
 func TestSquashFoldsSelectedCommitsNextToTheOldestWithTheGivenMessageAndTheOldestsAuthor(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)

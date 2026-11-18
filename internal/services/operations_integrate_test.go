@@ -453,6 +453,12 @@ func TestRebaseWithStashKeepsTheEntryWhenAFailedRebaseLeftTheTreeChanged(t *test
 	if list := gittest.Out(t, repo.Dir, "stash", "list"); list == "" {
 		t.Error("stash list is empty, want the entry kept")
 	}
+	if got := readFile(t, repo.Dir, "side.txt"); got != "hooked\n" {
+		t.Errorf("side.txt = %q, want the hook's change left in the tree", got)
+	}
+	if got := gittest.Out(t, repo.Dir, "show", "stash@{0}:side.txt"); got != "local" {
+		t.Errorf("stashed side.txt = %q, want the local change", got)
+	}
 	if status := gittest.Out(t, repo.Dir, "status", "--porcelain", "--untracked-files=no"); strings.Contains(status, "UU") {
 		t.Errorf("status = %q, want no conflicted file", status)
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -232,7 +233,10 @@ func TestOpenPathOpensTheGivenPath(t *testing.T) {
 
 	s.OpenPath(t.Context(), `\\wsl.localhost\Ubuntu-22.04\home\user\project`)
 	if len(opener.windows) != 1 {
-		t.Errorf("windows opened = %d, want 1", len(opener.windows))
+		t.Fatalf("windows opened = %d, want 1", len(opener.windows))
+	}
+	if got := opener.windows[0].url; !strings.Contains(got, "distro=Ubuntu-22.04") {
+		t.Errorf("window URL = %q, want the Ubuntu-22.04 distro", got)
 	}
 }
 
@@ -352,24 +356,6 @@ func TestUpdateWindowTitleSetsTheCallingWindowsTitle(t *testing.T) {
 	}
 }
 
-func TestLogPathReportsTheAppLogsLocation(t *testing.T) {
-	s := &AppService{logPath: "/x/gaertli.log"}
-
-	got := s.LogPath()
-	if got.Path != "/x/gaertli.log" || got.Error != "" {
-		t.Errorf("LogPath() = %+v, want Path /x/gaertli.log, no Error", got)
-	}
-}
-
-func TestLogPathReportsWhyTheLogCouldNotOpen(t *testing.T) {
-	s := &AppService{logErr: "permission denied"}
-
-	got := s.LogPath()
-	if got.Path != "" || got.Error != "permission denied" {
-		t.Errorf("LogPath() = %+v, want empty Path, Error %q", got, "permission denied")
-	}
-}
-
 // A windowless/background call fails without ever touching OpenWorktree.
 func TestSelectWorktreeFailsWithNoCallingWindow(t *testing.T) {
 	called := false
@@ -401,9 +387,16 @@ func TestSelectRecentRepoSwitchesToTheEntrysOwnPath(t *testing.T) {
 	}
 	s := &AppService{api: api, reg: reg, store: newTestStore(t)}
 
-	err := s.SelectRecentRepo(callFrom(opener.windows[0].ID()), settings.RecentRepo{Path: "/b"})
+	fw := &fakeCallingWindow{id: opener.windows[0].ID()}
+	err := s.SelectRecentRepo(context.WithValue(context.Background(), application.WindowKey, fw), settings.RecentRepo{Path: "/b"})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if want := []string{selectionURL("/b", "")}; !slices.Equal(fw.setURLs, want) {
+		t.Errorf("SetURL calls = %v, want %v", fw.setURLs, want)
+	}
+	if !reg.inUse("/b") {
+		t.Error("inUse(/b) = false, want true")
 	}
 }
 

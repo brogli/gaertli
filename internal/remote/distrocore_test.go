@@ -4,7 +4,6 @@ package remote_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -158,11 +157,17 @@ func TestEnsureSpawnsOnceThenReusesTheLiveClient(t *testing.T) {
 }
 
 func TestEnsureForcesARedeployOnAProtocolMismatch(t *testing.T) {
-	dc, _ := newDistroCore(t, badBin, slog.Default())
+	dc, wsl := newDistroCore(t, badBin, slog.Default())
 
 	_, _, err := dc.Ensure(t.Context())
 
 	coretest.AssertCode(t, err, core.Internal)
+	if !strings.Contains(err.Error(), "persists after a fresh deploy") {
+		t.Errorf("err = %v, want the mismatch to persist after a fresh deploy", err)
+	}
+	if len(wsl.spawns) != 2 {
+		t.Errorf("spawns = %d, want 2 (one try, one after the redeploy)", len(wsl.spawns))
+	}
 }
 
 // gitPath returns dir's path the way git reports it: what OpenWorktree's
@@ -232,8 +237,9 @@ func TestEnsureRespawnsAndTheOldSessionIsGone(t *testing.T) {
 	}
 
 	_, err = client2.Summary(t.Context(), core.WorktreeID(info.Path))
-	if _, ok := errors.AsType[*core.Error](err); !ok {
-		t.Fatalf("bare call on the fresh client err = %v, want a *core.Error (unknown worktree)", err)
+	coretest.AssertCode(t, err, core.Internal)
+	if !strings.Contains(err.Error(), "unknown worktree") {
+		t.Errorf("bare call on the fresh client err = %v, want unknown worktree", err)
 	}
 }
 

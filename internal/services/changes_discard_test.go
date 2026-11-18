@@ -53,7 +53,7 @@ func TestDiscardFileRestoresATrackedFileAndRemovesAnUntrackedFileOrDirectory(t *
 func TestDiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstagedChangePending(t *testing.T) {
 	t.Parallel()
 	repo := gittest.New(t)
-	changed := twoHunksFixture(t, repo.Dir)
+	twoHunksFixture(t, repo.Dir)
 
 	c, id := openWorktree(t, repo.Dir)
 	sel := shown(t, c, id, "f.txt", false, []int{2}, []int{2})
@@ -65,11 +65,8 @@ func TestDiscardLinesDiscardsOnlyTheSelectedHunkLeavingTheOtherUnstagedChangePen
 	if strings.Contains(onDisk, "line2-changed") {
 		t.Errorf("f.txt still has the discarded line2 change: %q", onDisk)
 	}
-	if !strings.Contains(onDisk, "line15-changed") {
-		t.Errorf("f.txt lost the untouched line15 change: %q", onDisk)
-	}
-	if onDisk == changed {
-		t.Error("f.txt unchanged, want the selected hunk discarded")
+	if want := numberedLines(20, map[int]string{15: "line15-changed\n"}); onDisk != want {
+		t.Errorf("f.txt = %q, want %q", onDisk, want)
 	}
 
 	status := statusOf(t, c, id)
@@ -155,7 +152,7 @@ func TestDiscardLinesRefusesStaleSelectionsAndAppliesNothing(t *testing.T) {
 	}{
 		{"another line added where the shown one was", "1\n2\n3\n4\nY\nX\n5\n6\n", "changed since it was shown", nil, []int{5}},
 		{"an identical line added above the shown one", "1\n2\n3\n4\nX\nY\nX\n5\n6\n", "changed since it was shown", nil, []int{5}},
-		{"lines the diff does not change", displayed, "", []int{99}, []int{99}},
+		{"lines the diff does not change", displayed, "line selection matches no changed line", []int{99}, []int{99}},
 	}
 	repo := gittest.New(t)
 	files := map[string]string{}

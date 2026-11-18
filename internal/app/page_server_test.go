@@ -1,6 +1,6 @@
 //go:build server
 
-// Requirements: QA-MNT-02
+// Requirements: FR-REPO-04
 
 package app
 

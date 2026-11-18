@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CHG-10
+// Requirements: FR-CHG-03
 
 package services
 
