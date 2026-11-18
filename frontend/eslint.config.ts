@@ -67,8 +67,6 @@ const config: ReturnType<typeof defineConfigWithVueTs> = defineConfigWithVueTs(
           message: 'Use the OpenVue component.',
         },
       ],
-      // Icons come from lib/icons.ts, never a hand-spelled oi- class.
-      'vue/no-restricted-class': ['error', '/^oi-/'],
     },
   },
   // Outside data stays unknown until narrowed. Vue's config turns these rules

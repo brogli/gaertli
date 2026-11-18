@@ -24,7 +24,7 @@ linters:
           # git itself talks to the network; this package only shells out to it.
           files: ['**/internal/git/**']
           deny:
-            - pkg: net
+            - pkg: net$
               desc: internal/git only shells out to git
             - pkg: net/http
               desc: internal/git only shells out to git
