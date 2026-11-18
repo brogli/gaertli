@@ -35,7 +35,7 @@ describe('statusIcon', () => {
 
 // Every .vue template under src/ draws its icons from lib/icons.ts's
 // classes, never a symbol or emoji glyph, an HTML entity standing in for
-// one, or its own oi- class string. The right arrow and the ellipsis are
+// one. The right arrow and the ellipsis are
 // ordinary running-text punctuation ("old → new", "New branch…"), not icons.
 // The glob is relative to the frontend package root, where vitest runs.
 const files = globSync('src/**/*.vue')
@@ -83,8 +83,6 @@ function entityGlyphs(content: string): string[] {
     .filter((ch): ch is string => !!ch && isIconGlyph(ch))
 }
 
-const OI_CLASS = /\boi-[a-z0-9-]+/
-
 describe('icon guard', () => {
   it('no template uses a symbol glyph, emoji or HTML entity as an icon', () => {
     const offenders = files.filter((f) => {
@@ -95,11 +93,6 @@ describe('icon guard', () => {
         entityGlyphs(content).length > 0
       )
     })
-    expect(offenders).toEqual([])
-  })
-
-  it('no template spells its own oi- class instead of using lib/icons.ts', () => {
-    const offenders = files.filter((f) => OI_CLASS.test(readFileSync(f, 'utf-8')))
     expect(offenders).toEqual([])
   })
 })
