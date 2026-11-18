@@ -28,6 +28,7 @@ type Job struct {
 	ID      ID
 	Kind    core.JobKind
 	Branch  string // the branch a per-branch job acts on; "" for a repo-wide one
+	Remote  string // the one remote a job acts on; "" for all
 	State   core.JobState
 	Percent int
 	Message string
@@ -77,14 +78,26 @@ func NewManager(onUpdate func(Job)) *Manager {
 // A kind already running is not started twice: Start returns that job's
 // id.
 func (m *Manager) Start(ctx context.Context, kind core.JobKind, fn func(ctx context.Context, progress Progress) (any, error)) ID {
-	return m.StartForBranch(ctx, kind, "", fn)
+	return m.start(ctx, Job{Kind: kind}, fn)
 }
 
 // StartForBranch is Start for a job of kind acting on one branch: one such
 // job per branch runs at a time.
 func (m *Manager) StartForBranch(ctx context.Context, kind core.JobKind, branch string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
+	return m.start(ctx, Job{Kind: kind, Branch: branch}, fn)
+}
+
+// StartForRemote is Start for a job of kind acting on one remote, or on all
+// for "": one job of kind runs at a time, whatever its remote.
+func (m *Manager) StartForRemote(ctx context.Context, kind core.JobKind, remote string, fn func(ctx context.Context, progress Progress) (any, error)) ID {
+	return m.start(ctx, Job{Kind: kind, Remote: remote}, fn)
+}
+
+// start runs fn as a new job like job, unless a job of its kind on its
+// branch is already running.
+func (m *Manager) start(ctx context.Context, job Job, fn func(ctx context.Context, progress Progress) (any, error)) ID {
 	m.mu.Lock()
-	if id, ok := m.activeLocked(kind, branch); ok {
+	if id, ok := m.activeLocked(job.Kind, job.Branch); ok {
 		m.mu.Unlock()
 		return id
 	}
@@ -93,7 +106,7 @@ func (m *Manager) StartForBranch(ctx context.Context, kind core.JobKind, branch 
 	id := ID(strconv.Itoa(m.next))
 	jobCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	m.jobs[id] = &entry{
-		job:    Job{ID: id, Kind: kind, Branch: branch, State: core.JobRunning, Percent: -1},
+		job:    Job{ID: id, Kind: job.Kind, Branch: job.Branch, Remote: job.Remote, State: core.JobRunning, Percent: -1},
 		cancel: cancel,
 	}
 	m.order = append(m.order, id)

@@ -149,20 +149,16 @@ describe('SyncControls', () => {
     expect(Facade.Fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('"Try again" on a locked fetch of one remote fetches that remote again', async () => {
+  it('"Try again" on a locked fetch of one remote fetches that remote again, wherever the fetch started', async () => {
     setRefs({}, ['origin', 'upstream'])
-    Facade.Fetch.mockResolvedValue('job-7')
-    const { body } = await mountControls()
+    await mountControls()
     const notice = await mountNotices()
-    await body.get('.p-splitbutton-dropdown').trigger('click')
-    await flushPromises()
-    await clickMenuItem(body, 'upstream', 'tieredmenu')
-    await flushPromises()
 
     useSyncStore().upsert(
       jobFixture({
         id: 'job-7',
         kind: JobKind.FetchJob,
+        remote: 'upstream',
         state: JobState.JobFailed,
         error: { code: Code.Locked, message: 'locked' },
       }),
