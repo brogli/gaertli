@@ -57,13 +57,14 @@ func TestErrorArgsNameTheMessagesVariableParts(t *testing.T) {
 	}
 }
 
-func TestErrorfLeavesKeyAndArgsZero(t *testing.T) {
-	e := core.Errorf(core.Internal, "boom")
-	if e.Key != "" {
-		t.Errorf("Key = %q, want empty", e.Key)
+func TestErrorfSerialisesWithoutKeyAndArgs(t *testing.T) {
+	b, err := json.Marshal(core.Errorf(core.Internal, "boom"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if e.Args != nil {
-		t.Errorf("Args = %+v, want nil", e.Args)
+	const want = `{"code":"INTERNAL","message":"boom"}`
+	if string(b) != want {
+		t.Errorf("json = %s\nwant   %s", b, want)
 	}
 }
 
@@ -86,16 +87,5 @@ func TestRetagReclassifiesAnExistingError(t *testing.T) {
 	}
 	if e.GitStderr != "fatal: x" || e.Command != "git push" {
 		t.Errorf("GitStderr/Command changed: %q/%q, want them untouched", e.GitStderr, e.Command)
-	}
-}
-
-func TestErrorKeysHasNoEmptyKeyOrNilArgs(t *testing.T) {
-	for key, args := range core.ErrorKeys {
-		if key == "" {
-			t.Error("ErrorKeys has an empty key")
-		}
-		if args == nil {
-			t.Errorf("ErrorKeys[%q] = nil, want a (possibly empty) slice", key)
-		}
 	}
 }

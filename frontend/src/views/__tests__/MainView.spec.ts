@@ -1,4 +1,4 @@
-// Requirements: FR-REPO-07, FR-UX-19, FR-WT-13, FR-WT-16
+// Requirements: FR-REPO-07, FR-UX-04, FR-UX-19, FR-WT-13, FR-WT-16
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -48,9 +48,9 @@ describe('MainView', () => {
   })
 
   it.each([
-    ['FR-UX-04 with no path, the gear opens the Settings dialog', ''],
+    ['with no path, the gear opens the Settings dialog', ''],
     [
-      'FR-UX-04 with a path, the toolbar gear opens the Settings dialog, WorktreeContent still rendered',
+      'with a path, the toolbar gear opens the Settings dialog, WorktreeContent still rendered',
       '/repo',
     ],
   ])('%s', async (_name, path) => {

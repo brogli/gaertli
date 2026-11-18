@@ -100,8 +100,21 @@ func runScript(t *testing.T, dir, distro, wslpathDir string, args ...string) {
 	}
 }
 
-// readArgvEventually waits for the fake app's argv file, which it writes
-// only after a short sleep.
+// holdApp makes the fake app in dir wait before it records its arguments, and
+// returns the function that lets it go. The test must call it or the app
+// lingers.
+func holdApp(t *testing.T, dir string) (release func()) {
+	t.Helper()
+	hold := filepath.Join(dir, "hold")
+	if err := os.WriteFile(hold, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	release = func() { _ = os.Remove(hold) }
+	t.Cleanup(release)
+	return release
+}
+
+// readArgvEventually waits for the fake app's argv file.
 func readArgvEventually(t *testing.T, dir string) string {
 	t.Helper()
 	path := filepath.Join(dir, "argv.txt")
@@ -170,6 +183,7 @@ func TestScriptExitsWithoutWaitingForTheApp(t *testing.T) {
 	t.Parallel()
 	skipOnWindows(t)
 	dir, _ := newApp(t, "gaertli", 0o755)
+	release := holdApp(t, dir)
 	wslpathDir := fakeWslpath(t, wslpathSuccessScript)
 
 	runScript(t, dir, "Ubuntu-22.04", wslpathDir, "repo")
@@ -177,6 +191,7 @@ func TestScriptExitsWithoutWaitingForTheApp(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "argv.txt")); err == nil {
 		t.Error("the app had already recorded its arguments before the script exited")
 	}
+	release()
 	readArgvEventually(t, dir)
 }
 

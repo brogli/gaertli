@@ -1,4 +1,4 @@
-// Requirements: FR-DIFF-07, FR-ED-06, FR-UX-01, FR-UX-06, OSS-02
+// Requirements: FR-DIFF-07, FR-ED-06, FR-UX-01, FR-UX-06
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,7 +32,7 @@ describe('App', () => {
     document.documentElement.classList.remove('gaertli-dark')
   })
 
-  it('renders the app name with no worktree open', () => {
+  it('renders the main view on the default route', () => {
     expect(mount(App).text()).toContain('Gärtli')
   })
 

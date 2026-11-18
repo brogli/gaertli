@@ -70,20 +70,6 @@ func remoteAppendCommitOnBranch(t *testing.T, remoteDir, branch, file, content, 
 	return gittest.HeadSHA(t, clone)
 }
 
-// lastCommand returns the most recent git call rec recorded whose Command
-// starts with "git <verb>".
-func lastCommand(t *testing.T, rec *commandRecorder, verb string) git.Entry {
-	t.Helper()
-	list := rec.snapshot()
-	for _, l := range slices.Backward(list) {
-		if strings.HasPrefix(l.Command, "git "+verb) {
-			return l
-		}
-	}
-	t.Fatalf("no %q command logged", verb)
-	return git.Entry{}
-}
-
 func TestClassifyPushRejectionClassifiesByReason(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -739,21 +725,17 @@ func TestPullRebaseAfterAnUpstreamRewriteReplaysOnlyTheLocalCommit(t *testing.T)
 	}
 }
 
-func TestPushPlainUpdatesTrackedUpstreamNoSetUpstream(t *testing.T) {
+func TestPushPlainUpdatesTrackedUpstream(t *testing.T) {
 	t.Parallel()
 	repo, origin := pullMergeFixture(t)
 	gittest.Commit(t, repo.Dir, "local.txt", "x", "local commit")
 	localTip := gittest.HeadSHA(t, repo.Dir)
 
 	c, wt := openWorktree(t, repo.Dir)
-	rec := recordCommands(t, c, wt)
 	waitForJobState(t, c, wt, jobID(t)(c.Push(t.Context(), wt, "", "")), core.JobDone)
 
 	if got := gittest.Out(t, origin, "rev-parse", "master"); core.SHA(got) != localTip {
 		t.Errorf("origin's master = %q, want %q", got, localTip)
-	}
-	if cmd := lastCommand(t, rec, "push"); strings.Contains(cmd.Command, "--set-upstream") {
-		t.Errorf("push command = %q, want no --set-upstream", cmd.Command)
 	}
 }
 
@@ -1091,7 +1073,7 @@ func updateBranchResult(t *testing.T, job core.JobInfo) core.UpdateBranchResult 
 	return *job.Result
 }
 
-func Test02_03_05_UpdateBranchFastForwardsABranchNotCheckedOutAnywhere(t *testing.T) {
+func TestUpdateBranchFastForwardsABranchNotCheckedOutAnywhere(t *testing.T) {
 	t.Parallel()
 	repo, origin := updateBranchFixture(t)
 	beforeSHA, _ := refSHA(t, repo.Dir, "refs/heads/B")

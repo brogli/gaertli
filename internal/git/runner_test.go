@@ -358,7 +358,7 @@ func TestNothingIsKilledWhenGitEndedBeforeTheCancel(t *testing.T) {
 	coretest.AssertCode(t, err, core.Cancelled)
 	pid := readTrimmed(t, dir+"/pid")
 	t.Cleanup(func() { _ = exec.Command("kill", pid).Run() })
-	time.Sleep(testGrace) // Run returned when the pipes closed, a grace period after git exited
+	time.Sleep(testGrace) // a kill wrongly scheduled for the grace period would have fired by now
 	if processGone(pid) {
 		t.Error("the child of a git that ended before the cancel was killed")
 	}

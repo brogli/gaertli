@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/brogli/gaertli/internal/core"
 	"github.com/brogli/gaertli/internal/git/gittest"
@@ -85,8 +84,9 @@ func cancelFixture(t *testing.T) (*gittest.Repo, string) {
 // stalledHook is a reference-transaction hook that holds git inside a
 // prepared transaction, while git holds the transaction's lock files.
 type stalledHook struct {
-	stalled string // created once git waits in the hook
-	hold    string // the hook waits while it exists
+	stalled     string // created once git waits in the hook
+	hold        string // the hook waits while it exists
+	interrupted string // created when the hook receives SIGTERM
 }
 
 // stallRefUpdate installs a stalledHook in dir for transactions touching
@@ -94,35 +94,40 @@ type stalledHook struct {
 func stallRefUpdate(t *testing.T, dir, ref string) stalledHook {
 	t.Helper()
 	tmp := t.TempDir()
-	h := stalledHook{stalled: filepath.Join(tmp, "stalled"), hold: filepath.Join(tmp, "hold")}
+	h := stalledHook{
+		stalled:     filepath.Join(tmp, "stalled"),
+		hold:        filepath.Join(tmp, "hold"),
+		interrupted: filepath.Join(tmp, "interrupted"),
+	}
 	writeFile(t, tmp, "hold", "")
 	writeHook(t, dir, "reference-transaction", fmt.Sprintf(`[ "$1" = prepared ] || exit 0
 refs=$(cat)
 case "$refs" in *' %s'*) ;; *) exit 0 ;; esac
+trap "touch '%s'; exit 143" TERM
 touch '%s'
 while [ -e '%s' ]; do sleep 0.05; done
-`, ref, h.stalled, h.hold))
+`, ref, h.interrupted, h.stalled, h.hold))
 	t.Cleanup(h.release)
 	return h
 }
 
 func (h stalledHook) release() { _ = os.Remove(h.hold) }
 
-// cancel waits until job's git stalls in the hook, cancels the job and
-// waits for it to end cancelled.
+// cancel waits until job's git stalls in the hook, cancels the job, waits
+// for it to end cancelled and checks the interrupt reached the hook, not only
+// git.
 func (h stalledHook) cancel(t *testing.T, c *Core, wt core.WorktreeID, job string) {
 	t.Helper()
 	testwait.Until(func() bool {
 		_, err := os.Stat(h.stalled)
 		return err == nil
 	})
-	start := time.Now()
 	if err := c.CancelJob(t.Context(), wt, job); err != nil {
 		t.Fatal(err)
 	}
 	waitForJobState(t, c, wt, job, core.JobCancelled)
-	if took := time.Since(start); took > time.Second {
-		t.Errorf("cancel took %s, want the hook stopped with git, not its pipe cut off after the grace period", took)
+	if _, err := os.Stat(h.interrupted); err != nil {
+		t.Errorf("the hook got no SIGTERM, want it interrupted with git, not killed after the grace period: %v", err)
 	}
 }
 

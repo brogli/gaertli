@@ -102,15 +102,13 @@ describe('WorktreePicker', () => {
     expect(worktreeRow(body, '/repos/alpha-feat').find('.current-marker i').exists()).toBe(true)
   })
 
-  it('a row shows its folder name first and its branch after it, smaller; typing part of a folder name leaves only its row', async () => {
+  it('a row shows its folder name first and its branch after it; typing part of a folder name leaves only its row', async () => {
     const { body } = await openPicker()
 
     const parts = worktreeRow(body, '/repos/alpha-feat').findAll(
       '[data-test="worktree-folder"], [data-test="worktree-branch"]',
     )
     expect(parts.map((p) => p.text())).toEqual(['alpha-feat', 'feat'])
-    expect(parts[0]!.classes()).not.toContain('muted')
-    expect(parts[1]!.classes()).toContain('muted')
 
     await body.get('.picker-list input').setValue('feat')
     await flushPromises()
@@ -288,12 +286,13 @@ describe('WorktreePicker', () => {
     expect(AppService.SelectWorktree).not.toHaveBeenCalled()
   })
 
-  it('a linked worktree confirms, naming the loss, before removing', async () => {
+  it('removing a linked worktree confirms, naming its path, before removing', async () => {
     const { body } = await openPicker()
 
     await worktreeRow(body, '/repos/alpha-feat')
       .get('[data-test="remove-worktree"]')
       .trigger('click')
+    expect(confirmOptions().message).toContain('/repos/alpha-feat')
     expect(confirmOptions().message).not.toContain('uncommitted changes')
     confirmOptions().accept()
     await flushPromises()

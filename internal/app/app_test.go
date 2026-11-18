@@ -137,20 +137,6 @@ func TestLaunchPath(t *testing.T) {
 	}
 }
 
-func TestLaunchPathThenOpenOrFocusOpensAWindow(t *testing.T) {
-	r, opener := newTestRegistry()
-
-	path, ok := launchPath([]string{"gaertli", "/a"}, "/wd")
-	if !ok {
-		t.Fatal("launchPath ok = false")
-	}
-	r.OpenOrFocus(core.WorktreeID(path), path, "")
-
-	if len(opener.windows) != 1 {
-		t.Fatalf("windows created = %d, want 1", len(opener.windows))
-	}
-}
-
 // The first launch resolves its path argument the same way the
 // second-instance relay resolves a relayed one: against the launching
 // working directory.

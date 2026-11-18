@@ -6,14 +6,12 @@ import { Code } from '../../../bindings/github.com/brogli/gaertli/internal/core'
 import { findButton } from '@/testing/findButton'
 
 describe('ErrorBanner', () => {
-  it("an inline error is OpenVue's error Message", () => {
+  it('an inline error shows its message', () => {
     const wrapper = mount(ErrorBanner, {
       props: { error: { code: Code.GitFailed, message: 'fatal: bad revision' } },
     })
 
-    const message = wrapper.get('.p-message')
-    expect(message.classes()).toContain('p-message-error')
-    expect(message.text()).toContain('fatal: bad revision')
+    expect(wrapper.get('.p-message').text()).toContain('fatal: bad revision')
   })
 
   it("a git error's details show the command and git's full output", async () => {

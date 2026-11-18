@@ -1,5 +1,6 @@
 // Requirements: FR-UPD-01, FR-UPD-02, FR-UPD-05
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { test, expect } from './fixtures'
 import {
@@ -51,16 +52,30 @@ test('an update runs as a background job while the app stays usable', async ({
   git,
 }) => {
   pushFromClone(git, repos.other, 'B', { 'q1.txt': 'q1\n' }, 'remote q1')
-  git(repos.work, 'config', 'remote.origin.uploadpack', 'sleep 3; git-upload-pack')
-  const app = await openApp(repos.work)
+  // The remote side of the fetch waits while this file exists.
+  const holdDir = fs.mkdtempSync(path.join(os.tmpdir(), 'update-hold-'))
+  const hold = path.join(holdDir, 'hold')
+  fs.writeFileSync(hold, '')
+  git(
+    repos.work,
+    'config',
+    'remote.origin.uploadpack',
+    `while [ -e '${hold}' ]; do sleep 0.05; done; git-upload-pack`,
+  )
+  try {
+    const app = await openApp(repos.work)
 
-  await pickRefAction(app, 'B', 'Update from upstream')
-  const list = await openJobsMenu(app)
-  await expect(list).toContainText('Update B')
-  await logRow(app, 'add logo').click()
-  await expect(app.locator('.commit-details')).toContainText('add logo and func a')
-  await expect(jobsMenuButton(app)).toHaveAttribute('title', '1 running job')
+    await pickRefAction(app, 'B', 'Update from upstream')
+    const list = await openJobsMenu(app)
+    await expect(list).toContainText('Update B')
+    await logRow(app, 'add logo').click()
+    await expect(app.locator('.commit-details')).toContainText('add logo and func a')
+    await expect(jobsMenuButton(app)).toHaveAttribute('title', '1 running job')
 
-  await expect(jobsMenuButton(app)).toHaveAttribute('title', 'No running jobs')
+    fs.rmSync(hold)
+    await expect(jobsMenuButton(app)).toHaveAttribute('title', 'No running jobs')
+  } finally {
+    fs.rmSync(holdDir, { recursive: true, force: true })
+  }
   expect(rev(git, repos.work, 'B')).toBe(rev(git, repos.remote, 'B'))
 })

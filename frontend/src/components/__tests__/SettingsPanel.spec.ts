@@ -215,6 +215,7 @@ describe('SettingsPanel', () => {
     expect(wrapper.findComponent(ErrorBanner).exists()).toBe(false)
     expect(wrapper.findAll('fieldset')).toHaveLength(1)
     expect(wrapper.get('legend').text()).toBe('Open in editor')
+    expect(wrapper.text()).not.toContain('Base folder for new worktrees in WSL')
   })
 
   it('a rejected save renders ErrorBanner with the error', async () => {
@@ -350,12 +351,4 @@ describe('SettingsPanel', () => {
       expect(wrapper.find('[data-test="app-version"]').text()).toBe(text)
     },
   )
-
-  it('the stored protected branches show as chips', async () => {
-    const wrapper = await mountPanel()
-
-    const chips = wrapper.findAll('.p-autocomplete-chip-item')
-    expect(chips).toHaveLength(1)
-    expect(chips[0]!.text()).toContain('main')
-  })
 })

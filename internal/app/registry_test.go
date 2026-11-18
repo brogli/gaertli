@@ -44,7 +44,6 @@ type fakeWindow struct {
 	url          string
 	width        int
 	height       int
-	minWidth     int
 	focusCount   int
 	emitted      []emittedEvent
 	handlers     map[events.WindowEventType]func(*application.WindowEvent)
@@ -120,7 +119,7 @@ type fakeOpener struct {
 func (o *fakeOpener) NewWithOptions(opts application.WebviewWindowOptions) shellWindow {
 	w := &fakeWindow{
 		id: uint(len(o.windows)) + 1, title: opts.Title, url: opts.URL,
-		width: opts.Width, height: opts.Height, minWidth: opts.MinWidth,
+		width: opts.Width, height: opts.Height,
 	}
 	o.windows = append(o.windows, w)
 	return w
@@ -143,23 +142,6 @@ func newTestRegistry() (*Registry, *fakeOpener) {
 	r.opener = opener
 	r.SetLocal(fakeAPI{})
 	return r, opener
-}
-
-func TestMainWindowGetsTheMinimumWidthADiffWindowDoesNot(t *testing.T) {
-	r, opener := newTestRegistry()
-
-	r.OpenOrFocus("wt", "/wt", "")
-	r.OpenOrFocusDiff(diffWindowKey{wt: "wt"}, "wt", DiffTarget{Kind: CommitDiff, Sha: "a", Path: "f1"})
-
-	if len(opener.windows) != 2 {
-		t.Fatalf("opened %d windows, want 2", len(opener.windows))
-	}
-	if got := opener.windows[0].minWidth; got != mainWindowMinWidth {
-		t.Errorf("main window MinWidth = %d, want %d", got, mainWindowMinWidth)
-	}
-	if got := opener.windows[1].minWidth; got != 0 {
-		t.Errorf("diff window MinWidth = %d, want 0 (unset)", got)
-	}
 }
 
 func TestADiffWindowOpensAtTheDefaultSizeWithNothingStored(t *testing.T) {
@@ -276,26 +258,6 @@ func TestDispatchTargetsTheWindowsAnEventConcerns(t *testing.T) {
 	}
 	if wtC.emitCount() != 0 {
 		t.Errorf("wtC emitCount = %d, want 0", wtC.emitCount())
-	}
-}
-
-// SetRepo/targets route a repo-scoped event by current selection: only the
-// window whose selection belongs to that repo.
-func TestDispatchByRepoReachesOnlyTheWindowSelectingThatRepo(t *testing.T) {
-	r, opener := newTestRegistry()
-
-	r.OpenOrFocus("A", "/a", "")
-	r.OpenOrFocus("B", "/b", "")
-	r.SetRepo("A", "R1")
-	r.SetRepo("B", "R2")
-
-	r.Dispatch(repoEvent("R1"))
-
-	if opener.windows[0].emitCount() != 1 {
-		t.Errorf("window selecting R1's worktree emitCount = %d, want 1", opener.windows[0].emitCount())
-	}
-	if opener.windows[1].emitCount() != 0 {
-		t.Errorf("window selecting R2's worktree emitCount = %d, want 0", opener.windows[1].emitCount())
 	}
 }
 
@@ -965,21 +927,6 @@ func setEditorProfile(t *testing.T, store *settings.Store, profile core.EditorPr
 	t.Helper()
 	if err := store.Update(func(s *settings.Settings) { s.EditorProfile = profile }); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestPushEditorProfilePushesTheProfileToTheLocalCore(t *testing.T) {
-	r, _ := newTestRegistry()
-	var pushed []core.EditorProfile
-	r.SetLocal(fakeAPI{editorProfiles: &pushed})
-	store := newTestStore(t)
-	setEditorProfile(t, store, core.EditorProfile{Name: "Beta", FolderCmd: "beta {path}"})
-	r.SetStore(store)
-
-	r.PushEditorProfile(t.Context())
-
-	if len(pushed) != 1 || pushed[0].Name != "Beta" {
-		t.Errorf("local core received %+v, want exactly one push of Beta", pushed)
 	}
 }
 

@@ -7,6 +7,7 @@ linters:
   default: standard
   enable:
     - contextcheck
+    - depguard
     - errorlint
     - gocritic
     - intrange
@@ -17,6 +18,16 @@ linters:
     - thelper
     - usetesting
   settings:
+    depguard:
+      rules:
+        no-network:
+          # git itself talks to the network; this package only shells out to it.
+          files: ['**/internal/git/**']
+          deny:
+            - pkg: net$
+              desc: internal/git only shells out to git
+            - pkg: net/http
+              desc: internal/git only shells out to git
     revive:
       rules:
         - name: context-as-argument

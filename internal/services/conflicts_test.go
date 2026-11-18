@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-02, FR-CONF-05, FR-CONF-06, FR-CONF-07
+// Requirements: FR-CONF-02, FR-CONF-05, FR-CONF-07
 
 package services
 

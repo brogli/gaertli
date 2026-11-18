@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-02, FR-CONF-06, FR-CONF-07, FR-CONF-11
+// Requirements: FR-CONF-02, FR-CONF-05, FR-CONF-06, FR-CONF-07, FR-CONF-11
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { undo } from '@codemirror/commands'
 import { createPinia, setActivePinia } from 'pinia'
@@ -94,25 +94,25 @@ describe('ConflictedFileView', () => {
   const { current, incoming } = conflictFileFixture()
   it.each([
     [
-      'FR-CONF-07 a binary conflict',
+      'a binary conflict',
       { kind: ConflictKind.ConflictBinary },
       'Both sides changed this binary file.',
       ['Keep the version of main', 'Take the version of side'],
     ],
     [
-      'FR-CONF-07 a symlink conflict',
+      'a symlink conflict',
       { kind: ConflictKind.ConflictSymlink },
       'Both sides changed this symbolic link.',
       ['Keep the version of main', 'Take the version of side'],
     ],
     [
-      'FR-CONF-05 FR-CONF-07 a revert, naming its incoming side as the state before the commit,',
+      'a revert, naming its incoming side as the state before the commit,',
       { kind: ConflictKind.ConflictBinary, operation: OperationKind.RevertOperation },
       'Both sides changed this binary file.',
       ['Keep the version of main', 'Take the version before abcdef0 on side'],
     ],
     [
-      'FR-CONF-05 FR-CONF-07 a conflict between sides without a commit, naming them the current and incoming side,',
+      'a conflict between sides without a commit, naming them the current and incoming side,',
       {
         kind: ConflictKind.ConflictBinary,
         operation: OperationKind.$zero,

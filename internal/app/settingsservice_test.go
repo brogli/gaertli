@@ -33,14 +33,14 @@ func TestSettingsServiceSetThenGetRoundTrips(t *testing.T) {
 	want := settings.Preferences{
 		EditorProfile:   core.EditorProfile{Name: "Alpha", FolderCmd: "alpha {path}"},
 		DefaultPullMode: core.PullRebase,
-		DiffMode:        settings.UnifiedDiff,
+		DiffMode:        settings.SideBySideDiff,
 	}
 
 	if err := s.Set(t.Context(), want); err != nil {
 		t.Fatal(err)
 	}
 	got := s.Get()
-	if got.EditorProfile != want.EditorProfile || got.DefaultPullMode != want.DefaultPullMode {
+	if got.EditorProfile != want.EditorProfile || got.DefaultPullMode != want.DefaultPullMode || got.DiffMode != want.DiffMode {
 		t.Errorf("Get() = %+v, want %+v", got, want)
 	}
 }

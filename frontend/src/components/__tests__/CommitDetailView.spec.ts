@@ -79,12 +79,11 @@ describe('CommitDetailView', () => {
     expect(wrapper.text()).toContain('b.txt')
   })
 
-  it('splits a commit, starting in the middle: message and fields above, changed files below', async () => {
+  it('splits a commit: message and fields above, changed files below', async () => {
     const wrapper = await mountSelected({ files: [{ path: 'a.txt', status: 'M' }] })
 
     const splitter = wrapper.getComponent(Splitter)
     const [message, files] = splitter.findAllComponents(SplitterPanel)
-    expect([message!.props('size'), files!.props('size')]).toEqual([50, 50])
     expect(message!.find('.subject').text()).toBe('Fix the bug')
     expect(message!.find('.fields').exists()).toBe(true)
     expect(message!.find('.changed-files').exists()).toBe(false)

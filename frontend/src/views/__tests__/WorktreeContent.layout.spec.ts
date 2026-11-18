@@ -1,4 +1,4 @@
-// Requirements: FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-21
+// Requirements: FR-LOG-06, FR-UX-05, FR-UX-08, FR-UX-09, FR-UX-21
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -146,8 +146,8 @@ describe('WorktreeContent layouts', () => {
   })
 
   it.each([
-    ['FR-LOG-06 narrow (600): brings the log view forward', 600, false, false],
-    ['FR-LOG-06 medium (1200): leaves the side panel as it was', 1200, true, true],
+    ['narrow (600): brings the log view forward', 600, false, false],
+    ['medium (1200): leaves the side panel as it was', 1200, true, true],
   ])(
     "%s when the branch picker's show-log fires",
     async (_name, width, logShownBefore, changesShownAfter) => {

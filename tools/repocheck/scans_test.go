@@ -2,7 +2,7 @@
 
 // Package repocheck holds the tests that scan the working tree for what no
 // linter checks: foreign lockfiles, machine-specific defaults, test-file
-// placement, glossary use, the release version script.
+// placement, glossary use, error-key call sites, the release version script.
 package repocheck_test
 
 import (

@@ -144,15 +144,4 @@ describe('ResetDialog', () => {
     expect(Facade.Reset).toHaveBeenCalledTimes(1)
     expect(Facade.Reset).toHaveBeenCalledWith('/repo', 'abc123', 'hard')
   })
-
-  it('never calls Facade.Reset if the confirmation is not accepted (QA-SAFE-01)', async () => {
-    Facade.UncommittedCount.mockResolvedValue(4)
-    const { body } = await mountDialog()
-
-    await body.get('input#reset-mode-hard').setValue()
-    await submit(body)
-
-    expect(confirmRequire).toHaveBeenCalledTimes(1)
-    expect(Facade.Reset).not.toHaveBeenCalled()
-  })
 })

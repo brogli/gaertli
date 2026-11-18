@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-01
+// Requirements: FR-REPO-04
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

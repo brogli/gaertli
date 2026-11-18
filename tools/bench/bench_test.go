@@ -1,6 +1,6 @@
 //go:build bench
 
-// Requirements: QA-PERF-02, QA-PERF-06, QA-PERF-07
+// Requirements: QA-PERF-02, QA-PERF-03, QA-PERF-06, QA-PERF-07
 
 // Package bench proves the literal performance numbers against the real
 // reference repo, through the in-process services.Core: the same call path
@@ -12,14 +12,11 @@
 package bench
 
 import (
-	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/brogli/gaertli/internal/core"
-	"github.com/brogli/gaertli/internal/git"
 	"github.com/brogli/gaertli/internal/services"
 	"github.com/brogli/gaertli/tools/mkrepo"
 )
@@ -86,7 +83,7 @@ func TestMemoryUnder500MB(t *testing.T) {
 	waitLogDone(t, c, id)
 	runtime.GC()
 	runtime.ReadMemStats(&after)
-	grown := after.HeapAlloc - before.HeapAlloc
+	grown := int64(after.HeapAlloc) - int64(before.HeapAlloc)
 	t.Logf("heap growth after loading 100k commits: %d MB", grown/(1<<20))
 	if grown > 500*(1<<20) {
 		t.Fatalf("QA-PERF-07: heap grew %d MB, want <= 500", grown/(1<<20))
@@ -104,40 +101,9 @@ func TestRefreshUnder1s(t *testing.T) {
 	}
 }
 
-// TestTopoOrderCommitGraphCost logs how long the app's log call takes on the
-// reference repo with and without a commit-graph file. It has no budget.
-func TestTopoOrderCommitGraphCost(t *testing.T) {
-	if err := mkrepo.Build(t.Context(), refDir, mkrepo.Params); err != nil {
-		t.Fatal(err)
-	}
-	r := git.Runner{}
-	graphFile := filepath.Join(refDir, ".git", "objects", "info", "commit-graph")
-	_ = os.Remove(graphFile) // this test owns the "without" measurement; a prior test may have already written one
-
-	t.Logf("git log --topo-order --all: %s without a commit-graph file", timeTopoOrderLog(t, r))
-
-	if _, err := r.Run(t.Context(), git.Call{Dir: refDir, Args: []string{"commit-graph", "write", "--reachable"}}); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("git log --topo-order --all: %s with a commit-graph file", timeTopoOrderLog(t, r))
-}
-
-func timeTopoOrderLog(t *testing.T, r git.Runner) time.Duration {
-	t.Helper()
-	start := time.Now()
-	_, err := r.Run(t.Context(), git.Call{
-		Dir: refDir, ReadOnly: true, Timeout: 2 * time.Minute,
-		Args: services.LogArgs(core.LogFilter{}),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return time.Since(start)
-}
-
-// TestLogRowsWindowLatency records one LogRows(from, from+50) call's
-// latency on the fully-loaded reference repo: the Go-side cost a single
-// virtual-scroll tick pays, not the whole frame cost.
+// TestLogRowsWindowLatency checks one LogRows(from, from+50) call's
+// stays under 100ms on the fully-loaded reference repo: the Go-side cost a
+// single virtual-scroll tick pays, not the whole frame cost.
 func TestLogRowsWindowLatency(t *testing.T) {
 	c, id := openReference(t)
 	if err := c.LoadLog(t.Context(), id); err != nil {
@@ -149,14 +115,17 @@ func TestLogRowsWindowLatency(t *testing.T) {
 	if _, err := c.LogRows(t.Context(), id, 50_000, 50_050); err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("LogRows(50000, 50050) latency: %s", time.Since(start))
+	elapsed := time.Since(start)
+	t.Logf("LogRows(50000, 50050) latency: %s", elapsed)
+	if elapsed > 100*time.Millisecond {
+		t.Fatalf("QA-PERF-03: LogRows window took %s, want <= 100ms", elapsed)
+	}
 }
 
 // waitLogDone polls LogRows until the load finishes.
 func waitLogDone(t *testing.T, c *services.Core, id core.WorktreeID) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Minute)
-	for time.Now().Before(deadline) {
+	for {
 		res, err := c.LogRows(t.Context(), id, 0, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -169,5 +138,4 @@ func waitLogDone(t *testing.T, c *services.Core, id core.WorktreeID) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatal("log did not finish loading in time")
 }

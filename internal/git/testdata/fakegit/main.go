@@ -6,7 +6,8 @@
 //   - "log" with FAKEGIT_STREAM_FILE set: copies that file's
 //     0x00-terminated records to stdout one at a time, sleeping
 //     FAKEGIT_STREAM_DELAY_MS between each, so a test can point Runner.Git
-//     at fakegit for a whole session while only the log call streams.
+//     at fakegit for a whole session while only the log call streams. Once
+//     the last record is written it creates FAKEGIT_STREAM_DONE_FILE (if set).
 //   - FAKEGIT_STDERR_FILE set (any argv): copies that file's \r/\n-terminated
 //     records to stderr one at a time, sleeping FAKEGIT_STDERR_DELAY_MS
 //     between each — the stderr counterpart of FAKEGIT_STREAM_FILE, for
@@ -59,6 +60,9 @@ func run(isLog bool) {
 	}
 	if file := os.Getenv("FAKEGIT_STREAM_FILE"); isLog && file != "" {
 		streamFile(file, "\x00", "FAKEGIT_STREAM_DELAY_MS", os.Stdout)
+		if done := os.Getenv("FAKEGIT_STREAM_DONE_FILE"); done != "" {
+			_ = os.WriteFile(done, nil, 0o644)
+		}
 	} else {
 		fmt.Print(os.Getenv("FAKEGIT_STDOUT"))
 	}

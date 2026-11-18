@@ -31,9 +31,10 @@ func TestParseCandidatesReadsDateAndMergeFromEachRecord(t *testing.T) {
 		t.Fatalf("len(candidates) = %d, want 3", len(candidates))
 	}
 	wantMerge := []bool{false, false, true}
+	wantAt := []int64{10, 20, 30}
 	for i, c := range candidates {
-		if c.Merge != wantMerge[i] {
-			t.Errorf("candidates[%d].Merge = %v, want %v", i, c.Merge, wantMerge[i])
+		if c.Merge != wantMerge[i] || c.CommitAt != wantAt[i] {
+			t.Errorf("candidates[%d] Merge, CommitAt = %v, %d, want %v, %d", i, c.Merge, c.CommitAt, wantMerge[i], wantAt[i])
 		}
 	}
 }

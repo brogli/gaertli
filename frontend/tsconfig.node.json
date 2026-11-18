@@ -22,6 +22,7 @@
     "e2e/**/*.ts",
     "e2e-real/**/*.ts",
     "bindings/**/*.ts",
-    "src/testing/colour.ts"
+    "src/testing/colour.ts",
+    "src/testing/fixtures/log-rows.ts"
   ]
 }

@@ -16,6 +16,7 @@ import (
 func TestCmdScriptStartsTheAppDetached(t *testing.T) {
 	t.Parallel()
 	dir, scriptPath := newApp(t, "gaertli.cmd", 0o644)
+	release := holdApp(t, dir)
 
 	cmd := exec.Command("cmd", "/c", scriptPath, `C:\x`)
 	cmd.Dir = dir
@@ -28,6 +29,7 @@ func TestCmdScriptStartsTheAppDetached(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "argv.txt")); err == nil {
 		t.Error("gaertli.cmd waited for the app")
 	}
+	release()
 
 	if got, want := readArgvEventually(t, dir), `C:\x`; got != want {
 		t.Errorf("app argv = %q, want %q", got, want)

@@ -115,7 +115,7 @@ describe('CommitBox', () => {
     expect(amendCheckbox(wrapper).element.checked).toBe(false)
   })
 
-  it('the Commit button is disabled while a commit is in flight, so a double-click cannot amend twice', async () => {
+  it('the Commit button is disabled while a commit is in flight', async () => {
     stageAFile()
     let resolveCommit: () => void = () => {}
     Facade.Commit.mockReturnValue(new Promise<void>((resolve) => (resolveCommit = resolve)))

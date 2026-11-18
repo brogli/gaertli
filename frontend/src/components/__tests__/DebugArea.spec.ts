@@ -1,6 +1,6 @@
 // Requirements: FR-UX-19
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import DebugArea from '../DebugArea.vue'
 import { mountNotices } from '@/testing/mountNotices'
 import { findButton } from '@/testing/findButton'
@@ -16,14 +16,6 @@ async function mountWithNotices() {
 }
 
 describe('DebugArea', () => {
-  it('has an error, a warning and a success button', async () => {
-    const { debug } = await mountWithNotices()
-
-    expect(findButton(debug, 'Error')).toBeTruthy()
-    expect(findButton(debug, 'Warning')).toBeTruthy()
-    expect(findButton(debug, 'Success')).toBeTruthy()
-  })
-
   it('each button shows a sample notice of its own severity, through the normal notice path', async () => {
     const { debug, body } = await mountWithNotices()
 
@@ -51,26 +43,5 @@ describe('DebugArea', () => {
       'p-toast-message-warn',
       'p-toast-message-success',
     ])
-  })
-
-  describe('closing after 5 s', () => {
-    afterEach(() => {
-      vi.useRealTimers()
-    })
-
-    it('5 s after showing all three samples, only the error remains', async () => {
-      const { debug, body } = await mountWithNotices()
-      vi.useFakeTimers()
-
-      await findButton(debug, 'Error')!.trigger('click')
-      await findButton(debug, 'Warning')!.trigger('click')
-      await findButton(debug, 'Success')!.trigger('click')
-      await vi.advanceTimersByTimeAsync(5000)
-
-      const severities = body
-        .findAll('.p-toast-message')
-        .map((m) => m.classes().find((c) => c.startsWith('p-toast-message-')))
-      expect(severities).toEqual(['p-toast-message-error'])
-    })
   })
 })

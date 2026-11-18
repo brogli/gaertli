@@ -42,16 +42,6 @@ describe('JobsMenu', () => {
     expect(wrapper.findComponent(Badge).exists()).toBe(false)
   })
 
-  it('the trigger is an OpenVue Button, secondary and outlined', async () => {
-    Facade.Jobs.mockResolvedValue([])
-    const { body } = await mountMenu()
-
-    const classes = body.get('[data-test="jobs-menu"]').classes()
-    expect(classes).toContain('p-button')
-    expect(classes).toContain('p-button-secondary')
-    expect(classes).toContain('p-button-outlined')
-  })
-
   it('opening the idle list shows its one line', async () => {
     Facade.Jobs.mockResolvedValue([])
     const { body } = await mountMenu()

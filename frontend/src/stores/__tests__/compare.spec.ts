@@ -78,6 +78,7 @@ describe('compare store', () => {
     const log = useLogStore()
     const compare = useCompareStore()
     log.selection = [row('x'), row('y')]
+    compare.startAgainstWorking(row('x'))
     compare.selectFile({ status: 'M', path: 'a.txt' })
 
     compare.exit()
