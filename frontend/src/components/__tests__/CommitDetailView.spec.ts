@@ -1,4 +1,4 @@
-// Requirements: FR-CMP-02, FR-CMP-04, FR-ED-02, FR-LOG-03, FR-LOG-04, FR-LOG-13, FR-LOG-15, FR-UX-10
+// Requirements: FR-CMP-02, FR-CMP-04, FR-ED-02, FR-LOG-03, FR-LOG-04, FR-LOG-15, FR-LOG-28, FR-UX-10
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

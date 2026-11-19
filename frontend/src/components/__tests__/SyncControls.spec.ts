@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-09, FR-SYNC-01, FR-SYNC-02, FR-SYNC-03, FR-SYNC-06, FR-SYNC-11, FR-UX-01, FR-UX-03, FR-UX-05, FR-UX-09, QA-SAFE-01
+// Requirements: FR-CONF-09, FR-SYNC-01, FR-SYNC-02, FR-SYNC-03, FR-SYNC-06, FR-SYNC-11, FR-UX-01, FR-UX-03, FR-UX-05, FR-UX-09, FR-UX-25, QA-SAFE-01
 import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { reactive } from 'vue'

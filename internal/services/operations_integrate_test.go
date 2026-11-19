@@ -1,4 +1,4 @@
-// Requirements: FR-BR-11, FR-BR-12, FR-SYNC-09
+// Requirements: FR-BR-11, FR-BR-12, FR-BR-18, FR-SYNC-09
 
 package services
 

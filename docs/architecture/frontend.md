@@ -16,8 +16,8 @@
 ## Main window
 
 Three views, laid out by the window's width: side by side when wide, the log beside a tabbed panel
-at medium width, one tabbed view when narrow (FR-UX-08). Hidden views stay mounted, so they keep
-their scroll position and the typed message.
+at medium width, one tabbed view when narrow (FR-UX-08, FR-UX-26). Hidden views stay mounted, so
+they keep their scroll position and the typed message.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐

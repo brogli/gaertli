@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05
+// Requirements: FR-CONF-14
 import { expect, test, type Page } from '@playwright/test'
 import { contrastRatio, deltaEOK, parseColor } from '../src/testing/colour'
 import { mockConflictUrl } from './helpers'

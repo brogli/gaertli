@@ -1,4 +1,4 @@
-// Requirements: FR-BR-01, FR-BR-02, FR-BR-08, FR-CMP-01, FR-CMP-04, FR-CP-06, FR-LOG-11, FR-LOG-17, FR-RV-04, FR-UX-05, FR-WT-02
+// Requirements: FR-BR-01, FR-BR-02, FR-BR-08, FR-CMP-01, FR-CMP-04, FR-CMP-06, FR-CP-06, FR-LOG-11, FR-LOG-17, FR-LOG-26, FR-LOG-27, FR-RV-04, FR-UX-05, FR-WT-02
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildOneCommitMenuItems,

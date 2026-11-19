@@ -2,7 +2,7 @@
 
 ## Structure
 
-The component diagram is in `architecture.md`.
+The component diagram is in [README.md](README.md).
 
 - Dependencies point down: only the shell knows windows and Wails; below it everything is plain Go,
   so the WSL core builds without cgo.

@@ -1,4 +1,4 @@
-// Requirements: FR-SYNC-12
+// Requirements: FR-SYNC-12, FR-SYNC-14
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

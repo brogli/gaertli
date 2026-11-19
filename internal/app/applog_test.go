@@ -1,4 +1,4 @@
-// Requirements: FR-UX-02, QA-SEC-02
+// Requirements: FR-UX-02, FR-UX-23, QA-SEC-02
 
 package app
 

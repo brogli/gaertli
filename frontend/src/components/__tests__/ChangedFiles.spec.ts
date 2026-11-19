@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-16, FR-LOG-21
+// Requirements: FR-LOG-16, FR-LOG-21, FR-LOG-31
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import ChangedFiles from '../ChangedFiles.vue'

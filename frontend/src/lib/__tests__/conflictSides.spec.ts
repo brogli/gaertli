@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05
+// Requirements: FR-CONF-12
 import { describe, expect, it } from 'vitest'
 import { i18n } from '@/i18n'
 import { conflictSideTitles } from '../conflictSides'

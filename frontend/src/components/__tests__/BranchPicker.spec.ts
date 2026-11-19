@@ -1,4 +1,4 @@
-// Requirements: FR-BR-01, FR-BR-05, FR-BR-06, FR-BR-08, FR-BR-09, FR-BR-11, FR-BR-12, FR-BR-13, FR-CONF-09, FR-LOG-01, FR-LOG-06, FR-REPO-03, FR-UPD-01, FR-UX-01, FR-UX-03, FR-UX-09, FR-UX-14, FR-WT-02, FR-WT-15
+// Requirements: FR-BR-01, FR-BR-05, FR-BR-06, FR-BR-08, FR-BR-09, FR-BR-11, FR-BR-12, FR-BR-13, FR-BR-15, FR-BR-17, FR-BR-18, FR-CONF-09, FR-LOG-01, FR-LOG-25, FR-REPO-03, FR-UPD-01, FR-UX-01, FR-UX-03, FR-UX-09, FR-UX-14, FR-WT-02, FR-WT-15, FR-WT-19
 import { flushPromises, type DOMWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

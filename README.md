@@ -14,9 +14,9 @@ core, Wails v3 shell, Vue 3 frontend. Every git operation runs the system `git`.
 
 Windows and Linux are the targets, including repos inside WSL from a native Windows window.
 
-- What it does: [docs/requirements.md](docs/requirements.md)
-- How it is built: [docs/architecture.md](docs/architecture.md), its code conventions:
-  [docs/conventions.md](docs/conventions.md)
+- What it does: [docs/requirements](docs/requirements/README.md)
+- How it is built: [docs/architecture](docs/architecture/README.md), its conventions:
+  [docs/conventions](docs/conventions/README.md)
 - Developing Gärtli: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## AI assisted coding disclosure

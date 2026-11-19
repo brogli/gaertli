@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-12, FR-DIFF-02, FR-UX-07, FR-UX-08, FR-UX-09, FR-UX-14
+// Requirements: FR-CHG-12, FR-DIFF-02, FR-UX-07, FR-UX-08, FR-UX-09, FR-UX-14, FR-UX-26
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { expectNoOverlap, mockDiffUrl, openMockRepo, switchToChanges } from './helpers'
 

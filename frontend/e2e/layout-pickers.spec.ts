@@ -1,4 +1,4 @@
-// Requirements: FR-UX-09
+// Requirements: FR-UX-09, FR-UX-27
 import { test, expect } from '@playwright/test'
 import { openBranchPicker, openMockRepo, openWorktreePicker, overflows, refLi } from './helpers'
 

@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-02
+// Requirements: FR-LOG-23
 import { describe, expect, it } from 'vitest'
 import { LANE_PALETTE_SIZE, laneColourClass } from '../laneColours'
 

@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11
+// Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11, FR-CONF-13, FR-CONF-14, FR-CONF-15, FR-CONF-16, FR-CONF-17, FR-CONF-18
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

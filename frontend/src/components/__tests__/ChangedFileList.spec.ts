@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-02, FR-CHG-10, FR-CMP-02, FR-DIFF-07, FR-ED-02, FR-UX-09, FR-UX-11, FR-UX-13
+// Requirements: FR-CHG-02, FR-CHG-10, FR-CMP-02, FR-DIFF-07, FR-ED-02, FR-UX-09, FR-UX-11, FR-UX-13, FR-UX-27
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import ChangedFileList from '../ChangedFileList.vue'

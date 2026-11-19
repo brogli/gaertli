@@ -1,4 +1,4 @@
-// Requirements: FR-BR-01, FR-BR-02, FR-BR-05, FR-BR-08, FR-BR-09, FR-CHG-01, FR-CMP-02, FR-DIFF-07, FR-ED-01, FR-ED-05, FR-ED-06, FR-LOG-11, FR-REPO-04, FR-REPO-07, FR-UX-01, FR-UX-05, FR-UX-09, FR-WT-02, QA-PORT-02, QA-REL-03
+// Requirements: FR-BR-01, FR-BR-02, FR-BR-05, FR-BR-08, FR-BR-09, FR-BR-15, FR-BR-17, FR-CHG-01, FR-CMP-02, FR-DIFF-07, FR-ED-01, FR-ED-05, FR-ED-06, FR-LOG-11, FR-REPO-04, FR-REPO-07, FR-UX-01, FR-UX-05, FR-UX-09, FR-UX-25, FR-WT-02, FR-WT-19, QA-PORT-02, QA-REL-03
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

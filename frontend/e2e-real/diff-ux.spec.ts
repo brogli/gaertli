@@ -1,4 +1,4 @@
-// Requirements: FR-DIFF-02, FR-DIFF-06, FR-DIFF-07, FR-ED-09
+// Requirements: FR-DIFF-02, FR-DIFF-06, FR-DIFF-07, FR-DIFF-13, FR-ED-09
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@playwright/test'

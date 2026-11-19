@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-02
+// Requirements: FR-LOG-02, FR-LOG-23
 import { mount, type DOMWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import GraphCell from '../GraphCell.vue'

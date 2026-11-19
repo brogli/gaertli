@@ -1,4 +1,4 @@
-// Requirements: FR-UX-15
+// Requirements: FR-UX-28
 import { test, expect } from '@playwright/test'
 import { openMockRepo } from './helpers'
 

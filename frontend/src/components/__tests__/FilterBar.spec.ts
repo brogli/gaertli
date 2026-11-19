@@ -1,4 +1,4 @@
-// Requirements: FR-LOG-05, FR-LOG-06, FR-LOG-08
+// Requirements: FR-LOG-05, FR-LOG-06, FR-LOG-08, FR-LOG-24
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
