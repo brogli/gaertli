@@ -46,6 +46,21 @@ and the divider stay in view. The two scroll together through the scroll event a
 Taking over wheel input instead would block smooth scrolling for the whole diff and still miss
 scrollbar and keyboard scrolling.
 
+Search and line numbers are CodeMirror's own parts, set up once for the diff view and the merge
+editor: the `@codemirror/search` panel at the top of each editor and the line-number gutter.
+
+- Each editor pane has its own search. A unified diff's removed lines are widgets, not document
+  text, so search does not find them. The panel's labels are the library's English phrases.
+- A right-click on a line number offers "Copy path:line" with the repo-relative path; the left side
+  of a renamed file uses the old path.
+- The selected change is the app's own editor state, its look shared with the merge editor. A diff
+  opens on its first change, a click selects the change under the cursor, and next and previous step
+  from it and centre it without animation. In unified mode the removed block is the merge library's
+  widget, which a view plugin outlines.
+- Escape closes the open searches first, and the window only when none was open.
+- An open search and the cursor's line survive a remount: a refetch with changed content, a mode
+  switch, a step to another file.
+
 ## Merge editor
 
 Three editors: the current and incoming sides read-only around the editable result (FR-CONF-05).
