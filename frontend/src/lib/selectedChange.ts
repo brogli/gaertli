@@ -1,22 +1,23 @@
 // The selected change of a code editor: the diff view's selected chunk, the
-// merge editor's selected region. Its lines are outlined in the accent colour
-// and marked in a gutter of their own.
+// merge editor's selected region. Its lines are outlined by a thin, muted
+// line in the text colour and marked in the accent colour in a gutter of their own.
 
 import type { Extension, StateField } from '@codemirror/state'
 import { type BlockInfo, EditorView, gutter, GutterMarker } from '@codemirror/view'
 
-const OUTLINE = '2px'
+const OUTLINE = '1px'
 const ACCENT = 'var(--p-primary-color)'
+const MUTED = 'color-mix(in srgb, var(--p-text-color) 35%, transparent)'
 
 const SELECTED_LOOK = EditorView.theme({
   '.cm-chunk-selected': {
     '--outline-top': '0px',
     '--outline-bottom': '0px',
     boxShadow: [
-      `inset ${OUTLINE} 0 0 0 ${ACCENT}`,
-      `inset -${OUTLINE} 0 0 0 ${ACCENT}`,
-      `inset 0 var(--outline-top) 0 0 ${ACCENT}`,
-      `inset 0 calc(-1 * var(--outline-bottom)) 0 0 ${ACCENT}`,
+      `inset ${OUTLINE} 0 0 0 ${MUTED}`,
+      `inset -${OUTLINE} 0 0 0 ${MUTED}`,
+      `inset 0 var(--outline-top) 0 0 ${MUTED}`,
+      `inset 0 calc(-1 * var(--outline-bottom)) 0 0 ${MUTED}`,
     ].join(', '),
   },
   '.cm-chunk-first': { '--outline-top': OUTLINE },
