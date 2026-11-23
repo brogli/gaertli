@@ -1213,6 +1213,15 @@ describe('DiffView', () => {
       expect([gutterMarksOf(a), gutterMarksOf(b)]).toEqual([0, 0])
     })
 
+    it('side by side, a click on the unchanged line after a removal selects none', async () => {
+      const [a, b] = sidesOf(await mountSideBySide(removalOnly))
+      expect(gutterMarksOf(a)).toBe(1)
+
+      click(b, 2)
+
+      expect([gutterMarksOf(a), gutterMarksOf(b)]).toEqual([0, 0])
+    })
+
     it('next and previous step from the selected change, or from the cursor when none is selected', async () => {
       Facade.DiffFile.mockResolvedValue(diffFileFixture(twoHunks))
       const wrapper = await mountCommit()

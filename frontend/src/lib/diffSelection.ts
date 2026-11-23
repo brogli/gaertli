@@ -33,12 +33,12 @@ export function chunkRange(chunk: Chunk, side: DiffSide): { from: number; to: nu
   return side === 'a' ? { from: chunk.fromA, to: chunk.toA } : { from: chunk.fromB, to: chunk.toB }
 }
 
-// chunkAt is the index of the chunk holding pos on side, or -1. A chunk with
-// no lines on side holds its position there.
+// chunkAt is the index of the chunk holding pos on side, or -1; a chunk with
+// no lines on side holds none.
 export function chunkAt(chunks: readonly Chunk[], side: DiffSide, pos: number): number {
   return chunks.findIndex((chunk) => {
     const { from, to } = chunkRange(chunk, side)
-    return from === to ? pos === from : from <= pos && pos < to
+    return from <= pos && pos < to
   })
 }
 
