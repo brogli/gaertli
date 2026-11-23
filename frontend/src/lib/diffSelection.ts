@@ -56,6 +56,18 @@ export function chunkBeside(
   return (beside ?? order[0])?.[0] ?? -1
 }
 
+// newSidePos is old-side pos on the new side: a change's start for a pos in
+// it, else pos shifted by the changes before it.
+export function newSidePos(chunks: readonly Chunk[], pos: number): number {
+  let shift = 0
+  for (const chunk of chunks) {
+    if (pos < chunk.fromA) break
+    if (pos < chunk.toA) return chunk.fromB
+    shift = chunk.toB - chunk.toA
+  }
+  return pos + shift
+}
+
 // chunkStart is where the cursor goes on side when chunk is stepped to.
 export function chunkStart(chunk: Chunk, side: DiffSide): number {
   return chunkRange(chunk, side).from

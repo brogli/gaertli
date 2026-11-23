@@ -33,6 +33,7 @@ import {
   chunkStart,
   diffSelection,
   type DiffSide,
+  newSidePos,
   selectChunk,
 } from '@/lib/diffSelection'
 import { codeEditorExtensions, lineNumbersWithMenu, PANE_LAYOUT } from '@/lib/codeEditor'
@@ -156,7 +157,7 @@ function destroyView(): void {
 }
 
 function updateSelectedLinesEnabled(): void {
-  selectedLinesEnabled.value = selectedLines() !== null
+  selectedLinesEnabled.value = cursorPlaced && selectedLines() !== null
 }
 
 // keptSearches are the old (a) and new (b) side's searches, kept from the
@@ -169,9 +170,12 @@ function keepSearches(): void {
 }
 
 // selected is the index of the selected chunk, -1 for none; clickedSide
-// is the side of the editor the user last moved the cursor in.
+// is the side of the editor the cursor was last clicked or stepped on.
+// cursorPlaced: the user put the cursor there, by a click or a step, or a
+// remount brought back where they had; the cursor a diff opens with is not.
 let selected = -1
 let clickedSide: DiffSide = 'b'
+let cursorPlaced = false
 
 // An Editor is a mounted editor and the side it shows.
 interface Editor {
@@ -216,6 +220,7 @@ function selectAtCursor(side: DiffSide) {
   return (update: ViewUpdate) => {
     if (!update.selectionSet || !update.transactions.some((tr) => tr.isUserEvent('select'))) return
     clickedSide = side
+    cursorPlaced = true
     select(chunkAt(chunks.value, side, update.state.selection.main.head))
   }
 }
@@ -225,6 +230,7 @@ function goToChunk(i: number): void {
   const chunk = chunks.value[i]
   const editor = newSide()
   if (!chunk || !editor) return
+  clickedSide = editor.side
   select(i)
   centreCursor(editor.cm, chunkStart(chunk, editor.side))
 }
@@ -234,6 +240,7 @@ function goToChunk(i: number): void {
 function stepChange(dir: 1 | -1): void {
   const n = chunks.value.length
   if (n === 0) return
+  cursorPlaced = true
   if (selected >= 0) return goToChunk((selected + dir + n) % n)
   const editor = editorOn(clickedSide)
   if (editor)
@@ -241,32 +248,40 @@ function stepChange(dir: 1 | -1): void {
 }
 
 // mountedTarget is the target the mounted view shows, as JSON; keptCursor is
-// the new side's cursor line, kept from the last destroyed view for a remount
-// of the same target.
+// the cursor line the user placed and its side, kept from the last destroyed
+// view for a remount of the same target.
 let mountedTarget = ''
-let keptCursor: { target: string; line: number } | undefined
+let keptCursor: { target: string; side: DiffSide; line: number } | undefined
 
 function keepCursor(): void {
-  const cm = newSide()?.cm
-  if (cm)
-    keptCursor = {
-      target: mountedTarget,
-      line: cm.state.doc.lineAt(cm.state.selection.main.head).number,
-    }
+  const editor = editorOn(clickedSide)
+  if (!editor || !cursorPlaced) return
+  const { cm, side } = editor
+  keptCursor = {
+    target: mountedTarget,
+    side,
+    line: cm.state.doc.lineAt(cm.state.selection.main.head).number,
+  }
 }
 
 // selectOnMount goes to the first chunk of a newly shown target; a remount
-// of the same target centres the cursor back on its line and selects what is
-// there.
+// of the same target centres the cursor back on its line, on the new side
+// when its own is not shown, and selects what is there.
 function selectOnMount(): void {
   const kept = keptCursor?.target === mountedTarget ? keptCursor : undefined
   keptCursor = undefined
-  const editor = newSide()
-  if (!kept || !editor) return goToChunk(0)
-  const { cm, side } = editor
-  const pos = cm.state.doc.line(Math.min(kept.line, cm.state.doc.lines)).from
-  select(chunkAt(chunks.value, side, pos))
-  centreCursor(cm, pos)
+  cursorPlaced = !!kept
+  const editor = kept && editorOn(kept.side)
+  const docs = chunkDocs()
+  if (!kept || !editor || !docs) return goToChunk(0)
+  const doc = kept.side === 'a' ? docs.old : docs.new
+  const pos = doc.line(Math.min(kept.line, doc.lines)).from
+  clickedSide = editor.side
+  select(chunkAt(chunks.value, kept.side, pos))
+  centreCursor(
+    editor.cm,
+    kept.side === 'a' && editor.side !== 'a' ? newSidePos(chunks.value, pos) : pos,
+  )
 }
 
 const copyMenu = ref<InstanceType<typeof CopyPathLineMenu>>()
@@ -287,7 +302,12 @@ async function mountView(): Promise<void> {
   const el = container.value
   const a = hostA.value
   const b = hostB.value
-  if (!file || file.binary || file.tooLarge) return
+  if (!file) return
+  // Shown again after a placeholder, a file opens on its first change.
+  if (file.binary || file.tooLarge) {
+    keptCursor = undefined
+    return
+  }
   if (sideBySide ? !a || !b : !el) return
 
   const shared = await codeEditorExtensions(props.target.path)
@@ -352,7 +372,7 @@ async function mountView(): Promise<void> {
         ],
       }),
     })
-    restoreSearch(view, keptSearches.b)
+    restoreSearch(view, keptSearches.b ?? keptSearches.a)
   }
   keptSearches = {}
   chunks.value = view instanceof MergeView ? view.chunks : (getChunks(view.state)?.chunks ?? [])

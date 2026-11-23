@@ -95,6 +95,7 @@ function selectText(wrapper: VueWrapper, from: string, to: string): void {
   const text = view.state.doc.toString()
   view.dispatch({
     selection: EditorSelection.range(text.indexOf(from), text.indexOf(to) + to.length),
+    userEvent: 'select',
   })
 }
 
@@ -240,7 +241,7 @@ describe('DiffView', () => {
 
     const view = editorOf(wrapper)
     // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10): inside the chunk.
-    view.dispatch({ selection: EditorSelection.range(8, 10) })
+    view.dispatch({ selection: EditorSelection.range(8, 10), userEvent: 'select' })
     await flushPromises()
     expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeUndefined()
 
@@ -563,7 +564,7 @@ describe('DiffView', () => {
     })
     const view = editorOf(wrapper)
     // "a\n" = 2 chars; "B\n" 2-4; "\n" 4-5; "C\n" 5-7.
-    view.dispatch({ selection: EditorSelection.range(2, 7) })
+    view.dispatch({ selection: EditorSelection.range(2, 7), userEvent: 'select' })
     await flushPromises()
 
     await wrapper.get('[data-test="stage-selected-lines"]').trigger('click')
@@ -758,23 +759,26 @@ describe('DiffView', () => {
       expect(wrapper.find(`[data-test="${control}"]`).exists()).toBe(false)
   })
 
-  it('"Stage selected lines" is disabled unless the selection falls entirely inside one change', async () => {
+  it('"Stage selected lines" is disabled until the user puts the selection entirely inside one change', async () => {
     const wrapper = await mountWorking(threeLines)
     const view = editorOf(wrapper)
-    view.dispatch({ selection: EditorSelection.range(0, 0) }) // "line1", outside the chunk
-    await flushPromises()
-    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
+    const disabled = () => wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')
+
+    // The diff opens with the cursor in its change, put there by the view, not the user.
+    expect(disabled()).toBeDefined()
 
     // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10); "Z\n"=2 (10-12): inside the chunk.
-    view.dispatch({ selection: EditorSelection.range(8, 12) })
+    view.dispatch({ selection: EditorSelection.range(8, 12), userEvent: 'select' })
     await flushPromises()
+    expect(disabled()).toBeUndefined()
 
-    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeUndefined()
-
-    view.dispatch({ selection: EditorSelection.range(0, 0) }) // back outside the chunk
+    view.dispatch({ selection: EditorSelection.range(0, 0), userEvent: 'select' }) // "line1", outside
     await flushPromises()
+    expect(disabled()).toBeDefined()
 
-    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-test="next-change"]').trigger('click')
+    await flushPromises()
+    expect(disabled()).toBeUndefined()
   })
 
   it('with an unstaged working-tree target, "Discard hunk" confirms then calls Facade.DiscardLines and reloads', async () => {
@@ -1100,6 +1104,17 @@ describe('DiffView', () => {
       expect(searchFieldOf(editorOf(wrapper))?.value).toBe('foo')
     })
 
+    it('a switch to unified keeps a search open on the left side only', async () => {
+      const wrapper = await mountSideBySide(fooTwice)
+      await wrapper.get('[data-test="search-left"]').trigger('click')
+      searchFor(editorViews(wrapper)[0]!, 'foo')
+
+      await wrapper.get('[data-test="mode-toggle"]').trigger('click')
+      await flushPromises()
+
+      expect(searchFieldOf(editorOf(wrapper))?.value).toBe('foo')
+    })
+
     it('a reload puts the focus back in the search field only if it was there', async () => {
       Facade.DiffWorking.mockResolvedValue(diffFileFixture(fooTwice))
       const wrapper = mount(DiffView, {
@@ -1281,6 +1296,42 @@ describe('DiffView', () => {
 
       await wrapper.setProps({ target: { ...workingProps().target, path: 'b.txt' } })
       await flushPromises()
+      expect(selectedLinesOf(editorOf(wrapper))).toEqual([2])
+    })
+
+    it('a switch to unified keeps the place clicked on the left side', async () => {
+      // Line 2 removed, line 4 changed: the new side's lines sit one up.
+      const wrapper = await mountSideBySide({
+        oldContent: 'line1\nline2\nline3\nline4 old\n',
+        newContent: 'line1\nline3\nline4 new\n',
+        hunks: [hunk(2, 1, 1, 0), hunk(4, 1, 3, 1)],
+      })
+      const toggle = async () => {
+        await wrapper.get('[data-test="mode-toggle"]').trigger('click')
+        await flushPromises()
+      }
+      const placeOf = (view: EditorView) => [selectedLinesOf(view), cursorLineOf(view)]
+
+      click(sidesOf(wrapper)[0], 4)
+      await toggle()
+      expect(placeOf(editorOf(wrapper))).toEqual([[3], 3])
+
+      await toggle()
+      click(sidesOf(wrapper)[0], 3)
+      await toggle()
+      expect(placeOf(editorOf(wrapper))).toEqual([[], 2])
+    })
+
+    it('a file shown again after a binary file opens on its first change', async () => {
+      const wrapper = await mountWorking(twoHunks)
+      await step(wrapper, 'next-change')
+
+      Facade.DiffWorking.mockResolvedValue(diffFileFixture({ binary: true }))
+      await wrapper.setProps({ target: { ...workingProps().target, path: 'b.bin' } })
+      await flushPromises()
+      await wrapper.setProps(workingProps())
+      await flushPromises()
+
       expect(selectedLinesOf(editorOf(wrapper))).toEqual([2])
     })
   })

@@ -25,9 +25,12 @@ export const editorSearch: Extension = [
   keymap.of(searchKeymap.filter((binding) => binding.key && SEARCH_KEYS.has(binding.key))),
 ]
 
-// closeOpenSearches closes the search of every editor in the window and
-// says whether one was open.
-export function closeOpenSearches(): boolean {
+// closeOpenSearches closes the search of the editor target is in, or else
+// that of every editor in the window, and says whether one was open.
+export function closeOpenSearches(target: EventTarget | null): boolean {
+  const own = target instanceof Element && target.closest<HTMLElement>('.cm-editor')
+  const ownView = own && EditorView.findFromDOM(own)
+  if (ownView && closeSearchPanel(ownView)) return true
   let closed = false
   for (const el of document.querySelectorAll<HTMLElement>('.cm-editor')) {
     const view = EditorView.findFromDOM(el)

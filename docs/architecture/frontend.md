@@ -57,9 +57,12 @@ editor: the `@codemirror/search` panel at the top of each editor and the line-nu
   opens on its first change, a click selects the change under the cursor, and next and previous step
   from it and centre it without animation. In unified mode the removed block is the merge library's
   widget, which a view plugin outlines.
-- Escape closes the open searches first, and the window only when none was open.
+- Escape belongs to an open dialog or menu first, then closes the search of the editor it is pressed
+  in, else every open search, and the window only when none was open.
 - An open search and the cursor's line survive a remount: a refetch with changed content, a mode
-  switch, a step to another file.
+  switch, a step to another file. The line kept is the one the user last clicked or stepped to, on
+  its side; a left-side line maps to the new side in unified mode. The line actions wait for such a
+  line: the cursor a diff opens with does not count.
 
 ## Merge editor
 

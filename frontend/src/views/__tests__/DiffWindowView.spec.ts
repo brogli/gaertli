@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-CONF-19, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-DIFF-13, FR-DIFF-14, FR-ED-02, FR-LOG-16, FR-LOG-31, QA-REL-03
+// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-CONF-19, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-DIFF-13, FR-DIFF-14, FR-ED-02, FR-LOG-16, FR-LOG-31, FR-UX-25, QA-REL-03
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,10 @@ import { Events, Window, emit } from '@/testing/runtime'
 
 import { confirmRequire } from '@/testing/confirm'
 import { useConflictsStore } from '@/stores/conflicts'
+import { useSettingsStore } from '@/stores/settings'
+import { defaultSettingsFixture } from '@/testing/fixtures/settings'
+import { DiffMode } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
+import { openSearchPanel } from '@codemirror/search'
 import DiffWindowView from '../DiffWindowView.vue'
 import DiffView from '@/components/DiffView.vue'
 import ConflictedFileView from '@/components/ConflictedFileView.vue'
@@ -367,20 +371,23 @@ describe('DiffWindowView', () => {
     expect(drafts.get('/repo', 'two.txt', '')).toBeUndefined()
   })
 
-  it('Escape closes the window, unless it closes an open dialog first', async () => {
-    await mountWindow(commitA)
-    const dialog = document.createElement('div')
-    dialog.setAttribute('role', 'alertdialog')
-    document.body.append(dialog)
+  it.each(['alertdialog', 'menubar'])(
+    'Escape closes the window, unless it closes an open %s first',
+    async (role) => {
+      await mountWindow(commitA)
+      const dialog = document.createElement('div')
+      dialog.setAttribute('role', role)
+      document.body.append(dialog)
 
-    pressKey('Escape')
-    expect(Window.Close).not.toHaveBeenCalled()
+      pressKey('Escape')
+      expect(Window.Close).not.toHaveBeenCalled()
 
-    dialog.remove()
-    pressKey('Escape')
-    await flushPromises()
-    expect(Window.Close).toHaveBeenCalledTimes(1)
-  })
+      dialog.remove()
+      pressKey('Escape')
+      await flushPromises()
+      expect(Window.Close).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('Escape with a search open closes the search, not the window; Escape again closes the window', async () => {
     // In the document, as the window's editors are.
@@ -401,6 +408,25 @@ describe('DiffWindowView', () => {
     pressKey('Escape')
     await flushPromises()
     expect(Window.Close).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it("side by side, Escape in one side's search closes that search only", async () => {
+    useSettingsStore().settings = defaultSettingsFixture({ diffMode: DiffMode.SideBySideDiff })
+    const wrapper = mount(DiffWindowView, {
+      props: { wt: '/repo', target: commitA },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const [a, b] = editorViews(wrapper)
+    openSearchPanel(a!)
+    openSearchPanel(b!)
+
+    searchFieldOf(a!)!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+
+    expect([searchFieldOf(a!), searchFieldOf(b!)]).toEqual([null, expect.anything()])
+    expect(Window.Close).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 

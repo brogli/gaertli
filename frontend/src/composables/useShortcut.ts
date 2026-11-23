@@ -2,7 +2,8 @@ import { onKeyStroke, type KeyFilter } from '@vueuse/core'
 
 // ContextMenu's own root list is role menubar; a submenu (nested items) is
 // role menu.
-const OVERLAY_SELECTOR = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="menubar"]'
+export const OVERLAY_SELECTOR =
+  '[role="dialog"], [role="alertdialog"], [role="menu"], [role="menubar"]'
 const TEXT_FIELD_SELECTOR = 'input, textarea, [role="combobox"]'
 
 export interface UseShortcutOptions {
