@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11, FR-CONF-13, FR-CONF-14, FR-CONF-15, FR-CONF-16, FR-CONF-17, FR-CONF-18, FR-CONF-20
+// Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11, FR-CONF-13, FR-CONF-14, FR-CONF-15, FR-CONF-16, FR-CONF-17, FR-CONF-18, FR-CONF-20, FR-CONF-21
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -15,6 +15,8 @@ import * as codeEditor from '@/lib/codeEditor'
 import { editorViews } from '@/testing/editorView'
 import { clickMenuItem } from '@/testing/contextMenu'
 import { lineNumbersOf } from '@/testing/lineNumbers'
+import { pressKey } from '@/testing/pressKey'
+import { searchFieldOf } from '@/testing/search'
 import MergeEditor from '../MergeEditor.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { findButton } from '@/testing/findButton'
@@ -657,5 +659,33 @@ describe('MergeEditor line numbers', () => {
     }
 
     expect(writeText.mock.calls).toEqual([['src/a.txt:1'], ['src/a.txt:1'], ['src/a.txt:1']])
+  })
+})
+
+describe('MergeEditor search', () => {
+  const searchesOpen = (wrapper: VueWrapper) => editorViews(wrapper).map((v) => !!searchFieldOf(v))
+
+  it("Ctrl+F outside the panes opens the result's search", async () => {
+    const wrapper = await mountEditor()
+
+    pressKey('f', { ctrlKey: true })
+
+    expect(searchesOpen(wrapper)).toEqual([false, true, false])
+  })
+
+  it("Ctrl+F in a side pane opens that pane's search", async () => {
+    const wrapper = await mountEditor()
+
+    press(viewAt(wrapper, INCOMING), { key: 'f', ctrlKey: true })
+
+    expect(searchesOpen(wrapper)).toEqual([false, false, true])
+  })
+
+  it("the toolbar button opens the result's search and shows Ctrl+F", async () => {
+    const wrapper = await mountEditor()
+
+    await click(wrapper, 'Search result · Ctrl+F')
+
+    expect(searchesOpen(wrapper)).toEqual([false, true, false])
   })
 })

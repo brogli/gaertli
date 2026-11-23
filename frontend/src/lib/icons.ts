@@ -100,6 +100,7 @@ const ICON = {
   jobsRunning: 'spinner',
   abort: 'stop-circle',
   rowActions: 'ellipsis-h',
+  search: 'search',
 } as const
 
 export type IconName = keyof typeof ICON

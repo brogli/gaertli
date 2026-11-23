@@ -1,10 +1,5 @@
 # IDs whose tests are still owed. The change that adds an ID's test removes
 # its line in the same commit; task trace fails otherwise.
-FR-DIFF-14
-FR-DIFF-15
-FR-DIFF-16
 FR-DIFF-19
 FR-DIFF-20
 FR-DIFF-21
-FR-DIFF-22
-FR-DIFF-23

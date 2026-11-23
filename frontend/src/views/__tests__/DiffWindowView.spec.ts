@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-CONF-19, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-DIFF-13, FR-ED-02, FR-LOG-16, FR-LOG-31, QA-REL-03
+// Requirements: FR-CHG-03, FR-CONF-02, FR-CONF-11, FR-CONF-19, FR-DIFF-02, FR-DIFF-07, FR-DIFF-10, FR-DIFF-13, FR-DIFF-14, FR-ED-02, FR-LOG-16, FR-LOG-31, QA-REL-03
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,6 +23,8 @@ import ConflictedFileView from '@/components/ConflictedFileView.vue'
 import { DiffKind, type DiffTarget } from '@/lib/diffTarget'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
+import { editorViews } from '@/testing/editorView'
+import { searchFieldOf } from '@/testing/search'
 
 const opts = { force: false, ignoreWhitespace: false }
 const files = [
@@ -378,6 +380,28 @@ describe('DiffWindowView', () => {
     pressKey('Escape')
     await flushPromises()
     expect(Window.Close).toHaveBeenCalledTimes(1)
+  })
+
+  it('Escape with a search open closes the search, not the window; Escape again closes the window', async () => {
+    // In the document, as the window's editors are.
+    const wrapper = mount(DiffWindowView, {
+      props: { wt: '/repo', target: commitA },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const [view] = editorViews(wrapper)
+    pressKey('f', { ctrlKey: true })
+    expect(searchFieldOf(view!)).not.toBeNull()
+
+    pressKey('Escape')
+    await flushPromises()
+    expect(searchFieldOf(view!)).toBeNull()
+    expect(Window.Close).not.toHaveBeenCalled()
+
+    pressKey('Escape')
+    await flushPromises()
+    expect(Window.Close).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
   })
 
   it('Escape with a merge draft closes the window without asking', async () => {

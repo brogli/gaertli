@@ -1,5 +1,6 @@
 import { EditorState, type Extension } from '@codemirror/state'
-import { EditorView, lineNumbers } from '@codemirror/view'
+import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import { closeSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { classHighlighter } from '@lezer/highlight'
@@ -23,14 +24,66 @@ const CODE_COLOURS = EditorView.theme({
 const FIXED_WIDTH_FONT = EditorView.theme({ '.cm-scroller': { fontFamily: 'var(--nb-font-mono)' } })
 
 // EDITOR_LOOK sets what CodeMirror's light base theme would show in every app
-// theme (gutters) to the app's content tokens.
+// theme (gutters, panels, their fields and buttons, search matches) to the
+// app's tokens. --nb-panel-offset moves a top panel below a sticky toolbar
+// above the editor.
 const EDITOR_LOOK = EditorView.theme({
   '.cm-gutters': {
     backgroundColor: 'var(--p-content-background)',
     color: 'var(--p-text-muted-color)',
     borderRight: '1px solid var(--p-content-border-color)',
   },
+  '.cm-panels': {
+    backgroundColor: 'var(--p-content-background)',
+    color: 'var(--p-text-color)',
+  },
+  '.cm-panels-top': {
+    top: 'var(--nb-panel-offset, 0)',
+    borderBottom: '1px solid var(--p-content-border-color)',
+  },
+  '.cm-textfield': {
+    backgroundColor: 'var(--p-form-field-background)',
+    color: 'var(--p-form-field-color)',
+    border: '1px solid var(--p-form-field-border-color)',
+  },
+  '.cm-button': {
+    backgroundImage: 'none',
+    backgroundColor: 'var(--p-content-background)',
+    border: '1px solid var(--p-content-border-color)',
+    '&:hover': { backgroundColor: 'var(--p-content-hover-background)' },
+  },
+  '.cm-searchMatch': {
+    backgroundColor: 'color-mix(in srgb, var(--p-primary-color) 25%, transparent)',
+  },
+  '.cm-searchMatch-selected': {
+    backgroundColor: 'color-mix(in srgb, var(--p-primary-color) 50%, transparent)',
+  },
 })
+
+// SEARCH_KEYS are the library's search bindings the app offers: Ctrl+F
+// opens, F3 and Shift+F3 step, Escape closes.
+const SEARCH_KEYS = new Set(['Mod-f', 'F3', 'Escape'])
+
+// editorSearch is the search panel at the editor's top; a match it steps to
+// is scrolled to the middle.
+export const editorSearch: Extension = [
+  search({
+    top: true,
+    scrollToMatch: (range) => EditorView.scrollIntoView(range, { y: 'center' }),
+  }),
+  keymap.of(searchKeymap.filter((binding) => binding.key && SEARCH_KEYS.has(binding.key))),
+]
+
+// closeOpenSearches closes the search of every editor in the window and
+// says whether one was open.
+export function closeOpenSearches(): boolean {
+  let closed = false
+  for (const el of document.querySelectorAll<HTMLElement>('.cm-editor')) {
+    const view = EditorView.findFromDOM(el)
+    if (view && closeSearchPanel(view)) closed = true
+  }
+  return closed
+}
 
 // lineNumbersWithMenu is the line-number gutter; right-clicking a number
 // calls onMenu with that line's 1-based number and the event.

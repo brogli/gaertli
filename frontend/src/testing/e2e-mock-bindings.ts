@@ -227,6 +227,11 @@ function commitDetailsFixture(sha: string): CommitDetails {
   }
 }
 
+// UNCHANGED_LINES are the diff's long unchanged middle, with one line of
+// its own for a search to find.
+const UNCHANGED_LINES =
+  'unchanged line\n'.repeat(100) + 'middle line\n' + 'unchanged line\n'.repeat(100)
+
 // DIFF_FILE_FIXTURE: real old/new content, so DiffView mounts CodeMirror
 // and shows its toolbar instead of a loading/binary placeholder.
 const DIFF_FILE_FIXTURE = diffFileFixture({
@@ -234,12 +239,9 @@ const DIFF_FILE_FIXTURE = diffFileFixture({
   oldPath: '',
   // Long enough to need more height than the diff window has, as a real
   // source file does.
-  oldContent:
-    'line one\nline two\nline three\n' + 'unchanged line\n'.repeat(200) + 'last old line\n',
+  oldContent: 'line one\nline two\nline three\n' + UNCHANGED_LINES + 'last old line\n',
   newContent:
-    'line one\nline TWO, changed\nline three\nline four\n' +
-    'unchanged line\n'.repeat(200) +
-    'last new line\n',
+    'line one\nline TWO, changed\nline three\nline four\n' + UNCHANGED_LINES + 'last new line\n',
   hunks: [hunk(2, 1, 2, 1), hunk(3, 0, 4, 1)],
 })
 

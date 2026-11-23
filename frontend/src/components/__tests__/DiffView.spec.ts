@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-CHG-14, FR-CMP-02, FR-CMP-04, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-DIFF-18, FR-DIFF-24, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
+// Requirements: FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-CHG-14, FR-CMP-02, FR-CMP-04, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-DIFF-14, FR-DIFF-15, FR-DIFF-16, FR-DIFF-17, FR-DIFF-18, FR-DIFF-22, FR-DIFF-23, FR-DIFF-24, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,6 +43,8 @@ import { findButton } from '@/testing/findButton'
 import { editorViews } from '@/testing/editorView'
 import { clickMenuItem } from '@/testing/contextMenu'
 import { lineNumbersOf } from '@/testing/lineNumbers'
+import { pressKey } from '@/testing/pressKey'
+import { matchesOf, pressEnterIn, searchFieldOf, searchFor, selectedLineOf } from '@/testing/search'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import {
   ChangeScope,
@@ -924,6 +926,7 @@ describe('DiffView', () => {
       'ignore-whitespace-toggle': 'Showing whitespace',
       'prev-change': 'Previous change',
       'next-change': 'Next change',
+      search: 'Search · Ctrl+F',
       'prev-file': 'Previous file',
       'next-file': 'Next file',
       'open-editor': 'Open in editor',
@@ -991,6 +994,159 @@ describe('DiffView', () => {
       const [a, b] = editorViews(wrapper)
       expect(await copyPathLine(a!)).toEqual(['old/a.txt:1'])
       expect(await copyPathLine(b!)).toEqual(['new/a.txt:1'])
+    })
+  })
+
+  describe('search', () => {
+    const fooTwice = {
+      oldContent: 'foo\nbar\n',
+      newContent: 'foo\nbar foo\nbaz\n',
+      hunks: [hunk(2, 1, 2, 2)],
+    }
+    const ctrlF = { key: 'f', ctrlKey: true }
+
+    // pressIn dispatches a keydown in view's content, as typing there does.
+    function pressIn(view: EditorView, init: KeyboardEventInit): void {
+      view.contentDOM.dispatchEvent(
+        new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
+      )
+    }
+
+    // searchesOpen says for each mounted editor whether its search is open.
+    const searchesOpen = (wrapper: VueWrapper) =>
+      editorViews(wrapper).map((v) => !!searchFieldOf(v))
+
+    it("Ctrl+F outside the editor opens the unified diff's search; Enter steps through the matches and wraps, Shift+Enter steps back", async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(fooTwice))
+      const wrapper = await mountCommit()
+      const view = editorOf(wrapper)
+
+      pressKey('f', ctrlF)
+      searchFor(view, 'foo')
+      await flushPromises()
+
+      expect(matchesOf(view)).toEqual(['foo', 'foo'])
+      const lines: number[] = []
+      for (let i = 0; i < 3; i++) {
+        pressEnterIn(view)
+        lines.push(selectedLineOf(view))
+      }
+      pressEnterIn(view, true)
+      lines.push(selectedLineOf(view))
+      expect(lines).toEqual([1, 2, 1, 2])
+    })
+
+    it("side by side, Ctrl+F outside the editors opens the right side's search only, Ctrl+F in the left editor the left's", async () => {
+      const wrapper = await mountSideBySide(fooTwice)
+      const [a] = editorViews(wrapper)
+
+      pressKey('f', ctrlF)
+      expect(searchesOpen(wrapper)).toEqual([false, true])
+
+      pressIn(a!, ctrlF)
+      expect(searchesOpen(wrapper)).toEqual([true, true])
+    })
+
+    it("side by side, each toolbar button opens its side's search; the right one shows Ctrl+F", async () => {
+      const wrapper = await mountSideBySide(fooTwice)
+
+      await wrapper.get('[data-test="search-left"]').trigger('click')
+      expect(searchesOpen(wrapper)).toEqual([true, false])
+      await wrapper.get('[data-test="search-right"]').trigger('click')
+      expect(searchesOpen(wrapper)).toEqual([true, true])
+
+      expect(wrapper.get('[data-test="search-left"]').attributes('title')).toBe('Search left side')
+      expect(wrapper.get('[data-test="search-right"]').attributes('title')).toBe(
+        'Search right side · Ctrl+F',
+      )
+    })
+
+    const removal = { oldContent: 'keep\ngone\n', newContent: 'keep\n', hunks: [hunk(2, 1, 1, 0)] }
+
+    it('a removed line is found on the left side, not on the right', async () => {
+      const wrapper = await mountSideBySide(removal)
+      const [a, b] = editorViews(wrapper)
+      await wrapper.get('[data-test="search-left"]').trigger('click')
+      await wrapper.get('[data-test="search-right"]').trigger('click')
+
+      searchFor(a!, 'gone')
+      searchFor(b!, 'gone')
+      await flushPromises()
+
+      expect(matchesOf(a!)).toEqual(['gone'])
+      expect(matchesOf(b!)).toEqual([])
+    })
+
+    it("the unified diff's search does not find a removed line", async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(removal))
+      const wrapper = await mountCommit()
+      const view = editorOf(wrapper)
+      await wrapper.get('[data-test="search"]').trigger('click')
+
+      searchFor(view, 'gone')
+      await flushPromises()
+
+      expect(wrapper.get('.cm-deletedChunk').text()).toContain('gone')
+      expect(matchesOf(view)).toEqual([])
+    })
+
+    it('"match case" narrows the matches', async () => {
+      Facade.DiffFile.mockResolvedValue(
+        diffFileFixture({ oldContent: '', newContent: 'Foo foo\n', hunks: [hunk(0, 0, 1, 1)] }),
+      )
+      const wrapper = await mountCommit()
+      const view = editorOf(wrapper)
+      await wrapper.get('[data-test="search"]').trigger('click')
+      searchFor(view, 'foo')
+      await flushPromises()
+      expect(matchesOf(view)).toEqual(['Foo', 'foo'])
+
+      await new DOMWrapper(view.dom.querySelector('.cm-search input[name="case"]')).setValue(true)
+      await flushPromises()
+
+      expect(matchesOf(view)).toEqual(['foo'])
+    })
+
+    it('an open search keeps its text when the diff reloads with new content and when another file is shown', async () => {
+      Facade.DiffWorking.mockResolvedValue(diffFileFixture(fooTwice))
+      const wrapper = await mountWorking(fooTwice)
+      await wrapper.get('[data-test="search"]').trigger('click')
+      searchFor(editorOf(wrapper), 'foo')
+
+      Facade.DiffWorking.mockResolvedValue(
+        diffFileFixture({ ...fooTwice, newContent: 'foo\nbar foo\nfoo\n' }),
+      )
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+      expect(matchesOf(editorOf(wrapper))).toEqual(['foo', 'foo', 'foo'])
+
+      await wrapper.setProps({ target: { ...workingProps().target, path: 'b.txt' } })
+      await flushPromises()
+      expect(searchFieldOf(editorOf(wrapper))?.value).toBe('foo')
+    })
+
+    it('a reload puts the focus back in the search field only if it was there', async () => {
+      Facade.DiffWorking.mockResolvedValue(diffFileFixture(fooTwice))
+      const wrapper = mount(DiffView, {
+        props: { ...base, ...workingProps() },
+        attachTo: document.body,
+      })
+      await flushPromises()
+      await wrapper.get('[data-test="search"]').trigger('click')
+      const reload = async (newContent: string) => {
+        Facade.DiffWorking.mockResolvedValue(diffFileFixture({ ...fooTwice, newContent }))
+        emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+        await flushPromises()
+      }
+
+      searchFieldOf(editorOf(wrapper))!.focus()
+      await reload('foo\n')
+      expect(document.activeElement).toBe(searchFieldOf(editorOf(wrapper)))
+
+      wrapper.get<HTMLButtonElement>('[data-test="open-editor"]').element.focus()
+      await reload('foo\nfoo\n')
+      expect(document.activeElement).toBe(wrapper.get('[data-test="open-editor"]').element)
+      wrapper.unmount()
     })
   })
 })

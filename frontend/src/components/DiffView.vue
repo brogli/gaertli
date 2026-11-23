@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { EditorState, Text } from '@codemirror/state'
 import { type Command, EditorView } from '@codemirror/view'
 import {
@@ -11,6 +12,13 @@ import {
   MergeView,
   unifiedMergeView,
 } from '@codemirror/merge'
+import {
+  getSearchQuery,
+  openSearchPanel,
+  searchPanelOpen,
+  setSearchQuery,
+  type SearchQuery,
+} from '@codemirror/search'
 import Button from 'openvue/button'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
@@ -22,10 +30,17 @@ import { useChangesStore } from '@/stores/changes'
 import { useCoreCall } from '@/composables/useCoreCall'
 import { useConfirmAction } from '@/composables/useConfirmAction'
 import { useOpenInEditor } from '@/composables/useOpenInEditor'
+import { useEditorSearch } from '@/composables/useEditorSearch'
+import { useWithShortcut } from '@/composables/useWithShortcut'
 import { diffColours } from '@/lib/diffColours'
 import { syncScroll } from '@/lib/tieScroll'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
-import { codeEditorExtensions, lineNumbersWithMenu, PANE_LAYOUT } from '@/lib/codeEditor'
+import {
+  codeEditorExtensions,
+  editorSearch,
+  lineNumbersWithMenu,
+  PANE_LAYOUT,
+} from '@/lib/codeEditor'
 import { iconClass, type IconName } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { useRepoChanged } from '@/lib/windowEvents'
@@ -59,6 +74,7 @@ const shownError = computed(() => error.value ?? refetchCall.error.value)
 const { confirmAction } = useConfirmAction()
 const { openEditor: openInEditor } = useOpenInEditor(() => props.wt, run)
 const { t } = useI18n()
+const withShortcut = useWithShortcut()
 
 const container = ref<HTMLElement | null>(null)
 // hostA/hostB hold side-by-side's two editors, one in each splitter panel;
@@ -71,6 +87,9 @@ const hostA = ref<HTMLElement | null>(null)
 const hostB = ref<HTMLElement | null>(null)
 let view: EditorView | MergeView | null = null
 let untieScroll: (() => void) | null = null
+// Unified, the search panel sticks below the sticky toolbar.
+const toolbarBar = ref<HTMLElement | null>(null)
+const { height: toolbarHeight } = useElementSize(toolbarBar)
 
 // Reactive copies of CodeMirror state: the mounted view's chunks, and
 // whether the selection lies inside one.
@@ -129,6 +148,7 @@ const whitespaceLabel = computed(() =>
 )
 
 function destroyView(): void {
+  keepSearches()
   untieScroll?.()
   untieScroll = null
   view?.destroy()
@@ -139,6 +159,40 @@ function destroyView(): void {
 
 function updateSelectedLinesEnabled(): void {
   selectedLinesEnabled.value = selectedLines() !== null
+}
+
+// A KeptSearch is what of a side's open search a remount brings back.
+interface KeptSearch {
+  query: SearchQuery
+  focused: boolean
+}
+
+// keptSearches are the old (a) and new (b) side's searches, kept from the
+// last destroyed view until a view mounts; unified is the new side.
+let keptSearches: { a?: KeptSearch | undefined; b?: KeptSearch | undefined } = {}
+
+function keepSearches(): void {
+  if (view instanceof MergeView) keptSearches = { a: keptSearch(view.a), b: keptSearch(view.b) }
+  else if (view) keptSearches = { b: keptSearch(view) }
+}
+
+function keptSearch(cm: EditorView): KeptSearch | undefined {
+  if (!searchPanelOpen(cm.state)) return undefined
+  const focused = !!cm.dom.querySelector('.cm-search')?.contains(document.activeElement)
+  return { query: getSearchQuery(cm.state), focused }
+}
+
+// restoreSearch reopens kept in cm, the focus in its field only if it was
+// there. Opening focuses the field, so otherwise the focus goes back.
+function restoreSearch(cm: EditorView, kept: KeptSearch | undefined): void {
+  if (!kept) return
+  const before = document.activeElement
+  openSearchPanel(cm)
+  cm.dispatch({ effects: setSearchQuery.of(kept.query) })
+  const field = cm.dom.querySelector<HTMLElement>('.cm-search [main-field]')
+  if (kept.focused) return field?.focus()
+  field?.blur()
+  if (before instanceof HTMLElement) before.focus()
 }
 
 const copyMenu = ref<InstanceType<typeof CopyPathLineMenu>>()
@@ -165,7 +219,7 @@ async function mountView(): Promise<void> {
   const shared = await codeEditorExtensions(props.target.path)
   if (seq !== loadSeq) return
 
-  const docExtensions = [EditorState.readOnly.of(true), diffColours, ...shared]
+  const docExtensions = [EditorState.readOnly.of(true), diffColours, editorSearch, ...shared]
   // git's diff is line-based, so changed lines are marked whole.
   const gitDiff = {
     diffConfig: { override: hunkChanges(file.hunks ?? []) },
@@ -192,6 +246,8 @@ async function mountView(): Promise<void> {
     b.append(merge.b.dom)
     untieScroll = syncScroll(merge.a.scrollDOM, merge.b.scrollDOM)
     view = merge
+    restoreSearch(merge.a, keptSearches.a)
+    restoreSearch(merge.b, keptSearches.b)
   } else {
     if (!el) return
     view = new EditorView({
@@ -212,7 +268,9 @@ async function mountView(): Promise<void> {
         ],
       }),
     })
+    restoreSearch(view, keptSearches.b)
   }
+  keptSearches = {}
   chunks.value = view instanceof MergeView ? view.chunks : (getChunks(view.state)?.chunks ?? [])
   updateSelectedLinesEnabled()
 }
@@ -227,6 +285,14 @@ onBeforeUnmount(destroyView)
 // changeTarget is the new-side editor: the unified view, or side-by-side's b.
 function changeTarget(): EditorView | null {
   return view instanceof MergeView ? view.b : view
+}
+
+useEditorSearch(changeTarget)
+
+// searchSide opens the search of side a or b, or the unified view's.
+function searchSide(side: 'a' | 'b'): void {
+  const cm = view instanceof MergeView ? view[side] : view
+  if (cm) openSearchPanel(cm)
 }
 
 // stepChange moves the new-side cursor to a neighbouring change.
@@ -351,6 +417,23 @@ interface ToolbarButton {
   action: () => void
 }
 
+// searchButtons open the unified view's search, or each side's; the one
+// Ctrl+F opens shows the shortcut.
+function searchButtons(): ToolbarButton[] {
+  const search = (test: string, label: string, side: 'a' | 'b') => ({
+    test,
+    label,
+    icon: 'search' as const,
+    action: () => searchSide(side),
+  })
+  if (mode.value === DiffMode.UnifiedDiff)
+    return [search('search', withShortcut('diffWindow.search', 'shortcuts.search'), 'b')]
+  return [
+    search('search-left', t('diffWindow.searchLeft'), 'a'),
+    search('search-right', withShortcut('diffWindow.searchRight', 'shortcuts.search'), 'b'),
+  ]
+}
+
 const toolbar = computed<ToolbarButton[]>(() => {
   const buttons: ToolbarButton[] = []
   if (showsContent.value) {
@@ -377,6 +460,7 @@ const toolbar = computed<ToolbarButton[]>(() => {
         icon: 'nextChange',
         action: () => stepChange(goToNextChunk),
       },
+      ...searchButtons(),
     )
   }
   return buttons
@@ -391,6 +475,7 @@ const toolbar = computed<ToolbarButton[]>(() => {
       <!-- Sticky: unified, the diff view scrolls as a whole (DiffWindowView.vue),
            and next/previous change must stay clickable wherever a jump lands. -->
       <div
+        ref="toolbarBar"
         class="diff-toolbar sticky top-0 z-10 flex items-center gap-1 bg-(--p-content-background)"
       >
         <ToggleButton
@@ -494,7 +579,12 @@ const toolbar = computed<ToolbarButton[]>(() => {
             ><div ref="hostB" class="h-full"></div
           ></SplitterPanel>
         </Splitter>
-        <div v-else ref="container" class="cm-container"></div>
+        <div
+          v-else
+          ref="container"
+          class="cm-container"
+          :style="{ '--nb-panel-offset': `${toolbarHeight}px` }"
+        ></div>
       </template>
     </template>
     <CopyPathLineMenu ref="copyMenu" />
