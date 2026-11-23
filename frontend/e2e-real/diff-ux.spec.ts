@@ -55,7 +55,6 @@ test('next/previous change jump between far changes; "Open in editor" opens the 
   await expect(diffLine(diff, 'row 5 CHANGED')).toBeInViewport()
 
   await nextChange.click()
-  await nextChange.click()
   await expect(diffLine(diff, 'row 180 CHANGED')).toBeInViewport()
   await expect(diffLine(diff, 'row 5 CHANGED')).not.toBeInViewport()
   await diff.locator('[data-test=prev-change]').click()

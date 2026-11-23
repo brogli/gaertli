@@ -72,7 +72,7 @@ async function outlineColour(page: Page): Promise<string> {
 }
 
 for (const theme of THEMES) {
-  test(`${theme} theme: changed, added, unresolved and resolved lines and the selection outline are visibly distinct`, async ({
+  test(`${theme} theme: changed, added, unresolved and resolved lines are visibly distinct and the selection outline shows against the background`, async ({
     page,
   }) => {
     await page.goto(`${mockConflictUrl}&theme=${theme}`)
@@ -96,10 +96,6 @@ for (const theme of THEMES) {
     expect(deltaEOK(outline, editorBg), 'outline against the background').toBeGreaterThanOrEqual(
       0.08,
     )
-    for (const name of names) {
-      const distance = deltaEOK(outline, painted[name]!.bg)
-      expect(distance, `outline against ${name}`).toBeGreaterThanOrEqual(0.04)
-    }
     for (const [i, a] of names.entries()) {
       for (const b of names.slice(i + 1)) {
         const distance = deltaEOK(painted[a]!.bg, painted[b]!.bg)

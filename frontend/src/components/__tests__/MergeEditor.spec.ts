@@ -1,4 +1,4 @@
-// Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11, FR-CONF-13, FR-CONF-14, FR-CONF-15, FR-CONF-16, FR-CONF-17, FR-CONF-18
+// Requirements: FR-CONF-05, FR-CONF-06, FR-CONF-10, FR-CONF-11, FR-CONF-13, FR-CONF-14, FR-CONF-15, FR-CONF-16, FR-CONF-17, FR-CONF-18, FR-CONF-20, FR-CONF-21
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,12 +7,15 @@ const { Facade } = vi.hoisted(() => ({
 }))
 vi.mock('../../../bindings/github.com/brogli/gaertli/internal/app', () => ({ Facade }))
 
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { type Extension } from '@codemirror/state'
 import { undo } from '@codemirror/commands'
 import { EditorView, ViewPlugin } from '@codemirror/view'
 import * as codeEditor from '@/lib/codeEditor'
-import { editorViews } from '@/testing/editorView'
+import { editorViews, lineNumbersOf, pressIn } from '@/testing/editorView'
+import { clickMenuItem } from '@/testing/contextMenu'
+import { pressKey } from '@/testing/pressKey'
+import { searchesOpen } from '@/testing/search'
 import MergeEditor from '../MergeEditor.vue'
 import { mountInBody } from '@/testing/mountInBody'
 import { findButton } from '@/testing/findButton'
@@ -54,12 +57,6 @@ function position(wrapper: VueWrapper): string {
 
 async function click(wrapper: VueWrapper, label: string): Promise<void> {
   await findButton(wrapper, label)?.trigger('click')
-}
-
-function press(view: EditorView, init: KeyboardEventInit): void {
-  view.contentDOM.dispatchEvent(
-    new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
-  )
 }
 
 // tintsOf is the tint class each line of the pane carries, if any.
@@ -296,7 +293,7 @@ describe('MergeEditor actions and navigation', () => {
     }
     expect(selectedLineCount(viewAt(wrapper, RESULT))).toBe(1)
 
-    press(incoming, { key: 'ArrowUp', altKey: true })
+    pressIn(incoming, { key: 'ArrowUp', altKey: true })
     await flushPromises()
     expect(position(wrapper)).toBe('Change 2 of 3 · 3 left')
   })
@@ -337,7 +334,7 @@ describe('MergeEditor actions and navigation', () => {
     const wrapper = await mountEditor(threeRegionFile())
     const result = viewAt(wrapper, RESULT)
 
-    press(result, { key: 'ArrowDown', altKey: true })
+    pressIn(result, { key: 'ArrowDown', altKey: true })
     await flushPromises()
 
     expect(position(wrapper)).toBe('Change 2 of 3 · 3 left')
@@ -359,7 +356,7 @@ describe('MergeEditor saving', () => {
     const resolve = findButton(wrapper, SAVE_AND_RESOLVE)!
     expect(resolve.attributes('disabled')).toBeDefined()
     expect(resolve.attributes('title')).toBe('Handle every change first')
-    press(viewAt(wrapper, RESULT), { key: 's', ctrlKey: true })
+    pressIn(viewAt(wrapper, RESULT), { key: 's', ctrlKey: true })
     await flushPromises()
 
     expect(Facade.SaveConflict).not.toHaveBeenCalled()
@@ -383,7 +380,7 @@ describe('MergeEditor saving', () => {
       true,
     )
 
-    press(viewAt(wrapper, RESULT), { key: 's', ctrlKey: true })
+    pressIn(viewAt(wrapper, RESULT), { key: 's', ctrlKey: true })
     await flushPromises()
     expect(Facade.SaveConflict).toHaveBeenLastCalledWith(
       '/repo',
@@ -627,5 +624,59 @@ describe('MergeEditor changes only one side made', () => {
     await click(wrapper, 'Apply non-conflicting changes')
 
     expect(save().attributes('disabled')).toBeUndefined()
+  })
+})
+
+describe('MergeEditor line numbers', () => {
+  it('each pane numbers its own version of the file', async () => {
+    const file = conflictFileFixture()
+    const wrapper = await mountEditor(file)
+
+    const lineCounts = [file.current.content, 'a\no1\nb\no2\nz', file.incoming.content].map(
+      (text) => String(text).split('\n').length,
+    )
+    const numbers = editorViews(wrapper).map(lineNumbersOf)
+    expect(numbers.map((n) => n.length)).toEqual(lineCounts)
+    expect(numbers.map((n) => n[0])).toEqual(['1', '1', '1'])
+  })
+
+  it('right-clicking a number in any pane offers "Copy path:line"', async () => {
+    const writeText = vi.fn()
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const wrapper = await mountEditor(conflictFileFixture({ path: 'src/a.txt' }))
+
+    for (const view of editorViews(wrapper)) {
+      const number = view.dom.querySelector('.cm-lineNumbers .cm-gutterElement:nth-child(2)')!
+      await new DOMWrapper(number).trigger('contextmenu')
+      await clickMenuItem(new DOMWrapper(document.body), 'Copy path:line')
+    }
+
+    expect(writeText.mock.calls).toEqual([['src/a.txt:1'], ['src/a.txt:1'], ['src/a.txt:1']])
+  })
+})
+
+describe('MergeEditor search', () => {
+  it("Ctrl+F outside the panes opens the result's search", async () => {
+    const wrapper = await mountEditor()
+
+    pressKey('f', { ctrlKey: true })
+
+    expect(searchesOpen(wrapper)).toEqual([false, true, false])
+  })
+
+  it("Ctrl+F in a side pane opens that pane's search", async () => {
+    const wrapper = await mountEditor()
+
+    pressIn(viewAt(wrapper, INCOMING), { key: 'f', ctrlKey: true })
+
+    expect(searchesOpen(wrapper)).toEqual([false, false, true])
+  })
+
+  it("the toolbar button opens the result's search and shows Ctrl+F", async () => {
+    const wrapper = await mountEditor()
+
+    await click(wrapper, 'Search result · Ctrl+F')
+
+    expect(searchesOpen(wrapper)).toEqual([false, true, false])
   })
 })

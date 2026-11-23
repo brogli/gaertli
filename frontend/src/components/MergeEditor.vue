@@ -3,14 +3,18 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { EditorState, type Extension, Prec } from '@codemirror/state'
 import { EditorView, keymap, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { openSearchPanel } from '@codemirror/search'
 import Button from 'openvue/button'
 import Message from 'openvue/message'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
-import { codeEditorExtensions, PANE_LAYOUT } from '@/lib/codeEditor'
+import { codeEditorExtensions, lineNumbersWithMenu, PANE_LAYOUT } from '@/lib/codeEditor'
+import { editorSearch } from '@/lib/editorSearch'
 import { useConflictsStore } from '@/stores/conflicts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
+import { useEditorSearch } from '@/composables/useEditorSearch'
+import { useWithShortcut } from '@/composables/useWithShortcut'
 import { conflictColours } from '@/lib/conflictColours'
 import { DEFAULT_MARKER_SIZE } from '@/lib/conflictMarkers'
 import { resultFromBase, takenLines, type Take } from '@/lib/conflictText'
@@ -47,6 +51,7 @@ import {
   MergeChangeKind,
   type ConflictFile,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
+import CopyPathLineMenu from './CopyPathLineMenu.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 
@@ -65,6 +70,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const withShortcut = useWithShortcut()
 const { error, run } = useCoreCall()
 const conflicts = useConflictsStore()
 
@@ -156,6 +162,9 @@ const changedMessage = computed(() => {
   const changed = dirty.value && fingerprint.value !== diskFingerprint.value
   return changed ? t('mergeEditor.changedOnDisk', { path: props.file.path }) : ''
 })
+
+const searchLabel = withShortcut('mergeEditor.searchResult', 'shortcuts.search')
+useEditorSearch(() => views.result)
 
 const saveTitle = computed(
   () =>
@@ -279,9 +288,21 @@ function selectClickedRegion(update: ViewUpdate): void {
     result.dispatch({ effects: selectRegion.of(region) })
 }
 
+const copyMenu = ref<InstanceType<typeof CopyPathLineMenu>>()
+
 function createViews(shared: Extension[]): void {
   const { file } = props
-  const paneExtensions = [...shared, PANE_LAYOUT, conflictColours, CONFLICT_KEYS]
+  const lineNumbers = lineNumbersWithMenu((line, event) =>
+    copyMenu.value?.show(event, file.path, line),
+  )
+  const paneExtensions = [
+    ...shared,
+    PANE_LAYOUT,
+    conflictColours,
+    CONFLICT_KEYS,
+    lineNumbers,
+    editorSearch,
+  ]
   for (const pane of SIDE_PANES) {
     views[pane] = new EditorView({
       parent: hostOf(pane),
@@ -449,6 +470,14 @@ onBeforeUnmount(() => {
       />
       <span class="px-1" data-test="conflict-position">{{ position }}</span>
       <Button
+        v-bind="ICON_BUTTON"
+        :icon="iconClass('search')"
+        :title="searchLabel"
+        :aria-label="searchLabel"
+        data-test="search-result"
+        @click="views.result && openSearchPanel(views.result)"
+      />
+      <Button
         v-for="{ take: kind, label } in takes"
         :key="kind"
         v-bind="SECONDARY_BUTTON"
@@ -512,5 +541,6 @@ onBeforeUnmount(() => {
         <div :ref="hostRef(pane)" class="min-h-0 flex-1" />
       </SplitterPanel>
     </Splitter>
+    <CopyPathLineMenu ref="copyMenu" />
   </div>
 </template>

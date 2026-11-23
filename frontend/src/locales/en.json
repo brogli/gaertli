@@ -60,6 +60,7 @@
     "noneSelected": "None selected"
   },
   "common": {
+    "copyPathLine": "Copy path:line",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "clear": "Clear",
@@ -184,6 +185,9 @@
     "ignoringWhitespace": "Ignoring whitespace",
     "previousChange": "Previous change",
     "nextChange": "Next change",
+    "search": "Search",
+    "searchLeft": "Search left side",
+    "searchRight": "Search right side",
     "previousFile": "Previous file",
     "nextFile": "Next file",
     "binaryFile": "Binary file, no preview available.",
@@ -415,7 +419,8 @@
     "resolveFirst": "Handle every change first",
     "strayMarker": "A line still starts with a conflict marker. Remove it, or mark the file resolved from the conflict list.",
     "reload": "Reload",
-    "changedOnDisk": "{path} changed on disk."
+    "changedOnDisk": "{path} changed on disk.",
+    "searchResult": "Search result"
   },
   "shortcuts": {
     "previousConflict": "Alt+Up",
@@ -427,6 +432,7 @@
     "refresh": "F5",
     "newWindow": "Ctrl+Shift+N",
     "stopComparing": "Esc",
+    "search": "Ctrl+F",
     "withShortcut": "{action} · {shortcut}"
   },
   "repoPicker": {

@@ -12,6 +12,8 @@ import {
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
 import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
+import { closeOpenSearches } from '@/lib/editorSearch'
+import { OVERLAY_SELECTOR } from '@/composables/useShortcut'
 import { useChangesStore } from '@/stores/changes'
 import { useDiffStore } from '@/stores/diff'
 import { useConflictsStore } from '@/stores/conflicts'
@@ -183,15 +185,15 @@ useWindowEvent('diff:show', (ev) => {
   target.value = ev.data.target
 })
 
-// Escape closes the window, unless a dialog (a discard's confirmation) is
-// open: that Escape is the dialog's. Capturing runs this before the dialog
-// closes itself.
+// Escape closes the window, unless a dialog (a discard's confirmation), a
+// menu or an editor's search is open: that Escape is the overlay's, or closes
+// the search. Capturing runs this before the overlay or editor sees the key.
 useEventListener(
   window,
   'keydown',
   (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && !document.querySelector('[role=dialog], [role=alertdialog]'))
-      void Window.Close()
+    if (e.key !== 'Escape' || document.querySelector(OVERLAY_SELECTOR)) return
+    if (!closeOpenSearches(e.target)) void Window.Close()
   },
   { capture: true },
 )
