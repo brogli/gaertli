@@ -1295,6 +1295,23 @@ describe('DiffView', () => {
       expect(selectedLinesOf(editorOf(wrapper))).toEqual([2])
     })
 
+    it('a reload that shortens the file below the cursor puts the cursor on its last line', async () => {
+      const wrapper = await mountWorking(twoHunks)
+      await step(wrapper, 'next-change')
+
+      Facade.DiffWorking.mockResolvedValue(
+        diffFileFixture({
+          oldContent: 'line1\nline2 old',
+          newContent: 'line1\nline2 new',
+          hunks: [hunk(2, 1, 2, 1)],
+        }),
+      )
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+
+      expect(cursorLineOf(editorOf(wrapper))).toBe(2)
+    })
+
     it('a switch to unified keeps the place clicked on the left side', async () => {
       // Line 2 removed, line 4 changed: the new side's lines sit one up.
       const wrapper = await mountSideBySide({
