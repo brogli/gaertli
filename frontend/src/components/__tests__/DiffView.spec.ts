@@ -40,10 +40,10 @@ import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { DiffMode } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
-import { editorViews, lineNumbersOf, selectedLineOf } from '@/testing/editorView'
+import { editorViews, lineNumbersOf, pressIn, selectedLineOf } from '@/testing/editorView'
 import { clickMenuItem } from '@/testing/contextMenu'
 import { pressKey } from '@/testing/pressKey'
-import { matchesOf, pressEnterIn, searchFieldOf, searchFor } from '@/testing/search'
+import { matchesOf, pressEnterIn, searchesOpen, searchFieldOf, searchFor } from '@/testing/search'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import {
   ChangeScope,
@@ -978,17 +978,6 @@ describe('DiffView', () => {
       hunks: [hunk(2, 1, 2, 2)],
     }
     const ctrlF = { key: 'f', ctrlKey: true }
-
-    // pressIn dispatches a keydown in view's content, as typing there does.
-    function pressIn(view: EditorView, init: KeyboardEventInit): void {
-      view.contentDOM.dispatchEvent(
-        new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
-      )
-    }
-
-    // searchesOpen says for each mounted editor whether its search is open.
-    const searchesOpen = (wrapper: VueWrapper) =>
-      editorViews(wrapper).map((v) => !!searchFieldOf(v))
 
     it("Ctrl+F outside the editor opens the unified diff's search; Enter steps through the matches and wraps, Shift+Enter steps back", async () => {
       Facade.DiffFile.mockResolvedValue(diffFileFixture(fooTwice))

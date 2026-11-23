@@ -21,3 +21,10 @@ export function lineNumbersOf(view: EditorView): string[] {
 export function selectedLineOf(view: EditorView): number {
   return view.state.doc.lineAt(view.state.selection.main.from).number
 }
+
+// pressIn dispatches a keydown in view's content, as typing there does.
+export function pressIn(view: EditorView, init: KeyboardEventInit): void {
+  view.contentDOM.dispatchEvent(
+    new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }),
+  )
+}

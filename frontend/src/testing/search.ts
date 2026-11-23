@@ -1,4 +1,6 @@
+import type { VueWrapper } from '@vue/test-utils'
 import type { EditorView } from '@codemirror/view'
+import { editorViews } from './editorView'
 
 // searchFieldOf is the text field of view's open search panel, or null.
 export function searchFieldOf(view: EditorView): HTMLInputElement | null {
@@ -29,4 +31,9 @@ export function pressEnterIn(view: EditorView, shiftKey = false): void {
 // matchesOf are the texts of view's highlighted search matches.
 export function matchesOf(view: EditorView): string[] {
   return [...view.dom.querySelectorAll('.cm-searchMatch')].map((el) => el.textContent ?? '')
+}
+
+// searchesOpen says for each editor mounted in wrapper whether its search is open.
+export function searchesOpen(wrapper: VueWrapper): boolean[] {
+  return editorViews(wrapper).map((view) => !!searchFieldOf(view))
 }

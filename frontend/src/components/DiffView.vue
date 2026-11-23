@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
-import { EditorState, Text } from '@codemirror/state'
+import { EditorState, type Extension, Text } from '@codemirror/state'
 import { EditorView, type ViewUpdate } from '@codemirror/view'
 import {
   type Chunk,
@@ -30,7 +30,7 @@ import { hunkChanges, hunksIn } from '@/lib/gitHunks'
 import {
   chunkAt,
   chunkBeside,
-  chunkStart,
+  chunkRange,
   diffSelection,
   type DiffSide,
   newSidePos,
@@ -90,7 +90,7 @@ const { height: toolbarHeight } = useElementSize(toolbarBar)
 
 // Reactive copies of CodeMirror state: the mounted view's chunks, and
 // whether the selection lies inside one.
-const chunks = ref<readonly Chunk[]>([])
+const chunks = shallowRef<readonly Chunk[]>([])
 const selectedLinesEnabled = ref(false)
 
 const working = computed(() => props.target.kind === DiffKind.WorkingDiff)
@@ -232,7 +232,7 @@ function goToChunk(i: number): void {
   if (!chunk || !editor) return
   clickedSide = editor.side
   select(i)
-  centreCursor(editor.cm, chunkStart(chunk, editor.side))
+  centreCursor(editor.cm, chunkRange(chunk, editor.side).from)
 }
 
 // revealFirstChunk selects the first chunk and centres it, the cursor left
@@ -243,7 +243,7 @@ function revealFirstChunk(): void {
   if (!chunk || !editor) return
   select(0)
   editor.cm.dispatch({
-    effects: EditorView.scrollIntoView(chunkStart(chunk, editor.side), { y: 'center' }),
+    effects: EditorView.scrollIntoView(chunkRange(chunk, editor.side).from, { y: 'center' }),
   })
 }
 
@@ -298,9 +298,14 @@ function selectOnMount(): void {
 
 const copyMenu = ref<InstanceType<typeof CopyPathLineMenu>>()
 
-// numbersFor is the line-number gutter whose menu copies path:line.
-function numbersFor(path: string) {
-  return lineNumbersWithMenu((line, event) => copyMenu.value?.show(event, path, line))
+// sideExtensions are what an editor showing side of path adds: the line
+// numbers whose menu copies path:line, and the selected change.
+function sideExtensions(side: DiffSide, path: string): Extension[] {
+  return [
+    lineNumbersWithMenu((line, event) => copyMenu.value?.show(event, path, line)),
+    diffSelection(side),
+    EditorView.updateListener.of(selectAtCursor(side)),
+  ]
 }
 
 // loadSeq drops a language load that resolves after a newer file started.
@@ -339,20 +344,12 @@ async function mountView(): Promise<void> {
         extensions: [
           ...docExtensions,
           PANE_LAYOUT,
-          numbersFor(props.target.oldPath || props.target.path),
-          diffSelection('a'),
-          EditorView.updateListener.of(selectAtCursor('a')),
+          ...sideExtensions('a', props.target.oldPath || props.target.path),
         ],
       },
       b: {
         doc: file.newContent ?? '',
-        extensions: [
-          ...docExtensions,
-          PANE_LAYOUT,
-          numbersFor(props.target.path),
-          diffSelection('b'),
-          EditorView.updateListener.of(selectAtCursor('b')),
-        ],
+        extensions: [...docExtensions, PANE_LAYOUT, ...sideExtensions('b', props.target.path)],
       },
       ...gitDiff,
     })
@@ -370,14 +367,12 @@ async function mountView(): Promise<void> {
         doc: file.newContent ?? '',
         extensions: [
           ...docExtensions,
-          numbersFor(props.target.path),
           unifiedMergeView({
             original: Text.of((file.oldContent ?? '').split('\n')),
             mergeControls: false,
             ...gitDiff,
           }),
-          diffSelection('unified'),
-          EditorView.updateListener.of(selectAtCursor('unified')),
+          ...sideExtensions('unified', props.target.path),
           EditorView.updateListener.of((update) => {
             if (update.selectionSet) updateSelectedLinesEnabled()
           }),

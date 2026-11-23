@@ -29,7 +29,7 @@ interface Selection {
 }
 
 // chunkRange is chunk's range on side; unified shows the new side's lines.
-function chunkRange(chunk: Chunk, side: DiffSide): { from: number; to: number } {
+export function chunkRange(chunk: Chunk, side: DiffSide): { from: number; to: number } {
   return side === 'a' ? { from: chunk.fromA, to: chunk.toA } : { from: chunk.fromB, to: chunk.toB }
 }
 
@@ -66,11 +66,6 @@ export function newSidePos(chunks: readonly Chunk[], pos: number): number {
     shift = chunk.toB - chunk.toA
   }
   return pos + shift
-}
-
-// chunkStart is where the cursor goes on side when chunk is stepped to.
-export function chunkStart(chunk: Chunk, side: DiffSide): number {
-  return chunkRange(chunk, side).from
 }
 
 function selectionOf(chunk: Chunk | null, side: DiffSide, doc: Text): Selection | null {
