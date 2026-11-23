@@ -89,7 +89,7 @@ const toolbarBar = ref<HTMLElement | null>(null)
 const { height: toolbarHeight } = useElementSize(toolbarBar)
 
 // Reactive copies of CodeMirror state: the mounted view's chunks, and
-// whether the selection lies inside one.
+// whether the selection holds lines that can be staged or discarded.
 const chunks = shallowRef<readonly Chunk[]>([])
 const selectedLinesEnabled = ref(false)
 
@@ -320,7 +320,7 @@ async function mountView(): Promise<void> {
   const a = hostA.value
   const b = hostB.value
   if (!file) return
-  // Shown again after a placeholder, a file opens on its first change.
+  // A placeholder drops the kept cursor, so the next file opens on its first change.
   if (file.binary || file.tooLarge) {
     keptCursor = undefined
     return

@@ -78,8 +78,8 @@ function selectionOf(chunk: Chunk | null, side: DiffSide, doc: Text): Selection 
   }
 }
 
-// selectionField holds the selection of an editor showing side; its
-// documents are read-only, so the lines last as long as the chunk.
+// selectionField holds the selection of an editor showing side; the
+// documents are read-only, so its lines stay valid until the next selection.
 function selectionField(side: DiffSide) {
   return StateField.define<Selection | null>({
     create: () => null,

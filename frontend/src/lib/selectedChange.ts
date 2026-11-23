@@ -37,7 +37,7 @@ const selectionMarker = new (class extends GutterMarker {
 
 // selectionGutter marks the selected change in a gutter beside the pane's
 // lines: the lines and block widgets that, by field's value, belong to it.
-// It brings the selected change's look.
+// It also installs the outline and mark styles.
 export function selectionGutter<V>(
   field: StateField<V>,
   lineMarked: (value: V, line: BlockInfo) => boolean,

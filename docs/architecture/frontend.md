@@ -56,8 +56,8 @@ editor: the `@codemirror/search` panel at the top of each editor and the line-nu
 - The selected change is the app's own editor state, its thin, muted outline and accent gutter mark
   shared with the merge editor. A diff opens with its first change selected and centred, the cursor
   left at the top; a click selects the change under the cursor, and next and previous step from it,
-  move the cursor to it and centre it without animation. In unified mode the removed block is the
-  merge library's widget, which a view plugin outlines.
+  move the cursor to it and centre it without animation. In unified mode the outline also covers the
+  removed block above the change.
 - Escape belongs to an open dialog or menu first, then closes the search of the editor it is pressed
   in, else every open search, and the window only when none was open.
 - An open search and the cursor's line survive a remount: a refetch with changed content, a mode
