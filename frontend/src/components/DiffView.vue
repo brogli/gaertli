@@ -25,7 +25,7 @@ import { useOpenInEditor } from '@/composables/useOpenInEditor'
 import { diffColours } from '@/lib/diffColours'
 import { syncScroll } from '@/lib/tieScroll'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
-import { codeEditorExtensions, PANE_LAYOUT } from '@/lib/codeEditor'
+import { codeEditorExtensions, lineNumbersWithMenu, PANE_LAYOUT } from '@/lib/codeEditor'
 import { iconClass, type IconName } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { useRepoChanged } from '@/lib/windowEvents'
@@ -33,6 +33,7 @@ import { DiffKind, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
 import { Facade } from '../../bindings/github.com/brogli/gaertli/internal/app'
 import { DiffMode } from '../../bindings/github.com/brogli/gaertli/internal/settings'
 import ErrorBanner from './ErrorBanner.vue'
+import CopyPathLineMenu from './CopyPathLineMenu.vue'
 import FileStepButtons from './FileStepButtons.vue'
 import {
   ChangeScope,
@@ -140,6 +141,13 @@ function updateSelectedLinesEnabled(): void {
   selectedLinesEnabled.value = selectedLines() !== null
 }
 
+const copyMenu = ref<InstanceType<typeof CopyPathLineMenu>>()
+
+// numbersFor is the line-number gutter whose menu copies path:line.
+function numbersFor(path: string) {
+  return lineNumbersWithMenu((line, event) => copyMenu.value?.show(event, path, line))
+}
+
 // loadSeq drops a language load that resolves after a newer file started.
 let loadSeq = 0
 
@@ -166,8 +174,18 @@ async function mountView(): Promise<void> {
   if (sideBySide) {
     if (!a || !b) return
     const merge = new MergeView({
-      a: { doc: file.oldContent ?? '', extensions: [...docExtensions, PANE_LAYOUT] },
-      b: { doc: file.newContent ?? '', extensions: [...docExtensions, PANE_LAYOUT] },
+      a: {
+        doc: file.oldContent ?? '',
+        extensions: [
+          ...docExtensions,
+          PANE_LAYOUT,
+          numbersFor(props.target.oldPath || props.target.path),
+        ],
+      },
+      b: {
+        doc: file.newContent ?? '',
+        extensions: [...docExtensions, PANE_LAYOUT, numbersFor(props.target.path)],
+      },
       ...gitDiff,
     })
     a.append(merge.a.dom)
@@ -182,6 +200,7 @@ async function mountView(): Promise<void> {
         doc: file.newContent ?? '',
         extensions: [
           ...docExtensions,
+          numbersFor(props.target.path),
           unifiedMergeView({
             original: Text.of((file.oldContent ?? '').split('\n')),
             mergeControls: false,
@@ -478,5 +497,6 @@ const toolbar = computed<ToolbarButton[]>(() => {
         <div v-else ref="container" class="cm-container"></div>
       </template>
     </template>
+    <CopyPathLineMenu ref="copyMenu" />
   </section>
 </template>

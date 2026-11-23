@@ -8,7 +8,7 @@ import Message from 'openvue/message'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
-import { codeEditorExtensions, PANE_LAYOUT } from '@/lib/codeEditor'
+import { codeEditorExtensions, lineNumbersWithMenu, PANE_LAYOUT } from '@/lib/codeEditor'
 import { useConflictsStore } from '@/stores/conflicts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { conflictColours } from '@/lib/conflictColours'
@@ -47,6 +47,7 @@ import {
   MergeChangeKind,
   type ConflictFile,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
+import CopyPathLineMenu from './CopyPathLineMenu.vue'
 import ErrorBanner from './ErrorBanner.vue'
 import FileStepButtons from './FileStepButtons.vue'
 
@@ -279,9 +280,14 @@ function selectClickedRegion(update: ViewUpdate): void {
     result.dispatch({ effects: selectRegion.of(region) })
 }
 
+const copyMenu = ref<InstanceType<typeof CopyPathLineMenu>>()
+
 function createViews(shared: Extension[]): void {
   const { file } = props
-  const paneExtensions = [...shared, PANE_LAYOUT, conflictColours, CONFLICT_KEYS]
+  const lineNumbers = lineNumbersWithMenu((line, event) =>
+    copyMenu.value?.show(event, file.path, line),
+  )
+  const paneExtensions = [...shared, PANE_LAYOUT, conflictColours, CONFLICT_KEYS, lineNumbers]
   for (const pane of SIDE_PANES) {
     views[pane] = new EditorView({
       parent: hostOf(pane),
@@ -512,5 +518,6 @@ onBeforeUnmount(() => {
         <div :ref="hostRef(pane)" class="min-h-0 flex-1" />
       </SplitterPanel>
     </Splitter>
+    <CopyPathLineMenu ref="copyMenu" />
   </div>
 </template>

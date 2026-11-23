@@ -1,5 +1,5 @@
-// Requirements: FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-CHG-14, FR-CMP-02, FR-CMP-04, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+// Requirements: FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-CHG-14, FR-CMP-02, FR-CMP-04, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-DIFF-18, FR-DIFF-24, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorSelection } from '@codemirror/state'
@@ -41,6 +41,8 @@ import { DiffMode } from '../../../bindings/github.com/brogli/gaertli/internal/s
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
 import { editorViews } from '@/testing/editorView'
+import { clickMenuItem } from '@/testing/contextMenu'
+import { lineNumbersOf } from '@/testing/lineNumbers'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import {
   ChangeScope,
@@ -96,9 +98,9 @@ function selectText(wrapper: VueWrapper, from: string, to: string): void {
 }
 
 // mountCommit mounts commit abc123's diff of path and waits for it to load.
-async function mountCommit(path = 'a.txt'): Promise<VueWrapper> {
+async function mountCommit(path = 'a.txt', oldPath = ''): Promise<VueWrapper> {
   const wrapper = mount(DiffView, {
-    props: { ...base, target: { kind: DiffKind.CommitDiff, sha: 'abc123', path, oldPath: '' } },
+    props: { ...base, target: { kind: DiffKind.CommitDiff, sha: 'abc123', path, oldPath } },
   })
   await flushPromises()
   return wrapper
@@ -740,7 +742,7 @@ describe('DiffView', () => {
 
   it.each([
     [
-      'a renamed working file (status "R") gets no hunk controls',
+      'a grown working file (status "R") gets no hunk controls',
       oneLine,
       { oldPath: 'old.txt', status: 'R' },
       noControls,
@@ -828,13 +830,17 @@ describe('DiffView', () => {
   })
 
   // mountSideBySide mounts a.txt's commit diff in side-by-side mode.
-  async function mountSideBySide(): Promise<VueWrapper> {
+  async function mountSideBySide(
+    file: Partial<DiffFile> = oneLine,
+    path = 'a.txt',
+    oldPath = '',
+  ): Promise<VueWrapper> {
     SettingsService.Get.mockResolvedValue(
       defaultSettingsFixture({ diffMode: DiffMode.SideBySideDiff }),
     )
     await useSettingsStore().load()
-    Facade.DiffFile.mockResolvedValue(diffFileFixture(oneLine))
-    return mountCommit()
+    Facade.DiffFile.mockResolvedValue(diffFileFixture(file))
+    return mountCommit(path, oldPath)
   }
 
   it('side by side, scrolling side a sideways moves side b with it', async () => {
@@ -936,5 +942,55 @@ describe('DiffView', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-test="mode-toggle"]').attributes('aria-pressed')).toBe('true')
+  })
+
+  describe('line numbers', () => {
+    const grown = {
+      oldContent: 'one\ntwo',
+      newContent: 'zero\none\ntwo\nthree',
+      hunks: [hunk(0, 0, 1, 1), hunk(3, 0, 4, 1)],
+    }
+
+    it('side by side, each side numbers its own version of the file', async () => {
+      const wrapper = await mountSideBySide(grown)
+
+      const [a, b] = editorViews(wrapper)
+      expect(lineNumbersOf(a!)).toEqual(['1', '2'])
+      expect(lineNumbersOf(b!)).toEqual(['1', '2', '3', '4'])
+    })
+
+    it('unified, the current lines are numbered', async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(grown))
+
+      const wrapper = await mountCommit()
+
+      expect(lineNumbersOf(editorOf(wrapper))).toEqual(['1', '2', '3', '4'])
+    })
+
+    // copyPathLine right-clicks the number of editor's first line and copies.
+    async function copyPathLine(editor: EditorView): Promise<string[]> {
+      const writeText = vi.fn()
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+      await new DOMWrapper(
+        editor.dom.querySelector('.cm-lineNumbers .cm-gutterElement:nth-child(2)'),
+      ).trigger('contextmenu')
+      await clickMenuItem(new DOMWrapper(document.body), 'Copy path:line')
+      return writeText.mock.calls.map(([text]) => String(text))
+    }
+
+    it('right-clicking a number offers "Copy path:line"', async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(grown))
+      const wrapper = await mountCommit('src/a.txt')
+
+      expect(await copyPathLine(editorOf(wrapper))).toEqual(['src/a.txt:1'])
+    })
+
+    it("side by side, a renamed file's left side copies the old path", async () => {
+      const wrapper = await mountSideBySide(grown, 'new/a.txt', 'old/a.txt')
+
+      const [a, b] = editorViews(wrapper)
+      expect(await copyPathLine(a!)).toEqual(['old/a.txt:1'])
+      expect(await copyPathLine(b!)).toEqual(['new/a.txt:1'])
+    })
   })
 })

@@ -1,5 +1,5 @@
 import { EditorState, type Extension } from '@codemirror/state'
-import { EditorView } from '@codemirror/view'
+import { EditorView, lineNumbers } from '@codemirror/view'
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { classHighlighter } from '@lezer/highlight'
@@ -22,6 +22,31 @@ const CODE_COLOURS = EditorView.theme({
 // CodeMirror's default system monospace.
 const FIXED_WIDTH_FONT = EditorView.theme({ '.cm-scroller': { fontFamily: 'var(--nb-font-mono)' } })
 
+// EDITOR_LOOK sets what CodeMirror's light base theme would show in every app
+// theme (gutters) to the app's content tokens.
+const EDITOR_LOOK = EditorView.theme({
+  '.cm-gutters': {
+    backgroundColor: 'var(--p-content-background)',
+    color: 'var(--p-text-muted-color)',
+    borderRight: '1px solid var(--p-content-border-color)',
+  },
+})
+
+// lineNumbersWithMenu is the line-number gutter; right-clicking a number
+// calls onMenu with that line's 1-based number and the event.
+export function lineNumbersWithMenu(onMenu: (line: number, event: MouseEvent) => void): Extension {
+  return lineNumbers({
+    domEventHandlers: {
+      contextmenu(view, block, event) {
+        if (!(event instanceof MouseEvent)) return false
+        event.preventDefault()
+        onMenu(view.state.doc.lineAt(block.from).number, event)
+        return true
+      },
+    },
+  })
+}
+
 // languageExtensionFor is the syntax highlighting for path's filename, or
 // null (plain text) when @codemirror/language-data knows none.
 async function languageExtensionFor(path: string): Promise<Extension | null> {
@@ -38,6 +63,7 @@ export async function codeEditorExtensions(path: string): Promise<Extension[]> {
   return [
     EditorState.lineSeparator.of('\n'),
     FIXED_WIDTH_FONT,
+    EDITOR_LOOK,
     ...(language ? [language, syntaxHighlighting(classHighlighter), CODE_COLOURS] : []),
   ]
 }

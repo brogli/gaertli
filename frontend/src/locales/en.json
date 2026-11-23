@@ -60,6 +60,7 @@
     "noneSelected": "None selected"
   },
   "common": {
+    "copyPathLine": "Copy path:line",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "clear": "Clear",
