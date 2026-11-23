@@ -9,12 +9,8 @@ import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
 import { useI18n } from '@/i18n'
 import { openSearchPanel } from '@codemirror/search'
-import {
-  codeEditorExtensions,
-  editorSearch,
-  lineNumbersWithMenu,
-  PANE_LAYOUT,
-} from '@/lib/codeEditor'
+import { codeEditorExtensions, lineNumbersWithMenu, PANE_LAYOUT } from '@/lib/codeEditor'
+import { editorSearch } from '@/lib/editorSearch'
 import { useConflictsStore } from '@/stores/conflicts'
 import { useCoreCall, type CoreError } from '@/composables/useCoreCall'
 import { useEditorSearch } from '@/composables/useEditorSearch'

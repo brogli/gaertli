@@ -32,7 +32,7 @@ import {
   type MergeChange,
   type SideChange,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
-import { selectedClasses, selectionGutter } from './codeEditor'
+import { selectedClasses, selectionGutter } from './selectedChange'
 import { DEFAULT_MARKER_SIZE, isMarkerLine } from './conflictMarkers'
 import type { Pane } from './conflictPanes'
 

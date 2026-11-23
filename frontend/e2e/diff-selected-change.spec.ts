@@ -1,17 +1,10 @@
 // Requirements: FR-DIFF-19, FR-DIFF-20, FR-DIFF-21
-import { expect, test, type Locator } from '@playwright/test'
-import { mockDiffUrl } from './helpers'
+import { expect, test } from '@playwright/test'
+import { mockDiffUrl, offCentre } from './helpers'
 
 // happy-dom has no layout, so only a real browser shows that a step brings the
 // change to the middle of its pane, where the unified diff scrolls as a whole,
 // and that the outline is painted on the removed block @codemirror/merge draws.
-
-// offCentre is how many of target's heights its middle lies from scroller's.
-async function offCentre(target: Locator, scroller: Locator): Promise<number> {
-  const box = (await target.boundingBox())!
-  const pane = (await scroller.boundingBox())!
-  return Math.abs(box.y + box.height / 2 - (pane.y + pane.height / 2)) / box.height
-}
 
 test('unified, the diff opens with its first change outlined from its removed block; a step centres the change', async ({
   page,

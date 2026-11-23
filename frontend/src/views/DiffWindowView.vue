@@ -12,7 +12,7 @@ import {
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
 import { DiffKind, fileTarget, readsWorkingTree, type DiffTarget } from '@/lib/diffTarget'
 import { useRepoChanged, useWindowEvent } from '@/lib/windowEvents'
-import { closeOpenSearches } from '@/lib/codeEditor'
+import { closeOpenSearches } from '@/lib/editorSearch'
 import { useChangesStore } from '@/stores/changes'
 import { useDiffStore } from '@/stores/diff'
 import { useConflictsStore } from '@/stores/conflicts'

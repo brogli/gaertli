@@ -10,13 +10,7 @@ import {
   MergeView,
   unifiedMergeView,
 } from '@codemirror/merge'
-import {
-  getSearchQuery,
-  openSearchPanel,
-  searchPanelOpen,
-  setSearchQuery,
-  type SearchQuery,
-} from '@codemirror/search'
+import { openSearchPanel } from '@codemirror/search'
 import Button from 'openvue/button'
 import Splitter from 'openvue/splitter'
 import SplitterPanel from 'openvue/splitterpanel'
@@ -41,12 +35,8 @@ import {
   type DiffSide,
   selectChunk,
 } from '@/lib/diffSelection'
-import {
-  codeEditorExtensions,
-  editorSearch,
-  lineNumbersWithMenu,
-  PANE_LAYOUT,
-} from '@/lib/codeEditor'
+import { codeEditorExtensions, lineNumbersWithMenu, PANE_LAYOUT } from '@/lib/codeEditor'
+import { editorSearch, type KeptSearch, keptSearch, restoreSearch } from '@/lib/editorSearch'
 import { iconClass, type IconName } from '@/lib/icons'
 import { ICON_BUTTON, SECONDARY_BUTTON } from '@/lib/layout'
 import { useRepoChanged } from '@/lib/windowEvents'
@@ -128,7 +118,7 @@ useRepoChanged([ChangeScope.IndexChanged], () => {
 // openEditor opens the file shown at the cursor's line on the new side;
 // line 0 when no editor is mounted (a binary or too-large file).
 function openEditor(): void {
-  const cm = changeTarget()
+  const cm = newSide()?.cm
   const line = cm ? cm.state.doc.lineAt(cm.state.selection.main.head).number : 0
   openInEditor({ path: props.target.path }, line)
 }
@@ -169,12 +159,6 @@ function updateSelectedLinesEnabled(): void {
   selectedLinesEnabled.value = selectedLines() !== null
 }
 
-// A KeptSearch is what of a side's open search a remount brings back.
-interface KeptSearch {
-  query: SearchQuery
-  focused: boolean
-}
-
 // keptSearches are the old (a) and new (b) side's searches, kept from the
 // last destroyed view until a view mounts; unified is the new side.
 let keptSearches: { a?: KeptSearch | undefined; b?: KeptSearch | undefined } = {}
@@ -184,42 +168,33 @@ function keepSearches(): void {
   else if (view) keptSearches = { b: keptSearch(view) }
 }
 
-function keptSearch(cm: EditorView): KeptSearch | undefined {
-  if (!searchPanelOpen(cm.state)) return undefined
-  const focused = !!cm.dom.querySelector('.cm-search')?.contains(document.activeElement)
-  return { query: getSearchQuery(cm.state), focused }
-}
-
-// restoreSearch reopens kept in cm, the focus in its field only if it was
-// there. Opening focuses the field, so otherwise the focus goes back.
-function restoreSearch(cm: EditorView, kept: KeptSearch | undefined): void {
-  if (!kept) return
-  const before = document.activeElement
-  openSearchPanel(cm)
-  cm.dispatch({ effects: setSearchQuery.of(kept.query) })
-  const field = cm.dom.querySelector<HTMLElement>('.cm-search [main-field]')
-  if (kept.focused) return field?.focus()
-  field?.blur()
-  if (before instanceof HTMLElement) before.focus()
-}
-
 // selected is the index of the selected chunk, -1 for none; clickedSide
 // is the side of the editor the user last moved the cursor in.
 let selected = -1
 let clickedSide: DiffSide = 'b'
 
-// editors are the mounted editors with the side each shows, the new side
-// last.
-function editors(): [EditorView, DiffSide][] {
-  if (view instanceof MergeView)
-    return [
-      [view.a, 'a'],
-      [view.b, 'b'],
-    ]
-  return view ? [[view, 'unified']] : []
+// An Editor is a mounted editor and the side it shows.
+interface Editor {
+  cm: EditorView
+  side: DiffSide
 }
 
-const newSide = () => editors().at(-1)
+// editors are the mounted editors, the new side last.
+function editors(): Editor[] {
+  if (view instanceof MergeView)
+    return [
+      { cm: view.a, side: 'a' },
+      { cm: view.b, side: 'b' },
+    ]
+  return view ? [{ cm: view, side: 'unified' }] : []
+}
+
+// newSide is the new side's editor: the unified view, or side-by-side's b.
+const newSide = (): Editor | undefined => editors().at(-1)
+
+// editorOn is side's editor, or the new side's when none shows side.
+const editorOn = (side: DiffSide): Editor | undefined =>
+  editors().find((e) => e.side === side) ?? newSide()
 
 // centreCursor puts cm's cursor at pos and scrolls it to the middle; side by
 // side, the scroll tie moves the other side along.
@@ -231,8 +206,9 @@ function centreCursor(cm: EditorView, pos: number): void {
 }
 
 function select(i: number): void {
+  if (i === selected) return
   selected = i
-  for (const [cm] of editors()) cm.dispatch({ effects: selectChunk.of(chunks.value[i] ?? null) })
+  for (const { cm } of editors()) cm.dispatch({ effects: selectChunk.of(chunks.value[i] ?? null) })
 }
 
 // selectAtCursor selects the chunk a user's cursor move on side lands in.
@@ -247,10 +223,10 @@ function selectAtCursor(side: DiffSide) {
 // goToChunk selects chunk i and centres the new side's cursor on its start.
 function goToChunk(i: number): void {
   const chunk = chunks.value[i]
-  const [cm, side] = newSide() ?? []
-  if (!chunk || !cm || !side) return
+  const editor = newSide()
+  if (!chunk || !editor) return
   select(i)
-  centreCursor(cm, chunkStart(chunk, side))
+  centreCursor(editor.cm, chunkStart(chunk, editor.side))
 }
 
 // stepChange goes to the chunk beside the selected one, or beside the
@@ -259,8 +235,9 @@ function stepChange(dir: 1 | -1): void {
   const n = chunks.value.length
   if (n === 0) return
   if (selected >= 0) return goToChunk((selected + dir + n) % n)
-  const [cm, side] = editors().find(([, s]) => s === clickedSide) ?? newSide() ?? []
-  if (cm && side) goToChunk(chunkBeside(chunks.value, side, cm.state.selection.main.head, dir))
+  const editor = editorOn(clickedSide)
+  if (editor)
+    goToChunk(chunkBeside(chunks.value, editor.side, editor.cm.state.selection.main.head, dir))
 }
 
 // mountedTarget is the target the mounted view shows, as JSON; keptCursor is
@@ -270,7 +247,7 @@ let mountedTarget = ''
 let keptCursor: { target: string; line: number } | undefined
 
 function keepCursor(): void {
-  const cm = changeTarget()
+  const cm = newSide()?.cm
   if (cm)
     keptCursor = {
       target: mountedTarget,
@@ -284,8 +261,9 @@ function keepCursor(): void {
 function selectOnMount(): void {
   const kept = keptCursor?.target === mountedTarget ? keptCursor : undefined
   keptCursor = undefined
-  const [cm, side] = newSide() ?? []
-  if (!kept || !cm || !side) return goToChunk(0)
+  const editor = newSide()
+  if (!kept || !editor) return goToChunk(0)
+  const { cm, side } = editor
   const pos = cm.state.doc.line(Math.min(kept.line, cm.state.doc.lines)).from
   select(chunkAt(chunks.value, side, pos))
   centreCursor(cm, pos)
@@ -390,17 +368,12 @@ watch([() => diff.file, mode, container, hostA, hostB], mountView, { flush: 'pos
 
 onBeforeUnmount(destroyView)
 
-// changeTarget is the new-side editor: the unified view, or side-by-side's b.
-function changeTarget(): EditorView | null {
-  return view instanceof MergeView ? view.b : view
-}
-
-useEditorSearch(changeTarget)
+useEditorSearch(() => newSide()?.cm)
 
 // searchSide opens the search of side a or b, or the unified view's.
 function searchSide(side: 'a' | 'b'): void {
-  const cm = view instanceof MergeView ? view[side] : view
-  if (cm) openSearchPanel(cm)
+  const editor = editorOn(side)
+  if (editor) openSearchPanel(editor.cm)
 }
 
 // stageLines stages sel, or unstages it on the staged side. The file and

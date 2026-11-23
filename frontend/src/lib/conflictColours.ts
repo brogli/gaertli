@@ -14,7 +14,7 @@ const TINTS: Record<string, [tone: string, mix: number, selectedMix: number]> = 
 // tokens: blue for lines a side changed, green for lines it added, red for an
 // unresolved conflict, a neutral tint of the text colour for a resolved
 // one. The selected region's lines take a stronger tint; its outline and
-// gutter mark are every code editor's (codeEditor.ts).
+// gutter mark are every selected change's (selectedChange.ts).
 export const conflictColours = EditorView.theme({
   ...Object.fromEntries(
     Object.entries(TINTS).map(([name, [tone, mix, selectedMix]]) => [

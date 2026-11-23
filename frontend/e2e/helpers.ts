@@ -16,6 +16,13 @@ export const mockDiffUrl =
 export const mockConflictUrl =
   '/?view=diff&wt=/mock/repo&kind=working&conflicted=true&file=scroll.txt'
 
+// offCentre is how many of target's heights its middle lies from scroller's.
+export async function offCentre(target: Locator, scroller: Locator): Promise<number> {
+  const box = (await target.boundingBox())!
+  const pane = (await scroller.boundingBox())!
+  return Math.abs(box.y + box.height / 2 - (pane.y + pane.height / 2)) / box.height
+}
+
 // expectNoOverlap: sorted left to right, each box's x-range ends at or
 // before the next one's begins.
 export function expectNoOverlap(boxes: { x: number; width: number }[]): void {

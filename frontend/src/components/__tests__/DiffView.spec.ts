@@ -40,11 +40,10 @@ import { defaultSettingsFixture } from '@/testing/fixtures/settings'
 import { DiffMode } from '../../../bindings/github.com/brogli/gaertli/internal/settings'
 import { changedFilesFixture } from '@/testing/fixtures/changes'
 import { findButton } from '@/testing/findButton'
-import { editorViews } from '@/testing/editorView'
+import { editorViews, lineNumbersOf, selectedLineOf } from '@/testing/editorView'
 import { clickMenuItem } from '@/testing/contextMenu'
-import { lineNumbersOf } from '@/testing/lineNumbers'
 import { pressKey } from '@/testing/pressKey'
-import { matchesOf, pressEnterIn, searchFieldOf, searchFor, selectedLineOf } from '@/testing/search'
+import { matchesOf, pressEnterIn, searchFieldOf, searchFor } from '@/testing/search'
 import { diffFileFixture, hunk } from '@/testing/fixtures/diff'
 import {
   ChangeScope,

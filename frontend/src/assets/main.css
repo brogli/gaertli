@@ -119,7 +119,11 @@
     --nb-diff-removed-marker: var(--nb-tone-red);
   }
 
-  :root.gaertli-plain-selected-change {
+  /* Here the stronger tint would leave the selected change's text below
+     4.5:1, so it keeps the plain tint and is marked by its outline and
+     gutter mark only. */
+  :root[data-theme='gruvbox-dark'],
+  :root[data-theme='catppuccin-mocha'] {
     --nb-diff-added-selected: var(--nb-diff-added);
     --nb-diff-removed-selected: var(--nb-diff-removed);
   }
