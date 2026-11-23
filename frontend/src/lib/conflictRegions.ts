@@ -19,11 +19,10 @@ import {
 } from '@codemirror/state'
 import { invertedEffects, isolateHistory } from '@codemirror/commands'
 import {
+  type BlockInfo,
   Decoration,
   type DecorationSet,
   EditorView,
-  gutter,
-  GutterMarker,
   WidgetType,
 } from '@codemirror/view'
 import {
@@ -33,6 +32,7 @@ import {
   type MergeChange,
   type SideChange,
 } from '../../bindings/github.com/brogli/gaertli/internal/core'
+import { selectedClasses, selectionGutter } from './codeEditor'
 import { DEFAULT_MARKER_SIZE, isMarkerLine } from './conflictMarkers'
 import type { Pane } from './conflictPanes'
 
@@ -118,11 +118,7 @@ interface RegionLook {
 // resolved mark, and the outline of a selected region.
 function lineClass(look: RegionLook, n: number, lines: number[]): string {
   const classes = [look.resolved ? 'cm-conflict-resolved' : look.tint]
-  if (look.selected) {
-    classes.push('cm-chunk-selected')
-    if (n === lines[0]) classes.push('cm-chunk-first')
-    if (n === lines.at(-1)) classes.push('cm-chunk-last')
-  }
+  if (look.selected) classes.push(selectedClasses(n === lines[0], n === lines.at(-1)))
   return classes.filter(Boolean).join(' ')
 }
 
@@ -299,7 +295,7 @@ export function regionsExtension(
     markerSizeFacet.of(markerSize),
     placeholderFacet.of(placeholderLabel),
     tintsFacet.of(tints ?? initial.map(() => CONFLICT_TINT)),
-    selectionGutter(resultField, (value) => value.regions[value.selected]),
+    selectionGutter(resultField, (value, line) => inSelected(value.regions[value.selected], line)),
     undoResolved,
     resultField.init((state) => {
       const regions = initial.map(({ range, resolved }) => ({
@@ -414,28 +410,10 @@ function replacement(state: EditorState, region: Region, lines: string[]) {
   return { from: region.from, insert: atLineStart ? `${text}\n` : `\n${text}` }
 }
 
-// ---- selection marker ----
-
-const selectionMarker = new (class extends GutterMarker {
-  elementClass = 'cm-chunk-gutter-mark'
-})()
-
-// selectionGutter marks the lines of the selected region in a gutter beside
-// the pane's lines; selectedOf finds that region in the pane's field.
-function selectionGutter<V>(
-  field: StateField<V>,
-  selectedOf: (value: V) => Region | undefined,
-): Extension {
-  return gutter({
-    class: 'cm-chunk-gutter',
-    lineMarker: (view, line) => {
-      const region = selectedOf(view.state.field(field))
-      const inside =
-        region && region.from < region.to && region.from <= line.from && line.from <= region.to
-      return inside ? selectionMarker : null
-    },
-    lineMarkerChange: (update) => update.startState.field(field) !== update.state.field(field),
-  })
+// inSelected says whether line lies in the selected region; a region
+// without text has no line to mark.
+function inSelected(region: Region | undefined, line: BlockInfo): boolean {
+  return !!region && region.from < region.to && region.from <= line.from && line.from <= region.to
 }
 
 // ---- side panes ----
@@ -536,7 +514,7 @@ export function sideRegionsExtension(
     sideConfigFacet.of({ ranges, changes }),
     placeholderFacet.of(placeholderLabel),
     tintsFacet.of(tints ?? ranges.map(() => CONFLICT_TINT)),
-    selectionGutter(sideField, (value) => value.regions[value.selected]),
+    selectionGutter(sideField, (value, line) => inSelected(value.regions[value.selected], line)),
     sideField,
   ]
 }

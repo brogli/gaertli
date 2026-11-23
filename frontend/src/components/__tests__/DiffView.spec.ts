@@ -1,4 +1,4 @@
-// Requirements: FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-CHG-14, FR-CMP-02, FR-CMP-04, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-DIFF-14, FR-DIFF-15, FR-DIFF-16, FR-DIFF-17, FR-DIFF-18, FR-DIFF-22, FR-DIFF-23, FR-DIFF-24, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
+// Requirements: FR-CHG-03, FR-CHG-04, FR-CHG-10, FR-CHG-14, FR-CMP-02, FR-CMP-04, FR-DIFF-01, FR-DIFF-02, FR-DIFF-03, FR-DIFF-04, FR-DIFF-06, FR-DIFF-08, FR-DIFF-09, FR-DIFF-14, FR-DIFF-15, FR-DIFF-16, FR-DIFF-17, FR-DIFF-18, FR-DIFF-19, FR-DIFF-20, FR-DIFF-21, FR-DIFF-22, FR-DIFF-23, FR-DIFF-24, FR-ED-06, FR-ED-09, FR-REPO-04, FR-UX-09, FR-UX-16, QA-COMP-01
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -329,31 +329,6 @@ describe('DiffView', () => {
       ignoreWhitespace: false,
     })
     expect(wrapper.find('.cm-editor').exists()).toBe(true)
-  })
-
-  it('next/previous change moves the cursor between real changes', async () => {
-    Facade.DiffFile.mockResolvedValue(diffFileFixture(twoHunks))
-
-    const wrapper = await mountCommit()
-
-    const view = editorOf(wrapper)
-    const chunks = getChunks(view.state)?.chunks ?? []
-    expect(chunks.length).toBeGreaterThanOrEqual(2)
-
-    await wrapper.get('[data-test="next-change"]').trigger('click')
-    const afterFirst = view.state.selection.main.head
-    expect(afterFirst).toBeGreaterThanOrEqual(chunks[0]!.fromB)
-    expect(afterFirst).toBeLessThanOrEqual(chunks[0]!.endB)
-
-    await wrapper.get('[data-test="next-change"]').trigger('click')
-    const afterSecond = view.state.selection.main.head
-    expect(afterSecond).toBeGreaterThanOrEqual(chunks[1]!.fromB)
-    expect(afterSecond).toBeLessThanOrEqual(chunks[1]!.endB)
-    expect(afterSecond).not.toBe(afterFirst)
-
-    await wrapper.get('[data-test="prev-change"]').trigger('click')
-    const afterPrevious = view.state.selection.main.head
-    expect(afterPrevious).toBe(afterFirst)
   })
 
   it('next/previous file ask for the neighbouring file', async () => {
@@ -786,11 +761,11 @@ describe('DiffView', () => {
 
   it('"Stage selected lines" is disabled unless the selection falls entirely inside one change', async () => {
     const wrapper = await mountWorking(threeLines)
-
-    // The default cursor position (0) sits in "line1", outside the chunk.
+    const view = editorOf(wrapper)
+    view.dispatch({ selection: EditorSelection.range(0, 0) }) // "line1", outside the chunk
+    await flushPromises()
     expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
 
-    const view = editorOf(wrapper)
     // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10); "Z\n"=2 (10-12): inside the chunk.
     view.dispatch({ selection: EditorSelection.range(8, 12) })
     await flushPromises()
@@ -1033,7 +1008,8 @@ describe('DiffView', () => {
       }
       pressEnterIn(view, true)
       lines.push(selectedLineOf(view))
-      expect(lines).toEqual([1, 2, 1, 2])
+      // The diff opens with the cursor on its change, line 2.
+      expect(lines).toEqual([2, 1, 2, 1])
     })
 
     it("side by side, Ctrl+F outside the editors opens the right side's search only, Ctrl+F in the left editor the left's", async () => {
@@ -1147,6 +1123,166 @@ describe('DiffView', () => {
       await reload('foo\nfoo\n')
       expect(document.activeElement).toBe(wrapper.get('[data-test="open-editor"]').element)
       wrapper.unmount()
+    })
+  })
+  describe('selected change', () => {
+    // removalOnly removes line 2 and adds nothing in its place.
+    const removalOnly = {
+      oldContent: 'line1\nline2\nline3\n',
+      newContent: 'line1\nline3\n',
+      hunks: [hunk(2, 1, 1, 0)],
+    }
+
+    // selectedLinesOf are the numbers of view's lines outlined as the selected change.
+    function selectedLinesOf(view: EditorView): number[] {
+      return [...view.contentDOM.querySelectorAll('.cm-line.cm-chunk-selected')].map(
+        (el) => view.state.doc.lineAt(view.posAtDOM(el)).number,
+      )
+    }
+
+    const gutterMarksOf = (view: EditorView) =>
+      view.dom.querySelectorAll('.cm-chunk-gutter-mark').length
+
+    // removedBlockOf is the class list of the unified diff's removed block.
+    const removedBlockOf = (view: EditorView) => [
+      ...(view.contentDOM.querySelector('.cm-deletedChunk')?.classList ?? []),
+    ]
+
+    // click puts view's cursor at line n's start, as a mouse click does.
+    function click(view: EditorView, n: number): void {
+      view.dispatch({
+        selection: { anchor: view.state.doc.line(n).from },
+        userEvent: 'select.pointer',
+      })
+    }
+
+    // sidesOf are side by side's old and new editors.
+    function sidesOf(wrapper: VueWrapper): [EditorView, EditorView] {
+      const [a, b] = editorViews(wrapper)
+      if (!a || !b) throw new Error('not side by side')
+      return [a, b]
+    }
+
+    const cursorLineOf = (view: EditorView) =>
+      view.state.doc.lineAt(view.state.selection.main.head).number
+
+    const step = async (wrapper: VueWrapper, button: 'next-change' | 'prev-change') => {
+      await wrapper.get(`[data-test="${button}"]`).trigger('click')
+      await flushPromises()
+    }
+
+    it('a diff opens with its first change selected, the cursor on it; unified, the outline runs from its removed block through its last line', async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(twoHunks))
+      const view = editorOf(await mountCommit())
+
+      expect(selectedLinesOf(view)).toEqual([2])
+      expect(cursorLineOf(view)).toBe(2)
+      expect(removedBlockOf(view)).toEqual(
+        expect.arrayContaining(['cm-chunk-selected', 'cm-chunk-first']),
+      )
+      expect(removedBlockOf(view)).not.toContain('cm-chunk-last')
+      const line = view.contentDOM.querySelector('.cm-line.cm-chunk-selected')!
+      expect(line.classList).toContain('cm-chunk-last')
+      expect(line.classList).not.toContain('cm-chunk-first')
+      expect(gutterMarksOf(view)).toBe(2)
+    })
+
+    it('unified, a change of removed lines only is outlined and marked on its removed block', async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(removalOnly))
+      const view = editorOf(await mountCommit())
+
+      expect(selectedLinesOf(view)).toEqual([])
+      expect(removedBlockOf(view)).toEqual(
+        expect.arrayContaining(['cm-chunk-selected', 'cm-chunk-first', 'cm-chunk-last']),
+      )
+      expect(gutterMarksOf(view)).toBe(1)
+    })
+
+    it('side by side, a click in a change on the left selects it on both sides; a click on an unchanged line selects none', async () => {
+      const wrapper = await mountSideBySide(twoHunks)
+      const [a, b] = sidesOf(wrapper)
+      expect([selectedLinesOf(a), selectedLinesOf(b)]).toEqual([[2], [2]])
+      expect([gutterMarksOf(a), gutterMarksOf(b)]).toEqual([1, 1])
+
+      click(a, 6)
+      expect([selectedLinesOf(a), selectedLinesOf(b)]).toEqual([[6], [6]])
+
+      click(b, 4)
+      expect([selectedLinesOf(a), selectedLinesOf(b)]).toEqual([[], []])
+      expect([gutterMarksOf(a), gutterMarksOf(b)]).toEqual([0, 0])
+    })
+
+    it('next and previous step from the selected change, or from the cursor when none is selected', async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(twoHunks))
+      const wrapper = await mountCommit()
+      const view = editorOf(wrapper)
+
+      await step(wrapper, 'next-change')
+      expect([selectedLinesOf(view), cursorLineOf(view)]).toEqual([[6], 6])
+      await step(wrapper, 'prev-change')
+      expect([selectedLinesOf(view), cursorLineOf(view)]).toEqual([[2], 2])
+
+      click(view, 4)
+      await step(wrapper, 'prev-change')
+      expect(selectedLinesOf(view)).toEqual([2])
+      click(view, 4)
+      await step(wrapper, 'next-change')
+      expect(selectedLinesOf(view)).toEqual([6])
+    })
+
+    it('side by side, a step from a change clicked on the left lands on the right side', async () => {
+      const wrapper = await mountSideBySide(twoHunks)
+      const [a, b] = sidesOf(wrapper)
+
+      click(a, 4)
+      await step(wrapper, 'next-change')
+
+      expect([selectedLinesOf(a), selectedLinesOf(b)]).toEqual([[6], [6]])
+      expect(cursorLineOf(b)).toBe(6)
+    })
+
+    it('a step scrolls the change to the middle of its pane', async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(twoHunks))
+      const wrapper = await mountCommit()
+      const scroll = vi.spyOn(EditorView, 'scrollIntoView')
+
+      await step(wrapper, 'next-change')
+
+      expect(scroll).toHaveBeenCalledWith(editorOf(wrapper).state.doc.line(6).from, {
+        y: 'center',
+      })
+      scroll.mockRestore()
+    })
+
+    it('a switch between unified and side by side keeps the selection where the cursor was', async () => {
+      Facade.DiffFile.mockResolvedValue(diffFileFixture(twoHunks))
+      const wrapper = await mountCommit()
+      await step(wrapper, 'next-change')
+
+      await wrapper.get('[data-test="mode-toggle"]').trigger('click')
+      await flushPromises()
+      const [a, b] = sidesOf(wrapper)
+      expect([selectedLinesOf(a), selectedLinesOf(b), cursorLineOf(b)]).toEqual([[6], [6], 6])
+
+      await wrapper.get('[data-test="mode-toggle"]').trigger('click')
+      await flushPromises()
+      expect(selectedLinesOf(editorOf(wrapper))).toEqual([6])
+    })
+
+    it('a reload with new content keeps the selection where the cursor was; another file opens on its first change', async () => {
+      const wrapper = await mountWorking(twoHunks)
+      await step(wrapper, 'next-change')
+
+      Facade.DiffWorking.mockResolvedValue(
+        diffFileFixture({ ...twoHunks, newContent: twoHunks.newContent.replace('7', 'seven') }),
+      )
+      emit('repo:changed', { data: { scope: ChangeScope.IndexChanged } })
+      await flushPromises()
+      expect(selectedLinesOf(editorOf(wrapper))).toEqual([6])
+
+      await wrapper.setProps({ target: { ...workingProps().target, path: 'b.txt' } })
+      await flushPromises()
+      expect(selectedLinesOf(editorOf(wrapper))).toEqual([2])
     })
   })
 })

@@ -86,9 +86,20 @@
        editor background, distinct enough to meet FR-DIFF-11 in every
        theme (measured in frontend/e2e/diff-colours.spec.ts). Markers use
        darker shades in a light theme, where a line background this faint
-       cannot also reach 3:1 without failing the text's 4.5:1. */
+       cannot also reach 3:1 without failing the text's 4.5:1. The selected
+       change's lines take the merge editor's stronger tint. */
     --nb-diff-added: color-mix(in srgb, var(--nb-tone-green) 25%, var(--p-content-background));
     --nb-diff-removed: color-mix(in srgb, var(--nb-tone-red) 25%, var(--p-content-background));
+    --nb-diff-added-selected: color-mix(
+      in srgb,
+      var(--nb-tone-green) 40%,
+      var(--p-content-background)
+    );
+    --nb-diff-removed-selected: color-mix(
+      in srgb,
+      var(--nb-tone-red) 40%,
+      var(--p-content-background)
+    );
     --nb-diff-added-marker: var(--p-green-600);
     --nb-diff-removed-marker: var(--p-red-600);
   }
@@ -106,6 +117,11 @@
     --nb-tone-indigo: var(--p-indigo-400);
     --nb-diff-added-marker: var(--nb-tone-green);
     --nb-diff-removed-marker: var(--nb-tone-red);
+  }
+
+  :root.gaertli-plain-selected-change {
+    --nb-diff-added-selected: var(--nb-diff-added);
+    --nb-diff-removed-selected: var(--nb-diff-removed);
   }
 
   /* Headings are compact labels, not document titles: h1 is the start

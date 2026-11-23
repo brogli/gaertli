@@ -18,6 +18,10 @@ export interface DarkThemeEntry {
   accent: string
   surface: ColorScale
   credit: ThemeCredit
+  // plainSelectedChange: a diff's stronger tint for the selected change would
+  // leave its text below 4.5:1, so the change keeps the plain tint and is
+  // marked by its outline and gutter mark only.
+  plainSelectedChange?: boolean
 }
 
 // darkThemes are the four themes beyond System, Light and Dark. Their
@@ -26,6 +30,7 @@ export interface DarkThemeEntry {
 export const darkThemes: DarkThemeEntry[] = [
   {
     id: Theme.GruvboxDarkTheme,
+    plainSelectedChange: true,
     label: 'Gruvbox dark',
     accent: '#fe8019',
     surface: {
@@ -51,6 +56,7 @@ export const darkThemes: DarkThemeEntry[] = [
   },
   {
     id: Theme.CatppuccinMochaTheme,
+    plainSelectedChange: true,
     label: 'Catppuccin Mocha',
     accent: '#cba6f7',
     surface: {
@@ -141,6 +147,10 @@ export function applyTheme(setting: Theme, osPrefersDark: boolean): void {
     setting === Theme.DarkTheme ||
     (setting !== Theme.LightTheme && osPrefersDark)
   document.documentElement.classList.toggle('gaertli-dark', dark)
+  document.documentElement.classList.toggle(
+    'gaertli-plain-selected-change',
+    !!theme?.plainSelectedChange,
+  )
 
   updatePrimaryPalette(theme ? palette(theme.accent) : auraPrimary)
   updateSurfacePalette({ dark: theme ? theme.surface : auraDarkSurface })

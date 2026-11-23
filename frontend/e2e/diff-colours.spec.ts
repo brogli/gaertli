@@ -1,4 +1,4 @@
-// Requirements: FR-DIFF-11
+// Requirements: FR-DIFF-11, FR-DIFF-19
 import { expect, test, type Page } from '@playwright/test'
 import { contrastRatio, deltaEOK, parseColor } from '../src/testing/colour'
 import { mockDiffUrl } from './helpers'
@@ -15,8 +15,19 @@ const MODES = ['unified', 'side-by-side'] as const
 // editor whose root carries "cm-merge-b"; the old side (a) shows a removed
 // line the same way in side-by-side, or as unified's inline
 // ".cm-deletedChunk" widget, since unified has no side-a editor of its own.
+// SELECTED_* match the selected change's lines, PLAIN_* those of the others.
 const ADDED_SELECTOR = '.cm-merge-b .cm-changedLine'
 const REMOVED_SELECTOR = '.cm-merge-a .cm-changedLine, .cm-deletedChunk'
+const selected = (selectors: string) =>
+  selectors
+    .split(', ')
+    .map((s) => `${s}.cm-chunk-selected`)
+    .join(', ')
+const plain = (selectors: string) =>
+  selectors
+    .split(', ')
+    .map((s) => `${s}:not(.cm-chunk-selected)`)
+    .join(', ')
 const ADDED_MARKER_SELECTOR = '.cm-merge-b .cm-changedLineGutter'
 const REMOVED_MARKER_SELECTOR = '.cm-merge-a .cm-changedLineGutter, .cm-deletedLineGutter'
 const EDITOR_SELECTOR = '.cm-editor'
@@ -72,6 +83,8 @@ interface Measurement {
   removedText: string
   addedMarker: string
   removedMarker: string
+  selectedAddedBg: string
+  selectedRemovedBg: string
 }
 
 async function measure(
@@ -80,22 +93,36 @@ async function measure(
   mode: (typeof MODES)[number],
 ): Promise<Measurement> {
   await page.goto(`${mockDiffUrl}&theme=${theme}&diffMode=${mode}`)
-  await page.locator(ADDED_SELECTOR).first().waitFor()
-  await page.locator(REMOVED_SELECTOR).first().waitFor()
+  // The diff opens on its first change, which adds and removes a line.
+  await page.locator(selected(ADDED_SELECTOR)).first().waitFor()
+  await page.locator(selected(REMOVED_SELECTOR)).first().waitFor()
+  const selectedAddedBg = await resolvedBackground(page, selected(ADDED_SELECTOR))
+  const selectedRemovedBg = await resolvedBackground(page, selected(REMOVED_SELECTOR))
+  await page.locator('[data-test="next-change"]').click()
+  await page.locator(plain(REMOVED_SELECTOR)).first().waitFor()
 
   return {
     editorBg: await resolvedBackground(page, EDITOR_SELECTOR),
-    addedBg: await resolvedBackground(page, ADDED_SELECTOR),
-    removedBg: await resolvedBackground(page, REMOVED_SELECTOR),
+    addedBg: await resolvedBackground(page, plain(ADDED_SELECTOR)),
+    removedBg: await resolvedBackground(page, plain(REMOVED_SELECTOR)),
     addedText: await computedColor(page, ADDED_SELECTOR, 'color'),
     removedText: await computedColor(page, REMOVED_SELECTOR, 'color'),
     addedMarker: await computedColor(page, ADDED_MARKER_SELECTOR, 'backgroundColor'),
     removedMarker: await computedColor(page, REMOVED_MARKER_SELECTOR, 'backgroundColor'),
+    selectedAddedBg,
+    selectedRemovedBg,
   }
 }
 
+// selectedContrast is the text's contrast on the selected change's tint. A
+// theme whose stronger tint would fail the text's 4.5:1 keeps the plain one,
+// which the plain checks cover.
+function selectedContrast(text: string, selectedBg: string, plainBg: string): number {
+  return selectedBg === plainBg ? Infinity : contrastRatio(text, selectedBg)
+}
+
 for (const theme of THEMES) {
-  test(`${theme} theme: added and removed lines are visibly distinct, unified and side-by-side`, async ({
+  test(`${theme} theme: added and removed lines, plain and selected, are visibly distinct, unified and side-by-side`, async ({
     page,
   }) => {
     for (const mode of MODES) {
@@ -115,6 +142,19 @@ for (const theme of THEMES) {
       expect(contrastRatio(m.removedText, m.removedBg), mode).toBeGreaterThanOrEqual(4.5)
       expect(contrastRatio(m.addedMarker, m.editorBg), mode).toBeGreaterThanOrEqual(3)
       expect(contrastRatio(m.removedMarker, m.editorBg), mode).toBeGreaterThanOrEqual(3)
+
+      console.log(
+        `${theme} ${mode}: ΔEOK selected/plain added=${deltaEOK(m.selectedAddedBg, m.addedBg).toFixed(4)} removed=${deltaEOK(m.selectedRemovedBg, m.removedBg).toFixed(4)}`,
+      )
+      expect(
+        selectedContrast(m.addedText, m.selectedAddedBg, m.addedBg),
+        mode,
+      ).toBeGreaterThanOrEqual(4.5)
+      expect(
+        selectedContrast(m.removedText, m.selectedRemovedBg, m.removedBg),
+        mode,
+      ).toBeGreaterThanOrEqual(4.5)
+      expect(deltaEOK(m.selectedAddedBg, m.selectedRemovedBg), mode).toBeGreaterThanOrEqual(0.08)
     }
   })
 }

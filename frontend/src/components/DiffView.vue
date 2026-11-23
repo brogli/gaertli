@@ -2,13 +2,11 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { EditorState, Text } from '@codemirror/state'
-import { type Command, EditorView } from '@codemirror/view'
+import { EditorView, type ViewUpdate } from '@codemirror/view'
 import {
   type Chunk,
   getChunks,
   getOriginalDoc,
-  goToNextChunk,
-  goToPreviousChunk,
   MergeView,
   unifiedMergeView,
 } from '@codemirror/merge'
@@ -35,6 +33,14 @@ import { useWithShortcut } from '@/composables/useWithShortcut'
 import { diffColours } from '@/lib/diffColours'
 import { syncScroll } from '@/lib/tieScroll'
 import { hunkChanges, hunksIn } from '@/lib/gitHunks'
+import {
+  chunkAt,
+  chunkBeside,
+  chunkStart,
+  diffSelection,
+  type DiffSide,
+  selectChunk,
+} from '@/lib/diffSelection'
 import {
   codeEditorExtensions,
   editorSearch,
@@ -149,10 +155,12 @@ const whitespaceLabel = computed(() =>
 
 function destroyView(): void {
   keepSearches()
+  keepCursor()
   untieScroll?.()
   untieScroll = null
   view?.destroy()
   view = null
+  selected = -1
   chunks.value = []
   selectedLinesEnabled.value = false
 }
@@ -195,6 +203,94 @@ function restoreSearch(cm: EditorView, kept: KeptSearch | undefined): void {
   if (before instanceof HTMLElement) before.focus()
 }
 
+// selected is the index of the selected chunk, -1 for none; clickedSide
+// is the side of the editor the user last moved the cursor in.
+let selected = -1
+let clickedSide: DiffSide = 'b'
+
+// editors are the mounted editors with the side each shows, the new side
+// last.
+function editors(): [EditorView, DiffSide][] {
+  if (view instanceof MergeView)
+    return [
+      [view.a, 'a'],
+      [view.b, 'b'],
+    ]
+  return view ? [[view, 'unified']] : []
+}
+
+const newSide = () => editors().at(-1)
+
+// centreCursor puts cm's cursor at pos and scrolls it to the middle; side by
+// side, the scroll tie moves the other side along.
+function centreCursor(cm: EditorView, pos: number): void {
+  cm.dispatch({
+    selection: { anchor: pos },
+    effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+  })
+}
+
+function select(i: number): void {
+  selected = i
+  for (const [cm] of editors()) cm.dispatch({ effects: selectChunk.of(chunks.value[i] ?? null) })
+}
+
+// selectAtCursor selects the chunk a user's cursor move on side lands in.
+function selectAtCursor(side: DiffSide) {
+  return (update: ViewUpdate) => {
+    if (!update.selectionSet || !update.transactions.some((tr) => tr.isUserEvent('select'))) return
+    clickedSide = side
+    select(chunkAt(chunks.value, side, update.state.selection.main.head))
+  }
+}
+
+// goToChunk selects chunk i and centres the new side's cursor on its start.
+function goToChunk(i: number): void {
+  const chunk = chunks.value[i]
+  const [cm, side] = newSide() ?? []
+  if (!chunk || !cm || !side) return
+  select(i)
+  centreCursor(cm, chunkStart(chunk, side))
+}
+
+// stepChange goes to the chunk beside the selected one, or beside the
+// cursor of the side last clicked when none is.
+function stepChange(dir: 1 | -1): void {
+  const n = chunks.value.length
+  if (n === 0) return
+  if (selected >= 0) return goToChunk((selected + dir + n) % n)
+  const [cm, side] = editors().find(([, s]) => s === clickedSide) ?? newSide() ?? []
+  if (cm && side) goToChunk(chunkBeside(chunks.value, side, cm.state.selection.main.head, dir))
+}
+
+// mountedTarget is the target the mounted view shows, as JSON; keptCursor is
+// the new side's cursor line, kept from the last destroyed view for a remount
+// of the same target.
+let mountedTarget = ''
+let keptCursor: { target: string; line: number } | undefined
+
+function keepCursor(): void {
+  const cm = changeTarget()
+  if (cm)
+    keptCursor = {
+      target: mountedTarget,
+      line: cm.state.doc.lineAt(cm.state.selection.main.head).number,
+    }
+}
+
+// selectOnMount goes to the first chunk of a newly shown target; a remount
+// of the same target centres the cursor back on its line and selects what is
+// there.
+function selectOnMount(): void {
+  const kept = keptCursor?.target === mountedTarget ? keptCursor : undefined
+  keptCursor = undefined
+  const [cm, side] = newSide() ?? []
+  if (!kept || !cm || !side) return goToChunk(0)
+  const pos = cm.state.doc.line(Math.min(kept.line, cm.state.doc.lines)).from
+  select(chunkAt(chunks.value, side, pos))
+  centreCursor(cm, pos)
+}
+
 const copyMenu = ref<InstanceType<typeof CopyPathLineMenu>>()
 
 // numbersFor is the line-number gutter whose menu copies path:line.
@@ -234,11 +330,19 @@ async function mountView(): Promise<void> {
           ...docExtensions,
           PANE_LAYOUT,
           numbersFor(props.target.oldPath || props.target.path),
+          diffSelection('a'),
+          EditorView.updateListener.of(selectAtCursor('a')),
         ],
       },
       b: {
         doc: file.newContent ?? '',
-        extensions: [...docExtensions, PANE_LAYOUT, numbersFor(props.target.path)],
+        extensions: [
+          ...docExtensions,
+          PANE_LAYOUT,
+          numbersFor(props.target.path),
+          diffSelection('b'),
+          EditorView.updateListener.of(selectAtCursor('b')),
+        ],
       },
       ...gitDiff,
     })
@@ -262,6 +366,8 @@ async function mountView(): Promise<void> {
             mergeControls: false,
             ...gitDiff,
           }),
+          diffSelection('unified'),
+          EditorView.updateListener.of(selectAtCursor('unified')),
           EditorView.updateListener.of((update) => {
             if (update.selectionSet) updateSelectedLinesEnabled()
           }),
@@ -272,6 +378,8 @@ async function mountView(): Promise<void> {
   }
   keptSearches = {}
   chunks.value = view instanceof MergeView ? view.chunks : (getChunks(view.state)?.chunks ?? [])
+  mountedTarget = JSON.stringify(props.target)
+  selectOnMount()
   updateSelectedLinesEnabled()
 }
 
@@ -293,12 +401,6 @@ useEditorSearch(changeTarget)
 function searchSide(side: 'a' | 'b'): void {
   const cm = view instanceof MergeView ? view[side] : view
   if (cm) openSearchPanel(cm)
-}
-
-// stepChange moves the new-side cursor to a neighbouring change.
-function stepChange(go: Command): void {
-  const cm = changeTarget()
-  if (cm) go(cm)
 }
 
 // stageLines stages sel, or unstages it on the staged side. The file and
@@ -452,13 +554,13 @@ const toolbar = computed<ToolbarButton[]>(() => {
         test: 'prev-change',
         label: t('diffWindow.previousChange'),
         icon: 'prevChange',
-        action: () => stepChange(goToPreviousChunk),
+        action: () => stepChange(-1),
       },
       {
         test: 'next-change',
         label: t('diffWindow.nextChange'),
         icon: 'nextChange',
-        action: () => stepChange(goToNextChunk),
+        action: () => stepChange(1),
       },
       ...searchButtons(),
     )

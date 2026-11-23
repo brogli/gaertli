@@ -1,5 +1,12 @@
-import { EditorState, type Extension } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import { EditorState, type Extension, type StateField } from '@codemirror/state'
+import {
+  type BlockInfo,
+  EditorView,
+  gutter,
+  GutterMarker,
+  keymap,
+  lineNumbers,
+} from '@codemirror/view'
 import { closeSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
@@ -23,11 +30,29 @@ const CODE_COLOURS = EditorView.theme({
 // CodeMirror's default system monospace.
 const FIXED_WIDTH_FONT = EditorView.theme({ '.cm-scroller': { fontFamily: 'var(--nb-font-mono)' } })
 
+const OUTLINE = '2px'
+const ACCENT = 'var(--p-primary-color)'
+
 // EDITOR_LOOK sets what CodeMirror's light base theme would show in every app
 // theme (gutters, panels, their fields and buttons, search matches) to the
 // app's tokens. --nb-panel-offset moves a top panel below a sticky toolbar
-// above the editor.
+// above the editor. The selected change is outlined in the accent colour and
+// marked in its gutter.
 const EDITOR_LOOK = EditorView.theme({
+  '.cm-chunk-selected': {
+    '--outline-top': '0px',
+    '--outline-bottom': '0px',
+    boxShadow: [
+      `inset ${OUTLINE} 0 0 0 ${ACCENT}`,
+      `inset -${OUTLINE} 0 0 0 ${ACCENT}`,
+      `inset 0 var(--outline-top) 0 0 ${ACCENT}`,
+      `inset 0 calc(-1 * var(--outline-bottom)) 0 0 ${ACCENT}`,
+    ].join(', '),
+  },
+  '.cm-chunk-first': { '--outline-top': OUTLINE },
+  '.cm-chunk-last': { '--outline-bottom': OUTLINE },
+  '.cm-chunk-gutter': { minWidth: '6px' },
+  '.cm-chunk-gutter-mark': { backgroundColor: ACCENT },
   '.cm-gutters': {
     backgroundColor: 'var(--p-content-background)',
     color: 'var(--p-text-muted-color)',
@@ -97,6 +122,35 @@ export function lineNumbersWithMenu(onMenu: (line: number, event: MouseEvent) =>
         return true
       },
     },
+  })
+}
+
+// selectedClasses are the line classes of a line of the selected change:
+// the outline, and its top on the change's first line, its bottom on the last.
+export function selectedClasses(first: boolean, last: boolean): string {
+  return ['cm-chunk-selected', first && 'cm-chunk-first', last && 'cm-chunk-last']
+    .filter(Boolean)
+    .join(' ')
+}
+
+const selectionMarker = new (class extends GutterMarker {
+  elementClass = 'cm-chunk-gutter-mark'
+})()
+
+// selectionGutter marks the selected change in a gutter beside the pane's
+// lines: the lines and block widgets that, by field's value, belong to it.
+export function selectionGutter<V>(
+  field: StateField<V>,
+  lineMarked: (value: V, line: BlockInfo, state: EditorState) => boolean,
+  widgetMarked: (value: V, block: BlockInfo) => boolean = () => false,
+): Extension {
+  return gutter({
+    class: 'cm-chunk-gutter',
+    lineMarker: ({ state }, line) =>
+      lineMarked(state.field(field), line, state) ? selectionMarker : null,
+    widgetMarker: ({ state }, _widget, block) =>
+      widgetMarked(state.field(field), block) ? selectionMarker : null,
+    lineMarkerChange: (update) => update.startState.field(field) !== update.state.field(field),
   })
 }
 
