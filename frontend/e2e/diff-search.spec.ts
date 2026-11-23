@@ -1,4 +1,4 @@
-// Requirements: FR-DIFF-14
+// Requirements: FR-DIFF-17
 import { expect, test } from '@playwright/test'
 import { mockDiffUrl, offCentre } from './helpers'
 

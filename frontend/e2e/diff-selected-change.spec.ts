@@ -1,4 +1,4 @@
-// Requirements: FR-DIFF-19, FR-DIFF-20, FR-DIFF-21
+// Requirements: FR-DIFF-14, FR-DIFF-15, FR-DIFF-16
 import { expect, test } from '@playwright/test'
 import { mockDiffUrl, offCentre } from './helpers'
 
