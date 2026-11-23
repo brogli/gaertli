@@ -132,7 +132,7 @@ const auraDarkSurface = auraSemantic.colorScheme?.dark?.surface
 const auraDarkPrimaryColor = auraSemantic.colorScheme?.dark?.primary?.color
 
 // applyTheme sets the .gaertli-dark class for the setting and the OS
-// preference and data-theme to the setting, and swaps @openuxkit/themes' primary and dark surface
+// preference, and swaps @openuxkit/themes' primary and dark surface
 // palettes: a dark theme's hand-written palette, or Aura's own otherwise.
 export function applyTheme(setting: Theme, osPrefersDark: boolean): void {
   const theme = darkThemes.find((t) => t.id === setting)
@@ -141,7 +141,6 @@ export function applyTheme(setting: Theme, osPrefersDark: boolean): void {
     setting === Theme.DarkTheme ||
     (setting !== Theme.LightTheme && osPrefersDark)
   document.documentElement.classList.toggle('gaertli-dark', dark)
-  document.documentElement.dataset.theme = setting
 
   updatePrimaryPalette(theme ? palette(theme.accent) : auraPrimary)
   updateSurfacePalette({ dark: theme ? theme.surface : auraDarkSurface })
