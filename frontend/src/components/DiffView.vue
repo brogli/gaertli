@@ -157,7 +157,7 @@ function destroyView(): void {
 }
 
 function updateSelectedLinesEnabled(): void {
-  selectedLinesEnabled.value = cursorPlaced && selectedLines() !== null
+  selectedLinesEnabled.value = selectedLines() !== null
 }
 
 // keptSearches are the old (a) and new (b) side's searches, kept from the
@@ -172,7 +172,7 @@ function keepSearches(): void {
 // selected is the index of the selected chunk, -1 for none; clickedSide
 // is the side of the editor the cursor was last clicked or stepped on.
 // cursorPlaced: the user put the cursor there, by a click or a step, or a
-// remount brought back where they had; the cursor a diff opens with is not.
+// remount brought back where they had; only such a cursor survives a remount.
 let selected = -1
 let clickedSide: DiffSide = 'b'
 let cursorPlaced = false
@@ -235,6 +235,18 @@ function goToChunk(i: number): void {
   centreCursor(editor.cm, chunkStart(chunk, editor.side))
 }
 
+// revealFirstChunk selects the first chunk and centres it, the cursor left
+// where it is.
+function revealFirstChunk(): void {
+  const chunk = chunks.value[0]
+  const editor = newSide()
+  if (!chunk || !editor) return
+  select(0)
+  editor.cm.dispatch({
+    effects: EditorView.scrollIntoView(chunkStart(chunk, editor.side), { y: 'center' }),
+  })
+}
+
 // stepChange goes to the chunk beside the selected one, or beside the
 // cursor of the side last clicked when none is.
 function stepChange(dir: 1 | -1): void {
@@ -264,7 +276,7 @@ function keepCursor(): void {
   }
 }
 
-// selectOnMount goes to the first chunk of a newly shown target; a remount
+// selectOnMount reveals the first chunk of a newly shown target; a remount
 // of the same target centres the cursor back on its line, on the new side
 // when its own is not shown, and selects what is there.
 function selectOnMount(): void {
@@ -273,7 +285,7 @@ function selectOnMount(): void {
   cursorPlaced = !!kept
   const editor = kept && editorOn(kept.side)
   const docs = chunkDocs()
-  if (!kept || !editor || !docs) return goToChunk(0)
+  if (!kept || !editor || !docs) return revealFirstChunk()
   const doc = kept.side === 'a' ? docs.old : docs.new
   const pos = doc.line(Math.min(kept.line, doc.lines)).from
   clickedSide = editor.side

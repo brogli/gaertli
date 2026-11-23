@@ -95,7 +95,6 @@ function selectText(wrapper: VueWrapper, from: string, to: string): void {
   const text = view.state.doc.toString()
   view.dispatch({
     selection: EditorSelection.range(text.indexOf(from), text.indexOf(to) + to.length),
-    userEvent: 'select',
   })
 }
 
@@ -241,7 +240,7 @@ describe('DiffView', () => {
 
     const view = editorOf(wrapper)
     // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10): inside the chunk.
-    view.dispatch({ selection: EditorSelection.range(8, 10), userEvent: 'select' })
+    view.dispatch({ selection: EditorSelection.range(8, 10) })
     await flushPromises()
     expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeUndefined()
 
@@ -564,7 +563,7 @@ describe('DiffView', () => {
     })
     const view = editorOf(wrapper)
     // "a\n" = 2 chars; "B\n" 2-4; "\n" 4-5; "C\n" 5-7.
-    view.dispatch({ selection: EditorSelection.range(2, 7), userEvent: 'select' })
+    view.dispatch({ selection: EditorSelection.range(2, 7) })
     await flushPromises()
 
     await wrapper.get('[data-test="stage-selected-lines"]').trigger('click')
@@ -719,7 +718,7 @@ describe('DiffView', () => {
 
   it.each([
     [
-      'a grown working file (status "R") gets no hunk controls',
+      'a renamed working file (status "R") gets no hunk controls',
       oneLine,
       { oldPath: 'old.txt', status: 'R' },
       noControls,
@@ -759,26 +758,23 @@ describe('DiffView', () => {
       expect(wrapper.find(`[data-test="${control}"]`).exists()).toBe(false)
   })
 
-  it('"Stage selected lines" is disabled until the user puts the selection entirely inside one change', async () => {
+  it('"Stage selected lines" is disabled unless the selection falls entirely inside one change', async () => {
     const wrapper = await mountWorking(threeLines)
+
+    // The default cursor position (0) sits in "line1", outside the chunk.
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
+
     const view = editorOf(wrapper)
-    const disabled = () => wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')
-
-    // The diff opens with the cursor in its change, put there by the view, not the user.
-    expect(disabled()).toBeDefined()
-
     // "line1\n" = 6 chars; "X\n"=2 (6-8); "Y\n"=2 (8-10); "Z\n"=2 (10-12): inside the chunk.
-    view.dispatch({ selection: EditorSelection.range(8, 12), userEvent: 'select' })
+    view.dispatch({ selection: EditorSelection.range(8, 12) })
     await flushPromises()
-    expect(disabled()).toBeUndefined()
 
-    view.dispatch({ selection: EditorSelection.range(0, 0), userEvent: 'select' }) // "line1", outside
-    await flushPromises()
-    expect(disabled()).toBeDefined()
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeUndefined()
 
-    await wrapper.get('[data-test="next-change"]').trigger('click')
+    view.dispatch({ selection: EditorSelection.range(0, 0) }) // back outside the chunk
     await flushPromises()
-    expect(disabled()).toBeUndefined()
+
+    expect(wrapper.get('[data-test="stage-selected-lines"]').attributes('disabled')).toBeDefined()
   })
 
   it('with an unstaged working-tree target, "Discard hunk" confirms then calls Facade.DiscardLines and reloads', async () => {
@@ -1011,8 +1007,7 @@ describe('DiffView', () => {
       }
       pressEnterIn(view, true)
       lines.push(selectedLineOf(view))
-      // The diff opens with the cursor on its change, line 2.
-      expect(lines).toEqual([2, 1, 2, 1])
+      expect(lines).toEqual([1, 2, 1, 2])
     })
 
     it("side by side, Ctrl+F outside the editors opens the right side's search only, Ctrl+F in the left editor the left's", async () => {
@@ -1185,12 +1180,15 @@ describe('DiffView', () => {
       await flushPromises()
     }
 
-    it('a diff opens with its first change selected, the cursor on it; unified, the outline runs from its removed block through its last line', async () => {
+    it('a diff opens with its first change selected and centred, the cursor left at the top; unified, the outline runs from its removed block through its last line', async () => {
       Facade.DiffFile.mockResolvedValue(diffFileFixture(twoHunks))
+      const scroll = vi.spyOn(EditorView, 'scrollIntoView')
       const view = editorOf(await mountCommit())
 
       expect(selectedLinesOf(view)).toEqual([2])
-      expect(cursorLineOf(view)).toBe(2)
+      expect(scroll).toHaveBeenCalledWith(view.state.doc.line(2).from, { y: 'center' })
+      scroll.mockRestore()
+      expect(cursorLineOf(view)).toBe(1)
       expect(removedBlockOf(view)).toEqual(
         expect.arrayContaining(['cm-chunk-selected', 'cm-chunk-first']),
       )

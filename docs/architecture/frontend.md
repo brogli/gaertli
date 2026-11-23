@@ -53,16 +53,16 @@ editor: the `@codemirror/search` panel at the top of each editor and the line-nu
   text, so search does not find them. The panel's labels are the library's English phrases.
 - A right-click on a line number offers "Copy path:line" with the repo-relative path; the left side
   of a renamed file uses the old path.
-- The selected change is the app's own editor state, its look shared with the merge editor. A diff
-  opens on its first change, a click selects the change under the cursor, and next and previous step
-  from it and centre it without animation. In unified mode the removed block is the merge library's
+- The selected change is the app's own editor state, its outline and gutter mark shared with the
+  merge editor. A diff opens with its first change selected and centred, the cursor left at the top;
+  a click selects the change under the cursor, and next and previous step from it, move the cursor
+  to it and centre it without animation. In unified mode the removed block is the merge library's
   widget, which a view plugin outlines.
 - Escape belongs to an open dialog or menu first, then closes the search of the editor it is pressed
   in, else every open search, and the window only when none was open.
 - An open search and the cursor's line survive a remount: a refetch with changed content, a mode
   switch, a step to another file. The line kept is the one the user last clicked or stepped to, on
-  its side; a left-side line maps to the new side in unified mode. The line actions wait for such a
-  line: the cursor a diff opens with does not count.
+  its side; a left-side line maps to the new side in unified mode.
 
 ## Merge editor
 
