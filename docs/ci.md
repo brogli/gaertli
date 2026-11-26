@@ -16,7 +16,6 @@ Linux checks locally, offline after `task setup`, except the two e2e suites: `ta
 | `linux (go)`    | The Go tests, on real git, then again with the race tests under the race detector                                                                                         | `task ci:go`                                 |
 | `linux (app)`   | The Linux build, the Windows cross-build and installer; then the mock-backend e2e suite (layout and look) and the real-backend suite (git workflows through the real app) | `task ci:build`, `task e2e`, `task e2e:real` |
 | `windows`       | The Go tests' Windows-only paths: processes, paths, the WSL core                                                                                                          | On Windows: `go tool task test:go:core`      |
-| `macos`         | The app builds on macOS; nothing runs                                                                                                                                     | On a Mac: `task build`                       |
 
 `linux (check)` and `linux (app)` run each check as its own step, so a failed lint still shows
 whether the component tests passed: read every red step. A failed e2e step attaches its report and
