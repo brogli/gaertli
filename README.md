@@ -43,7 +43,7 @@ no auto-update. Installing a newer version over the old one keeps your settings.
   `sudo dnf install ./gaertli-<version>-linux-amd64.rpm`.
 - **Linux, other distributions**: unpack `gaertli-<version>-linux-amd64.tar.gz` and run the
   `gaertli` binary inside it. Start from a terminal says how to put it on `PATH`.
-- **macOS** (best-effort, unsigned, untested): `gaertli-<version>-darwin-arm64.zip`.
+- **macOS**: there is no download. Build from source (best effort, untested).
 
 You also need:
 
@@ -55,8 +55,8 @@ You also need:
 ## Build from source
 
 You need git, [Go](https://go.dev/dl) 1.27 or newer and [Nix](https://nixos.org/download) with
-flakes enabled. On Windows, all three inside WSL. [direnv](https://direnv.net) is optional, but
-recommended. The Nix shell brings everything else.
+flakes enabled. On Windows, all three inside WSL. macOS can also build without Nix.
+[direnv](https://direnv.net) is optional, but recommended. The Nix shell brings everything else.
 
 ```sh
 git clone https://github.com/brogli/gaertli
@@ -69,6 +69,22 @@ nix develop --command task setup   # downloads Go modules and frontend packages
 - **Linux**: `nix develop --command task build` builds `bin/gaertli`. It uses the Nix shell's
   libraries, so start it from there: `nix develop --command bin/gaertli`. For an app that runs on
   its own, install a release package.
+- **macOS**: `nix develop --command task darwin:package` builds `bin/gaertli.app`.
+
+### macOS without Nix
+
+You need git, the Xcode Command Line Tools (`xcode-select --install`), [Go](https://go.dev/dl) 1.27
+or newer, [Node.js](https://nodejs.org) 26 and [pnpm](https://pnpm.io) 12. The versions follow
+`go.mod` and `flake.nix`.
+
+```sh
+git clone https://github.com/brogli/gaertli
+cd gaertli
+go tool task setup                       # downloads Go modules and frontend packages
+go install tool                          # puts task and wails3 in Go's bin folder
+export PATH="$(go env GOPATH)/bin:$PATH"
+task darwin:package                      # builds bin/gaertli.app
+```
 
 ## First start
 

@@ -45,7 +45,7 @@
 | QA-PORT-02 | Works with repos stored inside WSL 2, in a normal Windows window: git, hooks and the editor run inside WSL, so results equal the user's WSL terminal (QA-COMP-01). Once WSL has booted, the QA-PERF limits hold. A distro on WSL 1 is not supported: the app says so and changes nothing there. |
 | QA-PORT-05 | Before placing its helper in a WSL distro, or a new version of it, the app asks. If the user declines, the app says that repos in that distro need the helper, and asks again the next time one is opened.                                                                                      |
 | QA-PORT-03 | Same features on all supported platforms.                                                                                                                                                                                                                                                       |
-| QA-PORT-04 | macOS: best effort. A release includes a macOS build if it builds; a failing one does not hold back the release. It is not tested, by hand or automatically. Reported bugs are fixed without a deadline. No macOS-only features.                                                                |
+| QA-PORT-04 | macOS: best effort, built from source only. Releases carry no macOS build, and nothing builds or tests it, by hand or automatically. Reported bugs are fixed without a deadline; no macOS-only features.                                                                                        |
 
 ## Security and privacy
 

@@ -69,15 +69,6 @@ tasks:
     cmds:
       - task: create:app:bundle
 
-  package:dryrun:
-    summary: Zips the .app bundle into dist/, mirroring release.yml's darwin job
-    deps:
-      - task: package
-    cmds:
-      - mkdir -p dist
-      - sh -c 'cd {{.BIN_DIR}} && zip -r -y ../dist/{{.ASSET_NAME}}-darwin-arm64.zip
-        {{.APP_NAME}}.app'
-
   package:universal:
     summary: Packages darwin universal binary (arm64 + amd64)
     deps:

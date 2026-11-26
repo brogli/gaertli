@@ -20,7 +20,7 @@ The app needs only git and the platform's web view, and no package bundles eithe
   name the desktop file and icon after the app's reverse-DNS id, which is also its GTK application
   id, so the desktop finds the icon for its windows. The `.deb` brings an AppArmor profile, since
   Ubuntu otherwise denies WebKitGTK's sandbox the user namespaces it needs (DIST-06).
-- **macOS**: an unsigned, untested app (QA-PORT-04).
+- **macOS**: none; users build from source (QA-PORT-04).
 - No auto-update and no code signing (DIST-03).
 
 ## Versions and releases
@@ -29,7 +29,7 @@ The app needs only git and the platform's web view, and no package bundles eithe
   every artifact's file name; tags are `vX.Y.Z`.
 - A release is started by hand on `main` (DIST-02). It refuses a commit CI has not passed, builds
   every artifact with checksums and third-party notices, and creates a draft release on the built
-  commit, replacing older drafts. A failed macOS build does not hold it back.
+  commit, replacing older drafts.
 - Release notes are the titles of the PRs merged since the last release, edited in the draft. Bots'
   PRs and those labelled `no-release-notes` stay out.
 - Publishing the draft tags the built commit, so the published files are the checked ones. A bad

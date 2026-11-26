@@ -118,51 +118,8 @@ jobs:
           name: linux-windows
           path: dist/
 
-  darwin:
-    needs: version
-    runs-on: macos-latest
-    continue-on-error: true # a failing macOS build never holds back the release
-    timeout-minutes: 30
-    # Only Node and pnpm from the flake, as in the linux-windows job.
-    defaults:
-      run:
-        shell: 'nix shell .#frontend-tools --command bash -eo pipefail {0}'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
-
-      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Setup (online)
-        run: |
-          go tool task setup
-          go install tool
-
-      - name: Build and package
-        env:
-          GOPROXY: off
-          GOTOOLCHAIN: local
-          GOFLAGS: -mod=readonly
-          VERSION: ${{ needs.version.outputs.version }}
-          COMMIT: ${{ needs.version.outputs.commit }}
-        run: go tool task darwin:package:dryrun
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: success()
-        with:
-          name: gaertli-${{ needs.version.outputs.version }}-darwin-arm64.zip
-          path: dist/gaertli-${{ needs.version.outputs.version }}-darwin-arm64.zip
-          if-no-files-found: ignore
-
   draft:
-    needs: [version, linux-windows, darwin]
-    if: always() && needs.linux-windows.result == 'success'
+    needs: [version, linux-windows]
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
