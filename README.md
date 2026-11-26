@@ -69,9 +69,11 @@ nix develop --command task setup   # downloads Go modules and frontend packages
 - **Linux**: `nix develop --command task build` builds `bin/gaertli`. It uses the Nix shell's
   libraries, so start it from there: `nix develop --command bin/gaertli`. For an app that runs on
   its own, install a release package.
-- **macOS**: `nix develop --command task darwin:package` builds `bin/gaertli.app`.
+- **macOS**: `nix develop --command task darwin:package` builds `bin/gaertli.app`. This is untested.
 
 ### macOS without Nix
+
+The following paragraphs and commands are untested.
 
 You need git, the Xcode Command Line Tools (`xcode-select --install`), [Go](https://go.dev/dl) 1.27
 or newer, [Node.js](https://nodejs.org) 26 and [pnpm](https://pnpm.io) 12. The versions follow
