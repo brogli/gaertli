@@ -124,17 +124,17 @@ importers:
         specifier: 1.94.0
         version: 1.94.0
       stylelint:
-        specifier: 18.0.0
-        version: 18.0.0
+        specifier: 18.1.0
+        version: 18.1.0
       stylelint-config-standard:
         specifier: 41.0.0
-        version: 41.0.0(stylelint@18.0.0)
+        version: 41.0.0(stylelint@18.1.0)
       stylelint-config-standard-vue:
         specifier: 2.0.0
-        version: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0))(stylelint-config-recommended-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0))(stylelint-config-recommended@19.0.0(stylelint@18.0.0))(stylelint@18.0.0))(stylelint-config-standard@41.0.0(stylelint@18.0.0))(stylelint@18.0.0)
+        version: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0))(stylelint-config-recommended-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0))(stylelint-config-recommended@19.0.0(stylelint@18.1.0))(stylelint@18.1.0))(stylelint-config-standard@41.0.0(stylelint@18.1.0))(stylelint@18.1.0)
       stylelint-config-tailwindcss:
         specifier: 1.0.1
-        version: 1.0.1(stylelint@18.0.0)(tailwindcss@4.3.5)
+        version: 1.0.1(stylelint@18.1.0)(tailwindcss@4.3.5)
       tailwindcss:
         specifier: 4.3.5
         version: 4.3.5
@@ -2212,8 +2212,8 @@ packages:
       stylelint: '>=13.13.1'
       tailwindcss: '>=2.2.16'
 
-  stylelint@18.0.0:
-    resolution: {integrity: sha512-kI10GsHXQvsH/AcklVZdQgwDuxtHi+A+h1Ujzd7h9LDf3e5jQiLQkWFlPtpynX3E6oVWHG1wo9v6dL0Mr+nnSA==}
+  stylelint@18.1.0:
+    resolution: {integrity: sha512-QbF/IY7KY6lZRhYU/vmPU1KYxc71wgkXdgeptqzTh3lbnZps6WHaskfPjpL6Fh4JaCzwkKKitVcMrpfQTSwwPA==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
     hasBin: true
 
@@ -4434,42 +4434,42 @@ snapshots:
 
   style-mod@4.1.4: {}
 
-  stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0):
+  stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0):
     dependencies:
       postcss-html: 2.0.1(postcss@8.5.33)
-      stylelint: 18.0.0
+      stylelint: 18.1.0
 
-  stylelint-config-recommended-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0))(stylelint-config-recommended@19.0.0(stylelint@18.0.0))(stylelint@18.0.0):
+  stylelint-config-recommended-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0))(stylelint-config-recommended@19.0.0(stylelint@18.1.0))(stylelint@18.1.0):
     dependencies:
       postcss-html: 2.0.1(postcss@8.5.33)
       semver: 7.8.6
-      stylelint: 18.0.0
-      stylelint-config-html: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0)
-      stylelint-config-recommended: 19.0.0(stylelint@18.0.0)
+      stylelint: 18.1.0
+      stylelint-config-html: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0)
+      stylelint-config-recommended: 19.0.0(stylelint@18.1.0)
 
-  stylelint-config-recommended@19.0.0(stylelint@18.0.0):
+  stylelint-config-recommended@19.0.0(stylelint@18.1.0):
     dependencies:
-      stylelint: 18.0.0
+      stylelint: 18.1.0
 
-  stylelint-config-standard-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0))(stylelint-config-recommended-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0))(stylelint-config-recommended@19.0.0(stylelint@18.0.0))(stylelint@18.0.0))(stylelint-config-standard@41.0.0(stylelint@18.0.0))(stylelint@18.0.0):
+  stylelint-config-standard-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0))(stylelint-config-recommended-vue@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0))(stylelint-config-recommended@19.0.0(stylelint@18.1.0))(stylelint@18.1.0))(stylelint-config-standard@41.0.0(stylelint@18.1.0))(stylelint@18.1.0):
     dependencies:
       postcss-html: 2.0.1(postcss@8.5.33)
-      stylelint: 18.0.0
-      stylelint-config-html: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0)
-      stylelint-config-recommended-vue: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.0.0))(stylelint-config-recommended@19.0.0(stylelint@18.0.0))(stylelint@18.0.0)
-      stylelint-config-standard: 41.0.0(stylelint@18.0.0)
+      stylelint: 18.1.0
+      stylelint-config-html: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0)
+      stylelint-config-recommended-vue: 2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint-config-html@2.0.0(postcss-html@2.0.1(postcss@8.5.33))(stylelint@18.1.0))(stylelint-config-recommended@19.0.0(stylelint@18.1.0))(stylelint@18.1.0)
+      stylelint-config-standard: 41.0.0(stylelint@18.1.0)
 
-  stylelint-config-standard@41.0.0(stylelint@18.0.0):
+  stylelint-config-standard@41.0.0(stylelint@18.1.0):
     dependencies:
-      stylelint: 18.0.0
-      stylelint-config-recommended: 19.0.0(stylelint@18.0.0)
+      stylelint: 18.1.0
+      stylelint-config-recommended: 19.0.0(stylelint@18.1.0)
 
-  stylelint-config-tailwindcss@1.0.1(stylelint@18.0.0)(tailwindcss@4.3.5):
+  stylelint-config-tailwindcss@1.0.1(stylelint@18.1.0)(tailwindcss@4.3.5):
     dependencies:
-      stylelint: 18.0.0
+      stylelint: 18.1.0
       tailwindcss: 4.3.5
 
-  stylelint@18.0.0:
+  stylelint@18.1.0:
     dependencies:
       '@csstools/css-calc': 3.4.3(@csstools/css-parser-algorithms@4.0.2(@csstools/css-tokenizer@4.0.2))(@csstools/css-tokenizer@4.0.2)
       '@csstools/css-parser-algorithms': 4.0.2(@csstools/css-tokenizer@4.0.2)
